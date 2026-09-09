@@ -48,4 +48,6 @@ CREATE TABLE invitation_quote (
 ```
 
 ## Data Security Note
-- `invitation_bank_accounts.account_number` is sensitive financial data — even though it is intentionally displayed by the owner on the public page (for digital gifts), access through the authenticated (editor) API remains subject to full object-level authorization (SECURITY/05). Encryption at rest for this column is also considered (SECURITY/09-PRIVACY-DATA-PROTECTION.md).
+- `invitation_bank_accounts.account_number` is sensitive personal data, **not a platform payment credential**. The couple enters it so that guests who cannot attend can send a gift directly to their own bank; the platform never transacts with it. It is displayed publicly by design whenever the invitation is published and the gift section is enabled — and omitted from the public payload entirely when that section is off (API/08, BR-4.1).
+- The column is **not encrypted at the application layer** (MEMORY ADR-025); the whole store is encrypted instead. What this field needs is **integrity**: object-level authorization on every write (SECURITY/05), an audit trail of changes, and an email to the owner when gift details change on a published invitation. An attacker who silently swaps this number collects the guests' gifts, and that loss is not one encryption would have prevented.
+- Access through the authenticated (editor) API remains subject to full object-level authorization, and the value is masked to the last four digits in every log (DEVOPS/06).

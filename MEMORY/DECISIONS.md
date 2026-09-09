@@ -53,7 +53,7 @@ Decisions `TASKS/` has identified as needing an ADR, listed here so they are not
 | P1-01 | Breached-password check: fail open or fail closed | Failing closed blocks legitimate registration during a third-party outage; failing open weakens the control silently |
 | P1-07 | Rate limiting behaviour when Redis is unavailable | Fail open means no limiting at all; fail closed means no logins at all. The answer may differ per policy. Sharpened by ADR-009: Redis now also carries the job queue |
 | P1-08 | Account deletion while an invitation is published | `OQ-11`. A legal question as much as a product one |
-| P1-13 | Encryption at rest for `invitation_bank_accounts.account_number` | `OQ-10`. ADR-020 already commits to application-layer encryption for TOTP secrets, so the key management will exist either way |
+| ~~P1-13~~ | ~~Encryption at rest for `invitation_bank_accounts.account_number`~~ — **decided 2026-09-09**, ADR-025: no column encryption; storage-level encryption plus integrity controls | `OQ-10` resolved. The reframing added R16 and a mandatory owner notification |
 | P3-01 | Package and addon pricing; free draft quota | `OQ-05`. Nothing can launch on placeholders |
 | P4-05 | CAPTCHA activation threshold | Vendor decided (ADR-011: Turnstile); the traffic threshold that switches it on is still open |
 | P6-13 | Which kill-switches exist as feature flags | `docs/SECURITY/12` § Containment assumes they exist |
@@ -675,5 +675,55 @@ The slug remains globally unique and remains the invitation's identity, so this 
 *Cost.* Nothing here is free of downside: three hostnames mean three certificate lifecycles instead of one wildcard, and a per-surface proxy configuration instead of one host rule. Caddy (ADR-015) automates certificates per hostname, so the operational cost is small.
 
 **Specification impact** — Amended: `docs/PLAN/10` (publishing addresses and the migration path), `docs/PLAN/00`, `docs/PLAN/15`, `docs/PLAN/18` (R15), `docs/ARCHITECTURE/08`, `docs/API/08`, `docs/BACKEND/06`, `docs/DEVOPS/03`, `docs/FRONTEND/01`, `docs/FRONTEND/07`, `docs/SECURITY/02`, `docs/SECURITY/10`, `docs/UI-UX/02`.
+
+---
+
+### ADR-025 — Gift account numbers: no column encryption; protect integrity instead
+
+| | |
+|---|---|
+| **Date** | 2026-09-09 |
+| **Status** | Accepted |
+| **Task** | `P1-13` — resolves `OQ-10` |
+| **Deciders** | Project owner |
+
+**Context** — `docs/SECURITY/09` § Encryption suggested "considering" application-level column encryption for `invitation_bank_accounts.account_number`, and `docs/SECURITY/00`'s data classification table listed the field as **Critical**, in the same row as password hashes, refresh tokens and payment payloads. That grouping invited a wrong instinct, and the project owner corrected it: the account number exists so that a guest who cannot attend can send a gift. It is entered by the couple to be **printed on their invitation**. The platform never uses it for any payment it processes — money moves between a guest and the couple's own bank, outside the system entirely.
+
+That changes the threat model, so the decision has to be re-derived rather than inherited.
+
+**What the field actually is.** For a published invitation with the gift section enabled, the account number is served to every guest who opens the link — publication is the entire purpose. The database additionally holds account numbers that are **not** public: drafts, invitations with the gift section toggled off (`docs/API/08` omits them, BR-4.1), expired invitations, and soft-deleted ones.
+
+**Decision** — **No column-level encryption for `invitation_bank_accounts.account_number`.** Protect it with storage-level encryption covering the whole database, the existing access controls, and — the part that actually matters here — **integrity controls**, because for a number published in order to receive money, tampering is a worse outcome than disclosure.
+
+Concretely:
+
+1. **Storage-level encryption at rest for the entire database**, plus encrypted backups (already required by `docs/DEVOPS/04`).
+2. **Object-level authorization** on every bank-account endpoint, already the project's first priority (`docs/SECURITY/05`).
+3. **Omission from the public payload** whenever the gift section is disabled — specified, and tested per-section in `P2-07`.
+4. **Log masking** to the last four digits, enforced by the logger (`P0-12`), never by developer discipline.
+5. **New: every change to a bank account on a `published` invitation notifies the owner by email**, in the manner of a bank confirming a payee change.
+6. **New: bank account writes are recorded** with actor and timestamp, so "when did this number change, and who changed it" is answerable.
+
+**Alternatives considered**
+
+- **Column-level encryption**, the option `docs/SECURITY/09` floated. Rejected on proportionality. The threat it addresses is a stolen database dump — but that same dump contains full names, home and venue addresses, coordinates, phone numbers, photographs and complete guest lists, all in plaintext. Encrypting one column does not change what a breach is or how it must be disclosed under the PDP law; it narrows a hole in a wall that is open beside it. If the concern is a stolen dump, the proportionate control is encryption of the whole store, which is item 1.
+
+  It also costs more here than it looks: the value is decrypted on every render of the page it appears on, and the field stops being queryable — which forecloses the one query worth having, "is this account number reused across many unrelated invitations", a genuine fraud signal.
+
+- **Encrypting only the non-public subset** (drafts and gift-disabled invitations): coherent in principle, since that subset is the only part encryption protects. Rejected as unimplementable in practice — the same row moves in and out of that subset every time an owner toggles a section or publishes, so it would mean re-encrypting on state changes and a schema that stores the same column two ways.
+
+- **Not storing the account number at all** (asking the couple to re-enter it, or accepting an image): rejected. It defeats the feature, and an image is worse in every respect.
+
+**Consequences**
+
+The security effort moves to where the loss actually is. If an attacker can change the account number on a live invitation — through an authorization bug, or a compromised owner account — then every guest who scans that page sends their gift to the attacker. The couple learns about it after the wedding, from relatives asking why the money never arrived. That is direct financial harm to third parties who have no relationship with the platform, and column encryption does nothing about it. Ownership checks, an audit trail and a change notification do.
+
+Items 5 and 6 are additions to the specification rather than restatements of it, and they carry a small cost: an extra email and an extra write on a rarely-changed field.
+
+`payments.raw_callback_payload` is deliberately **not** covered by this ADR. It is a different field with a different profile — never displayed, provider-supplied, and retained specifically so a signature can be re-verified during an investigation, which redaction would destroy. It stays unencrypted at the column level under the same storage-level protection, with access restricted and access logged (`docs/API/09`). If a provider is ever observed sending card-like data, that is a PCI scope change and `P3-16` is where it must be caught.
+
+Nothing here is expensive to revisit. Column encryption can be added later at the cost of a migration, and while there is no production data that migration is free — which is why the decision was worth making now rather than at `P1-13`.
+
+**Specification impact** — Amended: `docs/SECURITY/00` (data classification now separates credentials from sensitive personal data the owner deliberately publishes), `docs/SECURITY/09` (§ Encryption states the decision and its reasoning), `docs/DATABASE/06` (the column note), `docs/DATABASE/08` (raw payload scoped separately), `docs/PLAN/13` (gift account change notification), `docs/PLAN/18` (R16 — gift account tampering).
 
 ---

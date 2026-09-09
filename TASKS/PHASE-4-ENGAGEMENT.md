@@ -231,7 +231,8 @@
 **Goal** — Every notification in `docs/PLAN/13`'s table exists, triggered by the right event.
 
 **Steps**
-1. Wire each row of the table: account verification, password reset, invoice on payment success, publish confirmation, new RSVP (preference-gated), expiry reminders at H-7 and H-1, expiry notice, refund notice.
+1. Wire each row of the table: account verification, password reset, invoice on payment success, publish confirmation, new RSVP (preference-gated), expiry reminders at H-7 and H-1, expiry notice, refund notice, **and the gift account change notice** (`docs/PLAN/13`).
+1b. The gift account change email is a security control, not a courtesy: it is what lets a couple whose account was compromised notice that the number guests are sending money to has been swapped (R16, ADR-025). It names what changed and when, and it is **not** subject to notification preferences.
 2. Implement `reminder_email_h7_h1` daily at 08:00 WIB per `docs/BACKEND/08`, idempotent so a re-run does not send twice.
 3. Implement the three retention warnings before deletion required by BR-9, at defined intervals during the 90-day expired window.
 4. Include the invoice PDF from `P3-08` with the payment confirmation.
@@ -261,7 +262,7 @@
 
 **Steps**
 1. Check `user_notification_preferences` before sending preference-gated mail, per `docs/BACKEND/07` § Preferences.
-2. Never gate the mandatory transactional messages — verification, password reset, invoice, refund. A user cannot opt out of the receipt for money they paid.
+2. Never gate the mandatory messages — verification, password reset, invoice, refund, and the gift account change notice. A user cannot opt out of the receipt for money they paid, nor of being told that the account number their guests will pay into has changed.
 3. Offer the daily RSVP digest alternative mentioned in `docs/PLAN/13` for owners who do not want one email per guest; a popular wedding produces hundreds.
 4. Monitor the DLQ and alert when a critical transactional email fails permanently (`docs/DEVOPS/07`).
 5. Track delivery, bounce and complaint rates from the provider, and handle hard bounces so a dead address does not degrade domain reputation.

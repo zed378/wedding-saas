@@ -28,7 +28,8 @@ The master security document. This application stores fairly sensitive data (nam
 ## Data Classification
 | Level | Example | Treatment |
 |---|---|---|
-| Critical | password hash, refresh token, bank account number, payment payload | Encryption at rest considered, extremely restricted access, never logged |
+| Critical — secrets | password hash, refresh token, verification/reset token, TOTP secret, provider API keys | Never displayed to anyone, never logged, stored hashed or encrypted at the application layer. Compromise means impersonation |
+| Critical — sensitive personal data | bank account number for gifts, raw payment payload | Never logged in full; access restricted and, for the payment payload, logged. **The gift account number is entered by the couple to be published on their own invitation** — it is not a platform payment credential, and nothing in the system moves money with it. Its **integrity** matters more than its confidentiality: see 09-PRIVACY-DATA-PROTECTION.md § Encryption |
 | Sensitive | name, address, coordinates, personal photos, RSVP | Restricted to owner+admin (moderation) access, not publicly indexed by default |
 | Consciously-public | data the user INTENTIONALLY publishes in the invitation | Displayed per the user's toggle, still subject to rate-limiting & abuse prevention |
 | Non-sensitive | template metadata, catalog | Freely publicly accessible |

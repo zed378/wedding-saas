@@ -8,29 +8,19 @@ Three kinds of entry live here:
 
 Every entry names the task it blocks or affects, so nothing here is a note without a consequence.
 
-**Status as of 2026-09-09**: **all 17 specification gaps are resolved** and `docs/` has been amended accordingly (ADR-018 through ADR-022). The stack decision answered six open questions (ADR-004 through ADR-017); pricing and the publishing address answered two more (ADR-023, ADR-024). **Five open questions remain, and none of them blocks a task.**
+**Status as of 2026-09-09**: **all 17 specification gaps are resolved** and `docs/` has been amended accordingly (ADR-018 through ADR-022). The stack decision answered six open questions (ADR-004 through ADR-017); pricing and the publishing address answered two more (ADR-023, ADR-024); the gift account data question answered another (ADR-025). **Four open questions remain, and none of them blocks a task.**
 
 | | Total | Resolved | Open |
 |---|---|---|---|
-| Open Questions | 14 | 9 | 5 |
+| Open Questions | 14 | 10 | 4 |
 | Specification Gaps | 17 | 17 | 0 |
 | Deferred | 9 | — | 9 (by design) |
 
-Nothing on the board is `BLOCKED`. The remaining questions shape work rather than stopping it, and two of them (`OQ-10`, `OQ-12`) are worth answering early anyway.
+Nothing on the board is `BLOCKED`. The remaining questions shape work rather than stopping it, and `OQ-12` is worth answering early because it decides whether the roadmap's timeline is achievable at all.
 
 ---
 
 ## Open Questions — Remaining
-
-### OQ-10 — Encryption at rest for bank account numbers
-
-**Affects**: `P1-13` — and it should be answered before any production data exists.
-
-`docs/SECURITY/09` § Encryption says application-level column encryption for `invitation_bank_accounts.account_number` and `payments.raw_callback_payload` is "considered". Deciding after launch means migrating live sensitive data.
-
-Encryption costs the ability to query or index those columns and adds key management. Against that: these are the most sensitive fields the product stores, and they are the fields a database dump would be stolen for.
-
-**Note**: ADR-020 already commits to application-layer encryption for `user_mfa_factors.secret_encrypted`, so the key management mechanism will exist regardless. That removes most of the cost from answering "yes" here.
 
 ### OQ-11 — Account deletion with live invitations
 
@@ -119,6 +109,16 @@ Follow-on effects: `addons` ships with no active rows, checkout stops being a co
 Three fixed hostnames, no wildcards: `invitation.zedth.my.id` for public invitations, `app.zedth.my.id` for the application and API, `admin.zedth.my.id` for the admin panel from Phase 5. The public surface is kept on its own origin deliberately — guest-submitted content renders there, and sharing an origin with the authenticated app would give a stored XSS a path it does not currently have.
 
 This answer creates one new risk, **R15** in `docs/PLAN/18`: with invitations at the root of their host, an unreserved application route could shadow a published invitation. Closed by construction — that host serves nothing but invitations, and CI fails on a route that is not in `slug_blocklist`.
+
+### ~~OQ-10 — Encryption at rest for bank account numbers~~ — ANSWERED 2026-09-09
+
+**Answer**: **no column-level encryption.** Storage-level encryption for the whole database, plus integrity controls on the field. Recorded as ADR-025.
+
+The project owner supplied the fact that reframed the question: the account number is entered by the couple **to be published on their own invitation**, so a guest who cannot attend can send a gift directly to their bank. The platform never transacts with it. `docs/SECURITY/00` had classified it beside password hashes and tokens, which invited the wrong instinct.
+
+Once that is clear, encryption protects only the subset that is not already public — drafts and gift-disabled invitations — inside a database that holds names, addresses, coordinates and full guest lists in plaintext beside it. Encrypting the whole store is the proportionate control.
+
+**The reframing surfaced a risk that was not in the register.** For a number published in order to receive money, tampering beats disclosure: an attacker who swaps it on a live invitation collects every guest's gift, and the couple learns about it after the wedding from relatives asking why the money never arrived. Now **R16**, mitigated by object-level authorization, an audit trail on bank account writes, and a non-optional email to the owner when gift details change on a published invitation.
 
 ### ~~OQ-07 — Language of `TASKS/` and `MEMORY/`~~ — ANSWERED by default
 

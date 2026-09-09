@@ -424,19 +424,24 @@
 | **Spec required** | Yes — sensitive data |
 | **Surface** | backend |
 
-**Goal** — Gift account CRUD and the quote endpoint, treating account numbers as the critical-classification data `docs/SECURITY/00` says they are.
+**Goal** — Gift account CRUD and the quote endpoint, with the protections that match what this data actually is: personal data the couple enters **in order to publish it**, so that guests who cannot attend can send a gift. It is not a platform payment credential — nothing in the system moves money with it (`docs/SECURITY/00` § Data Classification, ADR-025).
 
 **Steps**
 1. Implement bank account CRUD and `PATCH /invitations/:id/quote`.
 2. Scope `:bank_id` by `invitation_id`, as in `P1-12`.
 3. Apply the logging rule now, not later: account numbers are masked to the last four digits by the `P0-12` logger, and a test asserts a full number never reaches a log line.
-4. Resolve `OQ-10` — whether `account_number` is encrypted at rest at the application layer. `docs/SECURITY/09` § Encryption says it is considered; deciding after data exists means migrating live sensitive data. Decide now and record an ADR. ADR-020 already commits to application-layer encryption for TOTP secrets, so the key management this needs will exist either way, which removes most of the cost of answering yes.
+4. Do **not** column-encrypt `account_number` (ADR-025 resolved `OQ-10`). Encryption would protect only the subset that is not already public, in a database that holds names, addresses, coordinates and guest lists in plaintext beside it; storage-level encryption covers the whole store instead.
+4b. Build the integrity controls that this field actually needs, because tampering is worse than disclosure here — an attacker who swaps the number on a live invitation collects every guest's gift (R16):
+   - record every bank account create, update and delete with actor and timestamp, so "who changed this, and when" is answerable;
+   - emit an event on any change to a bank account of a **published** invitation, which `P4-07` turns into a non-optional email to the owner naming what changed — the way a bank confirms a payee change;
+   - the ownership check on these endpoints is not routine here: it is the control standing between a compromised account and the guests' money.
 5. Validate `type` against the enum, and sanitize `provider_name` and `account_holder`.
 6. Maintain `display_order`.
 
 **Definition of Done**
 - [ ] Account numbers never appear unmasked in any log.
-- [ ] The encryption-at-rest decision is recorded as an ADR before any production data exists.
+- [ ] Changing a bank account on a published invitation writes an audit record and emits the owner-notification event, proven by a test.
+- [ ] No log line anywhere contains a full account number.
 - [ ] Cross-invitation `:bank_id` returns 404.
 - [ ] The quote endpoint stores `{text, source}` and sanitizes both.
 

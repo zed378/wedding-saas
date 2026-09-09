@@ -10,6 +10,7 @@ Add a line here as part of writing the record — an unindexed record is a recor
 
 | Date | Task | Record | Hook |
 |---|---|---|---|
+| 2026-09-09 | P1-13 | [Gift account data reframing](./records/2026-09-09-gift-account-data-reframing.md) | The account number is published on purpose, so guests can send a gift — not a payment credential. Encryption protects only the subset that is not already public. The reframing exposed the attack nobody had written down: swap the number on a live invitation and collect every guest's gift, silently. Now R16, with an audit trail and a non-optional owner email |
 | 2026-09-09 | P3-01, P0-23 | [Pricing and publishing address](./records/2026-09-09-pricing-and-publishing-address.md) | Rp 139,000 for 12 months, one package, one free draft; invitations at `invitation.zedth.my.id/{slug}` with no wildcard DNS. The care went into not collapsing everything onto one host — guest-submitted content sharing an origin with the dashboard would have handed a stored XSS a path the wildcard design never gave it. Board now has zero blocked tasks |
 | 2026-09-09 | — | [Specification gap remediation](./records/2026-09-09-specification-gap-remediation.md) | All 17 gaps closed and `docs/` amended: five tables, six endpoints, two new DATABASE files, 24 documents touched. The two contradictions were the point — a status code that would have leaked resource existence on some endpoints and not others, and a refund that returned the money and left the customer the product |
 | 2026-09-09 | P0-01 | [The stack is decided](./records/2026-09-09-P0-01-stack-decision.md) | TypeScript monorepo, NestJS, Next.js, Drizzle, Cloudflare R2, Midtrans, single VPS. The deciding argument was not preference: the field-path resolver has to behave identically in the backend validator and the editor checklist, and one language makes that a package rather than a discipline. Two vendor concentrations accepted and recorded as R13 and R14 |
@@ -32,7 +33,7 @@ Add a line here as part of writing the record — an unindexed record is a recor
 - `P0-24` — [TASKS and MEMORY scaffolding](./records/2026-09-09-P0-24-tasks-and-memory-scaffolding.md) — a plan that goes stale is worse than none, so the board is updated in the commit that changes the code
 
 ### Phase 1 — Auth and Invitation Core
-_No records yet._
+- `P1-13` — [Gift account data reframing](./records/2026-09-09-gift-account-data-reframing.md) — a classification table that groups a published gift number with a password hash will produce wrong decisions downstream
 
 ### Phase 2 — Template Rendering and Preview
 _No records yet._
@@ -64,6 +65,7 @@ Some records are worth finding by what they are rather than when they happened.
 | Specification amendments | [Gap remediation](./records/2026-09-09-specification-gap-remediation.md) — 17 gaps, 24 documents, 2 new DATABASE files |
 | Stack and architecture decisions | [P0-01](./records/2026-09-09-P0-01-stack-decision.md) — ADR-004 through ADR-017 |
 | Product and commercial decisions | [Pricing and publishing address](./records/2026-09-09-pricing-and-publishing-address.md) — ADR-023, ADR-024 |
+| Threat model corrections | [Gift account data reframing](./records/2026-09-09-gift-account-data-reframing.md) — ADR-025, R16 |
 | Security verification (IDOR sweeps, pentest, payment review) | _none yet_ |
 | Performance and load results | _none yet_ |
 | Disaster recovery and rollback drills | _none yet_ |

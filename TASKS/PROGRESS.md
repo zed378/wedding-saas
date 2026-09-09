@@ -6,7 +6,7 @@ Single source of truth for where the project stands. Updated in the same commit 
 **Current phase**: Phase 0 — Foundation (2 / 24 done). The stack is decided (`P0-01`, ADR-004 through ADR-017), so `P0-02` is unblocked and the four parallel tracks can start.
 **Overall**: 2 / 133 tasks done
 
-**Specification status**: all 17 gaps resolved and `docs/` amended (ADR-018 through ADR-022). Pricing and the publishing address are decided (ADR-023, ADR-024). **No task on this board is blocked** — five open questions remain in [`BACKLOG.md`](./BACKLOG.md) and all of them shape work rather than stopping it.
+**Specification status**: all 17 gaps resolved and `docs/` amended (ADR-018 through ADR-022). Pricing, the publishing address and the gift account data question are decided (ADR-023 through ADR-025). **No task on this board is blocked** — four open questions remain in [`BACKLOG.md`](./BACKLOG.md) and all of them shape work rather than stopping it.
 
 **Product decisions now fixed**: one package at **Rp 139,000 for 12 months**, free tier of **one draft**; invitations published at **`invitation.zedth.my.id/{slug}`** (path-based, no wildcard DNS), with per-invitation subdomains deferred to `P7-01`.
 
@@ -265,7 +265,6 @@ Five open questions remain and none of them stops work:
 
 | Question | Affects | Why it still matters |
 |---|---|---|
-| `OQ-10` | `P1-13` | Encryption at rest for bank account numbers. Answer **before production data exists** — afterwards it is a migration over live sensitive data |
 | `OQ-11` | `P1-08` | What happens to a published invitation when its owner deletes their account. Implementable under the recommendation; confirm before launch |
 | `OQ-12` | Every phase | Team size. `docs/PLAN/16`'s 15 weeks only hold if the parallel tracks are actually staffed |
 | `OQ-13` | `P2-03`, `P2-12` | What the preview watermark looks like, and whether published invitations carry a credit link |
@@ -298,6 +297,8 @@ All 17 gaps are resolved and every owed amendment has been made (2026-09-09, ADR
 | `docs/BACKEND/06` | Slug resolution by configured strategy — path today, subdomain later, one implementation |
 | `docs/PLAN/09`, `11`, `00`, `02` | One package at Rp 139,000 for 12 months; uniform media limits; free-draft quota as BR-1.4 |
 | `docs/UI-UX/13`, `14` | Checkout without tier comparison; watermark narrowed to previews only |
+| `docs/SECURITY/00`, `09`, `DATABASE/06`, `08` | Gift account numbers reclassified: personal data the couple publishes, not a payment credential. No column encryption; integrity controls instead |
+| `docs/PLAN/13`, `18` | Gift account change notification; R16 (gift account tampering) added |
 | `docs/API/00`, `FRONTEND/01`, `07`, `UI-UX/02`, `ARCHITECTURE/08`, `PLAN/15`, `SECURITY/02`, `10` | Real hostnames, path-based addresses, origin-separation rationale |
 | `docs/PLAN/02`, `docs/PLAN/06` | BR-5.4 and the lifecycle transition rules |
 | `docs/PLAN/07` | Demo data lives as a seeded system-owned invitation |

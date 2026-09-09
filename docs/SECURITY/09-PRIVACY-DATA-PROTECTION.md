@@ -23,7 +23,14 @@
 
 ## Encryption
 - Data in-transit: TLS across all connections (client-server, server-DB if across a network, server-storage).
-- Data at-rest: consider column-level encryption for `invitation_bank_accounts.account_number` and `payments.raw_callback_payload` using application-level encryption (not only the provider's disk encryption) as an additional layer.
+- Data at-rest: **storage-level encryption for the whole database**, plus encrypted backups (DEVOPS/04-DATABASE-BACKUP.md).
+- **No column-level encryption for `invitation_bank_accounts.account_number`** (decided — MEMORY ADR-025). The reasoning matters more than the conclusion, because the instinct runs the other way:
+  - The field exists so a guest who cannot attend can send a gift. The couple enters it **in order to publish it** on their own invitation. The platform never uses it to move money; a transfer happens between a guest and the couple's own bank, outside the system.
+  - For a published invitation with the gift section enabled, that number is already served to every guest who opens the link. Encryption protects only the subset that is not public — drafts, invitations with the gift section off, expired ones.
+  - Against a stolen dump, encrypting this one column changes little: the same dump holds names, home and venue addresses, coordinates, phone numbers, photographs and complete guest lists in plaintext. Encryption of the whole store is the proportionate control, not one column inside it.
+  - It also forecloses the one query worth having — whether an account number is reused across unrelated invitations, which is a real fraud signal.
+- **What replaces it is integrity protection**, because for a number published in order to receive money, tampering is the worse outcome. An attacker who changes the account number on a live invitation collects every guest's gift, and the couple finds out after the wedding. So: object-level authorization (SECURITY/05), an audit trail on bank account writes, and an email to the owner whenever gift account details change on a `published` invitation (PLAN/13-NOTIFICATION-SYSTEM.md).
+- `payments.raw_callback_payload` is a separate case and is also **not** column-encrypted: it is never displayed, and it is retained precisely so a signature can be re-verified during an investigation, which redaction would destroy. Access is restricted and logged (API/09). If a provider is ever seen sending card-like data, that is a PCI scope change to catch in the payment security review.
 
 ## Retention & Deletion
 - Per BR-9 (PLAN/02): an invitation `expired` for > 90 days without renewal → soft-delete → hard-delete 30 days later, with 3 email notifications sent beforehand.

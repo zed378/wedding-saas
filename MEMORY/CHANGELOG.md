@@ -10,6 +10,17 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-09 — gift account numbers reclassified
+
+**Changed** — data classification and the encryption decision ([record](./records/2026-09-09-gift-account-data-reframing.md), [ADR-025](./DECISIONS.md))
+- `invitation_bank_accounts.account_number` is **sensitive personal data the couple enters in order to publish**, so a guest who cannot attend can send a gift directly to their bank. It is **not a platform payment credential** — nothing in the system moves money with it. `docs/SECURITY/00` had grouped it with password hashes and tokens; that row is now split into "Critical — secrets" and "Critical — sensitive personal data".
+- **`OQ-10` answered: no column-level encryption.** It would protect only the subset that is not already public — drafts and gift-disabled invitations — inside a database holding names, addresses, coordinates and full guest lists in plaintext beside it. Storage-level encryption of the whole store is the proportionate control, and column encryption would foreclose a genuine fraud query.
+
+**Added** — the risk the reframing exposed
+- **R16**: gift account tampering. An attacker who changes the number on a live invitation collects every guest's gift, and the couple finds out after the wedding. Confidentiality was never the property under threat here; integrity is, and no risk in the register had covered it.
+- Bank account writes now carry an audit trail, and a **non-optional email** notifies the owner whenever gift details change on a published invitation — the way a bank confirms a payee change (`docs/PLAN/13`).
+- `payments.raw_callback_payload` scoped separately and also left unencrypted: it is retained precisely so a signature can be re-verified in an investigation, which redaction would defeat.
+
 ### 2026-09-09 — pricing and publishing address decided
 
 **Decided** — commercial model ([record](./records/2026-09-09-pricing-and-publishing-address.md), [ADR-023](./DECISIONS.md))
