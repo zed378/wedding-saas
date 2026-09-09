@@ -1,0 +1,41 @@
+# Normalize line endings to LF in the repository, always.
+#
+# This is not cosmetic. Development happens on Windows; the API, worker and every
+# container run on Linux. A shell script or a git hook committed with CRLF fails there
+# with "bad interpreter", and the failure surfaces in CI or in a container rather than
+# on the machine that introduced it — which is the most expensive place to find it.
+
+* text=auto eol=lf
+
+# Scripts must be LF even if a tool tries otherwise
+*.sh            text eol=lf
+*.mjs           text eol=lf
+*.js            text eol=lf
+Dockerfile      text eol=lf
+*.Dockerfile    text eol=lf
+.githooks/*     text eol=lf
+
+# Windows-only files keep CRLF
+*.bat           text eol=crlf
+*.cmd           text eol=crlf
+*.ps1           text eol=crlf
+
+# Binary — never diffed, never normalized
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.webp          binary
+*.gif           binary
+*.ico           binary
+*.woff          binary
+*.woff2         binary
+*.ttf           binary
+*.otf           binary
+*.pdf           binary
+*.mp3           binary
+*.mp4           binary
+
+# Lockfiles: keep diffs readable but do not let review noise hide a supply-chain change.
+# Marked as generated so review UIs collapse them by default — they still must be read
+# when a dependency changes.
+pnpm-lock.yaml  text eol=lf linguist-generated=true

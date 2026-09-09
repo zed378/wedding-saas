@@ -1,0 +1,16 @@
+{
+  "name": "@wi/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "echo \"[P0-15] build not wired yet\"",
+    "dev": "echo \"[P0-15] dev not wired yet\"",
+    "lint": "echo \"[P0-15] lint not wired yet\"",
+    "typecheck": "echo \"[P0-15] typecheck not wired yet\"",
+    "test": "echo \"[P0-19] tests not wired yet\""
+  },
+  "dependencies": {
+    "@wi/schema": "workspace:*"
+  }
+}

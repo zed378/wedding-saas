@@ -1,0 +1,4 @@
+# Module: template
+# Layering: Controller -> Service -> Repository -> DB (docs/ARCHITECTURE/01).
+# Business logic lives ONLY in the service. Object-level authorization is enforced
+# in the service layer, never only in a controller or a decorator (docs/SECURITY/04).

@@ -1,0 +1,21 @@
+# Prose is not code.
+#
+# docs/, TASKS/ and MEMORY/ are hand-written documents whose tables, wrapping and spacing
+# were chosen for reading. Running a code formatter over them reflows 160 files for no
+# benefit, buries real changes in whitespace noise, and touches paths CODEOWNERS protects
+# precisely because they should change only deliberately.
+
+docs/
+TASKS/
+MEMORY/
+CLAUDE.md
+AGENTS.md
+
+# Generated
+pnpm-lock.yaml
+node_modules/
+dist/
+build/
+.next/
+.turbo/
+coverage/

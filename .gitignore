@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+.turbo/
+
+# Environment — every variant is ignored; only .env.example is committed.
+# docs/DEVOPS/00-ENVIRONMENTS.md and SECURITY: a secret must never reach git.
+.env
+.env.*
+!.env.example
+
+# Local upload staging (never public-servable, never committed)
+.staging/
+tmp/
+
+# Test and coverage output
+coverage/
+test-results/
+playwright-report/
+.vitest/
+
+# Editor and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*

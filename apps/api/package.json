@@ -1,0 +1,17 @@
+{
+  "name": "@wi/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "echo \"[P0-04] build not wired yet\"",
+    "dev": "echo \"[P0-04] dev not wired yet\"",
+    "lint": "echo \"[P0-04] lint not wired yet\"",
+    "typecheck": "echo \"[P0-04] typecheck not wired yet\"",
+    "test": "echo \"[P0-19] tests not wired yet\""
+  },
+  "dependencies": {
+    "@wi/schema": "workspace:*"
+  },
+  "devDependencies": {}
+}
