@@ -47,7 +47,7 @@
 
 | | |
 |---|---|
-| **Status** | BLOCKED — `OQ-01` in `BACKLOG.md` |
+| **Status** | DONE — 2026-09-09 |
 | **Depends on** | — |
 | **Spec refs** | `docs/ARCHITECTURE/03-BACKEND-ARCHITECTURE.md`, `docs/ARCHITECTURE/02-FRONTEND-ARCHITECTURE.md`, `docs/BACKEND/00-BACKEND-STANDARDS.md`, `docs/FRONTEND/00-FRONTEND-STANDARDS.md`, `MEMORY/DECISIONS.md` ADR-002 |
 | **Spec required** | No |
@@ -62,15 +62,16 @@
 4. Decide monorepo versus separate repositories. `docs/FRONTEND/00` § Project Structure assumes shared packages (`ui`, `template-renderer`, `api-client`, `schema`) — the renderer in particular is shared between the editor preview and the public page (`docs/FRONTEND/04`), so a monorepo is the path of least resistance.
 5. Choose the queue technology, the cache client, and the object storage SDK, consistent with `docs/ARCHITECTURE/05`, `06`, `07`.
 6. Choose the payment provider for the MVP — Midtrans or Xendit (`OQ-02`). This is a Phase 3 dependency but a Phase 0 decision, because `docs/BACKEND/05` and `docs/SECURITY/07` describe provider-specific signature verification.
-7. Write one ADR per decision in `MEMORY/DECISIONS.md`, each naming at least one rejected alternative and why.
+7. Choose hosting, object storage, email provider, maps provider and CAPTCHA vendor (`OQ-03`, `OQ-04`, `OQ-06`, `OQ-09`) — each is a dependency of a later phase and cheapest to decide once, here.
+8. Write one ADR per decision in `MEMORY/DECISIONS.md`, each naming at least one rejected alternative and why.
 
 **Definition of Done**
-- [ ] ADRs exist for: backend language/framework, ORM and migration tool, frontend framework, repository layout, queue, cache client, object storage, image processing library, payment provider.
-- [ ] Each ADR names a rejected alternative and the specific reason.
-- [ ] The ORM ADR confirms the tool can run migrations as a separate pre-rollout step and supports expand-contract.
-- [ ] The frontend ADR confirms per-request SSR with on-demand revalidation for the public invitation surface.
-- [ ] `CLAUDE.md` and `AGENTS.md` § "Dev environment" are updated with real install/build/run commands, replacing the "no stack has been fixed" text.
-- [ ] `MEMORY/DECISIONS.md` ADR-002 ("Stack not yet chosen") is marked superseded, with a forward pointer.
+- [x] ADRs exist for backend language and framework, ORM and migration tool, frontend frameworks, repository layout, queue, storage, image library and payment provider — ADR-004 through ADR-017, which also cover email, maps, hosting, testing and observability.
+- [x] Each ADR names a rejected alternative and the specific reason.
+- [x] The ORM ADR confirms migrations run as a separate pre-rollout step and support expand-contract (ADR-007).
+- [x] The frontend ADR confirms per-request SSR with on-demand revalidation for the public invitation surface (ADR-006).
+- [x] `CLAUDE.md` and `AGENTS.md` § Dev environment carry the full stack table, replacing the placeholder text. The install and run **commands** land with `P0-02` and `P0-05` — there is nothing to install until the repository is scaffolded, and that limitation is stated in both files rather than left as an empty promise.
+- [x] `MEMORY/DECISIONS.md` ADR-002 is marked superseded, with a forward pointer.
 
 **Notes** — This is the one task where choosing differently is cheap. Every later phase makes it more expensive.
 
@@ -322,7 +323,7 @@
 3. Create `payments` with `UNIQUE (provider, provider_reference_id)`. Per `docs/DATABASE/08`, this constraint is the primary defence against a replayed webhook, at the level where it cannot be forgotten by application code.
 4. Include `signature_valid` on `payments`: a forged callback is recorded rather than discarded, because a spike in invalid signatures is an alerting condition (`docs/DEVOPS/07-ALERTING.md`).
 5. Create `audit_logs` with its three indexes, and revoke `UPDATE`/`DELETE` on it from the application database role — `docs/DATABASE/10` § Policy asks for append-only enforcement at the permission level where possible.
-6. Seed `packages` and `addons` as a **seed**, not a migration, with the values from `OQ-05`. Until pricing is answered, seed the shape from `docs/PLAN/09` § Packages with placeholder amounts and mark them clearly.
+6. Seed `packages` and `addons` as a **seed**, not a migration, with the values from `OQ-05`. Until pricing is answered, seed the shape from `docs/PLAN/09` § Packages with placeholder amounts and mark them clearly. Seed `custom_domain` with `is_active = false` (ADR-022) — it is not sellable until `P7-01` ships the feature.
 7. Write tests: inserting a duplicate `(provider, provider_reference_id)` is rejected; an `UPDATE` on `audit_logs` from the application role fails; an order cannot reference a non-existent package.
 
 **Definition of Done**
@@ -422,7 +423,7 @@
 **Steps**
 1. Implement the success and error envelopes from `docs/API/00` verbatim, including `meta` for paginated responses.
 2. Implement a global exception mapper: validation → 400 `VALIDATION_ERROR` with `details[]` of `{field, message}`; unauthenticated → 401; not found or not yours → 404; conflict → 409; business rule violation → 422; rate limited → 429; anything else → 500 with a generic message and the detail in logs only.
-3. Resolve `PG-01` before writing this mapper — `docs/API/00` currently describes both 403 and 404 for the "exists but is not yours" case, while `docs/SECURITY/04`, `docs/SECURITY/05` and `CLAUDE.md` all require 404. Until the document is amended, implement 404 and record the deviation.
+3. Return **404** for a resource that exists but is not the caller's, never 403. `PG-01` — where `docs/API/00` contradicted itself — is resolved by ADR-018, and that document now carries a dedicated section: 403 is reserved for a role the caller lacks or an action gated on `email_verified`, where no resource identity is revealed.
 4. Implement pagination helpers with the defaults from `docs/API/00` (`per_page` default 20, max 100) so every list endpoint behaves identically.
 5. Add `/health` per `docs/DEVOPS/05`: a liveness answer that does not touch dependencies, and a readiness answer that checks Postgres and Redis connectivity without heavy work, and discloses no infrastructure detail in its body.
 6. Add security headers from `docs/SECURITY/08`: `X-Content-Type-Options`, `Strict-Transport-Security`, a CSP baseline, and a frame policy that is `DENY` for the app while leaving the public invitation surface configurable.
@@ -651,7 +652,7 @@
 2. Set `configurable` per section: hero and event are not user-disableable (an invitation without event details is not an invitation); gallery, maps, gift, rsvp, guestbook, quote are.
 3. Author the theme block and `customizable_theme_keys` — start with `colors.primary` only, per `docs/PLAN/07` § Theme Variables.
 4. Seed it as a `templates` row plus a `template_versions` row at `1.0.0`, status `published`, through the seed command from `P0-06`.
-5. Author demo/dummy invitation data for the catalog's live demo (`docs/UI-UX/11` § Template Detail Page) and for admin preview (`docs/PLAN/07` § Template Preview). Resolve `PG-08` first: no table currently holds demo data. Recommendation on the card — keep demo data as a seeded invitation owned by a system account, so the demo renders through the real renderer with no second code path.
+5. Author demo invitation data for the catalog's live demo (`docs/UI-UX/11` § Template Detail Page) and for admin preview (`docs/PLAN/07` § Demo Data). Per ADR-022 this is a **seeded invitation owned by a system account**, not a fixture format, so the demo renders through the production renderer reading the production API shape with no second code path to drift. It is never publicly listed and is excluded from admin dashboard counts.
 6. Write a fixture test asserting the reference template validates against `P0-20`'s schema, so a later schema change that breaks it fails CI.
 
 **Definition of Done**
@@ -697,7 +698,7 @@
 
 | | |
 |---|---|
-| **Status** | BLOCKED — `OQ-03` (hosting target) and `OQ-08` (domain) in `BACKLOG.md` |
+| **Status** | BLOCKED — `OQ-08` (domain) in `BACKLOG.md`. Hosting and storage answered by ADR-011 and ADR-015 |
 | **Depends on** | P0-17 |
 | **Spec refs** | `docs/DEVOPS/00-ENVIRONMENTS.md`, `docs/ARCHITECTURE/08-DEPLOYMENT-ARCHITECTURE.md`, `docs/DEVOPS/03-REVERSE-PROXY.md`, `docs/PLAN/10-DOMAIN-PUBLISHING.md` |
 | **Spec required** | No |
@@ -708,7 +709,7 @@
 **Why the wildcard belongs in Phase 0** — `docs/PLAN/10` resolves an invitation from the `Host` header against `*.maindomain.com`. If that only gets set up in Phase 3 alongside publishing, the first time anyone discovers a DNS or certificate problem is the week publishing is supposed to ship.
 
 **Steps**
-1. Provision staging with the topology from `docs/ARCHITECTURE/08`: reverse proxy, API, worker, web app, public-invite, admin, Postgres, Redis, object storage.
+1. Provision staging with the topology from `docs/ARCHITECTURE/08` on the target chosen in ADR-015 — a single VPS running Docker Compose behind Caddy, Cloudflare in front, R2 for object storage: reverse proxy, API, worker pools, web app, public-invite, admin static files, Postgres, Redis, ClamAV.
 2. Configure `Host`-based routing per `docs/DEVOPS/03`: `*.maindomain.com` → public-invite with the slug extracted, `admin.` → admin, `api.` → API, apex and `www.` → web app.
 3. Provision a wildcard TLS certificate for `*.maindomain.com` and verify automatic renewal.
 4. Apply the environment separation rules from `docs/DEVOPS/00`: sandbox payment credentials, seeded data rather than a production copy, internal access restriction.

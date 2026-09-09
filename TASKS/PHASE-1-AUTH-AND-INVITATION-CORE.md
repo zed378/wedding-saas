@@ -95,7 +95,7 @@
 **Steps**
 1. Implement register, verify-email and resend-verification per `docs/API/01`.
 2. Create the user with `email_verified = false`; emit a `user.registered` event; the notification worker sends the mail (`docs/BACKEND/07`). Registration does not block on email delivery.
-3. Resolve `PG-06` before writing this: `docs/DATABASE/` has no table for verification or reset tokens. Add `user_tokens` (id, user_id, type, token_hash, expires_at, used_at) with the token stored hashed and single-use, and amend `docs/DATABASE/02` in the same change.
+3. Use `user_tokens` (`docs/DATABASE/02` § Single-Use Token Table, added by ADR-020): hashed token, `type = 'email_verification'`, 24-hour expiry, `used_at` set on redemption inside the same transaction as the effect so a replay is a no-op.
 4. Set the 24-hour expiry from `docs/SECURITY/03`, single use.
 5. Enforce the gating rule from `docs/API/01` step 2 in the **publish and order services**, not in a middleware that could be forgotten: unverified users may create and edit drafts; `POST /publish` and `POST /orders` return 403 `EMAIL_NOT_VERIFIED`.
 6. Create the `user_notification_preferences` row at registration, so no later code has to handle its absence.
@@ -428,7 +428,7 @@
 1. Implement bank account CRUD and `PATCH /invitations/:id/quote`.
 2. Scope `:bank_id` by `invitation_id`, as in `P1-12`.
 3. Apply the logging rule now, not later: account numbers are masked to the last four digits by the `P0-12` logger, and a test asserts a full number never reaches a log line.
-4. Resolve `OQ-10` — whether `account_number` is encrypted at rest at the application layer. `docs/SECURITY/09` § Encryption says it is "considered"; deciding after data exists means a migration over live sensitive data. Decide now, record an ADR.
+4. Resolve `OQ-10` — whether `account_number` is encrypted at rest at the application layer. `docs/SECURITY/09` § Encryption says it is considered; deciding after data exists means migrating live sensitive data. Decide now and record an ADR. ADR-020 already commits to application-layer encryption for TOTP secrets, so the key management this needs will exist either way, which removes most of the cost of answering yes.
 5. Validate `type` against the enum, and sanitize `provider_name` and `account_holder`.
 6. Maintain `display_order`.
 
@@ -457,7 +457,7 @@
 2. Validate `enabled_sections` against the active template version: every entry must be a `section_key` the template defines, and a section with `configurable: false` cannot be disabled (`docs/PLAN/07` § Section System, `docs/FRONTEND/04` step 2).
 3. Validate `theme_override` keys against `customizable_theme_keys` — anything outside that list is rejected rather than silently stored, or the customization boundary is not a boundary.
 4. Handle the slug per BR-6.2: freely changeable before first publish; after publish, require explicit confirmation and rate limit it, because old links break.
-5. Note `PG-02`: `docs/PLAN/08` models `slug` and `expiry_date` inside Settings while `docs/DATABASE/04` stores both on `invitations`, and `docs/API/04` accepts `slug` on the settings PATCH. Implement the API shape and document the mapping; amend `docs/PLAN/08` with a note rather than moving the column.
+5. Follow the domain-to-table mapping in `docs/PLAN/08` § Where Settings Fields Physically Live (added by ADR-022): `slug` and `expiry_date` are columns on `invitations`, the toggles live on `invitation_settings`, and the API presents both under `/settings`. The service writes to whichever table owns the column, so a user never has to know the schema to change a setting.
 6. Handle a slug uniqueness race by catching the unique violation and returning 409, per `docs/BACKEND/06` § Slug Validation.
 
 **Definition of Done**
@@ -546,8 +546,8 @@
 5. Enforce the per-invitation photo quota from the package before accepting, returning 400 `QUOTA_EXCEEDED` (`docs/API/05` § Error Cases).
 6. Store to the isolated staging area from `P0-16`, never to a web-servable path, with a server-generated UUID name — the original filename is never used in a path (`docs/SECURITY/06` layer 8).
 7. Create the `media` row with status `processing`, enqueue `media.process`, and respond 201 with `{id, status: "processing", purpose}` per `docs/API/05`.
-8. Resolve `PG-03`: `docs/FRONTEND/05` polls `GET /media/:id`, which `docs/API/05` never defines. Add `GET /api/v1/media/:media_id` with ownership scoping and amend `docs/API/05`.
-9. Note `PG-01` again here: `docs/API/05` § Error Cases specifies 403 for another user's invitation, contradicting the 404 rule. Implement 404 and amend the document.
+8. Implement `GET /api/v1/media/:media_id`, ownership-scoped — the endpoint the upload flow polls, added to `docs/API/05` by ADR-021.
+9. Return 404, not 403, for another user's invitation or media — `docs/API/05` § Error Cases was corrected by ADR-018.
 
 **Definition of Done**
 - [ ] A file whose bytes do not match its extension is rejected before it reaches staging.
@@ -758,7 +758,7 @@
 3. Handle failures per file with a retry that does not disturb the rest of the form.
 4. Implement drag-to-reorder with a debounced reorder call — and a keyboard alternative (move up/down), which `docs/UI-UX/17` requires explicitly for this interaction.
 5. Implement cover selection, caption editing and delete with the brief undo affordance from `docs/FRONTEND/05`.
-6. Build the map picker from `docs/PLAN/04` § F5: address input plus a draggable pin producing latitude and longitude, with the backend generating `maps_url`. The provider choice is `OQ-06`.
+6. Build the map picker from `docs/PLAN/04` § F5 using **MapLibre GL** over OSM tiles (ADR-014): address input plus a draggable pin producing latitude and longitude, with the backend generating `maps_url`. The public page deliberately loads no map SDK at all — that is `P2-03`'s static image plus deep link.
 7. Surface server rejections in plain Indonesian — "file type not supported", "photo quota reached" — never a raw error code.
 
 **Definition of Done**

@@ -82,7 +82,7 @@
 **Goal** — The owner can list, filter, summarize and export their RSVPs.
 
 **Steps**
-1. Resolve `PG-10` first: `docs/PLAN/04` § F10 and `docs/UI-UX/10` § RsvpTable both require owner-side RSVP management, and `docs/API/04` defines no endpoints for it. Add them and amend the document in the same change:
+1. Implement the four endpoints now specified in `docs/API/04` § Sub-resource: RSVP (owner side), added by ADR-021:
    - `GET /api/v1/invitations/:id/rsvps` — paginated, filterable by attendance status,
    - `GET /api/v1/invitations/:id/rsvps/summary` — totals per status and total guest count,
    - `GET /api/v1/invitations/:id/rsvps/export` — CSV,
@@ -144,7 +144,7 @@
 **Goal** — The owner moderates their own guestbook; the admin queue in Phase 5 is a separate, platform-level concern.
 
 **Steps**
-1. Resolve `PG-11`: `docs/PLAN/04` § F11 requires owner-side moderation and only `docs/API/09` (admin) defines moderation endpoints. Add owner endpoints and amend `docs/API/04`:
+1. Implement the owner-side moderation endpoints now specified in `docs/API/04` § Sub-resource: Guestbook (owner side), added by ADR-021 — distinct from the admin queue in `docs/API/09`, which is a platform-level concern:
    - `GET /api/v1/invitations/:id/guestbook` — all entries with status filter,
    - `PATCH /api/v1/invitations/:id/guestbook/:entry_id` — approve or reject,
    - `DELETE /api/v1/invitations/:id/guestbook/:entry_id`.
@@ -165,7 +165,7 @@
 
 | | |
 |---|---|
-| **Status** | BLOCKED — `OQ-09` (CAPTCHA vendor) in `BACKLOG.md` |
+| **Status** | TODO — vendor decided (ADR-011: Cloudflare Turnstile); the activation threshold is open as `OQ-14` |
 | **Depends on** | P4-01, P4-03 |
 | **Spec refs** | `docs/SECURITY/10-ABUSE-PREVENTION.md`, `docs/PLAN/18` R8, `docs/DEVOPS/07-ALERTING.md` |
 | **Spec required** | Yes — abuse prevention |
@@ -174,7 +174,7 @@
 **Goal** — Spam controls that escalate under attack and stay invisible during a normal wedding.
 
 **Steps**
-1. Integrate a privacy-respecting CAPTCHA, verified server-side.
+1. Integrate **Cloudflare Turnstile** (ADR-011, already part of the edge stack), verified server-side.
 2. Make it **adaptive**, per `docs/SECURITY/10`: off by default, enabled automatically for a slug that crosses a suspicious-traffic threshold. An always-on challenge in front of an RSVP form costs real confirmations from the elderly-guest persona in `docs/UI-UX/03`, which is a product cost, not just a UX one.
 3. Implement escalating temporary blocks for repeat rate-limit violators.
 4. Add the optional profanity filter as a per-invitation toggle, feeding the moderation queue rather than blocking outright.
@@ -193,7 +193,7 @@
 
 | | |
 |---|---|
-| **Status** | BLOCKED — `OQ-04` (email provider) in `BACKLOG.md` |
+| **Status** | TODO — provider decided (ADR-013: Resend) |
 | **Depends on** | P0-15 |
 | **Spec refs** | `docs/BACKEND/07-NOTIFICATION.md`, `docs/PLAN/13-NOTIFICATION-SYSTEM.md`, `docs/ARCHITECTURE/07` |
 | **Spec required** | No |
@@ -202,9 +202,9 @@
 **Goal** — An event-driven notification module with a swappable email provider and centrally stored templates.
 
 **Steps**
-1. Define `EmailPort` with `send({to, template, data})`, per `docs/BACKEND/07` § Provider Abstraction, and implement one adapter.
+1. Define `EmailPort` with `send({to, template, data})`, per `docs/BACKEND/07` § Provider Abstraction, and implement the **Resend** adapter (ADR-013). Amazon SES is the expected migration once volume justifies it, which is what the port is for.
 2. Implement the notification module as an event consumer on the internal bus, listening for the events listed in `docs/BACKEND/07`.
-3. Store email templates centrally as files rendered with data, never as HTML strings inside handlers (`docs/PLAN/13` § Email Templates) — the stated goal is changing copy without a deploy.
+3. Author templates as **React Email** components in `packages/ui`, rendered with data — never as HTML strings inside handlers (`docs/PLAN/13` § Email Templates). ADR-013 notes the trade honestly: templates ship with a deploy rather than being editable at runtime, accepted because a deploy here is a container rebuild and typed templates catch a missing variable at build time rather than in a customer's inbox.
 4. Give every email a consistent header and footer, and write copy in Bahasa Indonesia per `MEMORY/DECISIONS.md` ADR-001: engineering documentation is English, user-facing copy is Indonesian.
 5. Wrap handlers in try/catch with the retry policy from `docs/ARCHITECTURE/07`; a delivery failure never affects the transaction that emitted the event, which has already committed.
 6. Configure SPF, DKIM and DMARC for the sending domain — transactional mail that lands in spam is a silent product failure, and password reset mail is a phishing target.
@@ -287,7 +287,7 @@
 **Goal** — Aggregate view counts per invitation, without a database write per visitor.
 
 **Steps**
-1. Resolve `PG-12`: `docs/API/08` defines `POST /public/i/:slug/view` and `docs/PLAN/14` requires a per-invitation counter, but no table stores it. Add `invitation_view_counts` (invitation_id, view_date, count) with a daily grain so the owner dashboard can show a trend rather than a single lifetime number, and amend `docs/DATABASE/`.
+1. Implement against `invitation_view_counts` (`docs/DATABASE/11-ANALYTICS.md`, added by ADR-020): daily grain, upserted by the flush job, so the owner dashboard can show a trend rather than one lifetime number. The document also specifies the upsert and states the best-effort semantics explicitly.
 2. Increment in Redis on request, per `docs/PLAN/14` § Implementation Summary — never write to the primary database on a page view, which is exactly the traffic that spikes on the wedding day.
 3. Flush to the database every minute via `analytics_counter_flush` (`docs/BACKEND/08`), which is best-effort: dropping a batch on failure is acceptable and must be an explicit, documented choice rather than an accident.
 4. Store no per-visitor data. `docs/PLAN/14` § Privacy and `docs/SECURITY/09` both scope MVP analytics to aggregates only — no visitor identity, no behavioural tracking.

@@ -10,7 +10,23 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
-### 2026-09-09
+### 2026-09-09 — stack decided, specification gaps closed
+
+**Decided** — the technology stack ([P0-01](./records/2026-09-09-P0-01-stack-decision.md), ADR-004 through ADR-017)
+- TypeScript on Node 22 with NestJS; pnpm + Turborepo monorepo; Next.js for the app and the public invitation, Vite for admin; Drizzle ORM; Zod as the single validation vocabulary; BullMQ on Redis; sharp with ClamAV in an isolated worker.
+- Cloudflare R2 for object storage with Cloudflare CDN, DNS and Turnstile at the edge; Midtrans for payments; Resend for transactional email; MapLibre in the editor with no map SDK at all on the public page; a single VPS running Docker Compose behind Caddy.
+- Vitest, Testcontainers and Playwright for tests; GitHub Actions, Semgrep and OWASP ZAP for CI; Pino, OpenTelemetry, Prometheus and Sentry for observability.
+- Six open questions closed (`OQ-01`, `OQ-02`, `OQ-03`, `OQ-04`, `OQ-06`, `OQ-09`). Blocked tasks dropped from seven to two — only pricing (`OQ-05`) and the domain name (`OQ-08`) remain, and both are answers only the project owner can give.
+
+**Changed** — all 17 specification gaps resolved, `docs/` amended ([record](./records/2026-09-09-specification-gap-remediation.md), ADR-018 through ADR-022)
+- **The two contradictions.** A resource that exists but is not yours now returns **404** everywhere, never 403 — `docs/API/00` had documented both, and a differentiating status code is an enumeration oracle (ADR-018). A **refund returns the invitation to `draft`**, not `paid` — `docs/PLAN/02` and `docs/BACKEND/05` disagreed, and the difference was whether a refunded customer keeps the ability to republish for free (ADR-019).
+- **Five tables added** (ADR-020): `user_tokens`, `user_mfa_factors`, `user_recovery_codes`, `invitation_preview_tokens`, `invitation_view_counts`, `slug_blocklist` — every credential-shaped value stored hashed or encrypted. Two new files: `docs/DATABASE/11-ANALYTICS.md` and `docs/DATABASE/12-PLATFORM-CONFIG.md`.
+- **Six endpoints added** (ADR-021): single-media read, owner-side RSVP management with CSV export, owner-side guestbook moderation, template version upgrade, the public watermark flag, and a guest report endpoint that gives the admin moderation queue an actual source.
+- **Five documentation corrections** (ADR-022): where settings fields physically live, addon availability at MVP, who performs the `pending_payment` transition, where demo data lives, and three tables `docs/ARCHITECTURE/04` listed that do not exist.
+- `docs/PLAN/18-RISK-REGISTER.md` gained **R13** (one vendor carries storage, CDN, DNS and CAPTCHA) and **R14** (single-host deployment, no redundancy at MVP), both consequences of the hosting decision rather than oversights.
+- `docs/` grew from 121 to 123 files; 24 documents were amended.
+
+### 2026-09-09 — earlier
 
 **Added** — the execution layer ([P0-24](./records/2026-09-09-P0-24-tasks-and-memory-scaffolding.md), [ADR-003](./DECISIONS.md))
 - `TASKS/` — task conventions with an 11-item global Definition of Done, eight phase files covering **133 tasks**, a progress board, and a backlog. Every task names the specification documents it implements, its dependencies, and — where relevant — the abuse cases it must have automated tests for.

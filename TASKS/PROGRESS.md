@@ -3,8 +3,10 @@
 Single source of truth for where the project stands. Updated in the same commit as the work it describes (`00-TASK-CONVENTIONS.md` global DoD item 11).
 
 **Last updated**: 2026-09-09
-**Current phase**: Phase 0 — Foundation (1 / 24 done). `P0-01` is `BLOCKED` on `OQ-01`; nothing else in Phase 0 can start until the stack is chosen.
-**Overall**: 1 / 133 tasks done
+**Current phase**: Phase 0 — Foundation (2 / 24 done). The stack is decided (`P0-01`, ADR-004 through ADR-017), so `P0-02` is unblocked and the four parallel tracks can start.
+**Overall**: 2 / 133 tasks done
+
+**Specification status**: all 17 gaps found while writing this plan are resolved and `docs/` is amended (ADR-018 through ADR-022). Seven open questions remain in [`BACKLOG.md`](./BACKLOG.md); two of them block a task.
 
 Status values: `TODO` · `BLOCKED` · `SPEC` · `WIP` · `REVIEW` · `DONE` · `DROPPED`
 Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` must be split
@@ -15,11 +17,11 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 
 | Phase | Tasks | Done | Status | Gate to enter |
 |---|---|---|---|---|
-| [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 24 | 1 | **ACTIVE** — blocked on `OQ-01` | — |
+| [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 24 | 2 | **ACTIVE** | — |
 | [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 0 | Not started | Phase 0 exit criteria |
 | [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 14 | 0 | Not started | Phase 1 exit + `P1-25` |
-| [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 0 | Not started | Phase 2 exit + `OQ-02`, `OQ-05` answered |
-| [Phase 4 — Engagement](./PHASE-4-ENGAGEMENT.md) | 12 | 0 | Not started | Phase 3 exit + `OQ-04` answered |
+| [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 0 | Not started | Phase 2 exit + `OQ-05` (pricing) answered |
+| [Phase 4 — Engagement](./PHASE-4-ENGAGEMENT.md) | 12 | 0 | Not started | Phase 3 exit |
 | [Phase 5 — Admin Panel](./PHASE-5-ADMIN-PANEL.md) | 14 | 0 | Not started | Phase 4 exit |
 | [Phase 6 — Hardening and Launch](./PHASE-6-HARDENING-AND-LAUNCH.md) | 17 | 0 | Not started | Phase 5 exit |
 | [Phase 7 — Post-Launch](./PHASE-7-POST-LAUNCH.md) | 11 | 0 | Not started | MVP launched, `P6-17` signed off |
@@ -36,7 +38,7 @@ Roadmap: Week 1-2. Exit criteria in the phase file.
 
 | ID | Task | Surface | Size | Status | Depends on |
 |---|---|---|---|---|---|
-| P0-01 | Confirm and freeze the tech stack | docs | S | **BLOCKED** — `OQ-01` | — |
+| P0-01 | Confirm and freeze the tech stack | docs | S | **DONE** — ADR-004…ADR-017 | — |
 | P0-02 | Initialize the monorepo structure | infra | S | TODO | P0-01 |
 | P0-03 | Git conventions, PR template, CODEOWNERS | infra | S | TODO | P0-02 |
 | P0-04 | Backend service skeleton | backend | M | TODO | P0-02 |
@@ -58,10 +60,10 @@ Roadmap: Week 1-2. Exit criteria in the phase file.
 | P0-20 | Template schema definition and validator | backend, web-app | L | TODO | P0-08 |
 | P0-21 | Reference template and demo seed data | backend, web-app | L | TODO | P0-20 |
 | P0-22 | Frontend skeletons and design system | frontend | L | TODO | P0-02 |
-| P0-23 | Staging, wildcard DNS and TLS | infra | L | **BLOCKED** — `OQ-03`, `OQ-08` | P0-17 |
+| P0-23 | Staging, wildcard DNS and TLS | infra | L | **BLOCKED** — `OQ-08` (domain) | P0-17 |
 | P0-24 | Adopt the TASKS/MEMORY discipline | docs | S | **DONE** | — |
 
-**Critical path**: `P0-01` → `P0-02` → `P0-04` → `P0-05` → `P0-06` → `P0-07`…`P0-11`. `P0-11` is the one to give extra review attention: every `:id` endpoint in the next four phases is built on it.
+**Critical path**: `P0-02` → `P0-04` → `P0-05` → `P0-06` → `P0-07`…`P0-11`. `P0-11` is the one to give extra review attention: every `:id` endpoint in the next four phases is built on it.
 
 **Parallel tracks** once `P0-02` lands: backend schema (`P0-04`…`P0-11`), platform (`P0-17`, `P0-18`, `P0-23`), frontend (`P0-22`), template (`P0-20`, `P0-21` — needs only `P0-08`).
 
@@ -134,9 +136,9 @@ Roadmap: Week 8-9. **Entry needs `OQ-02` and `OQ-05` answered.**
 
 | ID | Task | Surface | Size | Status | Depends on |
 |---|---|---|---|---|---|
-| P3-01 | Packages, addons, pricing service | backend | M | **BLOCKED** — `OQ-05` | P0-10 |
+| P3-01 | Packages, addons, pricing service | backend | M | **BLOCKED** — `OQ-05` (pricing) | P0-10 |
 | P3-02 | Order creation | backend | L | TODO | P3-01, P1-06 |
-| P3-03 | Payment gateway port and adapter | backend | L | **BLOCKED** — `OQ-02` | P3-02, P0-18 |
+| P3-03 | Payment gateway port and adapter | backend | L | TODO — Midtrans (ADR-012) | P3-02, P0-18 |
 | P3-04 | Payment initiation | backend | M | TODO | P3-03 |
 | P3-05 | Payment webhook | backend | L | TODO | P3-04, P0-14 |
 | P3-06 | Status polling and reconciliation | backend | M | TODO | P3-05 |
@@ -165,8 +167,8 @@ Roadmap: Week 10-11.
 | P4-02 | Owner RSVP management and export | backend | M | TODO | P4-01 |
 | P4-03 | Public guestbook | backend | M | TODO | P2-07, P1-07 |
 | P4-04 | Owner guestbook moderation | backend | M | TODO | P4-03 |
-| P4-05 | Abuse controls and adaptive CAPTCHA | backend | M | **BLOCKED** — `OQ-09` | P4-01, P4-03 |
-| P4-06 | Notification module and email port | backend, worker | L | **BLOCKED** — `OQ-04` | P0-15 |
+| P4-05 | Abuse controls and adaptive CAPTCHA | backend | M | TODO — Turnstile (ADR-011); threshold `OQ-14` | P4-01, P4-03 |
+| P4-06 | Notification module and email port | backend, worker | L | TODO — Resend (ADR-013) | P0-15 |
 | P4-07 | Transactional email wiring | worker | L | TODO | P4-06 |
 | P4-08 | Preferences and delivery monitoring | backend, worker | M | TODO | P4-07 |
 | P4-09 | Page view counter | backend, worker | M | TODO | P2-07, P0-15 |
@@ -189,7 +191,7 @@ Roadmap: Week 12-13.
 | P5-05 | Template editor UI and preview | admin | L | TODO | P5-04, P2-03 |
 | P5-06 | User management | backend, admin | M | TODO | P5-03 |
 | P5-07 | Order and payment management | backend, admin | M | TODO | P5-03, P3-05 |
-| P5-08 | Manual refund | backend, admin | M | TODO | P5-07 |
+| P5-08 | Manual refund | backend, admin | M | TODO — target status decided (ADR-019) | P5-07 |
 | P5-09 | Moderation queue | backend, admin | M | TODO | P5-03, P4-04 |
 | P5-10 | Invitation overview, read-only | backend, admin | M | TODO | P5-03 |
 | P5-11 | Dashboard metrics | backend, admin | M | TODO | P5-03 |
@@ -197,7 +199,7 @@ Roadmap: Week 12-13.
 | P5-13 | Slug blocklist management | backend, admin | M | TODO | P5-03, P1-09 |
 | P5-14 | Phase 5 test suite and acceptance | all | M | TODO | all above |
 
-**Note**: `P5-08` cannot start until `PG-14` (refund target status contradiction) is resolved.
+**Note**: `PG-14` (the refund status contradiction) is resolved — a refund returns the invitation to `draft` (ADR-019), and all four affected documents are amended. `P5-08` is unblocked.
 
 ---
 
@@ -255,35 +257,44 @@ Not scheduled. Sequenced by real usage data rather than by the order below.
 
 | Task | Blocker | Kind |
 |---|---|---|
-| P0-01 | `OQ-01` — tech stack | Open question |
-| P0-23 | `OQ-03` — hosting target, `OQ-08` — domain | Open questions |
-| P3-01 | `OQ-05` — pricing values | Open question |
-| P3-03 | `OQ-02` — payment provider | Open question |
-| P4-05 | `OQ-09` — CAPTCHA vendor | Open question |
-| P4-06 | `OQ-04` — email provider | Open question |
-| P5-08 | `PG-14` — refund status contradiction | Specification gap |
+| P0-23 | `OQ-08` — the real domain name | Open question |
+| P3-01 | `OQ-05` — package and addon pricing, free draft quota | Open question |
 
-Seven of the thirteen open questions in [`BACKLOG.md`](./BACKLOG.md) block a specific task. `OQ-01` blocks everything.
+Down from seven blockers to two. The stack decision (ADR-004 through ADR-017) cleared `OQ-01`, `OQ-02`, `OQ-03`, `OQ-04`, `OQ-06` and `OQ-09`; the specification amendments (ADR-018 through ADR-022) cleared `PG-14`.
+
+Neither remaining blocker stops Phase 0 or Phase 1: `P0-23` needs a domain before staging goes up, and `P3-01` needs prices before Phase 3 is real. Both are answers only the project owner can give.
+
+Five further open questions affect work without blocking it: `OQ-10` (encryption at rest for account numbers, best answered before production data exists), `OQ-11` (account deletion with a live invitation), `OQ-12` (team size, which decides whether the roadmap's weeks are achievable), `OQ-13` (watermark design) and `OQ-14` (CAPTCHA activation threshold).
 
 ---
 
-## Specification Amendments Owed
+## Specification Amendments — Completed
 
-Each of these is a `docs/` change owed by the task that resolves the gap, per the deviation protocol. They are listed here so the debt is visible on the board rather than only inside a phase file.
+All 17 gaps are resolved and every owed amendment has been made (2026-09-09, ADR-018 through ADR-022). `docs/` now describes the system the plan builds, so no task starts by having to decide something two documents disagreed about.
 
-| Gap | Document to amend | Owed by |
-|---|---|---|
-| PG-01 | `docs/API/00`, `docs/API/05` | P0-13 |
-| PG-02 | `docs/PLAN/08` (mapping note) | P1-14 |
-| PG-03 | `docs/API/05` | P1-17 |
-| PG-04 | `docs/API/04`, `docs/DATABASE/04` | P2-12 |
-| PG-06 | `docs/DATABASE/02` | P1-02 |
-| PG-07 | `docs/API/06` | P3-02 |
-| PG-09 | `docs/API/08` | P3-09 |
-| PG-10, PG-11 | `docs/API/04` | P4-02, P4-04 |
-| PG-12 | `docs/DATABASE/` (new table) | P4-09 |
-| PG-13 | `docs/DATABASE/02` | P5-02 |
-| PG-14 | `docs/BACKEND/05` | P5-08 |
-| PG-15 | `docs/DATABASE/` (new table) | P5-13 |
-| PG-16 | `docs/API/04` | P1-15 or P5-04 |
-| PG-17 | `docs/ARCHITECTURE/04` | P0-09 |
+| Amended | Change |
+|---|---|
+| `docs/API/00` | 403 versus 404 rule, with the reasoning |
+| `docs/API/04` | Owner-side RSVP and guestbook endpoints, version upgrade, preview link list/revoke |
+| `docs/API/05` | `GET /media/:media_id`, 404 correction |
+| `docs/API/06` | Who transitions the invitation to `pending_payment` |
+| `docs/API/08` | `display.watermark`, preview token route, guest report endpoint |
+| `docs/API/09` | Owner versus platform moderation boundary |
+| `docs/ARCHITECTURE/04` | Table list corrected; three phantom tables removed |
+| `docs/BACKEND/05`, `docs/BACKEND/09` | Refund returns the invitation to `draft` |
+| `docs/DATABASE/00`, `01` | Table groups and ERD updated for five new tables |
+| `docs/DATABASE/02` | `user_tokens`, `user_mfa_factors`, `user_recovery_codes` |
+| `docs/DATABASE/04` | `invitation_preview_tokens` |
+| `docs/DATABASE/07` | Addon availability gating |
+| `docs/DATABASE/11-ANALYTICS.md` | **New** — `invitation_view_counts` |
+| `docs/DATABASE/12-PLATFORM-CONFIG.md` | **New** — `slug_blocklist` |
+| `docs/DEVOPS/03` | Caddy named as the origin proxy, with the on-demand TLS reasoning |
+| `docs/PLAN/02`, `docs/PLAN/06` | BR-5.4 and the lifecycle transition rules |
+| `docs/PLAN/07` | Demo data lives as a seeded system-owned invitation |
+| `docs/PLAN/08` | Where settings fields physically live |
+| `docs/PLAN/09` | Addon availability at MVP |
+| `docs/PLAN/12` | Moderation queue sources |
+| `docs/PLAN/14` | Pointer to the analytics table |
+| `docs/PLAN/18` | R13 (single-vendor edge) and R14 (single-host deployment) added |
+| `docs/README.md` | File counts |
+| `docs/SECURITY/01`, `10`, `11` | 404 wording, blocklist table pointer, IDOR sweep criterion |

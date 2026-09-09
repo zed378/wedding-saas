@@ -106,6 +106,7 @@
 1. Build: Hero (cover gate), Quote, Couple, Event with countdown, Gallery (grid and carousel variants), Maps, Gift, RSVP, Guestbook, Closing — the default order in `docs/UI-UX/14`.
 2. Drive every visual property from theme tokens; a component must look different under a different theme with no code change, since that is how `docs/PLAN/07` says templates differ from one another.
 3. Implement `layout_variant` handling where the schema offers options, for example gallery grid versus carousel.
+3b. Build the Maps section per ADR-014: **no map SDK on the public page**. A lazily-loaded static map image plus an "Open in Google Maps" deep link built from the stored coordinates. An embedded map SDK is one of the heaviest things a page can load, against a 150KB budget on a mid-range phone, and it bills per load on the one surface with unbounded traffic.
 4. Hide sub-elements gracefully when optional fields are empty (`docs/PLAN/07` § Required vs Optional) — an absent caption leaves no empty box behind.
 5. Meet the accessibility floor from `docs/UI-UX/17` even under decorative design: contrast over photo backgrounds via overlay, keyboard-operable controls, real alt text, `prefers-reduced-motion` honoured for scroll reveals.
 6. Leave RSVP and Guestbook as presentational shells here; their submission wiring is Phase 4.
@@ -365,7 +366,7 @@
 **Goal** — A time-limited link that lets a partner or organizer see an unpublished invitation, watermarked, without making it public.
 
 **Steps**
-1. Resolve `PG-04` first: `docs/API/04` defines `POST /invitations/:id/preview-link` but no table stores the token and no endpoint consumes it. Add `invitation_preview_tokens` (invitation_id, token_hash, expires_at, created_by, revoked_at) and a public resolve route; amend `docs/API/04` and `docs/DATABASE/04` in the same change.
+1. Implement against `invitation_preview_tokens` (`docs/DATABASE/04` § Share-Preview Tokens) and the public resolve route `GET /public/preview/:token` (`docs/API/08`), both added by ADR-020 and ADR-021. `docs/API/04` also gains list and revoke endpoints; the token itself is returned once, at creation, and stored only as a hash.
 2. Generate a high-entropy token stored hashed, with the 7-day expiry from `docs/PLAN/04` § F6. The token is the only thing standing between an unpublished invitation and the internet, so treat it like a credential.
 3. Serve the preview through the same renderer with the prominent "PREVIEW — NOT YET PUBLISHED" watermark required by FR-4.3.
 4. Force `noindex` on preview responses regardless of the invitation's setting.

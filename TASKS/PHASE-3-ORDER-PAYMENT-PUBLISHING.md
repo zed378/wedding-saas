@@ -39,7 +39,7 @@
 
 | | |
 |---|---|
-| **Status** | BLOCKED — `OQ-05` (pricing values) in `BACKLOG.md` |
+| **Status** | BLOCKED — `OQ-05` (pricing values) in `BACKLOG.md`. The addon-availability question is resolved by ADR-022 |
 | **Depends on** | P0-10 |
 | **Spec refs** | `docs/DATABASE/07-ORDERS.md`, `docs/PLAN/09-ORDER-PAYMENT.md` § Packages, `docs/SECURITY/07` § Pricing, `docs/PLAN/11` § Limits per Package |
 | **Spec required** | Yes — payment |
@@ -52,7 +52,7 @@
 2. Implement `PricingService.calculate(packageId, addonIds)` reading prices from the database at request time. `docs/SECURITY/07` § Pricing makes this non-negotiable: the client never sends an amount, and no price constant exists in code.
 3. Reject an inactive package or addon.
 4. Expose the package entitlements the rest of the system already needs: photo quota (`P1-17`), watermark flag (`P3-09`), validity months (`P3-09`), custom domain permission (Phase 7).
-5. Resolve `PG-05`: the `custom_domain` addon is purchasable per `docs/PLAN/09` while `docs/PLAN/00` places custom domains in Phase 2 (post-MVP). Selling an add-on for an unshipped capability is a support problem and arguably a consumer one. Recommendation: mark the addon inactive at launch and activate it with `P7-01`. Record the decision.
+5. Seed `custom_domain` with `is_active = false` and enforce that an inactive addon cannot be ordered. ADR-022 settled this: `docs/PLAN/09` § Add-on Availability at MVP now states it, and the addon is activated by `P7-01` when the feature actually ships.
 6. Unit test every package-plus-addon combination against expected totals, and test that a price supplied in the request body is ignored entirely.
 
 **Definition of Done**
@@ -82,7 +82,7 @@
 4. Snapshot `amount_total` at creation so later price changes never rewrite order history (`docs/DATABASE/07` § Notes).
 5. Set `expired_at = now + 24h` per `docs/PLAN/09`.
 6. Set `order_type` — `new_publish` or `renewal` — and validate the invitation's status suits it: a `draft` can be newly published; an `expired` or `published` invitation is renewed.
-7. Transition the invitation to `pending_payment` per BR-2.2, through the status history service. Resolve `PG-07`: `docs/API/06` does not say who performs this transition, while `docs/PLAN/02` requires it to happen at checkout. Implement it here and amend `docs/API/06`.
+7. Transition the invitation to `pending_payment` per BR-2.2, through the status history service, **inside the order-creation transaction** — ADR-022 assigned this transition to the order service and `docs/API/06` now states it. Renewal orders perform no transition: the invitation stays `published` or `expired` until the renewal is paid.
 8. Support the optional `Idempotency-Key` header from `docs/API/00`, so a double-clicked checkout does not create two orders.
 
 **Definition of Done**
@@ -105,7 +105,7 @@
 
 | | |
 |---|---|
-| **Status** | BLOCKED — `OQ-02` (provider) in `BACKLOG.md` |
+| **Status** | TODO — provider decided (ADR-012: Midtrans); commercial terms still to be confirmed |
 | **Depends on** | P3-02, P0-18 |
 | **Spec refs** | `docs/BACKEND/01-DOMAIN-MODULES.md` § order & payment, `docs/BACKEND/05-PAYMENT-FLOW.md`, `docs/PLAN/18` R9 |
 | **Spec required** | Yes — payment |
@@ -115,7 +115,7 @@
 
 **Steps**
 1. Define the port: `createTransaction`, `verifySignature`, `queryStatus`, and a normalization function mapping provider statuses onto the internal `pending | success | failed`.
-2. Implement the adapter for the chosen provider, following its official signature documentation precisely. `docs/SECURITY/07` gives Midtrans's SHA-512 over `order_id + status_code + gross_amount + server_key` as an illustration; the real algorithm comes from the provider's docs, not from memory.
+2. Implement the **Midtrans** adapter (ADR-012), following its official signature documentation precisely. `docs/SECURITY/07` gives the SHA-512 over `order_id + status_code + gross_amount + server_key` as an illustration; the real algorithm comes from the provider's current documentation, not from memory or from this sentence.
 3. Keep the `payment` module ignorant of the invitation domain, per `docs/BACKEND/01`: it talks to `order` only, and `order` emits `order.paid`. This decoupling is what makes a provider swap a module-local change.
 4. Store credentials per `P0-18`, with sandbox in staging and live only in production.
 5. Build a fake adapter for tests that can produce valid signatures, invalid signatures, duplicates and out-of-order callbacks — the abuse suites in `P3-05` depend on it.
@@ -299,7 +299,7 @@
 3. Return 422 with `details[]` listing missing field paths when validation fails (BR-4.2), reusing `P2-06`'s resolver so the checklist and the gate can never disagree.
 4. Validate the slug again at publish time — format, blocklist, uniqueness — and catch a unique-violation race as 409 `SLUG_TAKEN` (`docs/BACKEND/06`).
 5. Set `published_at = now()` and `expiry_date = now() + package duration` from `P3-01`'s entitlements.
-6. Determine watermark display from the package. Resolve `PG-09`: `packages.has_watermark` exists but `docs/API/08`'s public response carries no watermark field, so the renderer cannot know. Add a boolean to the public payload — derived server-side from the paid package, never from a client hint — and amend `docs/API/08`.
+6. Determine watermark display from the paid package and return it as `display.watermark` in the public payload (`docs/API/08`, added by ADR-021). It is derived server-side from `packages.has_watermark` and never influenced by a client hint. What the watermark actually looks like is still open as `OQ-13`.
 7. After commit, warm the cache and emit `invitation.published` (`docs/BACKEND/06`).
 8. Meet the acceptance criterion from `docs/PLAN/17`: the public page is reachable within five seconds of publishing.
 

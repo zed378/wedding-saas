@@ -72,7 +72,7 @@
 **Goal** — TOTP is mandatory for admin accounts, and the most damaging actions require re-authentication even inside a valid session.
 
 **Steps**
-1. Resolve `PG-13`: `docs/SECURITY/03` and `docs/PLAN/12` require mandatory admin 2FA, and `docs/DATABASE/` has no table for it. Add `user_mfa_factors` (user_id, type, secret_encrypted, confirmed_at, created_at) and `user_recovery_codes` (user_id, code_hash, used_at), and amend `docs/DATABASE/02`.
+1. Implement against `user_mfa_factors` and `user_recovery_codes` (`docs/DATABASE/02` § Multi-Factor Authentication Tables, added by ADR-020). Note the two rules the schema already encodes: a factor is inactive until `confirmed_at` is set, so an abandoned enrolment cannot lock an admin out, and the TOTP secret is encrypted at the application layer rather than relying on disk encryption.
 2. Implement TOTP enrolment with a QR code, confirmation of a first valid code before activation, and single-use recovery codes stored hashed.
 3. Encrypt the TOTP secret at rest — a secret readable from a database dump is a shared password.
 4. Enforce 2FA at login for `admin` and `super_admin`: no bypass, no "remind me later". An unenrolled admin can reach enrolment and nothing else.
@@ -250,7 +250,7 @@
 **Goal** — An admin can refund an order, with the invitation's state changing correctly and the whole thing audited.
 
 **Steps**
-1. Resolve `PG-14` before implementing — the two documents disagree. `docs/PLAN/02` § BR-5.4 says a refund moves the invitation `paid → draft` and unpublishes a published one; `docs/BACKEND/05` § Refund sets a published invitation to `paid`, which leaves it re-publishable without paying again. `docs/BACKEND/09` § E2E hedges with "reverts to draft/the correct status". These cannot all be right, and the difference is whether a refunded customer can put their invitation back online for free. Recommendation: refund sets the invitation to `draft` (BR-5.4), since a refund reverses the entitlement, and a `paid` state after a refund means the platform gave back the money and the product. Record the ADR and amend whichever document loses.
+1. A refund sets the invitation to **`draft`**, from whatever state it held, including directly from `published`. ADR-019 resolved the contradiction between `docs/PLAN/02` and `docs/BACKEND/05`, and all four affected documents are amended: a refund reverses the entitlement, not only the payment, so leaving the invitation `paid` would return the money and leave the customer the product.
 2. Implement `POST /admin/orders/:id/refund` with a mandatory reason and step-up re-authentication from `P5-02`.
 3. In one transaction: set the order `refunded`, transition the invitation per the resolved rule, write status history with the admin as actor and the reason, and write the audit row.
 4. Invalidate the public cache immediately if the invitation was published — the page must stop being served, not eventually stop.
@@ -390,7 +390,7 @@
 **Goal** — The reserved-word and profanity blocklist is data an admin can update, not a constant that needs a deploy.
 
 **Steps**
-1. Resolve `PG-15`: `docs/SECURITY/10` requires the blocklist to be "updatable without a deploy" and no table exists for it. Add `slug_blocklist` (term, match_type, reason, created_by, created_at) and amend `docs/DATABASE/`.
+1. Implement against `slug_blocklist` (`docs/DATABASE/12-PLATFORM-CONFIG.md`, added by ADR-020). The document specifies the `exact` versus `substring` distinction and why it matters: blocking reserved words as substrings would reject legitimate Indonesian names.
 2. Seed it with the reserved system words from `docs/PLAN/10`: `admin`, `api`, `www`, `app`, `mail`, `ftp`, and the rest, plus an initial profanity list.
 3. Implement case-insensitive matching with the substring and basic leetspeak variation handling described in `docs/SECURITY/10`, and support both exact and substring match types — blocking every slug containing a short common word would be worse than the problem.
 4. Cache the list and invalidate on change; slug validation runs on every invitation creation.
