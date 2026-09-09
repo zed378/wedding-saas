@@ -1,0 +1,83 @@
+# Pull request pipeline.
+#
+# P0-03 establishes the traceability gates below. P0-17 adds the rest of the seven steps
+# in docs/DEVOPS/01-CI-CD.md: unit tests, type check, build, integration tests against real
+# Postgres and Redis, dependency audit and SAST.
+#
+# Third-party actions are pinned by commit SHA, never by tag: a tag can be moved, and a
+# moved tag in CI is arbitrary code execution with repository credentials.
+
+name: pr
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  traceability:
+    name: Traceability gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Commit subjects carry a task ID
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          fail=0
+          while IFS= read -r subject; do
+            case "$subject" in
+              "Merge "*|"Revert "*) continue ;;
+            esac
+            if ! printf '%s' "$subject" | grep -Eq '^P[0-9]+[A-Z]?-[0-9]+(\.[0-9]+)?: .+'; then
+              echo "::error::Commit subject has no task ID: $subject"
+              fail=1
+            fi
+          done < <(git log --format=%s "$base..$head")
+          if [ "$fail" -ne 0 ]; then
+            echo "See TASKS/00-TASK-CONVENTIONS.md - Branch, Commit, PR."
+            exit 1
+          fi
+
+      - name: PR body names a task and its specification refs
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          fail=0
+          if ! printf '%s' "$BODY" | grep -Eq 'P[0-9]+[A-Z]?-[0-9]+'; then
+            echo "::error::The PR body names no task ID from TASKS/."
+            fail=1
+          fi
+          if ! printf '%s' "$BODY" | grep -Eq 'docs/[A-Z]+/'; then
+            echo "::error::The PR body cites no docs/ section. Name what this implements."
+            fail=1
+          fi
+          if [ "$fail" -ne 0 ]; then
+            echo "The template in .github/pull_request_template.md asks for both."
+            exit 1
+          fi
+
+      - name: New :id endpoints have tests
+        run: node scripts/check-id-endpoint-tests.mjs "${{ github.event.pull_request.base.sha }}"
+
+  format:
+    name: Formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check

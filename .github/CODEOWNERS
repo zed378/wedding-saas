@@ -1,0 +1,22 @@
+# Code owners.
+#
+# The three specification folders below change only deliberately: they are the contract
+# the whole plan is built against, and a silent edit to one of them makes every task that
+# cites it wrong. Editing them requires an explicit review — that is the deviation
+# protocol in TASKS/00-TASK-CONVENTIONS.md, made structural.
+
+# Default owner
+*                       @zed378
+
+# The contract — amended only through the deviation protocol
+/docs/SECURITY/         @zed378
+/docs/DATABASE/         @zed378
+/docs/API/              @zed378
+
+# The plan and the record
+/TASKS/                 @zed378
+/MEMORY/DECISIONS.md    @zed378
+
+# Agent operating instructions — these govern how work is done at all
+/CLAUDE.md              @zed378
+/AGENTS.md              @zed378

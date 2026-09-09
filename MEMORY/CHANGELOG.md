@@ -10,6 +10,25 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-09 — implementation begins
+
+**Added** — repository structure ([P0-02, P0-03](./records/2026-09-09-P0-02-P0-03-repo-scaffolding-and-conventions.md))
+- pnpm + Turborepo monorepo: `apps/{api,worker,web-app,public-invite,admin}` and `packages/{schema,template-renderer,ui,api-client,config}`. The API carries the twelve domain modules, five shared concerns and four infra adapters from `docs/ARCHITECTURE/01` as real directories; the worker carries its three pools.
+- The workspace graph is real rather than declared: `@wi/template-renderer` resolves from both `web-app` and `public-invite`, which is the property `docs/FRONTEND/04` depends on.
+- Node pinned to **24 LTS** — ADR-004 named 22, which is now in maintenance. A version correction inside an accepted decision.
+
+**Added** — traceability gates
+- `commit-msg` hook rejecting any subject without a task ID, verified by execution.
+- PR template requiring the task, the specification sections, test layers, the security review flag and the IDOR test for any new `:id` endpoint; `CODEOWNERS` marking `docs/SECURITY/`, `docs/DATABASE/` and `docs/API/` for explicit review.
+- **The `:id` guard**: CI fails any diff that adds a route taking a path parameter without touching a test file, and its message names `docs/SECURITY/05` and the helper that makes the test a one-liner. `docs/SECURITY/05` has zero tolerance, and a convention people are asked to remember is one that gets skipped invisibly.
+- `.gitattributes` forcing LF — unplanned, and added because git was rewriting shell hooks to CRLF, which fails in a Linux container far from where it was introduced.
+
+**Changed** — branching strategy ([ADR-026](./DECISIONS.md))
+- **One branch per phase** rather than per task: all of a phase lands on `feat/phase-<n>-<slug>`, which merges to `main` only when the phase's acceptance task is `DONE`. `main` carries no in-progress development code. Documentation-only changes still go to `main` directly.
+- Phase 0 work moved to `feat/phase-0-foundation` before anything was committed, so `main` still holds only the four specification commits.
+
+**Not done yet** — branch protection is not enabled on the GitHub repository, so `CODEOWNERS` and the CI checks are advisory until it is. That is a repository settings change.
+
 ### 2026-09-09 — gift account numbers reclassified
 
 **Changed** — data classification and the encryption decision ([record](./records/2026-09-09-gift-account-data-reframing.md), [ADR-025](./DECISIONS.md))

@@ -119,7 +119,28 @@ Sizes are recorded in `PROGRESS.md`, not repeated on every card.
 
 ## Branch, Commit, PR
 
-- Branch: `feat/P1-09-invitation-create`, `fix/P3-05-webhook-signature`, `chore/P0-17-ci-pipeline`.
+### Branching: one branch per task, named for its task ID
+
+`main` stays free of in-progress development code. Every task is worked on its own branch, and the branch name carries the **phase and task number** so it says which unit of work it is without anyone having to look it up.
+
+```
+feat/P0-02-monorepo-structure       Phase 0, task 2
+feat/P1-09-invitation-create        Phase 1, task 9
+fix/P3-05-webhook-signature         Phase 3, task 5
+chore/P0-17-ci-pipeline             Phase 0, task 17
+```
+
+| Rule | |
+|---|---|
+| **Naming** | `<type>/P<phase>-<nn>-<slug>` — never a generic phase name. `type` is `feat`, `fix`, `chore` or `docs` |
+| **Scope** | One task per branch. A task with sub-tasks may use `feat/P1-12.3-<slug>` |
+| **Commits** | Every subject on the branch carries the same task ID: `P0-02: scaffold monorepo structure` |
+| **Merge target** | `main`, once the task's Definition of Done — including its MEMORY record — is satisfied. Not before |
+| **Exception** | Changes to `docs/`, `TASKS/` and `MEMORY/` alone may go to `main` directly. They are reference, plan and record; the thing `main` is being kept clean *of* is half-finished code |
+
+The point is legibility: `main` should always describe a system that works, and a branch name should answer "which task is this?" on its own. A generic name like `phase-0-foundation` answers neither question — it hides twenty-four tasks behind one label, and nothing about it says whether the work on it is finished.
+
+The task ID appearing in the branch, the commit, the PR, the MEMORY record and `PROGRESS.md` is the whole traceability chain; the branch is simply its first link.
 - Commit subject: `P1-09: create invitation with template version lock and settings row`.
 - PR body states: the task ID, the specification sections implemented, which test layers were added and run, the security review flag (or "none"), and any deviation with its ADR link.
 - Business rules implemented in code carry their rule ID in a comment (`// BR-4.2`), per `docs/BACKEND/02-SERVICE-LAYER.md` § Principles.

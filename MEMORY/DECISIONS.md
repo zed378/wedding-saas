@@ -142,7 +142,9 @@ Writing the plan against the specification surfaced 17 specification gaps and 13
 
 **Context** — `docs/ARCHITECTURE/03` and `docs/BACKEND/00` name NestJS, Laravel and Django-DRF as acceptable, and require: a DI/service layer, schema validation that rejects unknown fields, a queue with retry and a dead-letter queue, and a safe image pipeline. `docs/PLAN/00` § Constraints assumes 1-3 engineers.
 
-**Decision** — TypeScript on Node.js 22 LTS, with **NestJS 12** as the backend framework, in one monorepo with the frontends.
+**Decision** — TypeScript on Node.js LTS, with **NestJS 12** as the backend framework, in one monorepo with the frontends.
+
+*Version correction (2026-09-09, `P0-02`)*: this ADR originally named Node 22 LTS. Node 24 is the active LTS and 22 is in maintenance, so the pin is **Node 24 LTS** (`.nvmrc`, `engines`). A version correction inside an accepted decision, not a change of decision.
 
 **Alternatives considered**
 
@@ -725,5 +727,37 @@ Items 5 and 6 are additions to the specification rather than restatements of it,
 Nothing here is expensive to revisit. Column encryption can be added later at the cost of a migration, and while there is no production data that migration is free — which is why the decision was worth making now rather than at `P1-13`.
 
 **Specification impact** — Amended: `docs/SECURITY/00` (data classification now separates credentials from sensitive personal data the owner deliberately publishes), `docs/SECURITY/09` (§ Encryption states the decision and its reasoning), `docs/DATABASE/06` (the column note), `docs/DATABASE/08` (raw payload scoped separately), `docs/PLAN/13` (gift account change notification), `docs/PLAN/18` (R16 — gift account tampering).
+
+---
+
+### ADR-026 — One branch per task, named for its task ID; `main` carries no in-progress code
+
+| | |
+|---|---|
+| **Date** | 2026-09-09 |
+| **Status** | Accepted |
+| **Task** | `P0-03` |
+| **Deciders** | Project owner |
+
+**Context** — `TASKS/00-TASK-CONVENTIONS.md` originally specified a branch per task (`feat/P1-09-invitation-create`) without saying anything about what `main` should contain. The project owner asked for two things, in two steps: first that development work happen off `main` so it stays free of in-progress code, and then — after a first pass used phase-wide branches — that branch names carry the phase and task number rather than a generic phase label.
+
+The repository's history at that point was four commits, all specification, plan and record. `P0-02` had just produced the first 70 code files.
+
+**Decision** — One branch per task, named `<type>/P<phase>-<nn>-<slug>`, merged to `main` only when that task's Definition of Done — including its MEMORY record — is satisfied. Changes confined to `docs/`, `TASKS/` and `MEMORY/` may land on `main` directly; they are reference, plan and record, and are not the in-progress code `main` is being kept clean of.
+
+**Alternatives considered**
+
+- **A branch per phase** (`feat/phase-0-foundation`), which this ADR proposed in its first form and the project owner rejected. It keeps `main` equally clean, but the name hides every task in the phase behind one label, so it answers neither "which task is this" nor "is it finished". It also produces a branch living for weeks — Phase 1 is 25 tasks — which delays integration problems rather than preventing them.
+- **Trunk-based, straight onto `main`**: fastest, and exactly what the owner asked to avoid.
+
+**Consequences** — The task ID now appears in the branch, every commit subject, the PR, the MEMORY record and `PROGRESS.md`: one chain, five links, and the branch is its first. `main` only ever gains a task that is genuinely finished, so "what is on main" and "what is done" are the same question.
+
+The cost is more branches and more merges than a phase branch would produce, and a merge per task means the board and the record must be updated per task rather than per phase — which the global Definition of Done already required anyway.
+
+The commit convention is unchanged and remains strict: subjects start with the task ID.
+
+**Specification impact** — `TASKS/00-TASK-CONVENTIONS.md` § Branch, Commit, PR rewritten; `.githooks/pre-push` warns on any name that is not task-shaped; `README.md` § Working conventions updated.
+
+**Note on this record** — an earlier form of this ADR, written during the same session and never committed, specified phase branches. It was corrected in place rather than superseded, because it had not yet landed anywhere a reader could have relied on it. The alternatives section above keeps the rejected option and the reason, which is the part worth preserving.
 
 ---

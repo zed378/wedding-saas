@@ -1,0 +1,32 @@
+#!/bin/sh
+# Warn (do not block) when a branch name does not follow the convention.
+#
+# Blocking a push over a branch name would be obstruction, and a hook that obstructs gets
+# disabled -- after which it enforces nothing at all. The commit-msg hook already carries
+# the traceability requirement; this one only keeps the naming honest.
+#
+# Expected: <type>/P<phase>-<nn>[.<sub>]-<slug>, e.g. feat/P0-02-monorepo-structure
+# A branch name should say which task it is. See TASKS/00-TASK-CONVENTIONS.md.
+
+branch=$(git rev-parse --abbrev-ref HEAD)
+
+case "$branch" in
+  main|develop) exit 0 ;;
+esac
+
+if printf '%s' "$branch" | grep -Eq '^(feat|fix|chore|docs)/P[0-9]+[A-Z]?-[0-9]+(\.[0-9]+)?-[a-z0-9-]+$'; then
+  exit 0
+fi
+
+{
+  echo "! Branch name does not follow the convention:"
+  echo "    $branch"
+  echo ""
+  echo "  Expected: feat/P0-02-monorepo-structure"
+  echo "            <type>/P<phase>-<task>-<slug>, type in feat|fix|chore|docs"
+  echo ""
+  echo "  A branch name should say which task it is. A generic phase name hides"
+  echo "  every task behind one label. See TASKS/00-TASK-CONVENTIONS.md."
+  echo ""
+} >&2
+exit 0

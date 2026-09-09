@@ -81,7 +81,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-09 |
 | **Depends on** | P0-01 |
 | **Spec refs** | `docs/ARCHITECTURE/01-APPLICATION-ARCHITECTURE.md`, `docs/FRONTEND/00-FRONTEND-STANDARDS.md` § Project Structure, `AGENTS.md` § Dev environment |
 | **Spec required** | No |
@@ -103,10 +103,10 @@
 6. Leave `docs/` untouched — it is reference material, amended only through the deviation protocol.
 
 **Definition of Done**
-- [ ] The backend module list matches `docs/ARCHITECTURE/01` exactly — same names, same nesting.
-- [ ] `packages/template-renderer` exists and is importable from both `apps/web-app` and `apps/public-invite`; this shared import is what `docs/FRONTEND/04` means by "the same renderer".
-- [ ] `.gitignore` makes committing any `.env` file impossible.
-- [ ] The root `README.md` describes the repository and points at `docs/`, `TASKS/`, and `MEMORY/`.
+- [x] The backend module list matches `docs/ARCHITECTURE/01` exactly — same names, same nesting.
+- [x] `packages/template-renderer` exists and is importable from both `apps/web-app` and `apps/public-invite`; verified by the workspace symlinks after `pnpm install`.
+- [x] `.gitignore` makes committing any `.env` file impossible — verified with `git check-ignore` on `.env` and `.env.production`, with `.env.example` still tracked.
+- [x] The root `README.md` describes the repository and points at `docs/`, `TASKS/`, and `MEMORY/`.
 
 ---
 
@@ -114,7 +114,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-09 |
 | **Depends on** | P0-02 |
 | **Spec refs** | `AGENTS.md` § PR / change instructions, `docs/DEVOPS/01-CI-CD.md` § Branch Strategy, `TASKS/00-TASK-CONVENTIONS.md` |
 | **Spec required** | No |
@@ -131,10 +131,12 @@
 6. Add a CI check that fails a PR touching a route file with an `:id` parameter unless the diff also touches a test file — crude, but it converts `docs/SECURITY/05`'s checklist item from a habit into a gate.
 
 **Definition of Done**
-- [ ] A PR cannot be opened without the task ID and specification references filled in.
-- [ ] A commit without a task ID prefix is rejected before it reaches `main`.
-- [ ] Editing `docs/SECURITY/`, `docs/DATABASE/`, or `docs/API/` requires a code-owner review.
-- [ ] The `:id`-without-test check runs on every PR and its failure message names `docs/SECURITY/05`.
+- [~] A PR cannot be opened without the task ID and specification references filled in — the template asks, and a CI job **fails** a PR whose body names neither a task nor a `docs/` section. GitHub cannot block the opening of a PR; failing its checks is the available enforcement.
+- [x] A commit without a task ID prefix is rejected before it reaches `main` — `.githooks/commit-msg`, verified by execution, plus a CI check over every commit in the PR.
+- [~] Editing `docs/SECURITY/`, `docs/DATABASE/`, or `docs/API/` requires a code-owner review — `CODEOWNERS` is written and correct, but takes effect only once branch protection is enabled in the GitHub repository settings, which cannot be done from here. **Not yet enabled.**
+- [x] The `:id`-without-test check runs on every PR and its failure message names `docs/SECURITY/05` — `scripts/check-id-endpoint-tests.mjs`, detection logic self-tested over six cases.
+
+**Note on existing history** — the repository already had four commits in Conventional Commits style when this task ran. The hook applies going forward; history is not rewritten for a convention introduced after it.
 
 ---
 

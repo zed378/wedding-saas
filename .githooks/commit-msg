@@ -1,0 +1,33 @@
+#!/bin/sh
+# Reject a commit subject that does not start with a valid task ID.
+#
+# Task IDs are the join key across this repository: branches, commits, PRs, MEMORY records
+# and PROGRESS.md all use them (TASKS/00-TASK-CONVENTIONS.md § Branch, Commit, PR). A commit
+# that carries no task ID cannot be traced back to the specification it implements, and this
+# project is built across many sessions where that trace is the only continuity there is.
+#
+# Installed by `pnpm prepare`, which sets core.hooksPath to .githooks.
+
+msg_file="$1"
+subject=$(head -n1 "$msg_file")
+
+# git-generated subjects
+case "$subject" in
+  "Merge "*|"Revert "*|"fixup! "*|"squash! "*) exit 0 ;;
+esac
+
+if printf '%s' "$subject" | grep -Eq '^P[0-9]+[A-Z]?-[0-9]+(\.[0-9]+)?: .+'; then
+  exit 0
+fi
+
+{
+  echo "x Commit rejected: the subject must start with a task ID."
+  echo ""
+  echo "  Got:       $subject"
+  echo "  Expected:  P1-09: create invitation with template version lock"
+  echo ""
+  echo "  Task IDs come from TASKS/ and are the join key across branches, commits,"
+  echo "  PRs, MEMORY records and PROGRESS.md."
+  echo "  See TASKS/00-TASK-CONVENTIONS.md - Branch, Commit, PR."
+} >&2
+exit 1
