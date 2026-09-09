@@ -9,7 +9,7 @@ CDN / Edge (static + public page cache + optional TLS termination here)
    │
    ▼
 Reverse Proxy / Load Balancer (e.g., Nginx/Traefik or a managed LB)
-   │  — routes based on Host header: wildcard subdomain, custom domain (Phase 2), admin subdomain
+   │  — routes on Host: public invitations host (path-based slugs), app host, admin host; custom domains in Phase 2
    ├──► Frontend App (containers, horizontal autoscale)
    ├──► Backend API (containers, horizontal autoscale, stateless)
    └──► Admin Panel (containers, separate/separate route)
@@ -37,8 +37,9 @@ backup)
 - Media processing (CPU-intensive) should ideally be in a separate worker pool from the email/notification worker so they don't starve each other's resources.
 
 ## TLS/SSL
-- A wildcard certificate for `*.maindomain.com`.
-- Custom domain (Phase 2): on-demand SSL provisioning per domain (see PLAN/10-DOMAIN-PUBLISHING.md).
+- **MVP: three fixed hostnames, three certificates, no wildcard** — `invitation.zedth.my.id` (public invitations, path-based), `app.zedth.my.id` (application and API), `admin.zedth.my.id` (admin, from Phase 5). Issued and renewed automatically by the origin proxy (MEMORY ADR-015, ADR-024).
+- A wildcard certificate for `*.invitation.zedth.my.id` arrives with the migration to per-invitation subdomains, which needs programmatic DNS.
+- Custom domain (Phase 2): on-demand SSL provisioning per domain (see PLAN/10-DOMAIN-PUBLISHING.md) — the same capability as the wildcard migration.
 
 ## Zero-downtime Deployment
 - Rolling deployment for API/Frontend (health-check before traffic is shifted).

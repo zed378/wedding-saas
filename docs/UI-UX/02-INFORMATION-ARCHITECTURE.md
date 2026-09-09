@@ -18,19 +18,21 @@
 
 ## Sitemap (Public Invitation)
 ```
-{slug}.maindomain.com/            Main invitation page (all sections in one scroll)
-{slug}.maindomain.com/?to=Name     Guest name personalization
+invitation.zedth.my.id/{slug}            Main invitation page (all sections in one scroll)
+invitation.zedth.my.id/{slug}?to=Name     Guest name personalization
+invitation.zedth.my.id/preview/{token}    Share-preview, watermarked, noindex
 ```
+Path-based at MVP; moving to `{slug}.invitation.zedth.my.id` later, with permanent redirects (PLAN/10).
 
 ## Sitemap (Admin Panel — separate subdomain)
 ```
-admin.maindomain.com/dashboard
-admin.maindomain.com/users
-admin.maindomain.com/templates
-admin.maindomain.com/templates/:id/versions/:vid/edit
-admin.maindomain.com/orders
-admin.maindomain.com/moderation
-admin.maindomain.com/audit-logs
+admin.zedth.my.id/dashboard
+admin.zedth.my.id/users
+admin.zedth.my.id/templates
+admin.zedth.my.id/templates/:id/versions/:vid/edit
+admin.zedth.my.id/orders
+admin.zedth.my.id/moderation
+admin.zedth.my.id/audit-logs
 ```
 
 ## Main Navigation (Authenticated App)

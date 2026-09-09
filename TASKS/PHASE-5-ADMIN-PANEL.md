@@ -44,7 +44,7 @@
 **Goal** — The admin panel runs on its own subdomain with a session that has nothing to do with the user application's.
 
 **Steps**
-1. Serve the admin app at `admin.maindomain.com` with cookies scoped to that host, so an XSS in the user application cannot reach an admin session (`docs/SECURITY/02` boundary 3→4).
+1. Serve the admin app at `admin.zedth.my.id` — one static DNS record, no wildcard — with cookies scoped to that host, so an XSS in the user application cannot reach an admin session (`docs/SECURITY/02` boundary 3→4, ADR-024).
 2. Apply a stricter Content-Security-Policy than the user app — the admin surface has no third-party embeds to accommodate.
 3. Shorten the admin session to about four hours, per `docs/SECURITY/03` § Admin Session.
 4. Build the shell: navigation for dashboard, users, templates, orders, moderation, audit logs (`docs/UI-UX/02` § Admin sitemap), desktop-first per `docs/UI-UX/15`.
@@ -395,6 +395,7 @@
 3. Implement case-insensitive matching with the substring and basic leetspeak variation handling described in `docs/SECURITY/10`, and support both exact and substring match types — blocking every slug containing a short common word would be worse than the problem.
 4. Cache the list and invalidate on change; slug validation runs on every invitation creation.
 5. Build the admin CRUD with a test box for checking whether a candidate slug would be blocked, and audit every change.
+5b. Add the CI check required by R15: every path segment routed on the public invitation host must exist as a reserved term in `slug_blocklist`. An unreserved route would shadow a published invitation and take a live wedding page offline, so this fails the build rather than relying on review.
 6. Report existing slugs that a newly added term would have blocked, so the team knows what is already live.
 
 **Definition of Done**

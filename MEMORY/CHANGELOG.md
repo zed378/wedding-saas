@@ -10,6 +10,26 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-09 — pricing and publishing address decided
+
+**Decided** — commercial model ([record](./records/2026-09-09-pricing-and-publishing-address.md), [ADR-023](./DECISIONS.md))
+- **One package: Rp 139,000 for 12 months**, 200 photos at 10 MB, no watermark. The Basic/Premium split is gone — a single price means a single tier.
+- **Free tier is one draft**: an account may hold at most one invitation that has never reached `paid`. A paid invitation stops counting, so a wedding organizer with five paid invitations can still start a sixth draft (new BR-1.4).
+- Renewal is another Rp 139,000 for another 12 months. `addons` ships with **no active rows** — `custom_domain` waits for Phase 2, `extended_validity` is redundant beside a 12-month package.
+- Read as a 12-month validity with manual renewal, **not** recurring billing; that interpretation is stated in the ADR rather than assumed.
+- Knock-on effects: checkout stops being a comparison page (`docs/UI-UX/13`), media limits collapse to one row (`docs/PLAN/11`), and the watermark narrows to free drafts and previews only — no published invitation carries one (`docs/UI-UX/14`).
+
+**Changed** — publishing addresses ([record](./records/2026-09-09-pricing-and-publishing-address.md), [ADR-024](./DECISIONS.md))
+- Invitations are published at **`invitation.zedth.my.id/{slug}`** — path-based on a fixed hostname. **No wildcard DNS record and no wildcard certificate**, because programmatic DNS management is not in place yet.
+- Three fixed hostnames, added as each surface is built: `invitation.zedth.my.id` (public invitations, previews, proxied public API), `app.zedth.my.id` (application and API, from `P0-23`), `admin.zedth.my.id` (admin, from `P5-01`).
+- The public surface stays on **its own origin** rather than sharing one with the application. Guest-submitted content renders there, and a shared origin would let a stored XSS act against the authenticated app — a containment the wildcard design provided for free.
+- Slug resolution is now **strategy-driven** (`docs/BACKEND/06`): path today, subdomain later, one implementation. Migration is configuration plus DNS, with published path URLs redirecting permanently and indefinitely.
+- Per-invitation subdomains merge into `P7-01` alongside custom domains — the same programmatic-DNS capability serves both.
+- New risk **R15**: an unreserved application route could shadow a published invitation. Closed by construction — that host serves only invitations, and CI fails on a route not present in `slug_blocklist`.
+- 20 documents amended; `maindomain.com` placeholders replaced with the real hostnames throughout.
+
+**Status** — `TASKS/PROGRESS.md` now shows **no blocked tasks**. Five open questions remain and none stops work.
+
 ### 2026-09-09 — stack decided, specification gaps closed
 
 **Decided** — the technology stack ([P0-01](./records/2026-09-09-P0-01-stack-decision.md), ADR-004 through ADR-017)

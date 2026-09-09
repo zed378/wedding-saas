@@ -18,6 +18,7 @@ The limits above are an initial baseline — to be adjusted based on real traffi
 ## Slug Blocklist
 - Forbidden words: reserved system words (`admin`,`api`,`www`,`app`,`mail`,`ftp`, etc.), hate speech/profanity (a separately curated list, managed by admins, updatable without a deploy). Stored in the `slug_blocklist` table — see DATABASE/12-PLATFORM-CONFIG.md for the schema, the `exact` versus `substring` match semantics, and the governance rules.
 - Validation is case-insensitive and includes basic substring checks for common variations (basic leetspeak) if needed.
+- **Every path segment served on the public invitation host is a reserved slug.** Invitations sit at the root of that host (PLAN/10), so an unreserved route would be able to shadow a published invitation and take it offline silently. CI fails if a route exists whose segment is not in `slug_blocklist` (see the admin blocklist task in TASKS Phase 5).
 
 ## Guestbook/RSVP Spam
 - The rate limits above + optional CAPTCHA (e.g., hCaptcha/Turnstile), automatically enabled if a suspicious-traffic threshold is exceeded on a given slug (adaptive, not always-on — preserving guest UX).

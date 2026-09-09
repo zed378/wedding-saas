@@ -11,7 +11,7 @@
 
 ## Access Control
 - All admin panel routes are behind RBAC middleware for the `admin`/`super_admin` role (see SECURITY/04-AUTHORIZATION-RBAC.md).
-- The admin panel is served on a separate path/subdomain (e.g., `admin.maindomain.com`) with a session separate from the user-facing application to reduce the attack surface (see SECURITY/02-TRUST-BOUNDARIES.md).
+- The admin panel is served on a separate hostname (`admin.zedth.my.id`) with a session separate from the user-facing application, to reduce the attack surface (see SECURITY/02-TRUST-BOUNDARIES.md). One static DNS record, no wildcard — see PLAN/10 § Hostnames.
 - 2FA is mandatory for admin accounts (see SECURITY/03-AUTHENTICATION-SECURITY.md).
 
 ## Mandatory Audit Trail

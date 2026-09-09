@@ -250,14 +250,14 @@
 | **Spec required** | Yes — public surface |
 | **Surface** | public-invite |
 
-**Goal** — The invitation renders server-side at `{slug}.maindomain.com`, resolved from the `Host` header.
+**Goal** — The invitation renders server-side at `invitation.zedth.my.id/{slug}`, with the slug resolved by the configured strategy.
 
 **Steps**
-1. Implement host-based resolution per `docs/BACKEND/06`: extract the subdomain from `Host`, or look up a custom domain in Phase 7, then fetch by slug.
+1. Implement slug resolution per `docs/BACKEND/06` § Slug Resolution — **one** implementation reading the slug from a path segment (MVP) or a `Host` label (later) according to configuration, with custom domains checked first in Phase 7. Validate the resolved slug's shape before querying: a path segment and a proxy-set header are both untrusted input.
 2. Fetch server-side during rendering, so the main content and meta tags exist in the initial HTML. `docs/FRONTEND/07` explains why: sharing bots scrape `og:*` without executing JavaScript, so a client-side fetch produces a broken WhatsApp preview.
 3. Render through the shared renderer in `public` mode.
 4. Implement the dedicated not-found page from `docs/UI-UX/14` § Special States — friendly, non-technical, matching the product's tone rather than a framework default.
-5. Handle the reverse proxy's slug header from `docs/DEVOPS/03` while still validating the slug server-side; a proxy header is an input, not a fact.
+5. Serve **only** `/{slug}`, `/preview/{token}` and the proxied `/public/*` on this host; everything else is a 404. With invitations at the root of the host, an unreserved route would silently shadow a published invitation (R15).
 6. Letterbox the page on desktop per `docs/UI-UX/15`: a mobile-width view centred on a large screen.
 7. Keep the initial JavaScript payload within the `docs/FRONTEND/09` budget by code-splitting so only the active template's section components ship.
 

@@ -698,28 +698,29 @@
 
 | | |
 |---|---|
-| **Status** | BLOCKED — `OQ-08` (domain) in `BACKLOG.md`. Hosting and storage answered by ADR-011 and ADR-015 |
+| **Status** | TODO — domain and address strategy decided (ADR-024) |
 | **Depends on** | P0-17 |
 | **Spec refs** | `docs/DEVOPS/00-ENVIRONMENTS.md`, `docs/ARCHITECTURE/08-DEPLOYMENT-ARCHITECTURE.md`, `docs/DEVOPS/03-REVERSE-PROXY.md`, `docs/PLAN/10-DOMAIN-PUBLISHING.md` |
 | **Spec required** | No |
 | **Surface** | infra |
 
-**Goal** — A staging environment that mirrors production's topology, including the wildcard subdomain routing the product's whole publishing model depends on.
+**Goal** — A staging environment that mirrors production's topology, including the host and path routing the product's publishing model depends on.
 
-**Why the wildcard belongs in Phase 0** — `docs/PLAN/10` resolves an invitation from the `Host` header against `*.maindomain.com`. If that only gets set up in Phase 3 alongside publishing, the first time anyone discovers a DNS or certificate problem is the week publishing is supposed to ship.
+**Why addressing belongs in Phase 0** — `docs/PLAN/10` (as amended by ADR-024) publishes invitations at `invitation.zedth.my.id/{slug}`, with the application on `app.zedth.my.id`. If routing and certificates are only set up in Phase 3 alongside publishing, the first time anyone discovers a DNS or TLS problem is the week publishing is supposed to ship.
 
 **Steps**
 1. Provision staging with the topology from `docs/ARCHITECTURE/08` on the target chosen in ADR-015 — a single VPS running Docker Compose behind Caddy, Cloudflare in front, R2 for object storage: reverse proxy, API, worker pools, web app, public-invite, admin static files, Postgres, Redis, ClamAV.
-2. Configure `Host`-based routing per `docs/DEVOPS/03`: `*.maindomain.com` → public-invite with the slug extracted, `admin.` → admin, `api.` → API, apex and `www.` → web app.
-3. Provision a wildcard TLS certificate for `*.maindomain.com` and verify automatic renewal.
+2. Configure routing per `docs/DEVOPS/03`: `invitation.zedth.my.id` → public-invite (`/{slug}`, `/preview/{token}`, `/public/*` proxied to the API), `app.zedth.my.id` → web app plus `/api/*`. The admin host follows in `P5-01`. **No wildcard record** — that is deliberate (ADR-024), and the two hosts are separate so guest-submitted content never shares an origin with the authenticated application.
+3. Let Caddy issue and renew a certificate per hostname; verify renewal actually happens rather than assuming it.
 4. Apply the environment separation rules from `docs/DEVOPS/00`: sandbox payment credentials, seeded data rather than a production copy, internal access restriction.
 5. Wire the staging deploy pipeline from `P0-17`: migrate, deploy, smoke test, notify.
 6. Add synthetic uptime checks from outside the infrastructure (`docs/DEVOPS/05` § Synthetic Monitoring).
-7. Deploy a placeholder page on an arbitrary subdomain and confirm end to end that `anything.maindomain.com` resolves, terminates TLS, and reaches the public-invite app with the slug attached.
+7. Deploy a placeholder and confirm end to end that `invitation.zedth.my.id/some-slug` resolves, terminates TLS, and reaches the public-invite app with the slug available to the handler — and that `invitation.zedth.my.id/dashboard` does **not** reach the application, because that host serves only invitations.
 
 **Definition of Done**
-- [ ] An arbitrary `*.maindomain.com` host reaches the public-invite app over HTTPS with the slug available to the handler.
-- [ ] The admin subdomain is served separately from the user application with its own session cookie scope.
+- [ ] `invitation.zedth.my.id/{slug}` reaches the public-invite app over HTTPS with the slug available to the handler, and nothing else on that host reaches any other app.
+- [ ] No wildcard DNS record or wildcard certificate exists — the MVP does not need one (ADR-024).
+- [ ] The application host is served separately from the public invitation host, with distinct cookie scopes; the admin host follows at `P5-01`.
 - [ ] Staging carries no production data and no live payment credentials.
 - [ ] A merge to the integration branch reaches staging without a manual step, and the smoke test result is visible.
 

@@ -582,3 +582,98 @@ Two of these deserve their reasoning stated. **Version upgrade is a separate end
 **Specification impact** — Amended: `docs/PLAN/07`, `docs/PLAN/08`, `docs/PLAN/09`, `docs/API/06`, `docs/ARCHITECTURE/04`, `docs/DATABASE/07`.
 
 ---
+
+### ADR-023 — Pricing: one package at Rp 139,000 for 12 months, one free draft
+
+| | |
+|---|---|
+| **Date** | 2026-09-09 |
+| **Status** | Accepted |
+| **Task** | `P3-01` — resolves `OQ-05` |
+| **Deciders** | Project owner |
+
+**Context** — `docs/PLAN/09` § Packages described a two-tier model (Basic and Premium) with different photo caps, watermark behaviour, custom-domain access and validity periods, and explicitly left final pricing out of scope. `docs/DATABASE/07` makes `packages.price` the source of truth for every calculation, so nothing in Phase 3 is real until the numbers exist. `docs/PLAN/00` § Business Model also left the free tier's boundary unstated: it says "1 free invitation" while FR-1.4 requires the architecture to support many invitations per account.
+
+**Decision** — A **single paid package**, priced at **Rp 139,000**, valid for **12 months**, with a **200 photo** cap at 10 MB per file and **no watermark**. The **free tier is one draft**: an account may hold at most one invitation that has never been paid for.
+
+The project owner's reasoning, recorded because it explains the shape and not only the number: the effort in producing a wedding invitation belongs to the couple, not to the platform, so the platform should be cheap.
+
+Concretely:
+
+| | |
+|---|---|
+| `packages` | one active row: `standard`, Rp 139,000, `duration_months = 12`, `max_photos = 200`, `has_watermark = false` |
+| `addons` | `custom_domain` inactive until `P7-01`; `extended_validity` inactive at MVP — redundant beside a 12-month package plus renewal orders |
+| Free tier | at most **one** invitation per account that has never reached `paid`. Draft only, watermarked preview, cannot publish |
+| Renewal | an `order_type = 'renewal'` order at the same Rp 139,000 for another 12 months |
+
+**Two interpretations were made and are flagged rather than buried.** "Subscription 1 tahun" is implemented as a **12-month validity period with manual renewal**, not recurring billing — `docs/PLAN/00` says the MVP is not subscription-based, the renewal flow in `docs/PLAN/10` already exists, and recurring billing is a materially different payment flow that would need its own security review (`P7-07`). And a single price is read as a **single tier**: with the two-tier table gone, Basic and Premium disappear rather than Basic being priced separately.
+
+**Alternatives considered**
+
+- **Keeping Basic and Premium** with 139,000 as one of them: rejected because only one price was given, and because a second tier at this level would have to sit around Rp 89,000 for a difference the customer would struggle to care about. `docs/UI-UX/13`'s comparison cards exist to help a user choose between tiers; with one tier there is nothing to compare, and the checkout gets simpler rather than poorer.
+- **A lower price with a photo cap around 20** (the old Basic shape): rejected on arithmetic. The marginal cost of the 200-photo cap is roughly Rp 900 a year in R2 storage, against a Rp 139,000 price. Capping photos low would save nothing worth the support conversation it creates.
+- **Free tier of zero drafts** (pay before editing): rejected because `docs/UI-UX/04` describes a journey where confidence is built by seeing the real preview before paying, and `docs/PLAN/00` targets a 15% draft-to-paid conversion — which requires drafts to exist.
+
+**Consequences**
+
+The free-draft rule is stated as "at most one invitation that has never reached `paid`", which is what keeps the wedding-organizer persona working: an organizer with five paid invitations can still start a sixth draft. Counting all drafts regardless of history would have made the product unusable for `docs/UI-UX/03`'s secondary persona.
+
+Unit economics at Rp 139,000 (about US$8.50): payment gateway fees run roughly Rp 1,000–4,000 depending on method; storage for a fully-loaded invitation is on the order of Rp 900 a year; egress is free on R2 (ADR-011). Gross margin is comfortable, which is the point — the model is volume at a price that does not make a couple hesitate.
+
+The watermark's role narrows sharply. With no paid tier carrying one, it appears only on **free drafts and share-previews**, not on any published invitation. That simplifies `PG-09`'s `display.watermark` flag — for now it is always false for a published invitation — and it retires most of `OQ-13`: what remains is what the preview watermark looks like, not a decision about which customers see one. It also removes the watermark as an acquisition channel, which was a stated secondary benefit in `docs/UI-UX/14`; a footer credit link is the obvious replacement if that channel is wanted, and is a separate decision.
+
+`extended_validity` going inactive means the `addons` table ships at MVP with no active rows. That is fine — the table and the `addon_ids` array stay, so the first active addon is a seed row rather than a schema change.
+
+**Specification impact** — Amended: `docs/PLAN/00` (business model), `docs/PLAN/02` (BR-8.1 and a new BR-1.4 free-draft rule), `docs/PLAN/09` (packages), `docs/PLAN/11` (media limits), `docs/DATABASE/07` (seed note), `docs/UI-UX/13` (checkout without tier comparison), `docs/UI-UX/14` (watermark scope).
+
+---
+
+### ADR-024 — Publishing addresses: path-based on fixed hostnames, no wildcard DNS
+
+| | |
+|---|---|
+| **Date** | 2026-09-09 |
+| **Status** | Accepted |
+| **Task** | `P0-23`, `P3-11` — resolves `OQ-08` |
+| **Deciders** | Project owner |
+
+**Context** — `docs/PLAN/10` § Subdomain specified `{slug}.maindomain.com` resolved from the `Host` header against a wildcard DNS record and a wildcard TLS certificate. `docs/DEVOPS/03`, `docs/BACKEND/06`, `docs/FRONTEND/01`, `docs/FRONTEND/07` and `docs/ARCHITECTURE/08` all build on that.
+
+The project owner's domain is `zedth.my.id`, with `invitation.zedth.my.id` already in service, and the infrastructure is not yet in a position to manage DNS records programmatically. The stated direction is to add a Cloudflare API token later so records can be created against a Cloudflare Tunnel — which is also, not coincidentally, the mechanism the Phase 7 custom-domain feature would need.
+
+**Decision** — For the MVP, an invitation is published at a **path on a fixed hostname**: `https://invitation.zedth.my.id/{slug}`. No wildcard DNS record and no wildcard certificate.
+
+Three fixed hostnames, added one at a time as each surface is built, with **no wildcard anywhere**:
+
+| Host | Serves | Added at |
+|---|---|---|
+| `invitation.zedth.my.id` | Public invitations at `/{slug}`, previews at `/preview/{token}`, and `/public/*` proxied to the API so guest submissions stay same-origin | Exists today |
+| `app.zedth.my.id` | Marketing, catalogue, auth, dashboard, editor, checkout, plus `/api/v1/*` and `/api/webhooks/*` | `P0-23` |
+| `admin.zedth.my.id` | The admin SPA and the admin API paths it proxies | `P5-01` |
+
+The slug remains globally unique and remains the invitation's identity, so this is a change of address format, not of data model.
+
+**Why not one single host for everything.** Serving guest-submitted content and the authenticated application from the same origin would create an escalation path that the wildcard design did not have. RSVP names and guestbook messages are attacker-controlled text rendered on the public page; a stored XSS that survives sanitization would then run on the **same origin** as the dashboard and the authenticated API, and could act as any logged-in user who opens that invitation — including the couple who own it. Under the original wildcard scheme each invitation had its own origin, so the browser's same-origin policy contained that failure for free. Splitting the public surface onto its own hostname costs exactly one static DNS record and restores that containment. `docs/SECURITY/02`'s trust boundaries survive this change; a single-host layout would have quietly removed one.
+
+**Alternatives considered**
+
+- **Wildcard `*.invitation.zedth.my.id` now**: the specified design, and still the target. Rejected for the MVP because it requires a wildcard DNS record and a wildcard certificate, which is precisely the automation that does not exist yet.
+- **`/i/{slug}` prefix instead of a bare slug**: eliminates any chance of an application route shadowing an invitation. Rejected because this URL is forwarded by hand to hundreds of guests over WhatsApp, and `invitation.zedth.my.id/andi-sarah` is the product's public face. The collision risk is handled structurally instead — see Consequences.
+- **A path prefix on one host for everything** (`/app`, `/admin`, `/{slug}`): fewest records, and rejected for the same-origin reason above.
+
+**Consequences**
+
+*The collision hazard is real and is closed by construction.* With invitations at the root of their host, any application route on that host could shadow a published invitation — a marketing page deployed at `/pricing` would take an invitation named `pricing` offline silently. The public host therefore serves **only** invitations, previews and the proxied `/public/*` API, and `slug_blocklist` (`docs/DATABASE/12`) reserves every path segment used on it. `P5-13` gains a CI check asserting that every reserved path is in the blocklist, so adding a route without reserving it fails the build rather than breaking a wedding.
+
+*Migration is a configuration change, not a rewrite.* Slug resolution is implemented once, reading the slug from **either** a path segment or a `Host` header according to configuration (`docs/BACKEND/06`). When the Cloudflare token and tunnel automation land, `{slug}.invitation.zedth.my.id` becomes the canonical form by flipping that configuration and creating records; the path form must then **301 permanently** to the subdomain form and keep doing so indefinitely. Links to a wedding invitation are forwarded through family WhatsApp groups and never expire in practice, so a published URL is a promise.
+
+*Canonical URLs and SEO.* `docs/PLAN/15`'s canonical URL becomes the path form. Since `seo_indexable` defaults to false, almost no invitation is indexed and the eventual canonical change carries little SEO cost — which is a good reason to migrate before that default is commonly overridden rather than after.
+
+*This unblocks Phase 7 rather than complicating it.* The custom-domain feature (`P7-01`) needs exactly the same capability the project owner intends to build: programmatic DNS records against a tunnel. The work is now shared, and `P7-01` should be re-read as "per-invitation subdomains **and** custom domains", since both fall out of the same automation.
+
+*Cost.* Nothing here is free of downside: three hostnames mean three certificate lifecycles instead of one wildcard, and a per-surface proxy configuration instead of one host rule. Caddy (ADR-015) automates certificates per hostname, so the operational cost is small.
+
+**Specification impact** — Amended: `docs/PLAN/10` (publishing addresses and the migration path), `docs/PLAN/00`, `docs/PLAN/15`, `docs/PLAN/18` (R15), `docs/ARCHITECTURE/08`, `docs/API/08`, `docs/BACKEND/06`, `docs/DEVOPS/03`, `docs/FRONTEND/01`, `docs/FRONTEND/07`, `docs/SECURITY/02`, `docs/SECURITY/10`, `docs/UI-UX/02`.
+
+---

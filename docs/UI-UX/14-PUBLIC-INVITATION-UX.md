@@ -30,4 +30,4 @@
 
 ## Special States
 - `expired`/not-found invitation: a simple fallback page, not a technical error — a friendly tone ("This invitation is no longer accessible").
-- Watermark (Basic package): a small, non-intrusive element, usually in the footer/corner, with a link to the product (optionally serving as a new-user acquisition channel).
+- Watermark: with a single paid package that carries no watermark (PLAN/09, ADR-023), a watermark appears **only** on a free draft's preview and on a share-preview link — never on a published invitation. `display.watermark` in the public API response (API/08) is therefore false for every published invitation at MVP; the field stays because the rule is a package property, not a constant. If a footer credit link is wanted as an acquisition channel, that is a separate, deliberate decision rather than a side effect of the package tier.

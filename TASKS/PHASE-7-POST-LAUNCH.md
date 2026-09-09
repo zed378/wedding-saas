@@ -38,10 +38,13 @@
 | **Spec required** | Yes — public surface |
 | **Surface** | backend, worker, infra |
 
-**Goal** — A couple can point their own domain at their invitation, with DNS verification and automatic certificate provisioning.
+**Goal** — A couple can point their own domain at their invitation, with DNS verification and automatic certificate provisioning — and, from the same capability, the platform moves from path-based addresses to per-invitation subdomains.
+
+**Scope note (ADR-024)**: the MVP publishes at `invitation.zedth.my.id/{slug}` because programmatic DNS is not in place. This task is where that changes. Building `{slug}.invitation.zedth.my.id` and customer-owned domains are the same underlying work — a Cloudflare API token creating records against the tunnel, plus a certificate per hostname — so they are done together rather than twice.
 
 **Steps**
 1. Use the `invitation_custom_domains` table created in `P0-09` — the schema is already specified in `docs/DATABASE/04`.
+1b. Flip the slug resolution strategy from `path` to `subdomain` (`docs/BACKEND/06`) and make every published path URL answer with a **permanent 301** to its subdomain form, indefinitely. Wedding links are forwarded through family WhatsApp groups and never re-sent; a published URL is a promise. Verify with a real link published before the migration.
 2. Implement the flow in `docs/PLAN/10`: the user enters a domain, the system shows CNAME or A-record instructions, a periodic job verifies DNS, then status moves `pending_verification → verified → active`.
 3. Implement `custom_domain_dns_check` every 10 minutes with a long backoff (`docs/BACKEND/08`), and a give-up threshold so a domain nobody configured stops being polled forever.
 4. Provision certificates on demand per domain via ACME, with renewal and failure alerting.
@@ -55,6 +58,7 @@
 - [ ] An unverified or unpaid-for domain never becomes active.
 - [ ] Resolution adds no per-request database query.
 - [ ] Certificate renewal is automated and alerted on.
+- [ ] Every pre-migration path URL still resolves, via permanent redirect, to the same invitation.
 - [ ] The addon is activated and `P3-01`'s deferral is closed.
 
 ---

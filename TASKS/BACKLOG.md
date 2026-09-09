@@ -8,31 +8,19 @@ Three kinds of entry live here:
 
 Every entry names the task it blocks or affects, so nothing here is a note without a consequence.
 
-**Status as of 2026-09-09**: **all 17 specification gaps are resolved** and `docs/` has been amended accordingly (ADR-018 through ADR-022). Six of the thirteen open questions are answered by the stack decision (ADR-004 through ADR-017). **Seven open questions remain**, of which three block a task.
+**Status as of 2026-09-09**: **all 17 specification gaps are resolved** and `docs/` has been amended accordingly (ADR-018 through ADR-022). The stack decision answered six open questions (ADR-004 through ADR-017); pricing and the publishing address answered two more (ADR-023, ADR-024). **Five open questions remain, and none of them blocks a task.**
 
 | | Total | Resolved | Open |
 |---|---|---|---|
-| Open Questions | 13 | 6 | 7 |
+| Open Questions | 14 | 9 | 5 |
 | Specification Gaps | 17 | 17 | 0 |
 | Deferred | 9 | — | 9 (by design) |
+
+Nothing on the board is `BLOCKED`. The remaining questions shape work rather than stopping it, and two of them (`OQ-10`, `OQ-12`) are worth answering early anyway.
 
 ---
 
 ## Open Questions — Remaining
-
-### OQ-05 — Package and addon pricing, and the free draft quota
-
-**Blocks**: `P3-01`, and therefore the real behaviour of all of Phase 3.
-
-`docs/PLAN/09` § Packages gives the shape — Basic and Premium, photo caps, watermark, validity — and explicitly puts final pricing out of scope. `docs/DATABASE/07` makes `packages.price` the source of truth for every calculation. Phase 3 can be built against placeholder values, but nothing can launch without real ones, and the conversion target in `docs/PLAN/00` (15% draft to paid) is unmeasurable until they exist.
-
-Also needed: the free tier's exact boundaries. `docs/PLAN/00` says a user creates one free invitation as a watermarked draft that cannot be published; `docs/PLAN/01` FR-1.4 wants multi-invitation support; `docs/SECURITY/10` rate limits invitation creation at 10 per day. How many unpaid drafts one account may hold is not stated anywhere.
-
-### OQ-08 — Domain name
-
-**Blocks**: `P0-23`, `P3-11`.
-
-Every document uses `maindomain.com` as a placeholder. The real domain is needed for wildcard DNS, the wildcard certificate, the admin subdomain, cookie scoping, and email sender configuration. The subdomain slug is also the product's public identity, so it is worth deciding deliberately rather than at deployment time.
 
 ### OQ-10 — Encryption at rest for bank account numbers
 
@@ -46,7 +34,7 @@ Encryption costs the ability to query or index those columns and adds key manage
 
 ### OQ-11 — Account deletion with live invitations
 
-**Blocks**: `P1-08`.
+**Affects**: `P1-08` — implementable under the recommendation below, but the recommendation needs confirming before launch, not after.
 
 `docs/API/02` offers account deletion and `docs/SECURITY/09` frames it as a data subject right. `docs/DATABASE/01` sets `invitations.owner_id` to `ON DELETE RESTRICT`. What happens when someone requests deletion while their invitation is published and their wedding is next week is not specified. Immediate takedown may destroy something guests are actively using; refusing outright may not satisfy the right.
 
@@ -58,13 +46,13 @@ Encryption costs the ability to query or index those columns and adds key manage
 
 `docs/PLAN/00` § Constraints assumes 1-3 engineers; `docs/PLAN/16` maps the phases onto 15 weeks. Those two are only compatible if the parallel tracks named in each phase file are actually staffed. With one engineer, the frontend and backend tracks serialize and the roadmap's week numbers do not hold. Knowing the real number changes what gets recommended for deferral.
 
-### OQ-13 — Watermark design and placement
+### OQ-13 — Watermark design, and whether a credit link replaces it
 
-**Affects**: `P3-09`, `P2-03`.
+**Affects**: `P2-03`, `P2-12`.
 
-`docs/PLAN/09` makes watermarking the visible difference between Basic and Premium, and `docs/UI-UX/14` says it should be "small, non-intrusive, usually in the footer/corner, with a link to the product". Nothing specifies what it looks like. It is simultaneously an acquisition channel and something a paying customer is buying their way out of, so its design is a product decision rather than an implementation detail.
+Narrowed considerably by ADR-023. With a single package that carries no watermark, a watermark now appears only on **free drafts and share-previews** — never on a published invitation. So this is no longer a question about which customers see one.
 
-The API side is now settled: `display.watermark` is returned by `GET /public/i/:slug`, derived server-side from the paid package (ADR-021). What remains is what the renderer draws.
+What remains: what the preview watermark looks like (`docs/UI-UX/14` asks for "small, non-intrusive"), and whether the platform wants a footer credit link on published invitations as the acquisition channel the watermark used to provide. The second is a deliberate product choice, not a leftover — a paid product that advertises on the customer's wedding page should do so on purpose or not at all.
 
 ### OQ-14 — CAPTCHA activation threshold
 
@@ -113,6 +101,24 @@ The public page is the surface with unbounded traffic and a 150KB JavaScript bud
 **Answer**: **Cloudflare Turnstile**, already part of the edge stack (ADR-011), invisible by default and activated adaptively.
 
 The activation threshold remains open as `OQ-14`.
+
+### ~~OQ-05 — Package and addon pricing, and the free draft quota~~ — ANSWERED 2026-09-09
+
+**Answer**: one package, **Rp 139,000 for 12 months**, 200 photos, no watermark. Free tier is **one draft** — at most one invitation per account that has never reached `paid`. Recorded as ADR-023.
+
+The project owner's framing is worth keeping: the effort of producing a wedding invitation belongs to the couple, not to the platform, so the platform is priced not to make a couple hesitate.
+
+Two readings were made explicit in the ADR rather than assumed silently: "subscription 1 tahun" is implemented as a 12-month validity with manual renewal, not recurring billing; and a single price means a single tier, so Basic and Premium disappear rather than one of them being priced.
+
+Follow-on effects: `addons` ships with no active rows, checkout stops being a comparison page, and the watermark narrows to previews only (`OQ-13`).
+
+### ~~OQ-08 — Domain name~~ — ANSWERED 2026-09-09
+
+**Answer**: `invitation.zedth.my.id`, with invitations published **path-based** at `/{slug}` rather than on wildcard subdomains, because programmatic DNS is not yet in place. Per-invitation subdomains arrive later, via a Cloudflare API token creating records against a tunnel. Recorded as ADR-024.
+
+Three fixed hostnames, no wildcards: `invitation.zedth.my.id` for public invitations, `app.zedth.my.id` for the application and API, `admin.zedth.my.id` for the admin panel from Phase 5. The public surface is kept on its own origin deliberately — guest-submitted content renders there, and sharing an origin with the authenticated app would give a stored XSS a path it does not currently have.
+
+This answer creates one new risk, **R15** in `docs/PLAN/18`: with invitations at the root of their host, an unreserved application route could shadow a published invitation. Closed by construction — that host serves nothing but invitations, and CI fails on a route that is not in `slug_blocklist`.
 
 ### ~~OQ-07 — Language of `TASKS/` and `MEMORY/`~~ — ANSWERED by default
 

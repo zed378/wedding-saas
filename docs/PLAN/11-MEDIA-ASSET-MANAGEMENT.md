@@ -12,8 +12,12 @@ See SECURITY/06-FILE-UPLOAD-SECURITY.md for detailed security controls, and BACK
 ## Limits per Package
 | Package | Max Photos | Max Size/File | Formats |
 |---|---|---|---|
-| Basic | 20 | 5 MB | jpg, png, webp |
-| Premium | 200 | 10 MB | jpg, png, webp |
+| `standard` (the only paid package) | 200 | 10 MB | jpg, png, webp |
+| Free draft (unpaid) | 200 | 10 MB | jpg, png, webp |
+
+A single package means the quota is uniform (PLAN/09, ADR-023). The limit is still enforced per invitation by the service before accepting an upload (API/05) — it is a resource control, not a commercial differentiator, and it is what stops one invitation consuming unbounded storage.
+
+Note that the retained "original" is the **capped** original from the processing pipeline (BACKEND/04 step 6), not the raw upload, so 200 photos does not mean 200 × 10 MB on disk.
 
 ## Upload Pipeline (summary — details in BACKEND/04-FILE-PROCESSING.md)
 1. Client requests a presigned upload URL / uploads directly to a backend endpoint (see API/05-MEDIA-API.md).

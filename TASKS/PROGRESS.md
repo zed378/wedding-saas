@@ -6,7 +6,9 @@ Single source of truth for where the project stands. Updated in the same commit 
 **Current phase**: Phase 0 — Foundation (2 / 24 done). The stack is decided (`P0-01`, ADR-004 through ADR-017), so `P0-02` is unblocked and the four parallel tracks can start.
 **Overall**: 2 / 133 tasks done
 
-**Specification status**: all 17 gaps found while writing this plan are resolved and `docs/` is amended (ADR-018 through ADR-022). Seven open questions remain in [`BACKLOG.md`](./BACKLOG.md); two of them block a task.
+**Specification status**: all 17 gaps resolved and `docs/` amended (ADR-018 through ADR-022). Pricing and the publishing address are decided (ADR-023, ADR-024). **No task on this board is blocked** — five open questions remain in [`BACKLOG.md`](./BACKLOG.md) and all of them shape work rather than stopping it.
+
+**Product decisions now fixed**: one package at **Rp 139,000 for 12 months**, free tier of **one draft**; invitations published at **`invitation.zedth.my.id/{slug}`** (path-based, no wildcard DNS), with per-invitation subdomains deferred to `P7-01`.
 
 Status values: `TODO` · `BLOCKED` · `SPEC` · `WIP` · `REVIEW` · `DONE` · `DROPPED`
 Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` must be split
@@ -20,7 +22,7 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 | [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 24 | 2 | **ACTIVE** | — |
 | [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 0 | Not started | Phase 0 exit criteria |
 | [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 14 | 0 | Not started | Phase 1 exit + `P1-25` |
-| [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 0 | Not started | Phase 2 exit + `OQ-05` (pricing) answered |
+| [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 0 | Not started | Phase 2 exit |
 | [Phase 4 — Engagement](./PHASE-4-ENGAGEMENT.md) | 12 | 0 | Not started | Phase 3 exit |
 | [Phase 5 — Admin Panel](./PHASE-5-ADMIN-PANEL.md) | 14 | 0 | Not started | Phase 4 exit |
 | [Phase 6 — Hardening and Launch](./PHASE-6-HARDENING-AND-LAUNCH.md) | 17 | 0 | Not started | Phase 5 exit |
@@ -60,7 +62,7 @@ Roadmap: Week 1-2. Exit criteria in the phase file.
 | P0-20 | Template schema definition and validator | backend, web-app | L | TODO | P0-08 |
 | P0-21 | Reference template and demo seed data | backend, web-app | L | TODO | P0-20 |
 | P0-22 | Frontend skeletons and design system | frontend | L | TODO | P0-02 |
-| P0-23 | Staging, wildcard DNS and TLS | infra | L | **BLOCKED** — `OQ-08` (domain) | P0-17 |
+| P0-23 | Staging, hosts and TLS | infra | L | TODO — addressing decided (ADR-024) | P0-17 |
 | P0-24 | Adopt the TASKS/MEMORY discipline | docs | S | **DONE** | — |
 
 **Critical path**: `P0-02` → `P0-04` → `P0-05` → `P0-06` → `P0-07`…`P0-11`. `P0-11` is the one to give extra review attention: every `:id` endpoint in the next four phases is built on it.
@@ -136,7 +138,7 @@ Roadmap: Week 8-9. **Entry needs `OQ-02` and `OQ-05` answered.**
 
 | ID | Task | Surface | Size | Status | Depends on |
 |---|---|---|---|---|---|
-| P3-01 | Packages, addons, pricing service | backend | M | **BLOCKED** — `OQ-05` (pricing) | P0-10 |
+| P3-01 | Packages, addons, pricing service | backend | M | TODO — Rp 139,000 / 12 months (ADR-023) | P0-10 |
 | P3-02 | Order creation | backend | L | TODO | P3-01, P1-06 |
 | P3-03 | Payment gateway port and adapter | backend | L | TODO — Midtrans (ADR-012) | P3-02, P0-18 |
 | P3-04 | Payment initiation | backend | M | TODO | P3-03 |
@@ -255,16 +257,19 @@ Not scheduled. Sequenced by real usage data rather than by the order below.
 
 ## Blocked Tasks
 
-| Task | Blocker | Kind |
+**None.** Every task on this board can start once its dependencies are `DONE`.
+
+The blockers cleared in sequence on 2026-09-09: the stack decision (ADR-004 through ADR-017) answered `OQ-01`, `OQ-02`, `OQ-03`, `OQ-04`, `OQ-06` and `OQ-09`; the specification amendments (ADR-018 through ADR-022) closed `PG-14`; pricing (ADR-023) cleared `P3-01`; and the publishing address (ADR-024) cleared `P0-23`.
+
+Five open questions remain and none of them stops work:
+
+| Question | Affects | Why it still matters |
 |---|---|---|
-| P0-23 | `OQ-08` — the real domain name | Open question |
-| P3-01 | `OQ-05` — package and addon pricing, free draft quota | Open question |
-
-Down from seven blockers to two. The stack decision (ADR-004 through ADR-017) cleared `OQ-01`, `OQ-02`, `OQ-03`, `OQ-04`, `OQ-06` and `OQ-09`; the specification amendments (ADR-018 through ADR-022) cleared `PG-14`.
-
-Neither remaining blocker stops Phase 0 or Phase 1: `P0-23` needs a domain before staging goes up, and `P3-01` needs prices before Phase 3 is real. Both are answers only the project owner can give.
-
-Five further open questions affect work without blocking it: `OQ-10` (encryption at rest for account numbers, best answered before production data exists), `OQ-11` (account deletion with a live invitation), `OQ-12` (team size, which decides whether the roadmap's weeks are achievable), `OQ-13` (watermark design) and `OQ-14` (CAPTCHA activation threshold).
+| `OQ-10` | `P1-13` | Encryption at rest for bank account numbers. Answer **before production data exists** — afterwards it is a migration over live sensitive data |
+| `OQ-11` | `P1-08` | What happens to a published invitation when its owner deletes their account. Implementable under the recommendation; confirm before launch |
+| `OQ-12` | Every phase | Team size. `docs/PLAN/16`'s 15 weeks only hold if the parallel tracks are actually staffed |
+| `OQ-13` | `P2-03`, `P2-12` | What the preview watermark looks like, and whether published invitations carry a credit link |
+| `OQ-14` | `P4-05` | The traffic threshold that turns the CAPTCHA on. Best set from observed traffic, but needs an initial value |
 
 ---
 
@@ -288,7 +293,12 @@ All 17 gaps are resolved and every owed amendment has been made (2026-09-09, ADR
 | `docs/DATABASE/07` | Addon availability gating |
 | `docs/DATABASE/11-ANALYTICS.md` | **New** — `invitation_view_counts` |
 | `docs/DATABASE/12-PLATFORM-CONFIG.md` | **New** — `slug_blocklist` |
-| `docs/DEVOPS/03` | Caddy named as the origin proxy, with the on-demand TLS reasoning |
+| `docs/DEVOPS/03` | Caddy named as the origin proxy; routing rewritten for three fixed hosts, no wildcard |
+| `docs/PLAN/10` | Publishing address is path-based at MVP, with hostnames, collision safety and the migration path |
+| `docs/BACKEND/06` | Slug resolution by configured strategy — path today, subdomain later, one implementation |
+| `docs/PLAN/09`, `11`, `00`, `02` | One package at Rp 139,000 for 12 months; uniform media limits; free-draft quota as BR-1.4 |
+| `docs/UI-UX/13`, `14` | Checkout without tier comparison; watermark narrowed to previews only |
+| `docs/API/00`, `FRONTEND/01`, `07`, `UI-UX/02`, `ARCHITECTURE/08`, `PLAN/15`, `SECURITY/02`, `10` | Real hostnames, path-based addresses, origin-separation rationale |
 | `docs/PLAN/02`, `docs/PLAN/06` | BR-5.4 and the lifecycle transition rules |
 | `docs/PLAN/07` | Demo data lives as a seeded system-owned invitation |
 | `docs/PLAN/08` | Where settings fields physically live |

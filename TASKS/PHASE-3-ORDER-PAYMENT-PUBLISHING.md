@@ -6,7 +6,7 @@
 
 **Gate before deploying to production**: `docs/PLAN/16` § Critical Dependencies requires `docs/SECURITY/07` to be reviewed before the payment API reaches production. That review is `P3-16`, and it is a hard gate, not a formality.
 
-**Exit criteria**: checkout through webhook to `paid` works end to end against the provider's sandbox, including the failure, expiry, replay and forged-signature paths; publishing produces a live page at `{slug}.maindomain.com` within five seconds; an owner's content edit invalidates the cache; the daily expiry job transitions invitations correctly.
+**Exit criteria**: checkout through webhook to `paid` works end to end against the provider's sandbox, including the failure, expiry, replay and forged-signature paths; publishing produces a live page at `invitation.zedth.my.id/{slug}` within five seconds; an owner's content edit invalidates the cache; the daily expiry job transitions invitations correctly.
 
 **Roadmap reference**: `docs/PLAN/16-IMPLEMENTATION-ROADMAP.md` § Phase 3 (Week 8-9).
 
@@ -39,7 +39,7 @@
 
 | | |
 |---|---|
-| **Status** | BLOCKED — `OQ-05` (pricing values) in `BACKLOG.md`. The addon-availability question is resolved by ADR-022 |
+| **Status** | TODO — pricing decided (ADR-023); addon availability decided (ADR-022) |
 | **Depends on** | P0-10 |
 | **Spec refs** | `docs/DATABASE/07-ORDERS.md`, `docs/PLAN/09-ORDER-PAYMENT.md` § Packages, `docs/SECURITY/07` § Pricing, `docs/PLAN/11` § Limits per Package |
 | **Spec required** | Yes — payment |
@@ -48,10 +48,10 @@
 **Goal** — One pricing service that computes an order total from database rows, and one place that answers "what does this package allow".
 
 **Steps**
-1. Seed `packages` and `addons` with real values once `OQ-05` is answered; keep the shape from `docs/PLAN/09` § Packages: photo cap, custom domain, watermark, active period.
+1. Seed `packages` with the one active row from `docs/PLAN/09` § Package (MVP): `standard`, Rp 139,000, `duration_months = 12`, `max_photos = 200`, `has_watermark = false`. Seed `addons` with `custom_domain` and `extended_validity` both **inactive** — no addon is active at MVP (ADR-022, ADR-023).
 2. Implement `PricingService.calculate(packageId, addonIds)` reading prices from the database at request time. `docs/SECURITY/07` § Pricing makes this non-negotiable: the client never sends an amount, and no price constant exists in code.
 3. Reject an inactive package or addon.
-4. Expose the package entitlements the rest of the system already needs: photo quota (`P1-17`), watermark flag (`P3-09`), validity months (`P3-09`), custom domain permission (Phase 7).
+4. Expose the package entitlements the rest of the system already needs: photo quota (`P1-17`), watermark flag (`P3-09`), validity months (`P3-09`), custom domain permission (Phase 7). Keep them as lookups even though there is one package — a second tier must be a seed row, never a code change.
 5. Seed `custom_domain` with `is_active = false` and enforce that an inactive addon cannot be ordered. ADR-022 settled this: `docs/PLAN/09` § Add-on Availability at MVP now states it, and the addon is activated by `P7-01` when the feature actually ships.
 6. Unit test every package-plus-addon combination against expected totals, and test that a price supplied in the request body is ignored entirely.
 
@@ -60,6 +60,8 @@
 - [ ] A client-supplied amount has no effect, proven by an explicit test.
 - [ ] Inactive packages and addons cannot be ordered.
 - [ ] Entitlement lookups (quota, watermark, duration) go through this one service.
+- [ ] A renewal order prices at the same Rp 139,000 for another 12 months.
+- [ ] Nothing in the codebase assumes exactly one package exists — adding a second tier is seed data plus checkout UI.
 
 ---
 
@@ -351,18 +353,19 @@
 | **Spec required** | No |
 | **Surface** | infra |
 
-**Goal** — The production topology from `docs/ARCHITECTURE/08` serving wildcard subdomains under a wildcard certificate.
+**Goal** — The production topology from `docs/ARCHITECTURE/08` serving the fixed hostnames from `docs/PLAN/10` § Hostnames, each with its own automatically renewed certificate.
 
 **Steps**
-1. Apply the `P0-23` routing configuration to production: wildcard, admin, api, apex.
-2. Provision and automate renewal for the wildcard certificate, and add the 14-day expiry alert from `docs/DEVOPS/07`.
+1. Apply the `P0-23` routing configuration to production: the public invitation host, the application host, and the admin host once `P5-01` needs it. No wildcard record (ADR-024).
+2. Confirm automatic renewal for each hostname's certificate, and add the 14-day expiry alert from `docs/DEVOPS/07`.
 3. Apply edge rate limiting per `docs/DEVOPS/03`, with the webhook path exempt.
 4. Set a longer upload timeout than the general API timeout, per `docs/DEVOPS/03` § Timeout & Buffering — a 10MB photo on a phone connection is not a stuck request.
 5. Add the security headers not already set at the application layer, and keep the frame policy separate for the public invitation surface (`docs/SECURITY/08`).
 6. Verify with a real published invitation, not a placeholder.
 
 **Definition of Done**
-- [ ] A real published invitation is reachable at its subdomain over HTTPS.
+- [ ] A real published invitation is reachable at `invitation.zedth.my.id/{slug}` over HTTPS.
+- [ ] A request for a reserved path on that host does not reach the public invitation app, and the reserved list matches `slug_blocklist` (R15).
 - [ ] Certificate renewal is automated and alerted on.
 - [ ] Media upload survives a slow connection that a normal API timeout would kill.
 - [ ] The webhook path bypasses edge rate limiting.
@@ -441,7 +444,7 @@
 **Goal** — A checkout flow that never claims success the server has not confirmed.
 
 **Steps**
-1. Build package comparison cards and addon checkboxes with a live price summary, per `docs/UI-UX/13`.
+1. Build the single package card per `docs/UI-UX/13` § Package Page — price, active period and what is included. There is one package and no active addon at MVP (ADR-023), so this page informs rather than asks the user to choose; a comparison table with one column is worse than none. Leave room for the layout to become comparison cards later without a redesign.
 2. Show the total from the server's calculation, never computed client-side — a client-computed total that disagrees with the charge is a support incident.
 3. Redirect or embed the provider widget from the initiation response.
 4. On return with `?returning=true` (`docs/FRONTEND/01`), poll `GET /orders/:id/payment/status`. **Ignore any status in the redirect URL entirely.** `docs/SECURITY/07` forbids acting on it; the UI does not read it at all, which is stronger than reading and disregarding it.

@@ -14,8 +14,9 @@ GET    /public/preview/:token                      Render an unpublished invitat
 
 `report` is the guest-facing half of the admin moderation queue in PLAN/12 § Moderation Queue — a queue fed by "user reports" needs a way for a user to report. It is heavily rate-limited per IP hash, reveals nothing about the entry's current state, and flags rather than hides: a report queues the entry for review (PLAN/05 § Admin Guestbook Moderation), it does not let a stranger remove a message from someone's wedding page.
 
-## Host Resolution
-- For custom domains (Phase 2), the reverse proxy/edge performs a `Host` header lookup → `invitation_id`/`slug` before the request reaches this handler (see PLAN/10-DOMAIN-PUBLISHING.md), so the handler consistently works with the `slug`.
+## Address Resolution
+- The handler always works with a `slug`, whatever the address format. At MVP the public app derives it from the URL path (`invitation.zedth.my.id/{slug}`); later it will derive it from a subdomain label, and for a custom domain (Phase 2) the edge resolves `Host` → `slug` first. See PLAN/10-DOMAIN-PUBLISHING.md and BACKEND/06-PUBLISHING.md § Slug Resolution.
+- These endpoints are reachable at `/public/*` on the public invitation host, proxied to the API, so a guest's RSVP or guestbook submission is a same-origin request from the page they are reading.
 
 ## GET /public/i/:slug — Response
 ```json

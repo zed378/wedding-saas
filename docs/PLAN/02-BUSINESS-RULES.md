@@ -4,6 +4,7 @@
 - BR-1.1 Each invitation is owned by exactly one user (`owner_id`). No shared ownership in the MVP.
 - BR-1.2 Users can only view/modify/delete their own invitations. Violation = a security incident (see SECURITY/05).
 - BR-1.3 Admins can view all invitations for moderation/support purposes, logged in the audit log.
+- BR-1.4 **Free draft quota**: an account may hold at most **one** invitation that has never reached `paid`. Attempting to create a second returns 422 `FREE_DRAFT_LIMIT_REACHED` naming the existing draft. An invitation that has been paid for stops counting against this quota, so a wedding organizer with many paid invitations can always start one more draft — the quota limits unpaid inventory, not customers. (PLAN/09, ADR-023; the per-day creation rate limit in SECURITY/10 remains as a separate abuse control.)
 
 ## BR-2 Invitation Lifecycle
 - BR-2.1 A new invitation starts as `draft`. Drafts can be edited freely and are not public.
@@ -40,7 +41,7 @@
 - BR-7.3 Guestbook with moderation enabled: new messages start as `pending` and only appear publicly after being `approved` by the invitation owner.
 
 ## BR-8 Media
-- BR-8.1 Total storage quota per invitation is limited according to the package (e.g., Basic: 20 photos, Premium: unlimited up to a reasonable cap of 200).
+- BR-8.1 Total storage quota per invitation is 200 photos at up to 10 MB each, for both the free draft and the paid package (PLAN/11). With a single package the quota is a resource control rather than a commercial differentiator.
 - BR-8.2 All files are reprocessed (resized, EXIF stripped) before being permanently stored — see SECURITY/06-FILE-UPLOAD-SECURITY.md.
 
 ## BR-9 Expiry & Retention

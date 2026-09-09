@@ -14,11 +14,21 @@
 /settings/account                            (protected)
 ```
 
-## Public Invitation App (separate, SSR/ISR)
+## Public Invitation App (separate, SSR)
+
+Served on its own hostname, `invitation.zedth.my.id` (PLAN/10-DOMAIN-PUBLISHING.md, MEMORY ADR-024):
+
 ```
-/                (resolved from the Host header subdomain/custom domain → a specific invitation)
+/{slug}             The invitation
+/preview/{token}    Share-preview of an unpublished invitation (noindex, watermarked, submissions disabled)
+/public/*           Proxied to the API — guest RSVP, guestbook and view counter, same-origin
 ```
-Routing here is not path-based but rather **host-based multi-tenancy** — a middleware/edge function determines the `invitation_id` from the `Host` header before the request reaches the render handler (see ARCHITECTURE/08, PLAN/10).
+
+Everything else on this host is a 404. That is deliberate: with invitations at the root, any other route would be able to shadow one.
+
+Resolution is **path-based at MVP** and moves to host-based later without a rewrite — the slug is read by a configured strategy (BACKEND/06-PUBLISHING.md). Path URLs will redirect permanently to subdomain URLs when that happens.
+
+The authenticated application lives on a different hostname (`app.zedth.my.id`). Keeping guest-submitted content on its own origin is a security boundary, not a cosmetic split (SECURITY/02).
 
 ## Admin Panel
 ```
@@ -28,7 +38,7 @@ Routing here is not path-based but rather **host-based multi-tenancy** — a mid
 /moderation/guestbook
 /audit-logs
 ```
-Base path/subdomain separate (`admin.maindomain.com`) — conventional internal routing.
+Served on its own hostname (`admin.zedth.my.id`) with its own cookie scope — conventional internal routing within it (SECURITY/02 boundary 3→4).
 
 ## Route Guards
 - Protected route: redirect to `/login` if the token is invalid/expired, save the intended URL to redirect back after a successful login.

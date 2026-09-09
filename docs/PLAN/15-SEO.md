@@ -2,7 +2,7 @@
 
 ## Public Invitation Page
 - Dynamic meta tags per invitation: `<title>`, `og:title`, `og:description`, `og:image` (from the cover photo), `og:type=website`, `twitter:card=summary_large_image`.
-- Canonical URL using the active subdomain/custom domain.
+- Canonical URL using the invitation's active address — `https://invitation.zedth.my.id/{slug}` at MVP (PLAN/10). If the address format changes later, the canonical changes with it and the old form redirects permanently, so link equity and forwarded WhatsApp links both survive.
 - Robots: `noindex` can optionally be enabled by the user (privacy — some couples don't want their invitation indexed by Google, see SECURITY/09-PRIVACY-DATA-PROTECTION.md). Default: `noindex` to protect guest data privacy (RSVP/guestbook), UNLESS the user explicitly enables indexing.
 - Structured data (schema.org `Event`) optional for easy sharing, without sensitive data (does not include bank account numbers, etc.).
 

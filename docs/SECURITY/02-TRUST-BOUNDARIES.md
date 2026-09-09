@@ -30,7 +30,8 @@
 ## Rules per Boundary
 - **Boundary 1→2**: no user-specific data is returned without passing through a public status filter (`published` only) and output sanitization.
 - **Boundary 2→3**: having a valid token ONLY proves IDENTITY, not AUTHORIZATION over a specific resource — every handler receiving an `:id` MUST query with an ownership filter (see 05-MULTI-TENANCY-SECURITY.md), never relying on "the user is already logged in, so it's safe."
-- **Boundary 3→4 (Admin)**: the admin panel should ideally run on a separate subdomain (`admin.maindomain.com`) with a session separate from the user application, reducing cross-app CSRF/XSS risk and making it easier to apply a different CSP policy.
+- **Boundary 3→4 (Admin)**: the admin panel runs on a separate hostname (`admin.zedth.my.id`) with a session separate from the user application, reducing cross-app CSRF/XSS risk and making it easier to apply a different CSP policy.
+- **Boundary 1 is an origin boundary, not only a code boundary.** The public invitation surface runs on its own hostname (`invitation.zedth.my.id`), separate from the application (`app.zedth.my.id`). This matters because guest-submitted content — RSVP names, guestbook messages — is rendered on that surface: a stored XSS surviving sanitization there must not be able to act against the authenticated application, and the same-origin policy is what guarantees that. Collapsing these onto one host would remove a defence that costs one DNS record to keep (MEMORY ADR-024).
 - **Boundary 5**: the webhook endpoint does NOT have the usual user-auth middleware (no user token), but rather a provider-specific signature verification — this endpoint should be whitelisted separately from general rate-limiting so it isn't blocked during periods of legitimately high traffic from the provider.
 
 ## Data Zones

@@ -3,14 +3,25 @@
 Technical complement to PLAN/10-DOMAIN-PUBLISHING.md and BACKEND/02-SERVICE-LAYER.md (see the `publish()` example).
 
 ## Slug Resolution & Routing
+
+Resolution is implemented **once**, behind a configured strategy, so the MVP's path-based addresses and the eventual per-invitation subdomains are the same code path (PLAN/10-DOMAIN-PUBLISHING.md, MEMORY ADR-024).
+
 ```
-A request arrives at the Public Invitation app with a Host header
-  → Middleware: extract the subdomain from the Host (e.g., "andi-sarah.maindomain.com" → slug="andi-sarah")
-     OR look up the custom domain table if the Host doesn't match the main subdomain pattern (Phase 2)
+A request arrives at the Public Invitation app
+  → Middleware resolves the slug by the configured strategy:
+      'path'      (MVP)      → first path segment of the URL: "/andi-sarah" → slug="andi-sarah"
+      'subdomain' (later)    → leading label of the Host header: "andi-sarah.invitation..." → slug="andi-sarah"
+      custom domain (Phase 2) → Host lookup in invitation_custom_domains, checked before either of the above
+  → Normalize and validate the slug shape BEFORE querying (a path segment is untrusted input,
+     and so is a proxy-supplied header — neither is a fact)
   → Query the invitation WHERE slug = :slug AND status = 'published' AND deleted_at IS NULL
   → if not found: the 404 handler
   → if found: continue to the render pipeline (FRONTEND/07-PUBLIC-INVITATION.md)
 ```
+
+Only three paths are routed to the public app: `/{slug}`, `/preview/{token}` and the proxied `/public/*`. Everything else on that host is a 404 — which is what keeps an application route from ever shadowing an invitation.
+
+When the strategy changes from `path` to `subdomain`, the old path form must answer with a permanent redirect to the new canonical address, indefinitely.
 
 ## Publish Endpoint (additional detail beyond BACKEND/02)
 - After `publish()` succeeds, the service triggers:

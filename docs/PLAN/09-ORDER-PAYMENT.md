@@ -31,13 +31,24 @@ Payment
 
 `custom_domain` is defined in the `addons` table (DATABASE/07) but is **seeded inactive** (`is_active = false`) until the custom domain feature ships, which PLAN/00 § Phase 2 Scope places after the MVP. An inactive addon cannot be added to an order (API/06), so the catalogue and the shipped capability stay in step. Selling access to something that does not exist yet is a support problem first and a consumer-protection problem second.
 
-`extended_validity` is active at MVP: it is the renewal path described below, and needs no feature that is not already built.
+`extended_validity` is **also seeded inactive** at MVP. With a single 12-month package (below), extending validity at purchase time has nothing to extend — the renewal path is an `order_type = 'renewal'` order, not an addon. The `addons` table therefore ships with no active rows; the first active addon will be a seed row, not a schema change.
 
-## Packages (example, final pricing out of scope for this document)
-| Package | Photos | Custom Domain | Watermark | Active Period |
-|---|---|---|---|---|
-| Basic | 20 | No | Yes (small) | 6 months |
-| Premium | Unlimited* | Add-on | No | 12 months |
+## Package (MVP)
+
+One package, one price. See MEMORY ADR-023 for the reasoning, which is worth knowing before anyone proposes a second tier: the effort of producing a wedding invitation belongs to the couple, not to the platform, so the platform is priced to not make a couple hesitate.
+
+| Package | Price | Photos | Max size/file | Watermark | Active period |
+|---|---|---|---|---|---|
+| `standard` | **Rp 139,000** | 200 | 10 MB | No | **12 months** |
+
+- **One-time payment, not a recurring subscription.** The invitation is live for 12 months; extending it is a renewal order the user makes deliberately (see Renewal below and PLAN/06-INVITATION-LIFECYCLE.md). PLAN/00 § Business Model keeps recurring billing out of the MVP.
+- **Renewal** costs the same Rp 139,000 for another 12 months.
+- **Free tier: one draft.** An account may hold at most one invitation that has never reached `paid` — draft only, watermarked preview, cannot publish (BR-1.4). Once an invitation is paid for it no longer counts against that quota, so a wedding organizer with five paid invitations can still start a sixth draft.
+- `packages.price` remains the only source of an order amount (SECURITY/07 § Pricing). The figure above is seed data; no price constant belongs in application code.
+
+### Unit economics (recorded so a future price change starts from facts)
+
+At Rp 139,000, roughly US$8.50: payment gateway fees run about Rp 1,000-4,000 depending on method; object storage for a fully-loaded invitation is on the order of Rp 900 for the year, and egress is free on R2 (ADR-011). The 200-photo cap is generous because it is nearly free, not because it is a differentiator — capping it lower would save less than the support conversation it would cost.
 
 ## Order Flow
 1. User clicks "Publish" on an invitation eligible for publishing but not yet paid → the system checks the invitation's status.

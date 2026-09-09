@@ -311,7 +311,8 @@
 4. In one transaction, create: the `invitations` row (status `draft`), the `invitation_settings` row with `enabled_sections` initialized from the template's `enabled_by_default` sections and `seo_indexable = false`, the `invitation_quote` row, and both `invitation_people` rows (groom and bride, empty). Creating the people rows up front means every later PATCH is a simple update rather than an upsert with a race.
 5. Validate the slug if supplied, per `docs/PLAN/10`: 3-50 characters, `[a-z0-9-]`, no leading or trailing dash, not on the reserved and profanity blocklist (`docs/SECURITY/10` § Slug Blocklist), globally unique. A conflict returns 409 `SLUG_TAKEN`.
 6. Write the initial `invitation_status_history` row through `P0-14`'s service.
-7. Rate limit to 10 per day per user (`docs/SECURITY/10`), mitigating R7 slug squatting.
+7. Enforce the free-draft quota from BR-1.4 (ADR-023): an account may hold at most **one** invitation that has never reached `paid`. A second attempt returns 422 `FREE_DRAFT_LIMIT_REACHED` naming the existing draft. Count only invitations that have never been paid — an organizer with five paid invitations must still be able to start a sixth draft, which is what keeps `docs/UI-UX/03`'s secondary persona viable.
+8. Rate limit to 10 per day per user (`docs/SECURITY/10`), mitigating R7 slug squatting. This stays as an abuse backstop even though the free-draft quota makes it hard to reach.
 
 **Definition of Done**
 - [ ] A created invitation has a settings row, a quote row, and exactly two people rows.
@@ -319,6 +320,7 @@
 - [ ] A draft or deprecated template version is refused for new invitations.
 - [ ] Slug validation covers format, blocklist and uniqueness, each with a test.
 - [ ] `owner_id` comes from the token and cannot be set from the body.
+- [ ] The free-draft quota is enforced and counts only never-paid invitations, proven by a test where a user with a paid invitation can still create a draft.
 
 **Abuse cases to test**
 | Abuse case | Source | Expectation |

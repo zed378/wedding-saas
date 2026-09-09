@@ -1,9 +1,13 @@
 # 13 - Checkout UX
 
-## Package Selection Page
-- Comparison cards (Basic vs. Premium), highlighting different features (photo count, watermark, custom domain, active period).
-- Add-ons as separate checkboxes below the package selection (e.g., "+Custom Domain Rp X").
-- A real-time price summary in a sidebar/bottom-sticky area (subtotal, total) as the user changes their selections.
+## Package Page
+
+There is **one package** at MVP (PLAN/09, ADR-023), so this page does not ask the user to choose — it tells them what they get and what it costs, and gets out of the way. A comparison table with one column is worse than no comparison table.
+
+- A single card: price (Rp 139,000), active period (12 months), what is included (200 photos, no watermark, RSVP, guestbook, gallery, maps, gift).
+- No add-on checkboxes at MVP — no addon is active. The layout should accommodate them returning later without redesign, since `addon_ids` is already part of the order.
+- A price summary is still shown before the pay action, because PLAN/17 and UI-UX/18 require the user to understand exactly what they are paying for before committing — that requirement does not depend on there being a choice.
+- If a second tier is ever introduced, this page becomes comparison cards and the price summary becomes live; nothing else changes.
 
 ## Confirmation & Payment Page
 - Final summary: invitation name, chosen package, add-ons, total price.
