@@ -10,6 +10,19 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — the template catalog and media
+
+**Added** — four tables ([P0-08](./records/2026-09-10-P0-08-templates-media-schema.md))
+- `templates`, `template_versions`, `media`, `template_assets`, matching `docs/DATABASE/03` and the `media` block of `06`.
+- **Two delete rules, deliberately opposite.** `template_versions → templates` is `RESTRICT` because BR-3.3 says a version an invitation still renders from is deprecated, never deleted — a cascade would turn a catalog tidy-up into broken wedding pages. `template_assets → template_versions` is `CASCADE`, because an asset has no meaning without its version. They look inconsistent and are not; three tests pin them.
+- `sections` and `theme` are JSONB with **no** database-level validation: `docs/DATABASE/03` puts that JSON Schema in application code (`P0-20`), where it can be versioned with the validator.
+- `category` and `customizable_theme_keys` are real `varchar(n)[]` arrays, asserted as `ARRAY` rather than assumed — one of the concrete reasons ADR-007 picked Drizzle over Prisma.
+- `media.status` defaults to `processing`: a row exists before the `docs/SECURITY/06` pipeline has run, and defaulting to `ready` would make a failed scan invisible.
+
+**Deferred** — `media.invitation_id`'s **foreign key** lands in `P0-09` (ADR-032). `invitations` does not exist yet and `template_assets` needs `media` now, so no ordering satisfies every foreign key in one migration. The column, type, nullability and index are exactly as documented. A test asserts the constraint is currently absent and must be *replaced* when `P0-09` adds it — a test that flips to failing is a louder reminder than a note.
+
+**Worth knowing** — `RESTRICT` raises SQLSTATE **23001** (`restrict_violation`); `NO ACTION` raises **23503** (`foreign_key_violation`). Both occur in this schema. Application code that maps only 23503 to a friendly "still in use" message will return a 500 for the RESTRICT case, which is the more common one.
+
 ### 2026-09-10 — the users and auth schema
 
 **Added** — six tables ([P0-07](./records/2026-09-10-P0-07-users-auth-schema.md))

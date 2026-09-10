@@ -22,6 +22,16 @@ Nothing on the board is `BLOCKED`. The remaining questions shape work rather tha
 
 ## Open Questions — Remaining
 
+### OQ-16 — Should `media.purpose` have a CHECK constraint?
+
+**Affects**: `P1-17` — not blocking; the column ships exactly as documented.
+
+`docs/DATABASE/06` gives `media.purpose` as `VARCHAR(30) NOT NULL` with the four expected values in a **comment**: `'gallery' | 'profile' | 'cover' | 'template_asset'`. Every comparable column in the schema — `status`, `role`, `type` — carries a real CHECK. This one does not.
+
+`P0-08` left it unconstrained rather than inventing a rule the document does not state. The cost of guessing wrong in either direction is real: a CHECK that omits a value nobody thought of blocks a legitimate write, and no CHECK at all lets a typo create a category of media that no query will ever find.
+
+Decide in `P1-17`, when the upload pipeline actually writes the column and the full set of purposes is known.
+
 ### OQ-15 — Should a Google identity be unique across accounts?
 
 **Affects**: `P1-05` — not blocking; the schema ships exactly as documented.

@@ -276,7 +276,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-10 |
 | **Depends on** | P0-07 |
 | **Spec refs** | `docs/DATABASE/03-TEMPLATES.md`, `docs/DATABASE/06-MEDIA.md`, `docs/DATABASE/01-ERD.md` |
 | **Spec required** | Yes — data model |
@@ -292,10 +292,14 @@
 5. Note the ordering dependency: `template_assets.media_id` references `media`, so `media` is created first in the same migration.
 
 **Definition of Done**
-- [ ] `docs/DATABASE/03` and `06` are reproduced exactly for these four tables.
-- [ ] A test proves a `template_versions` row referenced by an invitation cannot be deleted (once `P0-09` lands, added there if ordering requires).
-- [ ] A test proves a duplicate `(template_id, version)` is rejected.
-- [ ] `media.invitation_id` accepts null and the `idx_media_invitation` index exists.
+- [x] `docs/DATABASE/03` and `06` reproduced exactly for these four tables — one ordering deviation, ADR-032.
+- [x] A test proves a `template_versions` row cannot be deleted while referenced — `refuses to delete a template that still has versions`, mutation-checked by flipping RESTRICT to CASCADE. The invitation-side half of this rule moves to `P0-09` as the card allows.
+- [x] A duplicate `(template_id, version)` is rejected — plus a companion test that the same version string **is** allowed under a different template, which guards the wrong fix.
+- [x] `media.invitation_id` accepts null and `idx_media_invitation` exists — both asserted.
+
+**Ordering deviation (ADR-032)**: `media.invitation_id`'s **foreign key** is added by `P0-09`, because `invitations` does not exist yet and `template_assets` needs `media` now. The column, type, nullability and index are exactly as documented; only the constraint arrives one migration later. A test asserts the constraint is currently **absent** and says it must be replaced, not deleted, when `P0-09` lands.
+
+**A real distinction found while testing**: `RESTRICT` raises SQLSTATE **23001** (`restrict_violation`), while `NO ACTION` raises **23503** (`foreign_key_violation`). Both appear in this schema and the tests assert each exactly. Application code that maps only 23503 to a friendly "still in use" message would return a 500 for the RESTRICT case.
 
 ---
 
@@ -317,13 +321,15 @@
 3. Apply the cascade rules from `docs/DATABASE/01`: children cascade from `invitations`; `invitations.owner_id` is `ON DELETE RESTRICT`; `template_version_id` is `ON DELETE RESTRICT`.
 4. Add `idx_guestbook_invitation` as the composite `(invitation_id, status)` — `docs/ARCHITECTURE/04` § Indexing names it explicitly because the moderation queue filters on both.
 5. Create `invitation_custom_domains` now even though the feature is Phase 7 (`docs/DATABASE/04` § Custom Domain). Creating the table early costs nothing and keeps the schema matching the document.
-6. Write integration tests for the constraints that encode business rules: a third `invitation_people` row for one invitation is rejected; `guest_count` outside 1..10 is rejected; deleting an invitation cascades its children; two live invitations cannot share a slug but a soft-deleted one frees it.
+6. **Add the deferred foreign key from `P0-08` (ADR-032)**: `ALTER TABLE media ADD CONSTRAINT media_invitation_id_invitations_id_fk FOREIGN KEY (invitation_id) REFERENCES invitations(id) ON DELETE CASCADE`. The column and its index already exist; only the constraint is missing, because `invitations` did not exist when `media` was created.
+7. Write integration tests for the constraints that encode business rules: a third `invitation_people` row for one invitation is rejected; `guest_count` outside 1..10 is rejected; deleting an invitation cascades its children; two live invitations cannot share a slug but a soft-deleted one frees it.
 
 **Definition of Done**
 - [ ] Every table, column, constraint and index in `docs/DATABASE/04`, `05`, `06` (invitation children) and `09` exists.
 - [ ] `invitation_settings.seo_indexable` defaults to `false`.
 - [ ] The constraint tests above pass.
 - [ ] `invitation_status_history` accepts a null `changed_by`, since system jobs change status with no acting user.
+- [ ] **`media.invitation_id` has its foreign key** (ADR-032), and the `P0-08` test asserting the constraint is absent has been **replaced** by one asserting a bad `invitation_id` is rejected. That test failing is the reminder; deleting it instead of replacing it would lose the guarantee silently.
 
 ---
 
