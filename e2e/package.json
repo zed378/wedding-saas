@@ -1,0 +1,18 @@
+{
+  "name": "@wi/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install --with-deps chromium",
+    "lint": "echo \"[P0-17] lint not wired yet\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "echo \"[P0-19] e2e runs under test:e2e, not test -- it needs browsers\""
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@axe-core/playwright": "^4.10.0",
+    "typescript": "^7.0.2",
+    "@types/node": "^22.20.1"
+  }
+}

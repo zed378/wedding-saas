@@ -1,4 +1,5 @@
 import pino, { type Logger, type LoggerOptions } from "pino";
+import { createRequire } from "node:module";
 
 /**
  * The worker's logger.
@@ -15,13 +16,23 @@ import pino, { type Logger, type LoggerOptions } from "pino";
  */
 const SERVICE = process.env["SERVICE_NAME"] ?? "worker";
 
+/**
+ * Pretty output only when pino-pretty is actually installed.
+ *
+ * NOT keyed on NODE_ENV -- see the same function in the API for the crash that caused.
+ * pino-pretty is a devDependency and is stripped from the runtime image, while the
+ * compose stack runs that image with NODE_ENV=development. The API exited during module
+ * initialisation, before serving a single request.
+ */
 function prettyTransport(): Pick<LoggerOptions, "transport"> {
-  if (
-    process.env["NODE_ENV"] === "production" ||
-    process.env["LOG_PRETTY"] === "false"
-  ) {
+  if (process.env["LOG_PRETTY"] === "false") return {};
+
+  try {
+    createRequire(import.meta.url).resolve("pino-pretty");
+  } catch {
     return {};
   }
+
   return {
     transport: {
       target: "pino-pretty",

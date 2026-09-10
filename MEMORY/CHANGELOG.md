@@ -10,6 +10,19 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — the test harness, and the two bugs it found immediately
+
+**Added** — all four test layers ([P0-19](./records/2026-09-10-P0-19-test-harness.md))
+- An integration harness that prefers a database you already have and falls back to a container, applies every migration automatically, and **fails rather than skips** when nothing is reachable — verified, exit code 1.
+- Factories, and `createTwoTenants()` above all. `docs/SECURITY/05` requires an IDOR test for every `:id` endpoint; what decides whether those get written is whether the setup is one line or twenty. The parties are named `alice` and `mallory` so a test states the attack in its own arguments.
+- E2E over real HTTP, and an accessibility suite with a **negative control** — a deliberately broken fixture, violations named rather than counted. An axe suite that only ever sees a correct page reports zero violations whether it is working or doing nothing at all.
+- Provider mocks that **abort by default**: any third-party call not explicitly routed is refused, so a test cannot quietly reach a real provider.
+
+**Fixed** — two bugs that only exist in the built artefact, which is why nothing had caught them:
+
+- **The API crashed on startup in the container.** `pino-pretty` is a devDependency stripped by `pnpm deploy --prod`, while compose runs that image with `NODE_ENV=development`. The logger keyed its transport on `NODE_ENV`, tried to load a missing module, and pino threw during initialisation — the process exited before serving a request. Present since `P0-12`. It now asks whether `pino-pretty` resolves, and falls back to structured JSON, which is what production wants anyway.
+- **`backend/api/Dockerfile` was two workspace members stale.** It lists each member's `package.json` by hand for layer caching, and `packages/storage` and `e2e` were never added. The image built without error and served whatever the cache last produced; E2E found it by requesting `/readyz` — a route present since `P0-13` — and getting a 404.
+
 ### 2026-09-10 — a configuration that refuses to mix environments
 
 **Added** — secrets and configuration conventions ([P0-18](./records/2026-09-10-P0-18-secrets-config.md), ADR-034)

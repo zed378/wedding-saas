@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Accessibility harness fixture</title>
+  </head>
+  <body>
+    <!--
+      A deliberately correct page, used to prove the axe harness runs and reports.
+
+      P0-22 builds the real pages; this exists so the accessibility LAYER has a real
+      passing test now rather than an empty runner that would pass whether or not it
+      worked. Its companion, inaccessible-page.html, is deliberately broken, and that
+      negative control is what proves this one passes for a reason.
+    -->
+    <header>
+      <h1>Rani &amp; Bagas</h1>
+    </header>
+    <main>
+      <h2>RSVP</h2>
+      <form>
+        <label for="guest-name">Your name</label>
+        <input id="guest-name" name="guest_name" type="text" autocomplete="name" />
+
+        <fieldset>
+          <legend>Will you attend?</legend>
+          <label for="attending-yes">Yes</label>
+          <input id="attending-yes" name="attendance" type="radio" value="attending" />
+          <label for="attending-no">No</label>
+          <input id="attending-no" name="attendance" type="radio" value="not_attending" />
+        </fieldset>
+
+        <button type="submit">Send</button>
+      </form>
+    </main>
+  </body>
+</html>

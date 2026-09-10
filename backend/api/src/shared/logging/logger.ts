@@ -80,16 +80,37 @@ function baseOptions(): LoggerOptions {
  * the aggregator (`docs/DEVOPS/06` § Aggregation). Redaction is identical in both --
  * pretty-printing happens after the formatter, so a development log is no leakier.
  */
+/**
+ * Development gets human-readable output; production gets one JSON object per line for
+ * the aggregator (`docs/DEVOPS/06` § Aggregation). Redaction is identical in both --
+ * pretty-printing happens after the formatter, so a development log is no leakier.
+ *
+ * The decision is "is pino-pretty actually installed", NOT "what is NODE_ENV".
+ *
+ * That distinction is not pedantry, it is a crash. `pino-pretty` is a devDependency, so
+ * `pnpm deploy --prod` strips it from the runtime image -- while `deploy/docker-compose.yml`
+ * runs that image with `NODE_ENV=development`, because it is a local stack. Keying on
+ * NODE_ENV therefore made the container try to load a transport that was not there, and
+ * pino throws during module initialisation: the API exited before it served a single
+ * request.
+ *
+ * It was found by the P0-19 E2E suite asking the running container for a route that had
+ * existed since P0-13 and getting a 404 -- the first time anything had exercised the
+ * built image rather than the source.
+ */
 function prettyTransport(): Pick<LoggerOptions, "transport"> {
-  // Spread-or-nothing rather than `transport: undefined`. The tsconfig sets
-  // `exactOptionalPropertyTypes`, so an explicit undefined is not the same as an absent
-  // key -- and pino treats the two differently too.
-  if (
-    process.env["NODE_ENV"] === "production" ||
-    process.env["LOG_PRETTY"] === "false"
-  ) {
+  if (process.env["LOG_PRETTY"] === "false") return {};
+
+  try {
+    // Resolve rather than import: this only asks whether the module could be loaded,
+    // which is exactly the question, and costs nothing when the answer is yes.
+    require.resolve("pino-pretty");
+  } catch {
+    // Absent. Structured JSON is the correct fallback and is what production wants
+    // anyway -- degrading to it is strictly better than refusing to start.
     return {};
   }
+
   return {
     transport: {
       target: "pino-pretty",

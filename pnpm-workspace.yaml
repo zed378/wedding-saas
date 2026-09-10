@@ -2,6 +2,7 @@ packages:
   - "backend/*"
   - "frontend/*"
   - "admin"
+  - "e2e"
   - "packages/*"
 
 # Install scripts are blocked by default: a postinstall is arbitrary code execution at
@@ -17,6 +18,8 @@ packages:
 # postinstall is not needed -- verified by loading the module and calling transformSync.
 allowBuilds:
   "@swc/core": false
+  # cpu-features: denied -- optional native probe used by ssh2; it degrades to a JS path when absent.
+  cpu-features: false
   esbuild: false
   # msgpackr-extract: denied. It is an optional NATIVE accelerator for msgpackr, which
   # BullMQ uses to serialise job payloads. msgpackr falls back to its JavaScript encoder
@@ -24,3 +27,7 @@ allowBuilds:
   # Redis queue with the build denied. The cost is some encoding speed on a workload that
   # is dominated by Redis round trips and image processing.
   msgpackr-extract: false
+  # protobufjs: denied -- its postinstall only regenerates bundled artefacts that ship prebuilt.
+  protobufjs: false
+  # ssh2: denied -- the native crypto binding is an accelerator; testcontainers only uses ssh2 for remote Docker hosts, which this project does not use.
+  ssh2: false
