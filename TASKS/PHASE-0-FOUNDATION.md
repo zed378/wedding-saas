@@ -468,7 +468,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-10 |
 | **Depends on** | P0-04 |
 | **Spec refs** | `docs/API/00-API-STANDARDS.md`, `docs/SECURITY/08-API-SECURITY.md` § Error Handling, `docs/DEVOPS/05-MONITORING.md` § Health Check |
 | **Spec required** | No |
@@ -486,10 +486,16 @@
 7. Configure CORS with an explicit origin allowlist — never `*` on authenticated endpoints.
 
 **Definition of Done**
-- [ ] Every response, success or error, matches `docs/API/00`, asserted by a shared integration test helper used across all later endpoint tests.
-- [ ] A thrown internal error produces a generic 500 body with no stack trace, path, or SQL, proven by a test.
-- [ ] Readiness fails when Postgres is down and the body still discloses nothing about the infrastructure.
-- [ ] The 403-versus-404 decision is recorded as an ADR and `docs/API/00` is amended.
+- [x] Every response matches `docs/API/00`, asserted by `test/support/envelope-assertions.ts` — the shared helper later endpoint tests are meant to use. It checks the key set exactly, so an extra top-level field is a failure too.
+- [x] A thrown internal error produces a generic 500 with nothing internal — proven with three shapes that realistically leak: a pg foreign-key error naming a table and constraint, a `TypeError` carrying file paths, and a **thrown string containing a connection URL with a password**.
+- [x] Readiness fails when Postgres is down and the body discloses nothing — proven against a real unreachable port, not a mock.
+- [x] The 403-versus-404 decision is ADR-018, and `docs/API/00` already carries the section. Verified rather than assumed.
+
+**The mapper works from an allowlist.** Only our own `AppError` subclasses and Nest's `HttpException` contribute anything to a response, and from the latter only the status. Everything else gets a fixed message. A pg error message contains the failing SQL and the constraint name; no amount of care at the call site fixes that, only refusing to forward unrecognised errors does.
+
+**There is no `ForbiddenError` for someone else's resource, by construction.** It accepts only `FORBIDDEN` and `EMAIL_NOT_VERIFIED` — the two cases revealing no resource identity. A class that cannot express the wrong answer cannot be misused to produce it. A test also asserts an unknown route and a not-yours resource return **byte-identical** bodies, because a difference there is the same oracle arriving through a message instead of a status code.
+
+**Found by running it, not by reading it**: readiness returned a correct 503 and logged `error: ""`. `pg` throws an `AggregateError` with an **empty message**, putting the cause in `.code` and `.errors[]`. Nothing failed — an operator would have had a 503 with no reason and correct-looking code to re-read.
 
 ---
 

@@ -10,6 +10,19 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — one response shape, and errors that cannot leak
+
+**Added** — the HTTP contract ([P0-13](./records/2026-09-10-P0-13-envelope-errors-health.md))
+- The success and error envelopes from `docs/API/00`, verbatim including `snake_case`. The API contract is where this repository's TypeScript conventions stop and the document's start.
+- **The exception mapper works from an allowlist.** Only our own domain errors and Nest's `HttpException` contribute to a response, and from the latter only the status. Everything else — a pg error, a `TypeError`, a thrown string — produces a fixed message. A Postgres error message contains the failing SQL and the constraint name; a Node error contains a file path. Neither author was thinking about the API contract, and no care at the call site fixes that.
+- **There is no `ForbiddenError` for another user's resource**, by construction: it accepts only `FORBIDDEN` and `EMAIL_NOT_VERIFIED`. ADR-018 is kept by the type system rather than by discipline. An unknown route and a not-yours resource also return **byte-identical** bodies, because a difference there is the same enumeration oracle arriving through a message instead of a status code.
+- Pagination **rejects rather than clamps**. Silently turning `per_page=1000` into 100 makes a paginating client skip records, and that surfaces as missing data much later in someone else's code. `page` and `per_page` require plain decimal digits — `Number("1e3")` is 1000, and several spellings of one value is the shape of a validation bypass.
+- `/readyz` joins `/health`. Liveness touches no dependency, because a liveness probe that checks the database restarts every healthy replica during a blip and turns one outage into two. Readiness does check, and names **which** dependency is down but never why.
+- Security headers per `docs/SECURITY/08`: `nosniff`, `X-Frame-Options: DENY`, HSTS, a CSP baseline, `Referrer-Policy: no-referrer`.
+- `test/support/envelope-assertions.ts` is the shared helper later endpoint tests use. It asserts leakage on **every** error it checks, so each new endpoint test gets that for free.
+
+**Found by running it** — readiness returned a correct 503 and logged `error: ""`. `pg` throws an `AggregateError` with an **empty message**, putting the cause in `.code` and `.errors[]`. Nothing failed and no test would have caught it; an operator would have had a 503 with no reason and correct-looking code to re-read.
+
 ### 2026-09-10 — logs that cannot leak
 
 **Added** — structured logging ([P0-12](./records/2026-09-10-P0-12-structured-logging.md))

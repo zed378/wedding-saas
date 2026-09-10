@@ -27,10 +27,43 @@ async function bootstrap(): Promise<void> {
   });
 
   // 4. Security headers (docs/SECURITY/08 § Security Headers). Framing is denied outright
-  //    here: nothing should embed the API, and helmet defaults to SAMEORIGIN. The public
-  //    invitation page may be deliberately embeddable, which is a decision for that
-  //    surface (P2-08), not this one.
-  app.use(helmet({ frameguard: { action: "deny" } }));
+  //    per docs/SECURITY/08 § Security Headers -- see the options below.
+  app.use(
+    helmet({
+      // X-Frame-Options: DENY. docs/SECURITY/08 § Security Headers. Nothing should
+      // embed the API, and helmet defaults to SAMEORIGIN which is weaker than the
+      // document asks for. The public invitation page may be deliberately embeddable
+      // -- that is a decision for that surface (P2-08), not this one.
+      frameguard: { action: "deny" },
+
+      // HSTS. Long max-age with subdomains, so app./invitation./admin. are all
+      // covered by one policy. `preload` is deliberately NOT set: submitting to the
+      // preload list is close to irreversible, and doing it before the domain is
+      // settled would strand any future non-TLS subdomain.
+      hsts: { maxAge: 31_536_000, includeSubDomains: true, preload: false },
+
+      // A baseline CSP for the API itself. This is not the public invitation page's
+      // policy -- that page renders user content and needs its own, stricter, one in
+      // P2-08. An API response is JSON that nothing should ever execute, so
+      // everything is denied and the few directives that matter are explicit.
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'none'"],
+          frameAncestors: ["'none'"],
+          baseUri: ["'none'"],
+          formAction: ["'none'"],
+        },
+      },
+
+      // Referrer-Policy. An API URL can carry an invitation id; do not leak it to a
+      // third party through a referrer header.
+      referrerPolicy: { policy: "no-referrer" },
+
+      // helmet sets X-Content-Type-Options: nosniff by default (docs/SECURITY/08).
+      // Left on, named here so a future edit knows it is required rather than
+      // incidental.
+    }),
+  );
 
   // 5. Body parsing with a size limit. Uploads do not travel this path -- they are
   //    multipart and size-capped at the edge before the body is read (P1-17).

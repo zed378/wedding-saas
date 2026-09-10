@@ -1,6 +1,8 @@
 import { MiddlewareConsumer, Module, type NestModule } from "@nestjs/common";
 import { ConfigModule } from "./config/config.module";
 import { HealthController } from "./http/health.controller";
+import { APP_FILTER } from "@nestjs/core";
+import { AppExceptionFilter } from "./http/exception.filter";
 import { RequestIdMiddleware } from "./http/request-id.middleware";
 import { ReferenceModule } from "./modules/_reference/reference.module";
 import { DatabaseModule } from "./infra/db/client";
@@ -28,6 +30,10 @@ import { LoggingModule } from "./shared/logging/logging.module";
  */
 @Module({
   controllers: [HealthController],
+  // Chain position 8. Registered as a provider rather than with
+  // `app.useGlobalFilters()` so it can take injected dependencies later, and so it is
+  // visible in the module graph rather than hidden in bootstrap.
+  providers: [{ provide: APP_FILTER, useClass: AppExceptionFilter }],
   imports: [
     ConfigModule,
     LoggingModule,
