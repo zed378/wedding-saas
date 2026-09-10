@@ -51,6 +51,11 @@ step "tenant-scoped data access" node scripts/check-tenant-scope.mjs
 # reconstruct -- and the diff will look like two lines of obvious code.
 step "status changes go through the writer" node scripts/check-status-writes.mjs
 
+# docs/ARCHITECTURE/05: the storage path carries invitation_id for isolation and audit,
+# so path construction is a tenant control. @wi/storage's branded StorageKey enforces it
+# at compile time; this catches the cast that would bypass it in one word.
+step "storage paths built by the port" node scripts/check-storage-paths.mjs
+
 # ---------------------------------------------------------------------------
 # Migration gates (P0-06). Both are file checks, so they need no database and
 # belong here rather than in scripts/db-roundtrip.sh, which does.

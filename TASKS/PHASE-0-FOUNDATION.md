@@ -574,7 +574,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-10 |
 | **Depends on** | P0-05 |
 | **Spec refs** | `docs/ARCHITECTURE/05-STORAGE-ARCHITECTURE.md`, `docs/BACKEND/02-SERVICE-LAYER.md` § Principles |
 | **Spec required** | No |
@@ -590,10 +590,18 @@
 5. Implement an in-memory fake of the port for unit tests.
 
 **Definition of Done**
-- [ ] The path scheme matches `docs/ARCHITECTURE/05` exactly and is unit tested.
-- [ ] Callers cannot construct a storage path themselves — only the port can.
-- [ ] A direct request to a bucket object URL is denied.
-- [ ] The staging area is separate and not publicly reachable.
+- [x] The path scheme matches `docs/ARCHITECTURE/05` exactly, unit tested — including the traversal cases, of which `{valid-uuid}/../../other` is the one a naive `startsWith` check would pass.
+- [x] Callers cannot construct a storage path. `StorageKey` is a **branded type** only `@wi/storage` can produce, so the compiler stops it rather than a reviewer; `scripts/check-storage-paths.mjs` catches the cast that would bypass that in one word.
+- [x] A direct request to a bucket object URL is denied — **403 against real MinIO**, on an object that genuinely exists.
+- [x] The staging area is its own bucket with its own key shape, and is equally denied.
+
+**A new package, `@wi/storage`, rather than a folder in the API.** Both surfaces touch storage: the API receives an upload into staging (`docs/BACKEND/04` Stage 1), the worker writes the variants (Stage 2). The `P0-15` record flagged duplicating the logger across those two packages as a known problem, and doing the same thing one task later would have been choosing it twice.
+
+**There is no `getPublicUrl` on the port.** `docs/ARCHITECTURE/05` § Access Control says files "must never be accessible directly via the bucket URL"; a method returning one would be used. `presignGet` exists instead, five minutes by default.
+
+**A contradiction found and deliberately not resolved.** `docs/ARCHITECTURE/05` lists variants as `original | large | thumbnail`; `docs/BACKEND/04` step 6 generates `thumbnail | medium | large`. Neither is a superset. The builder accepts all four, because the filename is the CDN cache key — guessing wrong means rewriting every stored object, not changing a constant. `P1-17` decides. Raised as `OQ-19`.
+
+**One test earns its place specifically**: the signed-URL check. Without it, all three 403 assertions would also pass against a MinIO that was simply down.
 
 ---
 

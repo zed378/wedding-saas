@@ -66,7 +66,7 @@ fi
 # field is renamed in the schema file, and that SQL reads as completely routine in a
 # diff. docs/DEVOPS/08 requires it to be a separate, deliberate contract-phase deploy.
 if command -v node >/dev/null 2>&1; then
-  if ! node scripts/check-migration-pairs.mjs || ! node scripts/check-destructive-migration.mjs || ! node scripts/check-tenant-scope.mjs || ! node scripts/check-status-writes.mjs; then
+  if ! node scripts/check-migration-pairs.mjs || ! node scripts/check-destructive-migration.mjs || ! node scripts/check-tenant-scope.mjs || ! node scripts/check-status-writes.mjs || ! node scripts/check-storage-paths.mjs; then
     echo "" >&2
     echo "  Push refused. See backend/api/migrations/README.md." >&2
     echo "" >&2

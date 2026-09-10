@@ -10,6 +10,21 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — object storage, with the path as a control
+
+**Added** — `@wi/storage` ([P0-16](./records/2026-09-10-P0-16-object-storage.md))
+- A `StoragePort` with an S3 implementation (MinIO locally, Cloudflare R2 in production), an in-memory fake for unit tests, and the path scheme from `docs/ARCHITECTURE/05`.
+- **The path is a tenant isolation control, not a format.** The document says it carries `invitation_id` "for isolation & audit purposes", and a control any call site can assemble is not a control. `StorageKey` is a branded type only the builders can produce, so a caller with a string does not have a key — the compiler stops a hand-built path rather than a reviewer.
+- Every component is validated, not just interpolated. The case worth naming is `{valid-uuid}/../../other`: a naive `startsWith` check passes it and the object lands outside the invitation's prefix.
+- **The port has no `getPublicUrl`.** `docs/ARCHITECTURE/05` says files "must never be accessible directly via the bucket URL", and a method returning one would be used. `presignGet` is time-bounded instead.
+- A third bucket, `staging`, for uploads that have passed only the extension, MIME and magic-byte checks — not the malware scan, not the decode, not the EXIF strip. Its own key shape, so an unscanned file is not reachable from anything that looks like a media path.
+- `move` copies before deleting, fixed in the port. A failed delete leaves an orphan the hourly cleanup removes; a delete before the copy would lose the file.
+- Shared as a **package**, because the API receives uploads and the worker writes variants. The `P0-15` record flagged duplicating the logger across those two surfaces; this does not repeat it.
+
+**Verified against real MinIO** — an unauthenticated GET of a real object returns 403, so does the staging bucket, so does anonymous listing, and a signed URL works with a bounded expiry. That last test is what proves the three denials are the bucket policy rather than an unreachable endpoint.
+
+**Open** — `OQ-19`: `docs/ARCHITECTURE/05` and `docs/BACKEND/04` disagree on the variant names, and neither is a superset. The builder accepts all four rather than guessing, because the filename is the CDN cache key and being wrong means rewriting every stored object.
+
 ### 2026-09-10 — the worker, and three silent failure modes closed
 
 **Added** — the queue and worker skeleton ([P0-15](./records/2026-09-10-P0-15-queue-worker-skeleton.md))
