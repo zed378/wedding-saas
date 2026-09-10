@@ -5,6 +5,7 @@ import { RequestIdMiddleware } from "./http/request-id.middleware";
 import { ReferenceModule } from "./modules/_reference/reference.module";
 import { DatabaseModule } from "./infra/db/client";
 import { TenancyModule } from "./shared/tenancy/tenancy.module";
+import { LoggingModule } from "./shared/logging/logging.module";
 
 /**
  * The middleware chain, in order. Positions later tasks fill are reserved here rather
@@ -13,7 +14,7 @@ import { TenancyModule } from "./shared/tenancy/tenancy.module";
  * mapper last means nothing escapes it.
  *
  *   1. request id                 RequestIdMiddleware          (here)
- *   2. structured logging         Pino, with redaction          P0-12
+ *   2. structured logging         Pino, with redaction          (here)
  *   3. CORS                       explicit origin allowlist     (main.ts)
  *   4. security headers           helmet                        (main.ts)
  *   5. body parsing + size limit  express.json({ limit })       (main.ts)
@@ -29,6 +30,7 @@ import { TenancyModule } from "./shared/tenancy/tenancy.module";
   controllers: [HealthController],
   imports: [
     ConfigModule,
+    LoggingModule,
     DatabaseModule,
     TenancyModule,
     // Scaffolding, not a feature. Removed once a real module exists on each surface.
