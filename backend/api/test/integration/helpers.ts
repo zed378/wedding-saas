@@ -77,3 +77,18 @@ export async function connect(requiredTables: string[] = []): Promise<Pool> {
 
 /** Alias kept for readability at call sites that do not need table checks. */
 export const freshPool = (): Promise<Pool> => connect();
+
+/**
+ * A pool connected as the APPLICATION role, not the owner.
+ *
+ * Needed for anything asserting a permission. The owner can do everything, so a test
+ * that checks "the application cannot UPDATE audit_logs" while connected as the owner
+ * proves nothing at all -- it would pass whether or not the REVOKE ever ran.
+ */
+export function applicationPool(): Pool {
+  const url = DATABASE_URL.replace(
+    /\/\/[^@]+@/,
+    "//wedding_app:wedding_app_dev@",
+  );
+  return new Pool({ connectionString: url, max: 2 });
+}

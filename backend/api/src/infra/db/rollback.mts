@@ -41,27 +41,40 @@ interface JournalEntry {
   tag: string;
 }
 
-export function readJournal(folder: string = MIGRATIONS_FOLDER): JournalEntry[] {
-  const raw = fs.readFileSync(path.join(folder, "meta", "_journal.json"), "utf8");
+export function readJournal(
+  folder: string = MIGRATIONS_FOLDER,
+): JournalEntry[] {
+  const raw = fs.readFileSync(
+    path.join(folder, "meta", "_journal.json"),
+    "utf8",
+  );
   const parsed = JSON.parse(raw) as { entries: JournalEntry[] };
   return parsed.entries;
 }
 
-export function downFilePath(tag: string, folder: string = MIGRATIONS_FOLDER): string {
+export function downFilePath(
+  tag: string,
+  folder: string = MIGRATIONS_FOLDER,
+): string {
   return path.join(folder, `${tag}.down.sql`);
 }
 
 async function main(): Promise<void> {
   assertMigrationsFolder();
   const env = loadMigrationEnv();
-  const pool = new Pool({ connectionString: env.MIGRATION_DATABASE_URL, max: 1 });
+  const pool = new Pool({
+    connectionString: env.MIGRATION_DATABASE_URL,
+    max: 1,
+  });
 
   try {
     const present = await pool.query<{ exists: boolean }>(
       "SELECT to_regclass('drizzle.__drizzle_migrations') IS NOT NULL AS exists",
     );
     if (!present.rows[0]?.exists) {
-      console.log("nothing to roll back: no migrations have ever been applied here.");
+      console.log(
+        "nothing to roll back: no migrations have ever been applied here.",
+      );
       return;
     }
 
@@ -123,7 +136,10 @@ async function main(): Promise<void> {
       // applied when its objects are gone, and the next `db:migrate` skips it.
       await client.query("BEGIN");
       await client.query(sql);
-      await client.query("DELETE FROM drizzle.__drizzle_migrations WHERE id = $1", [row.id]);
+      await client.query(
+        "DELETE FROM drizzle.__drizzle_migrations WHERE id = $1",
+        [row.id],
+      );
       await client.query("COMMIT");
     } catch (err) {
       await client.query("ROLLBACK");
@@ -141,7 +157,10 @@ async function main(): Promise<void> {
 // Only run when invoked directly, so the helpers above stay importable from tests.
 // pathToFileURL rather than string concatenation: on Windows argv[1] is
 // C:\...\rollback.mts, and `file://C:\...` is not the URL Node reports for it.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   main().catch((err: unknown) => {
     console.error("\nrollback failed:\n");
     console.error(err);

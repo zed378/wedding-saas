@@ -22,15 +22,22 @@ const migrationEnvSchema = z.object({
    */
   MIGRATION_DATABASE_URL: z
     .string()
-    .min(1, "required: migrations connect as the owner role, not the application role"),
+    .min(
+      1,
+      "required: migrations connect as the owner role, not the application role",
+    ),
 });
 
 export type MigrationEnv = z.infer<typeof migrationEnvSchema>;
 
-export function loadMigrationEnv(source: NodeJS.ProcessEnv = process.env): MigrationEnv {
+export function loadMigrationEnv(
+  source: NodeJS.ProcessEnv = process.env,
+): MigrationEnv {
   const result = migrationEnvSchema.safeParse(source);
   if (!result.success) {
-    const issues = result.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`);
+    const issues = result.error.issues.map(
+      (i) => `  - ${i.path.join(".")}: ${i.message}`,
+    );
     console.error(
       [
         "Cannot run migrations, the environment is incomplete:",

@@ -24,3 +24,6 @@ export * from "./templates.ts";
 
 // P0-09 — the invitation aggregate. docs/DATABASE/04, 05, 06, 09 and 11.
 export * from "./invitations.ts";
+
+// P0-10 — the commercial tables. docs/DATABASE/07, 08 and 10.
+export * from "./orders.ts";
