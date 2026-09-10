@@ -988,3 +988,36 @@ A fourth test asserts that many invitations may have **no** slug at all. Drafts 
 **Specification impact** — `docs/DATABASE/04-INVITATIONS.md` amended: `UNIQUE` removed from the `slug` column, and the Notes entry extended to say the column carries no constraint of its own and why.
 
 ---
+### ADR-034 — Secrets live in per-environment scopes, and the split is enforced in code
+
+**Date** 2026-09-10 · **Status** Accepted · **Task** `P0-18`
+
+**Context** — `docs/DEVOPS/00` requires staging and production configuration to be "managed via a secret manager … NEVER committed to the repo", and requires staging to use the payment provider's sandbox credentials while production uses live.
+
+Those are two different problems. Keeping secrets out of the repository is a process question with a mechanical answer. Keeping them in the *right* environment is not: a live payment key on staging is a valid string of the right shape and length, and every per-field check passes it.
+
+**Decision** — Three things, in increasing order of how much they actually protect.
+
+1. **Per-environment scopes, not folders in one store.** Development uses a git-ignored `.env`; staging and production use separate scopes of the secret manager. A single store with a naming convention makes a cross-environment read a typo away, and the typo that matters is reading production credentials into staging.
+
+2. **Secret scanning at commit time**, `.githooks/pre-commit` running `scripts/check-secrets.mjs`. It blocks. A leaked credential is not recoverable by deleting the commit — once it reaches a shared history it is rotated or it is compromised — so the only useful moment to catch it is before it lands.
+
+3. **The environment split is enforced by the service refusing to start.** `backend/api/src/config/secret-rules.ts` rejects a live Midtrans key outside production, a sandbox key inside it, a short signing key, a non-HTTPS origin and a localhost database in production. Exit 78, naming every violation at once.
+
+The third is the one that earns its place. The first two stop a secret being where it should not be; only the third stops a *correct* secret being used in the wrong place, and that is the failure with real money attached.
+
+**Alternatives considered**
+
+- **A `PAYMENT_MODE=sandbox|live` flag.** Rejected: it adds a value someone must remember to flip in step with the key, and a mismatch between flag and key is a new failure mode. The provider's `SB-` prefix already carries the information.
+- **Rely on deployment discipline.** That is what the document already asks for. `P0-18`'s card asks for the two to be non-interchangeable "by configuration mistake", which means the machine has to catch it.
+- **Scan in CI only.** CI is deferred (ADR-028), and a commit-time hook catches the leak one step earlier regardless.
+
+**Consequences** — The sandbox-in-production check is the one most likely to be questioned, because it refuses a configuration that "works". It works in the worst possible way: every payment succeeds against the provider's test environment, no money arrives, and the orders look paid. Nothing errors, so nothing alerts.
+
+The scanner will produce false positives — it did on its first run, flagging a fake JWT used as a test fixture for the redactor. The documented escape is a word like `example` on the line, which also makes it read as a placeholder to a human. That is deliberate: a scanner that cries wolf gets disabled, and a disabled scanner catches nothing.
+
+`--no-verify` bypasses the hook, and with CI deferred nothing else checks. `deploy/SECRETS.md` says that if it is used, the value should be treated as compromised.
+
+**Specification impact** — None. `docs/DEVOPS/00` describes the intent; this implements it and adds the enforcement the document assumes.
+
+---

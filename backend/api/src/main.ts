@@ -8,6 +8,7 @@ import type { Server } from "node:http";
 
 import { AppModule } from "./app.module";
 import { ConfigValidationError, loadEnv } from "./config/env.schema";
+import { SecretRuleError } from "./config/secret-rules";
 import { gracefulShutdown } from "./http/graceful-shutdown";
 
 async function bootstrap(): Promise<void> {
@@ -96,7 +97,10 @@ async function bootstrap(): Promise<void> {
 }
 
 bootstrap().catch((error: unknown) => {
-  if (error instanceof ConfigValidationError) {
+  if (
+    error instanceof ConfigValidationError ||
+    error instanceof SecretRuleError
+  ) {
     // Configuration errors are for a human to read, not a stack trace to decode.
     // eslint-disable-next-line no-console -- the logger does not exist yet at this point
     console.error(error.message);

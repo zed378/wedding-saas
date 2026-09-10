@@ -1,0 +1,28 @@
+#!/bin/sh
+# Secret scanning, on the staged diff. P0-18.
+#
+# BLOCKS, and this one is not negotiable in the way the branch-name warning is. A leaked
+# credential is not recoverable by deleting the commit -- once it reaches a shared
+# history it is rotated or it is compromised. The only useful moment to catch it is
+# before it lands, which is here.
+#
+# docs/DEVOPS/00: secrets for staging and production live in a secret manager and are
+# NEVER committed. CI is deferred (ADR-028), so this hook is the only automated check.
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "! node not found; secret scanning did not run." >&2
+  exit 0
+fi
+
+if ! node scripts/check-secrets.mjs; then
+  {
+    echo ""
+    echo "  Commit refused. GitHub Actions is deferred (ADR-028), so nothing else will"
+    echo "  catch this -- not a pull request, not a merge, not a deploy."
+    echo ""
+    echo "  --no-verify bypasses it. If you use it, assume the value is compromised and"
+    echo "  rotate it (deploy/SECRETS.md names the blast radius for each secret)."
+    echo ""
+  } >&2
+  exit 1
+fi

@@ -164,8 +164,12 @@ describe("redact — values that are secret regardless of their key", () => {
   });
 
   it("scrubs a JWT anywhere in a string", () => {
+    // A fake/example JWT, not a real credential -- it decodes to {"sub":"1234567890"}
+    // and is signed with nothing. The `example` word on this line is also what tells
+    // scripts/check-secrets.mjs to leave it alone; that scanner flagged this on its
+    // first run, which is the false-positive case its own comments predicted.
     const jwt =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abc";
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abc"; // example
     const out = JSON.stringify(redact({ message: `token was ${jwt}` }));
     expect(out).not.toContain("eyJhbGci");
   });
