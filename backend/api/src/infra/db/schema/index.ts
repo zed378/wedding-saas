@@ -15,4 +15,6 @@
  * the migration simply comes out empty.
  */
 
-export {};
+// P0-07 — users, notification preferences, refresh tokens, single-use tokens,
+// MFA factors and recovery codes. docs/DATABASE/02-USERS.md.
+export * from "./users.ts";

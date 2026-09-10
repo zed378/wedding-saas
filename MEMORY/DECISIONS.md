@@ -892,3 +892,34 @@ Writing the down file is manual and therefore forgettable, so `scripts/check-mig
 **Specification impact** — None. `docs/DEVOPS/08` describes expand-contract and rollback strategy and says nothing about down migrations either way; this fills a gap rather than contradicting one.
 
 ---
+### ADR-031 — `users.email` is unique among active accounts only
+
+**Date** 2026-09-10 · **Status** Accepted · **Task** `P0-07` · **Amends** `docs/DATABASE/02-USERS.md`
+
+**Context** — `docs/DATABASE/02-USERS.md` defined email uniqueness twice, in two incompatible ways:
+
+```sql
+email VARCHAR(255) NOT NULL UNIQUE,
+CREATE UNIQUE INDEX idx_users_email ON users(email) WHERE deleted_at IS NULL;
+```
+
+A column-level `UNIQUE` constrains every row in the table, soft-deleted ones included. With it in place the partial index can never reject anything the constraint has not already rejected — it is unreachable code expressed as an index.
+
+The two statements also encode opposite intentions. The partial predicate exists so that a soft-deleted account releases its address; the column constraint holds that address until the row is physically gone. `docs/SECURITY/09` puts a retention period between those two events, and the `P0-07` task card states the goal outright: "the partial unique index that makes soft-deleted accounts free their email".
+
+Under the document as literally written, a user who deleted their account could not register again with the same address for the length of the retention window, and the failure would surface as a duplicate-key error rather than anything they could act on.
+
+**Decision** — The partial unique index is the only uniqueness rule on `users.email`. The column-level `UNIQUE` is dropped, and `docs/DATABASE/02-USERS.md` is amended in the same change with a note explaining why the two cannot coexist.
+
+**Alternatives considered**
+
+- **Keep the column `UNIQUE`, drop the partial index.** Simpler, and defensible if email reuse were unwanted. Rejected because it contradicts the stated goal of the task and the retention model in `docs/SECURITY/09`, and because it makes account deletion partially irreversible from the user's point of view.
+- **Keep both and treat the partial index as documentation.** Rejected on principle: an index that can never fire is a lie in the schema, and the next person to read it would reasonably assume email reuse works.
+
+**Consequences** — A deleted account's address becomes available immediately, which is the intended behaviour and is now covered by three tests: a duplicate among active users is rejected, the address is accepted once the first row is soft-deleted, and a *third* active account is still refused. That third test exists because the obvious wrong fix — dropping uniqueness altogether — would satisfy the second one.
+
+**A hazard this creates**, recorded so it is not discovered later: any lookup by email that forgets `WHERE deleted_at IS NULL` can now match a deleted account instead of the live one, and two rows can legitimately share an address. The index makes the correct query natural but cannot force it. This is a rule for `P0-11`'s repository layer, noted in the feature spec's open questions.
+
+**Specification impact** — `docs/DATABASE/02-USERS.md` amended: the `UNIQUE` keyword removed from the column, with a blockquote stating that uniqueness comes from `idx_users_email` and why. The `P0-07` DoD required exactly this — an ADR *and* the document corrected in the same change.
+
+---

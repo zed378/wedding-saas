@@ -22,6 +22,16 @@ Nothing on the board is `BLOCKED`. The remaining questions shape work rather tha
 
 ## Open Questions — Remaining
 
+### OQ-15 — Should a Google identity be unique across accounts?
+
+**Affects**: `P1-05` — not blocking; the schema ships exactly as documented.
+
+`docs/DATABASE/02` indexes `(oauth_provider, oauth_subject_id)` **non-uniquely**, so nothing at the database level stops two accounts carrying the same Google subject id. `docs/API/01` says an OAuth login is matched or registered by the verified Google **email**, so it cannot arise through the documented flow today — the email index already prevents two active accounts on one address.
+
+It becomes a real question the moment account linking is designed: if a user can attach a Google identity to an existing account, subject id becomes a login key and a duplicate makes login ambiguous.
+
+`P0-07` left the index exactly as specified rather than adding a unique constraint the documents do not state — an invented constraint would have been discovered later as an unexplained migration failure. Decide it in `P1-05`, when the linking behaviour is actually designed.
+
 ### OQ-11 — Account deletion with live invitations
 
 **Affects**: `P1-08` — implementable under the recommendation below, but the recommendation needs confirming before launch, not after.

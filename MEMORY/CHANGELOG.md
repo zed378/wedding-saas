@@ -10,6 +10,18 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — the users and auth schema
+
+**Added** — six tables ([P0-07](./records/2026-09-10-P0-07-users-auth-schema.md))
+- `users`, `user_notification_preferences`, `refresh_tokens`, `user_tokens`, `user_mfa_factors`, `user_recovery_codes`, matching `docs/DATABASE/02-USERS.md` column for column, with `updated_at` triggers and a down migration.
+- **The card named three tables; the document defines six.** The extra three are auth support in the same file, and shipping only three would have left `P1-04` (email verification) and `P5-02` (admin TOTP) adding tables from tasks that are not about schema.
+- Only hashed or encrypted material is stored: `password_hash`, `token_hash`, `code_hash`, and `secret_encrypted` as `BYTEA`. A database read must not yield a usable credential.
+- Every child table cascades from `users`, so a hard delete cannot leave a refresh token that still authenticates.
+
+**Fixed** — **`docs/DATABASE/02-USERS.md` contradicted itself** and is amended (ADR-031). It declared `email VARCHAR(255) NOT NULL UNIQUE` *and* a partial unique index limited to `deleted_at IS NULL`. A column-level `UNIQUE` covers soft-deleted rows too, making the partial index unreachable and holding a deleted account's address until the hard delete ran a retention period later — the opposite of what `docs/SECURITY/09` and the task's own goal describe. The partial index is now the only uniqueness rule.
+
+**Testing** — `pnpm --filter @wi/api test:integration` runs 22 constraint tests against a real PostgreSQL 18. They **fail rather than skip** when no database is reachable, because a skipped schema suite reports green for constraints nobody checked. Three were mutation-checked — dropping `idx_users_email`, `users_role_check` and the `updated_at` trigger each failed exactly the tests claiming to cover them.
+
 ### 2026-09-10 — migrations, and PostgreSQL 18
 
 **Added** — migration tooling ([P0-06](./records/2026-09-10-P0-06-migration-tooling.md))
