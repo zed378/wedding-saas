@@ -790,3 +790,37 @@
 - [x] `MEMORY/` follows the record format with an index, changelog, decision log and templates.
 - [x] `CLAUDE.md` and `AGENTS.md` describe the current structure, with no reference to `MEMORY/STATE.md` or `MEMORY/LOG/`.
 - [x] Gaps and open questions found while writing are recorded with the task each one blocks.
+
+## P0-26 — Helm Charts for the Kubernetes Path
+
+| | |
+|---|---|
+| **Status** | DONE — 2026-09-10 |
+| **Depends on** | P0-05 |
+| **Spec refs** | `docs/DEVOPS/02-CONTAINERIZATION.md`, `docs/DEVOPS/08-ROLLBACK.md`, `docs/BACKEND/08-JOBS-WORKERS.md`, `docs/SECURITY/06-FILE-UPLOAD-SECURITY.md`, ADR-015, ADR-024 |
+| **Spec required** | No |
+| **Surface** | infra |
+
+**Goal** — `deploy/helm/` holds a chart that deploys the API and the three worker pools to a cluster, so the escape from the single-host risk (**R14**) is a deployment change rather than a project. Not the MVP path — ADR-015 keeps the MVP on one VPS.
+
+**Steps**
+1. Chart scaffold: `Chart.yaml`, `values.yaml`, `.helmignore`, `templates/_helpers.tpl`.
+2. API Deployment (rolling update with `maxUnavailable: 0`), Service, optional HPA.
+3. One Deployment per worker pool — `media`, `general`, `cron` — with the resource profile each needs.
+4. Ingress splitting the application host (`/api`) from the public invitation host (`/public` only).
+5. Guard rails that refuse to render a dangerous configuration.
+6. `deploy/helm/verify.sh` — every check that is possible without a cluster, executable, so the chart does not rot while nothing deploys it.
+7. `deploy/helm/README.md`, including an honest account of what was *not* verified.
+
+**Definition of Done**
+- [x] `helm lint --set image.tag=...` passes. A **bare** `helm lint` fails on purpose — the chart has a required value; see the record for why lint reports it badly.
+- [x] `helm template` renders the full set — 6 resources — with an explicit tag.
+- [x] Every workload runs `runAsNonRoot`, `readOnlyRootFilesystem`, `seccompProfile: RuntimeDefault`, all capabilities dropped, and carries resource limits — asserted across all 4 Deployments in the rendered output.
+- [x] No secret value in the chart; credentials come from an existing Secret via `envFrom` (`P0-18`).
+- [x] Rendering fails without `image.tag`, and fails if `workers.pools.cron.replicaCount > 1` — both triggered deliberately.
+- [x] The public invitation host routes only `/public`; nothing authenticated is reachable on that origin (ADR-024) — asserted in the render, and the assertion itself negative-tested.
+- [x] `deploy/helm/verify.sh` runs all twelve checks green.
+
+**Not done, and named rather than left to be found**: Kubernetes **schema** validation. `kubectl apply --dry-run` needs a reachable API server for the OpenAPI schema and there is no cluster here. The manifests render and are well-formed; they are not proven acceptable to a real Kubernetes version. That check moves to `P0-23`.
+
+**Deferred to `P0-23`**: `NetworkPolicy` and `PodDisruptionBudget`. PostgreSQL and Redis are deliberately not subcharts — a datastore whose lifecycle is bound to the application release can be destroyed by `helm uninstall`.

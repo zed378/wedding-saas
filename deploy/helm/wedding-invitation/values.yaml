@@ -1,0 +1,106 @@
+# Defaults. Every environment overrides what it must; nothing here is a secret.
+#
+# Secrets are NEVER values. The chart reads them from an existing Secret in the
+# namespace (`secrets.existingSecret`), so a credential cannot reach git through a
+# values file -- which is the way it usually does (docs/DEVOPS/00, P0-18).
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  registry: ghcr.io
+  repository: zed378/wedding-saas
+  # Pinned by the deploy pipeline. Never `latest`: a moving tag makes a rollback
+  # ambiguous, and "roll back to the previous image" is the whole recovery plan
+  # (docs/DEVOPS/08-ROLLBACK.md).
+  tag: ""
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+# ---------------------------------------------------------------- hostnames
+# ADR-024. No wildcard: the public invitation surface is path-based at MVP, and it
+# stays on its own host so guest-submitted content never shares an origin with the
+# authenticated application (docs/SECURITY/02).
+hosts:
+  publicInvite: invitation.zedth.my.id
+  app: app.zedth.my.id
+  admin: admin.zedth.my.id
+
+# ---------------------------------------------------------------- config
+config:
+  nodeEnv: production
+  bodyLimit: 256kb
+  shutdownTimeoutMs: "10000"
+
+secrets:
+  # Name of a Secret that already exists in the namespace. Created out of band by the
+  # secret store (P0-18) -- external-secrets, sealed-secrets or by hand.
+  existingSecret: wedding-invitation-secrets
+
+# ---------------------------------------------------------------- api
+api:
+  enabled: true
+  replicaCount: 2
+  port: 3000
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: "1", memory: 512Mi }
+  probes:
+    # Liveness answers "should I be restarted" and touches no dependency: a liveness
+    # probe that checks the database restarts healthy pods during a database blip and
+    # turns one outage into two.
+    liveness: /health
+    # Readiness answers "should I get traffic" and does check dependencies.
+    # `/readyz` arrives with P0-13; until then this points at liveness, which means a
+    # pod that cannot reach PostgreSQL will still be sent requests.
+    readiness: /health
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+# ---------------------------------------------------------------- workers
+# Three pools, separate deployments, because they fail and scale differently
+# (docs/BACKEND/08-JOBS-WORKERS.md § Worker Configuration).
+workers:
+  enabled: false # no jobs exist until P0-15
+  pools:
+    media:
+      replicaCount: 1
+      # Hostile input, CPU-bound decoding. Hard caps are the decompression-bomb
+      # defence (docs/SECURITY/06 layer 6): one crafted file must not be able to
+      # starve anything else.
+      resources:
+        requests: { cpu: 250m, memory: 512Mi }
+        limits: { cpu: "2", memory: 2Gi }
+    general:
+      replicaCount: 1
+      resources:
+        requests: { cpu: 50m, memory: 128Mi }
+        limits: { cpu: 500m, memory: 512Mi }
+    cron:
+      # Pinned to one. A second instance would run the daily expiry job twice, and
+      # "expire every invitation past its date" is not safe to run concurrently
+      # without leader election (docs/BACKEND/08). The chart refuses to render more.
+      replicaCount: 1
+      resources:
+        requests: { cpu: 50m, memory: 128Mi }
+        limits: { cpu: 500m, memory: 512Mi }
+
+# ---------------------------------------------------------------- ingress
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  tls:
+    enabled: true
+    # One certificate per host. No wildcard until per-invitation subdomains land
+    # (P7-01) -- see ADR-024.
+    issuer: letsencrypt-prod
+
+# ---------------------------------------------------------------- scheduling
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

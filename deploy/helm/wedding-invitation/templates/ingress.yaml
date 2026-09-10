@@ -1,0 +1,54 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "wi.fullname" . }}
+  labels:
+    {{- include "wi.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.ingress.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.issuer | quote }}
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    # One certificate per host. No wildcard: ADR-024 publishes invitations by path on
+    # a fixed host precisely because per-hostname DNS automation does not exist yet.
+    - hosts: [{{ .Values.hosts.app | quote }}]
+      secretName: {{ include "wi.fullname" . }}-app-tls
+    - hosts: [{{ .Values.hosts.publicInvite | quote }}]
+      secretName: {{ include "wi.fullname" . }}-invite-tls
+    - hosts: [{{ .Values.hosts.admin | quote }}]
+      secretName: {{ include "wi.fullname" . }}-admin-tls
+  {{- end }}
+  rules:
+    # The application host carries the authenticated API.
+    - host: {{ .Values.hosts.app | quote }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "wi.fullname" . }}-api
+                port:
+                  number: {{ .Values.api.port }}
+    # The public invitation host carries ONLY /public, proxied to the same API, so a
+    # guest submission is same-origin with the page it came from. Nothing
+    # authenticated is routed here: guest-submitted content renders on this origin,
+    # and a stored XSS must not reach the dashboard (ADR-024, docs/SECURITY/02).
+    - host: {{ .Values.hosts.publicInvite | quote }}
+      http:
+        paths:
+          - path: /public
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "wi.fullname" . }}-api
+                port:
+                  number: {{ .Values.api.port }}
+{{- end }}
