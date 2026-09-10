@@ -13,6 +13,7 @@
     "test:integration": "vitest run --config vitest.integration.config.mts"
   },
   "dependencies": {
+    "@wi/logging": "workspace:*",
     "@wi/schema": "workspace:*",
     "@wi/storage": "workspace:*",
     "bullmq": "^6.3.4",

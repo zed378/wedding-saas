@@ -56,6 +56,11 @@ step "status changes go through the writer" node scripts/check-status-writes.mjs
 # at compile time; this catches the cast that would bypass it in one word.
 step "storage paths built by the port" node scripts/check-storage-paths.mjs
 
+# docs/DEVOPS/06: redaction happens at the logger, not at the call site. A logger built
+# straight from pino() writes secrets in clear text and looks identical in every other
+# respect -- the worker shipped exactly that for four tasks (P0-15).
+step "loggers built by @wi/logging" node scripts/check-logger-construction.mjs
+
 # Secret scanning over the whole tree. The pre-commit hook scans the staged diff, which
 # is where a leak is stopped; this is the sweep that catches one already in the working
 # tree -- a debug script that kept a token, a value pasted into .env.example.

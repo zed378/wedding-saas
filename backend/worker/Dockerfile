@@ -17,7 +17,12 @@ COPY packages ./packages
 COPY backend/worker ./backend/worker
 
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @wi/worker build
+# `@wi/worker...` -- the trailing dots mean "and everything it depends on". Without them
+# only the worker itself is built and its workspace dependencies have no `dist/`, which
+# `P0-19.1` hit the moment the worker gained its first type-level workspace import:
+#   src/logger.ts(2,30): error TS2307: Cannot find module '@wi/logging'
+# The API image had the same latent bug and the same fix.
+RUN pnpm --filter @wi/worker... build
 RUN pnpm --filter @wi/worker --prod --legacy deploy /out
 
 FROM node:24-alpine AS runtime

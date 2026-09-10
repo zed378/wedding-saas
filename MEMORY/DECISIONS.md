@@ -1021,3 +1021,69 @@ The scanner will produce false positives — it did on its first run, flagging a
 **Specification impact** — None. `docs/DEVOPS/00` describes the intent; this implements it and adds the enforcement the document assumes.
 
 ---
+### ADR-035 — Logging is one package, and a build guard keeps it that way
+
+**Date** 2026-09-10 · **Status** Accepted · **Task** `P0-19.1`
+
+**Context** — `docs/DEVOPS/06` § Mandatory Redaction requires redaction "at the logger middleware level, not relying on manual developer discipline each time".
+
+`P0-12` implemented that for the API. `P0-15` gave the worker a **separate** logger with a comment on it: "NOTE: this does NOT redact … the worker logs only fields it constructs itself … That is a real limitation and it is written down rather than assumed." The `P0-15` record predicted the cost and named `P0-19` as the place to fix it. `P0-19` did not fix it, and paid the prediction: a crash-on-startup bug had to be fixed **twice**, once per copy.
+
+Two tasks later the worker still had a logger that wrote whatever it was handed, in clear text.
+
+**Decision** — Three parts.
+
+1. **`packages/logging` (`@wi/logging`) owns redaction, request context and job trace.** It exports `createLogger(config, destination?)` rather than a logger instance, because the service name differs per surface and a package that decides it would need to read an environment variable on behalf of its consumer.
+
+2. **Each surface owns its instance.** `backend/api/src/shared/logging/logger.ts` and `backend/worker/src/logger.ts` are now four lines each: read `SERVICE_NAME`, call `createLogger`. The API additionally **pre-binds** `logSecurityEvent` to its security logger, because the package's signature takes the logger first and passing `logger` instead of `securityLogger` would compile, run, and silently move a security event from the 1-year retention stream to the 90-day one.
+
+3. **`scripts/check-logger-construction.mjs` refuses a `pino()` call outside `packages/logging/src/`**, blocking in `scripts/verify.sh` and `.githooks/pre-push`. Tests are exempt, because a test that builds its own instance to capture output is doing the opposite of hiding a leak.
+
+The third part is the one that matters. A comment saying "this does not redact" is not a mechanism — it survived four tasks and changed nothing. A logger built directly from `pino()` produces the same field names at the same level on the same stream; nothing about it looks wrong. The guard is the difference between a rule and a hope.
+
+**Alternatives considered**
+
+- **Export a ready-made `logger` singleton.** Rejected: the package would have to read `SERVICE_NAME` for its consumer, and the worker sets a different one per pool.
+- **Leave the duplication and add a test to each surface.** Rejected: it is the arrangement that just failed. The duplicated crash fix is the evidence.
+- **A lint rule instead of a script.** Reasonable, and the better home once `P0-17` wires ESLint. The script works today, with CI deferred (ADR-028), and moving it later is a small edit.
+
+**Consequences** — The worker redacts for the first time. Anything the worker logs — a whole job payload, an error carrying a connection string with a password in it — now goes through the same key-name walk as the API.
+
+`createLogger` gained an optional `destination` parameter purely so a test can assert what *that function* produces. This is not cosmetic: the suite inherited from `P0-12` builds its own pino instance with a copy of the formatters, so deleting the `log` formatter from `logger.ts` leaves all 39 of its assertions passing. `logger.spec.ts` closes that. Measured by mutation: replacing `redact(object)` with `object` fails exactly two tests in `logger.spec.ts` and none in `logging.spec.ts`.
+
+The guard is a text check and can be evaded. It is not aimed at a determined author; it is aimed at the ordinary one who reaches for `pino()` because that is what the docs for pino say to do.
+
+**Specification impact** — None. `docs/DEVOPS/06` already required this; the code did not do it.
+
+---
+### ADR-036 — The container dependency layer is keyed on the lockfile, not a hand-written list of workspace members
+
+**Date** 2026-09-10 · **Status** Accepted · **Task** `P0-19.1`
+
+**Context** — `backend/api/Dockerfile` used the standard monorepo Docker recipe: `COPY` every workspace member's `package.json` individually so the `pnpm install` layer caches on manifests alone rather than on the whole source tree.
+
+`P0-19` found that list two members stale (`packages/storage`, `e2e`) and recorded it under *What to Watch*: "The Dockerfile's hand-maintained package list will go stale again." The failure is silent — the image builds, and the container serves whatever the layer cache last produced. `P0-19` found it only because E2E asked the running container for a route that had existed since `P0-13` and got a 404.
+
+`P0-19.1` added a third package and had to touch the list again.
+
+**Decision** — Delete the list. `pnpm fetch` populates the store from **the lockfile alone** — it reads no `package.json` at all — so the dependency layer's cache key becomes `pnpm-lock.yaml`. The build stage then does `COPY . .` and installs from the warm store.
+
+`pnpm-workspace.yaml` travels with the lockfile, because it carries the `allowBuilds` decisions; without it `pnpm fetch` refuses with `ERR_PNPM_IGNORED_BUILDS` rather than silently skipping native postinstalls. It lists globs, not members, so it cannot go stale the way the manifest list did.
+
+The build commands also lose their hand-kept list: `pnpm --filter @wi/api... build` (trailing dots) builds the target and everything it depends on, in graph order.
+
+**Alternatives considered**
+
+- **Add `packages/logging` to the list and move on.** The obvious option, and it is what the previous two tasks each did. Three strikes.
+- **`COPY . .` with no fetch stage.** Correct, and loses dependency-layer caching entirely: every source edit re-downloads every package.
+- **Generate the list with a script.** A generated list still has to be regenerated, which is the same failure with an extra step.
+
+**Consequences** — The cache key is now the lockfile, so adding a dependency anywhere re-fetches everything. Adding a dependency is rare; forgetting a package is not, and the second failure is silent while the first is a slow build.
+
+**`--prefer-offline`, not `--offline`.** `--offline` was tried first, because it would *prove* the fetch layer complete — a missing package would fail the build rather than quietly reaching the network. It does not work: pnpm 11 verifies the lockfile against its supply-chain policies on every install, and that check reads registry metadata `pnpm fetch` does not mirror (`ERR_PNPM_NO_OFFLINE_META`). Package tarballs still come from the warm store; what crosses the network is metadata. Recorded because "offline" was the stronger claim and this is not it.
+
+`backend/worker/Dockerfile` had the same latent bug in its build command and it stopped being latent in this task: it ran `pnpm --filter @wi/worker build`, so no workspace dependency had a `dist/`, and the worker's first type-level workspace import failed the image build outright. Fixed the same way. Its dependency layer already copies `packages/` wholesale, so it never had the manifest-list problem.
+
+**Specification impact** — None. `docs/DEVOPS/02` sketches a single-package Dockerfile; the monorepo already deviates from it and the deviation is not new here.
+
+---

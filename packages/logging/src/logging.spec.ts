@@ -10,21 +10,22 @@ import {
   REDACTED_KEY_NAMES,
   MASKED_KEY_NAMES,
   EMAIL_KEY_NAMES,
-} from "../src/shared/logging/redact";
+} from "./redact.js";
 import {
   runWithRequestContext,
   currentRequestContext,
   enrichRequestContext,
-} from "../src/shared/logging/request-context";
+} from "./request-context.js";
 import {
   enqueueEnvelope,
   runJobWithTrace,
   type JobEnvelope,
-} from "../src/shared/logging/job-context";
-import { logger, securityLogger } from "../src/shared/logging/logger";
+} from "./job-context.js";
+import { createLogger, createSecurityLogger } from "./logger.js";
 
 /**
- * P0-12 — redaction, tested by trying to leak.
+ * P0-12 — redaction, tested by trying to leak. Moved here from `@wi/api` in `P0-19.1`
+ * when the module became a package; the assertions are unchanged.
  *
  * `docs/DEVOPS/06` § Mandatory Redaction says this must happen "at the logger middleware
  * level, not relying on manual developer discipline each time". The DoD asks for a test
@@ -261,10 +262,13 @@ describe("the logger itself", () => {
         cb();
       },
     });
-    // Built with the same formatters as src/shared/logging/logger.ts. Importing that
-    // module directly would write to stdout through a transport worker, which a test
-    // cannot capture -- so the formatter behaviour is what is asserted here, and the
-    // formatter is where redaction lives.
+    // Built with the same formatters as createLogger(). Calling createLogger()
+    // directly would write to stdout, which a test cannot capture -- so the formatter
+    // behaviour is what is asserted here, and the formatter is where redaction lives.
+    //
+    // This duplication is a known weakness: it verifies that THESE formatters redact,
+    // not that createLogger() installs them. `logger.spec.ts` closes that half by
+    // asserting the shape createLogger() actually produces.
     testLogger = pino(
       {
         base: { service: "api" },
@@ -335,6 +339,9 @@ describe("the logger itself", () => {
 });
 
 describe("security events", () => {
+  const logger = createLogger({ service: "api" });
+  const securityLogger = createSecurityLogger(logger);
+
   it("are tagged so retention can differ from application logs", async () => {
     // docs/DEVOPS/06 § Log Retention: security events for 1 year, application logs for
     // 90 days, "kept separate". The field is what makes that separation possible; the
