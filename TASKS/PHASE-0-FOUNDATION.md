@@ -388,7 +388,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-10 |
 | **Depends on** | P0-09 |
 | **Spec refs** | `docs/SECURITY/05-MULTI-TENANCY-SECURITY.md`, `docs/SECURITY/04-AUTHORIZATION-RBAC.md`, `docs/BACKEND/02-SERVICE-LAYER.md` |
 | **Spec required** | Yes — authorization |
@@ -408,11 +408,17 @@
 7. Write the test matrix now, before there are endpoints to test: owner reads own (found), non-owner reads (null), admin path reads (found, audit row written), child of another invitation via own parent (null), list returns only own rows when the database holds two users' data.
 
 **Definition of Done**
-- [ ] No exported function can fetch a tenant-owned row without a user scope or an explicit `admin` prefix.
-- [ ] Non-owner access returns null at the repository layer, so the service cannot accidentally return a 403 that confirms existence.
-- [ ] The cross-tenant sub-resource case is covered by a test.
-- [ ] The CI guard against direct table access from route handlers is in place and fails on a deliberately introduced violation.
-- [ ] `adminFind*` call sites write an audit row; a test asserts this.
+- [x] No exported function fetches a tenant-owned row without a `TenantScope` or an explicit `admin` name. The scope is a **branded type**, so a bare string does not type-check.
+- [x] Non-owner access returns `null`. Non-owner, soft-deleted and non-existent are all the same answer, so the service physically cannot leak existence through a status code (ADR-018).
+- [x] The cross-tenant sub-resource case is covered from **three** angles: another invitation's child, another owner's parent, and a mismatched parent within one owner.
+- [x] The guard is in place, **blocking** in `pre-push` and `scripts/verify.sh`, and was tested both ways.
+- [x] The admin path writes its own audit row **inside the read's transaction** — there is no way to obtain the data without leaving the trail — and **fails closed** if the audit write fails.
+
+**Mutation-checked four times**, because this is the layer where a passing test proves least: removing the owner filter from `findOwned`, the parent-id condition from `findOwnedChild`, the owner condition from `findOwnedChild`, and the audit insert from the admin path each failed exactly the tests claiming to cover them.
+
+**Every test seeds two users.** A single-user fixture proves nothing about isolation — every query returns that user's rows whether or not the filter exists.
+
+**A note for whoever reads this next**: the load-bearing part is `scripts/check-tenant-scope.mjs`, not the repository. The repository is correct and will stay correct; the risk is a handler that never calls it. With CI deferred (ADR-028) that guard runs only on push and in `verify.sh`, so `--no-verify` skips the project's number-one security control.
 
 **Abuse cases to test**
 | Abuse case | Source | Expectation |

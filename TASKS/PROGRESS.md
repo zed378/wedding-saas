@@ -3,8 +3,8 @@
 Single source of truth for where the project stands. Updated in the same commit as the work it describes (`00-TASK-CONVENTIONS.md` global DoD item 11).
 
 **Last updated**: 2026-09-10
-**Current phase**: Phase 0 — Foundation (13 / 26 done). **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. `P0-11` (tenant-scoped repository layer) is next on the critical path and is the one to give extra review attention; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
-**Overall**: 13 / 135 tasks done
+**Current phase**: Phase 0 — Foundation (14 / 26 done). **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
+**Overall**: 14 / 135 tasks done
 
 **No automated pipeline**: `P0-17` is deferred (ADR-028). Before merging to `main`, run `scripts/verify.sh`. The `:id`-endpoint gate blocks in `.githooks/pre-push`; integration tests, the coverage floor, SAST and dependency scanning are **not** running anywhere until `P0-17` is picked up — revisit before Phase 3 payment code.
 
@@ -21,7 +21,7 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 
 | Phase | Tasks | Done | Status | Gate to enter |
 |---|---|---|---|---|
-| [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 26 | 13 | **ACTIVE** | — |
+| [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 26 | 14 | **ACTIVE** | — |
 | [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 0 | Not started | Phase 0 exit criteria |
 | [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 14 | 0 | Not started | Phase 1 exit + `P1-25` |
 | [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 0 | Not started | Phase 2 exit |
@@ -52,7 +52,7 @@ Roadmap: Week 1-2. Exit criteria in the phase file.
 | P0-08 | Schema 2/4 — templates, versions, media | backend | M | **DONE** — `media.invitation_id` FK deferred to `P0-09` (ADR-032) | P0-07 |
 | P0-09 | Schema 3/4 — invitations and children | backend | L | **DONE** — 13 tables; ADR-033 resolved a second UNIQUE/soft-delete contradiction | P0-08 |
 | P0-10 | Schema 4/4 — orders, payments, audit logs | backend | M | **DONE** — `audit_logs` append-only by permission; webhook idempotency index in place | P0-09 |
-| P0-11 | Tenant-scoped repository layer | backend | L | TODO | P0-09 |
+| P0-11 | Tenant-scoped repository layer | backend | L | **DONE** — branded scope, guard blocking on push, 4 mutation checks | P0-09 |
 | P0-12 | Structured logging with redaction | backend | M | TODO | P0-04 |
 | P0-13 | Response envelope, errors, health | backend | M | TODO | P0-04 |
 | P0-14 | Audit log and status history writers | backend | M | TODO | P0-10, P0-12 |
@@ -69,7 +69,7 @@ Roadmap: Week 1-2. Exit criteria in the phase file.
 | P0-25 | Separate surfaces into backend/frontend/admin | infra | S | **DONE** | P0-02 |
 | P0-26 | Helm charts for the Kubernetes path | infra | M | **DONE** — K8s schema validation deferred to `P0-23`, no cluster reachable | P0-05 |
 
-**Critical path**: `P0-02` → `P0-04` → `P0-05` → `P0-06` → `P0-07`…`P0-11`. `P0-11` is the one to give extra review attention: every `:id` endpoint in the next four phases is built on it.
+**Critical path**: `P0-02` → `P0-04` → `P0-05` → `P0-06` → `P0-07`…`P0-11` — **all done**. `P0-11` got the extra review attention the board asked for: four mutation checks, two-user fixtures throughout, and a build guard that blocks direct table access.
 
 **Parallel tracks** once `P0-02` lands: backend schema (`P0-04`…`P0-11`), platform (`P0-17`, `P0-18`, `P0-23`), frontend (`P0-22`), template (`P0-20`, `P0-21` — needs only `P0-08`).
 

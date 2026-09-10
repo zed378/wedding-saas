@@ -10,6 +10,21 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — tenant isolation, built before the endpoints that need it
+
+**Added** — the tenant-scoped repository layer ([P0-11](./records/2026-09-10-P0-11-tenant-scoped-repository.md))
+- `docs/SECURITY/05` is the project's number-one security priority with zero tolerance for regressions, and every `:id` endpoint in Phases 1 to 5 will sit on this. Building it first means never writing one wrong, instead of auditing them all later.
+- **The unsafe query is absent from the exported surface**, not merely discouraged. `TenantScope` is a branded type constructed only by `tenantScope(userId)`, so a bare string — a slug, an invitation id, a variable from the wrong line — does not type-check where an owner filter belongs.
+- **Non-owner, soft-deleted and non-existent all return `null`.** The service above cannot return a 403 that confirms a resource exists (ADR-018), because it never learns the difference.
+- **Sub-resource access applies both conditions in one query.** `docs/SECURITY/05` § 7 asks for two validations; two round trips leave a state where someone has done the first and moved on. The attack this closes is `PATCH /invitations/{mine}/bank-accounts/{someone-elses}` — real parent, real child id, and only the second condition stops the write.
+- **The admin bypass writes its own audit row inside the read's transaction**, so there is no way to obtain the data without leaving the trail — and it **fails closed** if the audit write fails, per `docs/SECURITY/00`.
+- `scripts/check-tenant-scope.mjs` fails the build when anything outside the tenancy layer imports an invitation table directly. Blocking in `pre-push` and `scripts/verify.sh`.
+- The application's database connection now exists, as the **unprivileged** role — it cannot alter the schema it queries.
+
+**Testing** — 27 isolation tests, 145 across five suites. **Every test seeds two users**: a single-user fixture proves nothing about isolation. Four mutation checks — removing the owner filter, the parent-id condition, the child owner condition, and the audit insert — each failed exactly the tests claiming to cover them.
+
+**Fixed** — the five integration suites now share one `resetTenantData()` using `TRUNCATE ... CASCADE`. Each suite used to clear the tables it knew about in the order it believed correct, which stopped working the moment a suite left rows another suite's cleanup could not remove: twenty failures, none in the code under test. Noted as a follow-up in three previous records without being acted on; this is what that cost.
+
 ### 2026-09-10 — the commercial tables, and the schema is complete
 
 **Added** — five tables ([P0-10](./records/2026-09-10-P0-10-orders-payments-schema.md))

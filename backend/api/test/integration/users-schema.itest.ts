@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { Pool } from "pg";
 
+import { connect, tag, resetTenantData, applicationPool } from "./helpers.ts";
+
 /**
  * P0-07 — the constraints on the users tables, proven by violating them.
  *
@@ -18,14 +20,7 @@ import { Pool } from "pg";
  *   pnpm --filter @wi/api test:integration
  */
 
-const URL =
-  process.env["MIGRATION_DATABASE_URL"] ??
-  "postgres://wedding_owner:wedding_owner_dev@localhost:5432/wedding";
-
 let pool: Pool;
-
-/** Unique per run so a leftover row from a failed run cannot make a later one pass. */
-const tag = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 async function insertUser(
   overrides: Record<string, unknown> = {},
@@ -46,33 +41,16 @@ async function insertUser(
 }
 
 beforeAll(async () => {
-  pool = new Pool({ connectionString: URL, max: 4 });
-  try {
-    await pool.query("SELECT 1");
-  } catch (cause) {
-    throw new Error(
-      [
-        `Cannot reach PostgreSQL at ${URL.replace(/:[^:@]*@/, ":***@")}`,
-        "",
-        "These tests do not skip when the database is missing, on purpose: a skipped",
-        "schema suite reports green for constraints nobody verified.",
-        "",
-        "  docker compose -f deploy/docker-compose.yml up -d postgres",
-        "  pnpm --filter @wi/api db:migrate",
-        "",
-      ].join("\n"),
-      { cause },
-    );
-  }
-
-  const { rows } = await pool.query<{ n: string }>(
-    "SELECT count(*)::text AS n FROM information_schema.tables WHERE table_name = 'users'",
-  );
-  if (rows[0]?.n === "0") {
-    throw new Error(
-      "The users table does not exist. Run: pnpm --filter @wi/api db:migrate",
-    );
-  }
+  // This suite predates helpers.ts and carried its own copy of the connect-or-fail
+  // block. Moved to the shared helper so there is one place that decides what happens
+  // when the database is missing -- and, more importantly, one place that decides how
+  // tables are cleared between tests.
+  pool = await connect([
+    "users",
+    "refresh_tokens",
+    "user_tokens",
+    "user_mfa_factors",
+  ]);
 });
 
 afterAll(async () => {
@@ -80,8 +58,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  // Cascades clear every child table, which is itself a small check on the FKs.
-  await pool.query("DELETE FROM users");
+  await resetTenantData(pool);
 });
 
 describe("users — email uniqueness (ADR-031)", () => {
@@ -330,13 +307,10 @@ describe("privilege separation", () => {
     // docs/SECURITY/05 precondition: the connection that serves requests must not be
     // able to change the schema it queries. Verified from the failing side, because
     // that is the only direction that proves anything.
-    const appPool = new Pool({
-      connectionString: URL.replace(
-        /\/\/[^@]+@/,
-        "//wedding_app:wedding_app_dev@",
-      ),
-      max: 1,
-    });
+    // applicationPool() rather than a hand-built one: this suite used to derive the
+    // connection string itself, and when the local URL const was removed the reference
+    // silently resolved to the GLOBAL `URL` class instead of failing to compile.
+    const appPool = applicationPool();
     try {
       await expect(pool.query("SELECT 1")).resolves.toBeTruthy();
       await expect(

@@ -41,6 +41,11 @@ step() {
 # ---------------------------------------------------------------------------
 step ":id endpoints have tests" node scripts/check-id-endpoint-tests.mjs
 
+# The other half of docs/SECURITY/05: the gate above insists on a test for every :id
+# endpoint, this one insists the query goes through the tenant-scoped repository at all.
+# A handler that imports the table directly can be perfectly tested and still unscoped.
+step "tenant-scoped data access" node scripts/check-tenant-scope.mjs
+
 # ---------------------------------------------------------------------------
 # Migration gates (P0-06). Both are file checks, so they need no database and
 # belong here rather than in scripts/db-roundtrip.sh, which does.
