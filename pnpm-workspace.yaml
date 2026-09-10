@@ -1,3 +1,17 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Install scripts are blocked by default: a postinstall is arbitrary code execution at
+# install time, and this repository will handle payment secrets and user uploads. Every
+# package is therefore decided one at a time here, rather than the protection being
+# switched off wholesale.
+#
+# Managed with `pnpm approve-builds <pkg>` to allow and `pnpm approve-builds '!<pkg>'` to
+# deny. An unlisted package fails the install rather than being silently skipped, which is
+# the behaviour that makes this list meaningful.
+#
+# @swc/core: denied. It ships its platform binary as an optional dependency, so the
+# postinstall is not needed -- verified by loading the module and calling transformSync.
+allowBuilds:
+  "@swc/core": false

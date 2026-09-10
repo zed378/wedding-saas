@@ -2,9 +2,9 @@
 
 Single source of truth for where the project stands. Updated in the same commit as the work it describes (`00-TASK-CONVENTIONS.md` global DoD item 11).
 
-**Last updated**: 2026-09-09
-**Current phase**: Phase 0 — Foundation (4 / 24 done). Repository scaffolded and the traceability gates are in place; `P0-04` (backend skeleton) and `P0-22` (frontend skeletons) are both unblocked.
-**Overall**: 4 / 133 tasks done
+**Last updated**: 2026-09-10
+**Current phase**: Phase 0 — Foundation (5 / 24 done). The API runs, validates its configuration and serves the three surfaces. `P0-05` (Docker Compose) is next on the critical path; `P0-12`, `P0-13`, `P0-17`, `P0-18` and `P0-22` are all unblocked and can run in parallel.
+**Overall**: 5 / 133 tasks done
 
 **Specification status**: all 17 gaps resolved and `docs/` amended (ADR-018 through ADR-022). Pricing, the publishing address and the gift account data question are decided (ADR-023 through ADR-025). **No task on this board is blocked** — four open questions remain in [`BACKLOG.md`](./BACKLOG.md) and all of them shape work rather than stopping it.
 
@@ -19,7 +19,7 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 
 | Phase | Tasks | Done | Status | Gate to enter |
 |---|---|---|---|---|
-| [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 24 | 4 | **ACTIVE** | — |
+| [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 24 | 5 | **ACTIVE** | — |
 | [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 0 | Not started | Phase 0 exit criteria |
 | [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 14 | 0 | Not started | Phase 1 exit + `P1-25` |
 | [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 0 | Not started | Phase 2 exit |
@@ -43,7 +43,7 @@ Roadmap: Week 1-2. Exit criteria in the phase file.
 | P0-01 | Confirm and freeze the tech stack | docs | S | **DONE** — ADR-004…ADR-017 | — |
 | P0-02 | Initialize the monorepo structure | infra | S | **DONE** | P0-01 |
 | P0-03 | Git conventions, PR template, CODEOWNERS | infra | S | **DONE** — branch protection still to enable in GitHub settings | P0-02 |
-| P0-04 | Backend service skeleton | backend | M | TODO | P0-02 |
+| P0-04 | Backend service skeleton | backend | M | **DONE** | P0-02 |
 | P0-05 | Local environment via Docker Compose | infra | M | TODO | P0-04 |
 | P0-06 | Migration tooling and baseline migration | backend | S | TODO | P0-05 |
 | P0-07 | Schema 1/4 — users and auth tables | backend | M | TODO | P0-06 |

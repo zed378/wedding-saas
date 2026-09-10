@@ -122,7 +122,7 @@ The stack is decided and recorded — ADR-004 through ADR-017 in `MEMORY/DECISIO
 
 | Layer | Choice | Notes |
 |---|---|---|
-| Runtime | Node.js 22 LTS, TypeScript | One language across API, workers and all three frontends |
+| Runtime | Node.js 24 LTS, TypeScript | One language across API, workers and all three frontends |
 | Repo | pnpm workspaces + Turborepo | `apps/{api,worker,web-app,public-invite,admin}`, `packages/{schema,template-renderer,ui,api-client,config}` |
 | Backend | NestJS 12 | `Controller → Service → Repository`, constructor injection |
 | Database | PostgreSQL 16, Drizzle ORM 0.45.x + drizzle-kit | Migrations are a separate command, never run on startup |
@@ -145,7 +145,21 @@ The stack is decided and recorded — ADR-004 through ADR-017 in `MEMORY/DECISIO
 
 Exact versions are pinned in the lockfile by `P0-02`; the majors above are the decision.
 
-**Setup commands** — filled in by `P0-02` and `P0-05` once the repository is scaffolded. Until then there is nothing to install: this repository is still specification, plan and record only.
+**Setup commands**
+
+```bash
+pnpm install            # workspace install; also installs the git hooks
+pnpm build              # build every package and app (turbo orders by dependency)
+pnpm typecheck          # type check everything
+pnpm test               # unit and integration tests
+pnpm format             # prettier over code; docs/, TASKS/ and MEMORY/ are prose and excluded
+pnpm --filter @wi/api dev    # API in watch mode
+pnpm --filter @wi/api start  # API from dist/
+```
+
+Copy `.env.example` to `.env` first. The API validates its environment at startup and exits **78** naming every offending variable rather than failing later on the request that needed it (`apps/api/src/config/env.schema.ts`).
+
+The local service stack — PostgreSQL, Redis, MinIO, Mailpit, ClamAV — arrives with `P0-05`.
 
 Target layout, per `docs/ARCHITECTURE/01-APPLICATION-ARCHITECTURE.md`:
 ```

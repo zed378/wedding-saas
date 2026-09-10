@@ -144,7 +144,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-10 |
 | **Depends on** | P0-02 |
 | **Spec refs** | `docs/ARCHITECTURE/03-BACKEND-ARCHITECTURE.md`, `docs/ARCHITECTURE/01` § Layering, `docs/API/00-API-STANDARDS.md` |
 | **Spec required** | No |
@@ -162,11 +162,13 @@
 6. Implement graceful shutdown: stop accepting connections, drain in-flight requests within a bounded timeout, close DB and queue connections, exit.
 
 **Definition of Done**
-- [ ] Build and test commands pass on a clean checkout.
-- [ ] The service starts, serves its port, and exits cleanly on `SIGTERM` with in-flight requests completed.
-- [ ] Starting without a required config value fails at startup, naming the variable — never with a null dereference at first use.
-- [ ] The three route surfaces are mounted separately and a request to each is covered by a test.
-- [ ] The middleware chain is documented in code with the reserved positions named after the tasks that fill them.
+- [x] Build and test commands pass on a clean checkout — verified by deleting every `dist/` and the turbo cache and rebuilding. This is also where a real bug was found: a stale `.tsbuildinfo` made the build report success while emitting nothing (see the record).
+- [x] The service starts, serves its port, and drains in-flight requests on shutdown — proven by `graceful-shutdown.spec.ts`. **Qualified**: Windows does not deliver POSIX signals, so signal *delivery* is not tested here; the drain behaviour it triggers is. Delivery is exercised by the container stop in `P0-05`.
+- [x] Starting without a required config value fails at startup naming the variable — exit 78, every missing variable listed at once.
+- [x] The three route surfaces are mounted separately and a request to each is covered by a test.
+- [x] The middleware chain is documented in code with the reserved positions named after the tasks that fill them.
+
+**Beyond the card** — the `@wi/schema` import is asserted end to end rather than assumed, because ADR-004 chose one language on the strength of that boundary working. If it breaks, `P0-20` would be the expensive place to discover it.
 
 ---
 

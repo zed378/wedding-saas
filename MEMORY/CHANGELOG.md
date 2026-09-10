@@ -10,6 +10,23 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — the API runs
+
+**Added** — backend service skeleton ([P0-04](./records/2026-09-10-P0-04-backend-service-skeleton.md))
+- `apps/api` is a running NestJS service: environment validated before anything is constructed, the three surfaces from `docs/ARCHITECTURE/01` mounted separately (`/api/v1`, `/public`, `/api/webhooks`), the middleware chain documented as an ordering with positions 6-8 reserved for rate limiting (`P1-07`), authentication (`P1-06`) and the error mapper (`P0-13`).
+- **Configuration fails loudly**: a missing variable stops the service with exit 78 and names *every* offending variable at once — reporting one per restart is how people end up commenting out validation. Reserved variables are listed with the task that makes each required.
+- **Bounded drain on shutdown**: idle keep-alive sockets released, in-flight requests left to finish, capped so a stuck request cannot hang a rollout.
+- **The shared-package boundary is proven, not assumed.** The API imports from `@wi/schema` and a test asserts the value arrives over HTTP. ADR-004 chose one language on the strength of that boundary; if it breaks, `P0-20` would be the expensive place to find out.
+- 16 tests. Runtime behaviour also exercised by hand against the built output: all three surfaces answered, `X-Frame-Options: DENY` (helmet defaults to SAMEORIGIN; `docs/SECURITY/08` asks for DENY), and a configuration-less start exited 78.
+
+**Fixed** — a build that reported success and emitted nothing
+- `tsc`'s incremental state lived beside the config, so `rm -rf dist` left it behind and the next build concluded there was nothing to do. `tsBuildInfoFile` now lives inside `dist/`. Invisible from CI, because a clean checkout has no stale state — and its symptom was a *green* build.
+
+**Changed**
+- `packages/*` compile to CommonJS in `dist/` with declarations, so the CommonJS NestJS app can consume them.
+- Install scripts are denied by default through pnpm's `allowBuilds` policy; each package is decided one at a time rather than the protection being switched off.
+- `CLAUDE.md` and `AGENTS.md`: real setup commands, and the Node version corrected to 24 to match ADR-004 as amended.
+
 ### 2026-09-09 — implementation begins
 
 **Added** — repository structure ([P0-02, P0-03](./records/2026-09-09-P0-02-P0-03-repo-scaffolding-and-conventions.md))

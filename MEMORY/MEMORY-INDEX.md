@@ -10,6 +10,7 @@ Add a line here as part of writing the record — an unindexed record is a recor
 
 | Date | Task | Record | Hook |
 |---|---|---|---|
+| 2026-09-10 | P0-04 | [Backend service skeleton](./records/2026-09-10-P0-04-backend-service-skeleton.md) | The API runs: validated config that exits 78 naming every missing variable, three surfaces mounted separately, a bounded drain that releases idle keep-alive sockets but not busy ones. Found a build that reported success and emitted nothing — a stale `.tsbuildinfo` surviving `rm -rf dist`, invisible from CI because a clean checkout has none |
 | 2026-09-09 | P0-02, P0-03 | [Repository structure and the gates that keep it honest](./records/2026-09-09-P0-02-P0-03-repo-scaffolding-and-conventions.md) | Monorepo scaffolded and the workspace graph proven; three conventions turned into build failures, including a guard that fails any diff adding an `:id` route without touching a test. Found the repo already had four commits in a different convention — checking `git log` before installing a gate is what surfaced it |
 | 2026-09-09 | P1-13 | [Gift account data reframing](./records/2026-09-09-gift-account-data-reframing.md) | The account number is published on purpose, so guests can send a gift — not a payment credential. Encryption protects only the subset that is not already public. The reframing exposed the attack nobody had written down: swap the number on a live invitation and collect every guest's gift, silently. Now R16, with an audit trail and a non-optional owner email |
 | 2026-09-09 | P3-01, P0-23 | [Pricing and publishing address](./records/2026-09-09-pricing-and-publishing-address.md) | Rp 139,000 for 12 months, one package, one free draft; invitations at `invitation.zedth.my.id/{slug}` with no wildcard DNS. The care went into not collapsing everything onto one host — guest-submitted content sharing an origin with the dashboard would have handed a stored XSS a path the wildcard design never gave it. Board now has zero blocked tasks |
@@ -30,6 +31,7 @@ Add a line here as part of writing the record — an unindexed record is a recor
 
 ### Phase 0 — Foundation
 - `P0-01` — [The stack is decided](./records/2026-09-09-P0-01-stack-decision.md) — the constraint that chose the language was one sentence in `docs/FRONTEND/03`
+- `P0-04` — [Backend service skeleton](./records/2026-09-10-P0-04-backend-service-skeleton.md) — a green build that produced no artifact; and the shared-package boundary asserted rather than assumed
 - `P0-02`, `P0-03` — [Repository structure and gates](./records/2026-09-09-P0-02-P0-03-repo-scaffolding-and-conventions.md) — a checklist people are asked to remember is one that gets skipped invisibly; three of them are now build failures
 - `P0-23`, `P3-01` — [Pricing and publishing address](./records/2026-09-09-pricing-and-publishing-address.md) — the literal reading of the request would have cost a security property; two DNS records kept it
 - `P0-24` — [TASKS and MEMORY scaffolding](./records/2026-09-09-P0-24-tasks-and-memory-scaffolding.md) — a plan that goes stale is worse than none, so the board is updated in the commit that changes the code
