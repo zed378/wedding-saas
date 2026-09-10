@@ -19,3 +19,9 @@ build/
 .next/
 .turbo/
 coverage/
+
+# Helm templates are Go templates that happen to end in .yaml. They are not valid
+# YAML until Helm renders them -- `{{- if ... }}` on line 1 makes prettier fail with
+# "Block collections are not allowed within flow collections", which points at
+# nothing. `helm lint` is the tool that checks these; deploy/helm/verify.sh runs it.
+deploy/helm/*/templates/

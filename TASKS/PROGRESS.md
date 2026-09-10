@@ -6,6 +6,8 @@ Single source of truth for where the project stands. Updated in the same commit 
 **Current phase**: Phase 0 — Foundation (8 / 26 done). The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. `P0-06` (migration tooling) is next on the critical path; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
 **Overall**: 8 / 135 tasks done
 
+**No automated pipeline**: `P0-17` is deferred (ADR-028). Before merging to `main`, run `scripts/verify.sh`. The `:id`-endpoint gate blocks in `.githooks/pre-push`; integration tests, the coverage floor, SAST and dependency scanning are **not** running anywhere until `P0-17` is picked up — revisit before Phase 3 payment code.
+
 **Specification status**: all 17 gaps resolved and `docs/` amended (ADR-018 through ADR-022). Pricing, the publishing address and the gift account data question are decided (ADR-023 through ADR-025). **No task on this board is blocked** — four open questions remain in [`BACKLOG.md`](./BACKLOG.md) and all of them shape work rather than stopping it.
 
 **Product decisions now fixed**: one package at **Rp 139,000 for 12 months**, free tier of **one draft**; invitations published at **`invitation.zedth.my.id/{slug}`** (path-based, no wildcard DNS), with per-invitation subdomains deferred to `P7-01`.
@@ -56,13 +58,13 @@ Roadmap: Week 1-2. Exit criteria in the phase file.
 | P0-14 | Audit log and status history writers | backend | M | TODO | P0-10, P0-12 |
 | P0-15 | Queue and worker skeleton | worker | M | TODO | P0-05, P0-12 |
 | P0-16 | Object storage abstraction | backend | M | TODO | P0-05 |
-| P0-17 | CI pipeline | infra | M | TODO | P0-04 |
+| P0-17 | CI pipeline | infra | M | **DEFERRED** — ADR-028; gates moved to `scripts/verify.sh` + pre-push hook | P0-04 |
 | P0-18 | Secrets and configuration conventions | infra | S | TODO | P0-04 |
 | P0-19 | Test harness | backend, web-app | M | TODO | P0-05 |
 | P0-20 | Template schema definition and validator | backend, web-app | L | TODO | P0-08 |
 | P0-21 | Reference template and demo seed data | backend, web-app | L | TODO | P0-20 |
 | P0-22 | Frontend skeletons and design system | frontend | L | TODO | P0-02 |
-| P0-23 | Staging, hosts and TLS | infra | L | TODO — addressing decided (ADR-024) | P0-17 |
+| P0-23 | Staging, hosts and TLS | infra | L | TODO — addressing decided (ADR-024); `P0-17` deferred, so this no longer waits on it | P0-04 |
 | P0-24 | Adopt the TASKS/MEMORY discipline | docs | S | **DONE** | — |
 | P0-25 | Separate surfaces into backend/frontend/admin | infra | S | **DONE** | P0-02 |
 | P0-26 | Helm charts for the Kubernetes path | infra | M | **DONE** — K8s schema validation deferred to `P0-23`, no cluster reachable | P0-05 |
