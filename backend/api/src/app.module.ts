@@ -3,6 +3,8 @@ import { ConfigModule } from "./config/config.module";
 import { HealthController } from "./http/health.controller";
 import { RequestIdMiddleware } from "./http/request-id.middleware";
 import { ReferenceModule } from "./modules/_reference/reference.module";
+import { DatabaseModule } from "./infra/db/client";
+import { TenancyModule } from "./shared/tenancy/tenancy.module";
 
 /**
  * The middleware chain, in order. Positions later tasks fill are reserved here rather
@@ -27,6 +29,8 @@ import { ReferenceModule } from "./modules/_reference/reference.module";
   controllers: [HealthController],
   imports: [
     ConfigModule,
+    DatabaseModule,
+    TenancyModule,
     // Scaffolding, not a feature. Removed once a real module exists on each surface.
     ...(process.env["NODE_ENV"] === "production" ? [] : [ReferenceModule]),
   ],

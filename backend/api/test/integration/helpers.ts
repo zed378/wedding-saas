@@ -79,6 +79,26 @@ export async function connect(requiredTables: string[] = []): Promise<Pool> {
 export const freshPool = (): Promise<Pool> => connect();
 
 /**
+ * Clear every tenant-owned table, in one statement.
+ *
+ * Each suite used to delete the tables it knew about, in the order it believed correct.
+ * That worked until `P0-11` added a suite whose leftovers a *different* suite's cleanup
+ * could not remove: `invitations` RESTRICTs `template_versions`, so the templates suite
+ * -- written before `invitations` existed -- could no longer clear its own tables once
+ * another suite had run first. Twenty failures, none of them in the code under test.
+ *
+ * TRUNCATE ... CASCADE removes the ordering question entirely: name the three roots and
+ * PostgreSQL works out the dependents. `packages` and `addons` are deliberately absent,
+ * because nothing cascades upward into them and the seed must survive (`P0-10`).
+ *
+ * `P0-19` should replace this with a transaction per test or a database per suite. This
+ * is the honest interim: correct, but it means suites cannot run in parallel.
+ */
+export async function resetTenantData(pool: Pool): Promise<void> {
+  await pool.query("TRUNCATE users, templates, media RESTART IDENTITY CASCADE");
+}
+
+/**
  * A pool connected as the APPLICATION role, not the owner.
  *
  * Needed for anything asserting a permission. The owner can do everything, so a test

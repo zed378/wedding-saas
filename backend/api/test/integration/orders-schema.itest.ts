@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { Pool } from "pg";
 
-import { connect, applicationPool, tag } from "./helpers.ts";
+import { connect, applicationPool, tag, resetTenantData } from "./helpers.ts";
 
 /**
  * P0-10 — the commercial constraints, proven by violating them.
@@ -85,13 +85,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  await pool.query("DELETE FROM audit_logs");
-  await pool.query("DELETE FROM payments");
-  await pool.query("DELETE FROM orders");
-  await pool.query("DELETE FROM invitations");
-  await pool.query("DELETE FROM template_versions");
-  await pool.query("DELETE FROM templates");
-  await pool.query("DELETE FROM users");
+  await resetTenantData(pool);
 });
 
 describe("payments — webhook idempotency", () => {

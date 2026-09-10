@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { Pool } from "pg";
 
-import { connect, tag } from "./helpers.ts";
+import { connect, tag, resetTenantData } from "./helpers.ts";
 
 /**
  * P0-09 — the invitation aggregate's constraints, proven by violating them.
@@ -80,13 +80,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  // Order matters: invitations RESTRICTs from users and templates, so it goes first.
-  // Its own children cascade, and so does media once its invitation is gone.
-  await pool.query("DELETE FROM invitations");
-  await pool.query("DELETE FROM media");
-  await pool.query("DELETE FROM template_versions");
-  await pool.query("DELETE FROM templates");
-  await pool.query("DELETE FROM users");
+  await resetTenantData(pool);
 });
 
 describe("invitations — slug uniqueness (ADR-033)", () => {

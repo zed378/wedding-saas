@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { Pool } from "pg";
 
-import { connect, tag } from "./helpers.ts";
+import { connect, tag, resetTenantData } from "./helpers.ts";
 
 /**
  * P0-08 — the template catalog and media constraints, proven by violating them.
@@ -77,12 +77,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  // template_assets and template_versions cascade from templates; media does not
-  // belong to a template, so it is cleared separately.
-  await pool.query("DELETE FROM template_assets");
-  await pool.query("DELETE FROM template_versions");
-  await pool.query("DELETE FROM templates");
-  await pool.query("DELETE FROM media");
+  await resetTenantData(pool);
 });
 
 describe("templates", () => {
