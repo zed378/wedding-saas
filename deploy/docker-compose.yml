@@ -154,7 +154,73 @@ services:
       minio-init:
         condition: service_completed_successfully
 
-  # worker: wired by P0-15, when there are jobs to run.
+  # Three pools, three services. docs/BACKEND/08 § Worker Configuration separates them
+  # because they fail and scale differently -- and because the cron pool must run as a
+  # single logical instance or every scheduled job happens twice.
+  worker-general:
+    build:
+      context: ..
+      dockerfile: backend/worker/Dockerfile
+    command: ["--pool", "general"]
+    environment:
+      NODE_ENV: development
+      SERVICE_NAME: worker-general
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgres://wedding_app:wedding_app_dev@postgres:5432/wedding
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  worker-media:
+    build:
+      context: ..
+      dockerfile: backend/worker/Dockerfile
+    command: ["--pool", "media"]
+    environment:
+      NODE_ENV: development
+      SERVICE_NAME: worker-media
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgres://wedding_app:wedding_app_dev@postgres:5432/wedding
+    # Hard caps, per docs/BACKEND/04 § Resource Isolation. This pool decodes untrusted
+    # images: one crafted file must not be able to starve the rest of the stack, which
+    # is layer 6 of the decompression-bomb defence in docs/SECURITY/06.
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.25"
+          memory: 512M
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  worker-cron:
+    build:
+      context: ..
+      dockerfile: backend/worker/Dockerfile
+    command: ["--pool", "cron"]
+    environment:
+      NODE_ENV: development
+      SERVICE_NAME: worker-cron
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgres://wedding_app:wedding_app_dev@postgres:5432/wedding
+      # The documented cron times are WIB. The schedules carry an explicit timezone, so
+      # this only affects log timestamps -- but a container in UTC reading logs against a
+      # WIB schedule is confusing enough to be worth setting.
+      TZ: Asia/Jakarta
+    # One instance. Leader election makes a second safe rather than useful, and the Helm
+    # chart refuses to render replicaCount > 1 outright (P0-26).
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres-data:

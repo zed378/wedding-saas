@@ -18,3 +18,9 @@ packages:
 allowBuilds:
   "@swc/core": false
   esbuild: false
+  # msgpackr-extract: denied. It is an optional NATIVE accelerator for msgpackr, which
+  # BullMQ uses to serialise job payloads. msgpackr falls back to its JavaScript encoder
+  # when the native module is absent -- verified by round-tripping a job through a real
+  # Redis queue with the build denied. The cost is some encoding speed on a workload that
+  # is dominated by Redis round trips and image processing.
+  msgpackr-extract: false

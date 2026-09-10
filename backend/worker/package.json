@@ -4,13 +4,25 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "echo \"[P0-15] build not wired yet\"",
-    "dev": "echo \"[P0-15] dev not wired yet\"",
-    "lint": "echo \"[P0-15] lint not wired yet\"",
-    "typecheck": "echo \"[P0-15] typecheck not wired yet\"",
-    "test": "echo \"[P0-19] tests not wired yet\""
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "echo \"[P0-17] lint not wired yet\"",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.mts"
   },
   "dependencies": {
-    "@wi/schema": "workspace:*"
-  }
+    "@wi/schema": "workspace:*",
+    "bullmq": "^6.3.4",
+    "ioredis": "^5.11.1",
+    "pino": "^10.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "pino-pretty": "^13.1.3",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  },
+  "main": "dist/main.js"
 }
