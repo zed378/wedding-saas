@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 
 import { auditLogs } from "../../infra/db/schema/index";
-import { redact } from "../logging/redact";
+import { redact } from "@wi/logging";
 import type { Transaction } from "../db/transaction";
 
 /**

@@ -18,28 +18,42 @@ RUN corepack enable
 WORKDIR /repo
 
 # ---------------------------------------------------------------- dependencies
+# `pnpm fetch` populates the store from the LOCKFILE ALONE -- it reads no package.json at
+# all. That is the entire reason it is used here.
+#
+# This stage used to `COPY` every workspace member's package.json by hand so the layer
+# would cache on manifests. `P0-19` found that list two members stale (`packages/storage`
+# and `e2e`), and the failure was silent: the image built, and served whatever the cache
+# had last produced. `P0-19.1` needed to add a third (`packages/logging`) and instead
+# removed the list, because a hand-maintained inventory of the workspace is a mechanism
+# that fails quietly every time someone adds a package.
+#
+# The trade is real and worth stating: the cache key is now the lockfile, so adding any
+# dependency anywhere re-fetches. Adding a dependency is rare; forgetting a package is not.
 FROM base AS deps
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-COPY backend/api/package.json backend/api/
-COPY backend/worker/package.json backend/worker/
-COPY frontend/web-app/package.json frontend/web-app/
-COPY frontend/public-invite/package.json frontend/public-invite/
-COPY admin/package.json admin/
-COPY packages/schema/package.json packages/schema/
-COPY packages/template-renderer/package.json packages/template-renderer/
-COPY packages/ui/package.json packages/ui/
-COPY packages/api-client/package.json packages/api-client/
-COPY packages/config/package.json packages/config/
-RUN pnpm install --frozen-lockfile
+# `pnpm-workspace.yaml` comes along because it carries the `onlyBuiltDependencies`
+# allowlist. Without it `pnpm fetch` refuses with ERR_PNPM_IGNORED_BUILDS rather than
+# silently skipping native postinstalls, which is the correct behaviour and the reason
+# the decision has to travel with the lockfile. It is a root file listing globs, not
+# members, so it cannot go stale the way the manifest list did.
+COPY pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+RUN pnpm fetch
 
 # ---------------------------------------------------------------- build
+# `--prefer-offline`, not `--offline`. `--offline` was tried first because it would prove
+# the fetch layer complete -- and it fails: pnpm 11 verifies the lockfile against its
+# supply-chain policies on every install, and that check reads registry metadata that
+# `pnpm fetch` does not mirror. Package tarballs still come from the warm store; what
+# crosses the network is metadata. Stated rather than hidden, because "offline" would
+# have been the stronger claim and this is not it.
+#
+# `--filter @wi/api...` (with the trailing dots) means "@wi/api and everything it depends
+# on", so the build order comes from the dependency graph rather than a second hand-kept
+# list that could go stale the same way the first one did.
 FROM deps AS build
-COPY tsconfig.base.json turbo.json ./
-COPY packages/ packages/
-COPY backend/api/ backend/api/
-RUN pnpm --filter @wi/schema build \
- && pnpm --filter @wi/storage build \
- && pnpm --filter @wi/api build \
+COPY . .
+RUN pnpm install --prefer-offline --frozen-lockfile \
+ && pnpm --filter @wi/api... build \
  && pnpm --filter @wi/api --prod --legacy deploy /out
 
 # ---------------------------------------------------------------- runtime

@@ -716,6 +716,33 @@
 
 ---
 
+## P0-19.1 — Shared Logging Package
+
+| | |
+|---|---|
+| **Status** | DONE — 2026-09-10 |
+| **Size** | S |
+| **Surface** | backend, packages |
+| **Depends on** | P0-12, P0-15, P0-19 |
+| **Spec refs** | `docs/DEVOPS/06-LOGGING-STRATEGY.md` |
+| **Spec required** | No — an extraction of code `P0-12` already specified |
+
+Extract `@wi/logging` so the API and the worker share one redacting logger.
+
+Raised by `P0-15`, which shipped the worker with a logger carrying the comment "NOTE: this does NOT redact"; deferred by `P0-19`, which then had to apply one crash fix twice, once per copy. `docs/DEVOPS/06` § Mandatory Redaction requires redaction "at the logger middleware level, **not relying on manual developer discipline each time**" — which is precisely what that comment described. Numbered `.1` rather than taking a new task number because it closes debt from `P0-19` rather than adding scope to the phase.
+
+**Definition of Done**
+- [x] One package owns redaction, request context and job trace; the API and worker each keep only their service name.
+- [x] **The worker redacts**, proven by a test against the factory it calls — not against a hand-built copy of its formatters.
+- [x] A mechanism, not a comment, stops the next surface shipping its own logger: `scripts/check-logger-construction.mjs`, blocking in `verify.sh` and `.githooks/pre-push`.
+- [x] Both container images build and run — verified, 7/7 E2E green against the rebuilt API and both worker pools starting.
+
+**The inherited test suite could not have caught redaction being deleted.** It builds its own pino instance with a copy of the formatters, so nothing in it calls `createLogger`. Removing `redact()` from the real factory leaves all 39 of its assertions passing. `logger.spec.ts` closes that, and the gap is measured rather than asserted: the same mutation fails exactly two tests there and none in the old file. This is the second time this file has had a test that verified consistency instead of correctness — `P0-12`'s generated payload was the first.
+
+**Two latent build bugs surfaced.** `backend/worker/Dockerfile` built no workspace dependencies at all (`--filter @wi/worker` without the trailing dots); it had been harmless only because the worker had no type-level workspace import until now. And `backend/api/Dockerfile`'s hand-maintained list of workspace manifests — which `P0-19` found two members stale and predicted would go stale again — was about to need a third entry. It is gone: `pnpm fetch` keys the dependency layer on the lockfile alone (ADR-036).
+
+---
+
 ## P0-20 — Template Schema Definition and Validator
 
 | | |

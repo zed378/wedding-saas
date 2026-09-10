@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   currentRequestContext,
   runWithRequestContext,
-} from "./request-context";
+} from "./request-context.js";
 
 /**
  * Carrying `request_id` across the queue boundary.

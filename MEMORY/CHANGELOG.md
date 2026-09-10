@@ -10,6 +10,19 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — the worker finally redacts
+
+**Changed** — one logging package for both surfaces ([P0-19.1](./records/2026-09-10-P0-19.1-shared-logging.md))
+- `@wi/logging` owns redaction, request correlation and job trace. The API and the worker keep four lines each: their service name, and a call to `createLogger`.
+- **The worker redacts for the first time.** `P0-15` shipped it with a logger carrying the comment "NOTE: this does NOT redact", and `docs/DEVOPS/06` § Mandatory Redaction is explicit that this must not "rely on manual developer discipline each time". The comment was honest, accurate, and changed nothing for four tasks.
+- So the comment is replaced by a mechanism: `scripts/check-logger-construction.mjs` refuses a `pino()` call outside the package, blocking in `verify.sh` and on push. A logger built directly from pino writes secrets in clear text and looks identical in every other respect — same fields, same level, same stream.
+
+**Fixed** — two things that only fail in a build:
+- `backend/worker/Dockerfile` built **no workspace dependencies at all** — `--filter @wi/worker` without the trailing dots. Latent since `P0-15` because the worker had no type-level workspace import; the first one failed the image build outright.
+- `backend/api/Dockerfile`'s hand-maintained list of workspace manifests is gone. `P0-19` found it two members stale and predicted it would go stale again; this task would have been the third entry. `pnpm fetch` now keys the dependency layer on the lockfile alone, which reads no `package.json` at all.
+
+**Worth knowing** — the test suite inherited from `P0-12` **could not have caught redaction being deleted**. It built its own pino instance with a copy of the formatters, so nothing in it called the real factory. Removing `redact()` left all 39 assertions passing. Measured, then closed.
+
 ### 2026-09-10 — the test harness, and the two bugs it found immediately
 
 **Added** — all four test layers ([P0-19](./records/2026-09-10-P0-19-test-harness.md))
