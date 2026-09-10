@@ -41,6 +41,13 @@ step() {
 # ---------------------------------------------------------------------------
 step ":id endpoints have tests" node scripts/check-id-endpoint-tests.mjs
 
+# ---------------------------------------------------------------------------
+# Migration gates (P0-06). Both are file checks, so they need no database and
+# belong here rather than in scripts/db-roundtrip.sh, which does.
+# ---------------------------------------------------------------------------
+step "migrations have down files" node scripts/check-migration-pairs.mjs
+step "destructive migrations justified" node scripts/check-destructive-migration.mjs
+
 step "format" pnpm -w run format:check
 step "lint" pnpm -w run lint
 step "typecheck" pnpm -w run typecheck

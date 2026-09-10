@@ -834,3 +834,61 @@ And local hooks are weaker than CI in three specific ways, all of which should b
 **Specification impact** — None. `docs/DEVOPS/01-CI-CD.md` stands as the target; it is simply not implemented yet, which the task board now says explicitly.
 
 ---
+### ADR-029 — PostgreSQL 18, and the volume mount that moved with it
+
+**Date** 2026-09-10 · **Status** Accepted · **Task** `P0-06` · **Amends** ADR-007, ADR-015 (the `PostgreSQL 16` in each now reads 18)
+
+**Context** — ADR-007 and the stack table said PostgreSQL 16, chosen before any code existed. The project owner asked for `postgres:18-alpine` while `P0-06` was wiring up migrations — the cheapest possible moment, since the only schema that exists is one function and no data exists anywhere.
+
+**Decision** — **PostgreSQL 18**. `deploy/docker-compose.yml` runs `postgres:18-alpine`.
+
+**The part that is not a version bump.** PostgreSQL 18's official image moved the data directory and the declared volume:
+
+| | 16 | 18 |
+|---|---|---|
+| `PGDATA` | `/var/lib/postgresql/data` | `/var/lib/postgresql/18/docker` |
+| declared `VOLUME` | `/var/lib/postgresql/data` | `/var/lib/postgresql` |
+
+The compose file mounted `postgres-data:/var/lib/postgresql/data`. Left alone, that does **not** error. The named volume mounts and stays empty, the real data goes to an anonymous volume Docker creates for the declared path, and everything works — until the first `docker compose down`, at which point the database is empty and the named volume is still sitting there looking correct. A developer would reasonably conclude the volume was broken rather than unused.
+
+The mount is now `postgres-data:/var/lib/postgresql`. Verified rather than reasoned about: wrote a row, ran `down`, ran `up`, read the row back.
+
+**Consequences** — Any existing local volume holds a version-16 cluster that an 18 server refuses to start on. Local fix is `docker compose -f deploy/docker-compose.yml down -v`, which is free here because nothing but the baseline migration exists. **This would not be free later**, and it is the reason to take the bump now rather than at staging setup (`P0-23`).
+
+`gen_random_uuid()` remains core, so nothing in `docs/DATABASE/` changes. Verified on the image: it works with `pg_extension` holding nothing but `plpgsql`.
+
+`docs/DEVOPS/02-CONTAINERIZATION.md` still shows `postgres:16-alpine` in an illustrative snippet, unamended under the standing instruction that `docs/` is not rewritten for workflow and infrastructure decisions (ADR-027). The stack tables in `CLAUDE.md` and `AGENTS.md` — which every session reads first — now say 18.
+
+**Specification impact** — None. No document states a required major version outside that one snippet.
+
+---
+
+### ADR-030 — Down migrations are written by hand, and are a development tool
+
+**Date** 2026-09-10 · **Status** Accepted · **Task** `P0-06`
+
+**Context** — The `P0-06` Definition of Done requires an up/down/up round trip. Drizzle does not generate down migrations: `drizzle-kit generate` emits one forward SQL file and nothing else, and `drizzle-orm`'s migrator only moves forward.
+
+So the DoD could not be met as written without building something. The question was what, and how honestly to describe it.
+
+**Decision** — Every migration ships a hand-written `<tag>.down.sql` beside it, and `db:rollback` reverses the most recently applied one.
+
+Bookkeeping stays in Drizzle's own table rather than a second one of ours. Drizzle records applied migrations in `drizzle.__drizzle_migrations` as `(id, hash, created_at)`, where `created_at` equals the `when` of the matching entry in `meta/_journal.json`. `db:rollback` maps that timestamp back to the journal, finds the tag, runs the down file and deletes the row — in one transaction, so a half-failure cannot leave the table claiming a migration is applied when its objects are gone.
+
+**`db:rollback` is a development tool. It is not the production recovery mechanism**, and this ADR exists partly to stop it being read as one. `docs/DEVOPS/08-ROLLBACK.md` never treats down migrations as recovery: its database story is expand-contract, where safety comes from the old schema still being present, so that a *code* rollback lands on a schema that still has the columns it reads. Reversing a schema change over live data is lossy by nature — dropping a column drops everything written to it since the deploy, and no `.down.sql` returns it. Production recovery remains expand-contract, roll-forward, and point-in-time restore.
+
+What it is genuinely good for is the local loop: apply a migration, find it wrong, undo, edit, apply again, without recreating the container and losing the rest of the local database. That is a real cost it removes, several times a week, for the next four tasks.
+
+**Alternatives considered**
+
+- **No down migrations; recreate the database when a migration is wrong.** Honest and zero code, and defensible for production. Rejected for the local loop: `P0-07` through `P0-10` will iterate on the schema constantly, and a tool that makes the wrong thing easy gets worked around.
+- **A second table tracking our own migration state.** Avoids reaching into Drizzle's internals, but creates two sources of truth about what has been applied, which can disagree. A disagreement here is worse than the coupling.
+- **A migration library that has down migrations natively (node-pg-migrate, Umzug).** Would mean two migration tools, or abandoning the schema fidelity that ADR-007 chose Drizzle for.
+
+**Consequences** — We depend on a Drizzle internal: one table, three columns. That coupling is pinned by `backend/api/test/db-migrations.spec.ts`, which reads the DDL out of the installed package, so a Drizzle upgrade that changes the shape fails a test rather than silently reversing the wrong migration.
+
+Writing the down file is manual and therefore forgettable, so `scripts/check-migration-pairs.mjs` fails when one is missing — and when a `.down.sql` is orphaned by a deleted migration. "This cannot be reversed" is a valid down file, as long as it exists and raises an error naming what to restore from instead. An absent file and a deliberate refusal look identical from the outside; only one of them is a decision.
+
+**Specification impact** — None. `docs/DEVOPS/08` describes expand-contract and rollback strategy and says nothing about down migrations either way; this fills a gap rather than contradicting one.
+
+---

@@ -10,7 +10,6 @@ import { z } from "zod";
  * Reserved slots are listed rather than left to be discovered. Each names the task that
  * makes it required, so nobody has to guess whether an absent variable is an oversight:
  *
- *   DATABASE_URL              P0-06  migrations and the data layer
  *   REDIS_URL                 P0-15  queue, cache and rate limiting
  *   STORAGE_*                 P0-16  object storage (R2 / MinIO)
  *   JWT_SIGNING_KEY           P1-03  access token signing
@@ -40,6 +39,19 @@ export const envSchema = z.object({
 
   /** Bounded drain window on shutdown, milliseconds. */
   SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+
+  /**
+   * The APPLICATION connection (P0-06). Connects as a role that does not own its
+   * tables and holds neither SUPERUSER nor BYPASSRLS -- see
+   * deploy/postgres/init/01-app-role.sql for why that matters before row-level
+   * policies exist.
+   *
+   * Migrations do NOT use this. They connect as the owner through
+   * MIGRATION_DATABASE_URL, which is validated separately in
+   * src/infra/db/env.mts, so a running API cannot alter its own schema even if
+   * something tried.
+   */
+  DATABASE_URL: z.string().min(1),
 });
 
 export type Env = z.infer<typeof envSchema>;

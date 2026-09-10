@@ -5,7 +5,14 @@
     "emitDecoratorMetadata": true,
     "noEmit": true,
     "incremental": false,
-    "types": ["node"]
+    "types": ["node"],
+
+    // The db CLI scripts are .mts and import each other by their real filename, because
+    // Node runs them straight from source (`node src/infra/db/migrate.mts`) and its type
+    // stripping does not rewrite specifiers. TypeScript needs permission to accept that,
+    // and needs to rewrite .mts -> .mjs on emit so the compiled dist/ still resolves.
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true
   },
   "include": ["src/**/*", "test/**/*", "vitest.config.mts"]
 }

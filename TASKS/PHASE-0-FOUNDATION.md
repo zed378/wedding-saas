@@ -211,7 +211,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-10 |
 | **Depends on** | P0-05 |
 | **Spec refs** | `docs/ARCHITECTURE/04-DATABASE-ARCHITECTURE.md` § Migration Strategy, `docs/DEVOPS/08-ROLLBACK.md` |
 | **Spec required** | No |
@@ -227,10 +227,16 @@
 5. Verify a round trip: migrate up from empty, migrate down, migrate up again, on a clean container.
 
 **Definition of Done**
-- [ ] Migrations run as their own command and never on service startup.
-- [ ] The up/down/up round trip passes in CI against a fresh database.
-- [ ] A destructive migration without justification fails CI.
-- [ ] Seed data and schema migration are separate commands — production runs migrations without seeds.
+- [x] Migrations run as their own command and never on service startup — `src/main.ts` does not call the migrator and nothing in the application imports it.
+- [x] The up/down/up round trip passes against a fresh database — `scripts/db-roundtrip.sh`, 9 assertions, run against a real PostgreSQL 18 container. **Not in CI**: `P0-17` is deferred (ADR-028), so this is a script a person runs.
+- [x] A destructive migration without justification fails — `scripts/check-destructive-migration.mjs`, blocking in `pre-push` and in `scripts/verify.sh`. Verified four ways: unjustified `DROP COLUMN` fails, the same statement with a `CONTRACT-PHASE:` comment passes, a `DROP TABLE` written inside a comment does not trip it, and a clean tree passes.
+- [x] Seed and migration are separate commands — `db:seed` refuses `NODE_ENV=production` and refuses any non-local database URL without an explicit override. Both guards triggered on purpose.
+
+**Two DoD items said "in CI", which no longer exists.** `P0-17` is deferred, so they run as local gates instead: the destructive check blocks on push, and the round trip is `pnpm db:roundtrip` against a running container. That is weaker — a bypass with `--no-verify` skips it, and nothing runs on a clean checkout. Recorded rather than quietly re-scoped.
+
+**Deviation from step 2**: no `CREATE EXTENSION`. The card expected `pgcrypto` for `gen_random_uuid()`, which was correct for PostgreSQL 12 and earlier; it has been core since 13. Verified on the image — it works with `pg_extension` holding nothing but `plpgsql`. Skipping it is better than equivalent, because `CREATE EXTENSION` needs superuser and the migration role should not keep a privilege for nothing.
+
+**Added beyond the card**: `scripts/check-migration-pairs.mjs`, because Drizzle generates no down migrations (ADR-030) and a missing one is invisible until someone tries to roll back.
 
 ---
 
