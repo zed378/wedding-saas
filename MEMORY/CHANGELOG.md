@@ -10,6 +10,19 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — a configuration that refuses to mix environments
+
+**Added** — secrets and configuration conventions ([P0-18](./records/2026-09-10-P0-18-secrets-config.md), ADR-034)
+- **The service refuses to start when the configuration mixes environments.** A live Midtrans key outside production is a valid string of the right shape and length — every per-field check passes it — and a staging test with it would charge a real card. Only a rule reading two values at once can tell.
+- **The reverse is enforced too, and is easier to miss**: a sandbox key in production means every payment succeeds against the provider's test environment, no money arrives, and the orders look paid. Nothing errors, so nothing alerts.
+- Also refused in production: a signing key under 32 characters, a non-HTTPS origin, a localhost database. Exit 78, every violation named at once — reporting one at a time means a restart per mistake, which is how people end up commenting out validation.
+- **Secret scanning blocks at commit time**, not at push. A leaked credential is not recoverable by deleting the commit: once it reaches a shared history it is rotated or it is compromised. The scanner never prints the value it found — a scanner that echoes a secret into a terminal, a CI log and a screenshot has moved the leak rather than stopped it.
+- `deploy/SECRETS.md` gives twelve secrets a rotation procedure and, more usefully, a **blast radius**. `JWT_SIGNING_KEY` signs every user out unless rotated through a dual-key window; `REFRESH_TOKEN_PEPPER` cannot be rotated without ending every session; a Midtrans rotation makes in-flight webhooks fail verification and look like forgeries.
+
+**Testing** — 22 tests, two mutation checks. Removing the live-key rule failed 5 tests; removing the sandbox-in-production rule failed 2.
+
+**Noted** — the scanner flagged one of our own tests on its first run: the fake JWT fixture that proves the `P0-12` redactor scrubs JWTs. Exactly the false-positive class the script's comments predicted, resolved through the documented escape.
+
 ### 2026-09-10 — object storage, with the path as a control
 
 **Added** — `@wi/storage` ([P0-16](./records/2026-09-10-P0-16-object-storage.md))

@@ -56,6 +56,11 @@ step "status changes go through the writer" node scripts/check-status-writes.mjs
 # at compile time; this catches the cast that would bypass it in one word.
 step "storage paths built by the port" node scripts/check-storage-paths.mjs
 
+# Secret scanning over the whole tree. The pre-commit hook scans the staged diff, which
+# is where a leak is stopped; this is the sweep that catches one already in the working
+# tree -- a debug script that kept a token, a value pasted into .env.example.
+step "no committed credentials" node scripts/check-secrets.mjs --all
+
 # ---------------------------------------------------------------------------
 # Migration gates (P0-06). Both are file checks, so they need no database and
 # belong here rather than in scripts/db-roundtrip.sh, which does.

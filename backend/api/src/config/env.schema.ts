@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { checkSecretRules, SecretRuleError } from "./secret-rules";
+
 /**
  * Environment contract.
  *
@@ -11,11 +13,6 @@ import { z } from "zod";
  * makes it required, so nobody has to guess whether an absent variable is an oversight:
  *
  *   REDIS_URL                 P0-15  queue, cache and rate limiting
- *   JWT_SIGNING_KEY           P1-03  access token signing
- *   REFRESH_TOKEN_PEPPER      P1-03  refresh token hashing
- *   MIDTRANS_SERVER_KEY       P3-03  payment provider
- *   MIDTRANS_WEBHOOK_SECRET   P3-05  webhook signature verification
- *   RESEND_API_KEY            P4-06  transactional email
  *
  * See docs/DEVOPS/00-ENVIRONMENTS.md and P0-18 for where each value lives per environment.
  */
@@ -69,6 +66,30 @@ export const envSchema = z.object({
   STORAGE_BUCKET_USER_MEDIA: z.string().min(1).default("user-media"),
   STORAGE_BUCKET_TEMPLATE_ASSETS: z.string().min(1).default("template-assets"),
   STORAGE_BUCKET_STAGING: z.string().min(1).default("staging"),
+
+  /**
+   * Auth secrets (P1-03). Optional until then; `checkSecretRules` enforces a minimum
+   * length in production, because a signing key short enough to brute force is worse
+   * than none -- it looks like security.
+   */
+  JWT_SIGNING_KEY: z.string().min(1).optional(),
+  REFRESH_TOKEN_PEPPER: z.string().min(1).optional(),
+
+  /**
+   * Payment provider (P3-03, P3-05).
+   *
+   * Optional here and CROSS-CHECKED in `secret-rules.ts`: a live key outside production
+   * refuses to start, and so does a sandbox key inside it. Both are values that pass
+   * every per-field check and are still catastrophically wrong.
+   */
+  MIDTRANS_SERVER_KEY: z.string().min(1).optional(),
+  MIDTRANS_CLIENT_KEY: z.string().min(1).optional(),
+  MIDTRANS_WEBHOOK_SECRET: z.string().min(1).optional(),
+
+  /** Email (P4-06), CAPTCHA (P4-05), maps (P1-14). */
+  RESEND_API_KEY: z.string().min(1).optional(),
+  TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
+  MAPS_API_KEY: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -104,5 +125,16 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     });
     throw new ConfigValidationError(issues);
   }
+
+  /**
+   * Cross-field rules, after every individual field is valid.
+   *
+   * Separate because these are the checks no single field can make. The case that
+   * matters is a real, working, LIVE payment key on staging: it passes every field
+   * check and would charge real cards from a test run.
+   */
+  const violations = checkSecretRules(result.data);
+  if (violations.length > 0) throw new SecretRuleError(violations);
+
   return Object.freeze(result.data);
 }

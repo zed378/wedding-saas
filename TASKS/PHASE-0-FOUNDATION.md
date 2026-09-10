@@ -648,7 +648,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-10 |
 | **Depends on** | P0-04 |
 | **Spec refs** | `docs/DEVOPS/00-ENVIRONMENTS.md`, `docs/DEVOPS/01-CI-CD.md` § Secrets, `docs/SECURITY/03-AUTHENTICATION-SECURITY.md` § Tokens |
 | **Spec required** | No |
@@ -664,10 +664,16 @@
 5. Add secret scanning to CI, and a pre-commit hook.
 
 **Definition of Done**
-- [ ] `.env.example` lists every variable with a placeholder, and no real value.
-- [ ] The service refuses to start with a live payment key outside production.
-- [ ] Secret scanning runs in CI and on commit.
-- [ ] A rotation runbook exists for each secret, naming the blast radius.
+- [x] `.env.example` lists every variable with a placeholder — verified by scanning all 377 tracked files, not by reading it.
+- [x] The service refuses to start with a live payment key outside production, **and with a sandbox key inside it**. Exit 78, every violation named at once.
+- [x] Secret scanning blocks at commit (`.githooks/pre-commit`) and sweeps the whole tree in `scripts/verify.sh`. **CI is deferred (ADR-028)**, so the hook is the only automated check — consistent with every gate since `P0-17`.
+- [x] `deploy/SECRETS.md` gives twelve secrets a rotation procedure **and a blast radius**. The blast radius is the column that matters: a runbook without one tells you how to turn the key but not whether you can do it on a Friday afternoon.
+
+**The rule worth understanding.** A live Midtrans key on staging is a valid string of the right shape and length — every per-field check passes it. Only a rule reading two values at once can tell it is catastrophically wrong, and "catastrophic" is literal: a staging test would charge a real card.
+
+**The reverse is easier to miss and just as bad.** A sandbox key in production means every payment succeeds against the provider's test environment, no money arrives, and the orders look paid. Nothing errors, so nothing alerts. Expect this rule to fire during the first production deploy — by someone copying staging's configuration — and expect it to look like pedantry at exactly that moment.
+
+**Found on the scanner's first run**: it flagged one of our own tests, the fake JWT fixture proving the `P0-12` redactor scrubs JWTs. That is the false-positive class the script's own comments predicted, and the documented escape (a word like `example` on the line) was exercised by accident on day one.
 
 ---
 
