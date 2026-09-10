@@ -1,0 +1,219 @@
+{
+  "_readme": [
+    "P0-21 — the reference template, v1.0.0.",
+    "",
+    "This is DATA, not code, and the file format is the argument. docs/PLAN/07 § Core",
+    "Principles: 'Templates MUST NOT have their own application logic (no per-template",
+    "backend code). Visual differences between templates = differences in component sets",
+    "+ theme variables + layout config -- all data, not code.' A template that lived in a",
+    ".ts file would be a template that could import something, and the first one that did",
+    "would break the rule for every template after it.",
+    "",
+    "Two consumers read this file and neither may drift from the other: the seed command",
+    "(src/infra/db/seed.mts) and a test that validates it against the P0-20 schema",
+    "(test/reference-template.spec.ts). The test is the reason a later schema change",
+    "cannot silently invalidate the one template the product ships with.",
+    "",
+    "Section order is docs/UI-UX/14 § Section Order, exactly."
+  ],
+
+  "template": {
+    "slug": "elegant-rose",
+    "name": "Elegant Rose",
+    "category": ["modern", "floral"],
+    "is_premium": false,
+    "status": "published"
+  },
+
+  "version": "1.0.0",
+  "status": "published",
+  "changelog": "First reference template. Ten sections in the docs/UI-UX/14 default order.",
+
+  "sections": [
+    {
+      "_why": [
+        "configurable: false. An invitation with no cover is not an invitation, and",
+        "docs/FRONTEND/04 step 2 renders a non-configurable section whatever the user",
+        "chose. The consequence at publish time is deliberate: the two nicknames are",
+        "required even if the user never opens the hero section in the editor."
+      ],
+      "section_key": "hero",
+      "component": "HeroClassic",
+      "enabled_by_default": true,
+      "configurable": false,
+      "required_fields": [
+        "couple.groom.nickname",
+        "couple.bride.nickname",
+        "events.*.date"
+      ],
+      "optional_fields": ["gallery.photos.*.media_id"]
+    },
+    {
+      "section_key": "quote",
+      "component": "QuoteBanner",
+      "enabled_by_default": true,
+      "configurable": true,
+      "required_fields": ["quote.text"],
+      "optional_fields": ["quote.source"]
+    },
+    {
+      "_why": [
+        "Parents are optional fields, not required. docs/PLAN/08 § Entity: Person marks",
+        "father_name and mother_name optional, and a required parent name would block",
+        "publication for anyone whose parents have died or who does not wish to name them."
+      ],
+      "section_key": "couple",
+      "component": "CoupleProfile",
+      "enabled_by_default": true,
+      "configurable": true,
+      "required_fields": [
+        "couple.groom.full_name",
+        "couple.bride.full_name",
+        "couple.groom.nickname",
+        "couple.bride.nickname"
+      ],
+      "optional_fields": [
+        "couple.groom.photo",
+        "couple.bride.photo",
+        "couple.groom.father_name",
+        "couple.groom.mother_name",
+        "couple.bride.father_name",
+        "couple.bride.mother_name",
+        "couple.groom.child_order",
+        "couple.bride.child_order",
+        "couple.groom.instagram",
+        "couple.bride.instagram"
+      ]
+    },
+    {
+      "_why": [
+        "configurable: false, per the task card: 'an invitation without event details is",
+        "not an invitation'. The required fields use the wildcard, so EVERY event needs a",
+        "date, a start time, a venue and an address -- two events where one is half-filled",
+        "publishes a page with a blank card on it (BR-4.2).",
+        "",
+        "end_time is optional: a reception that runs until the guests leave has no end."
+      ],
+      "section_key": "event",
+      "component": "EventCardDouble",
+      "enabled_by_default": true,
+      "configurable": false,
+      "required_fields": [
+        "events.*.title",
+        "events.*.date",
+        "events.*.start_time",
+        "events.*.venue_name",
+        "events.*.address"
+      ],
+      "optional_fields": ["events.*.end_time", "events.*.description"]
+    },
+    {
+      "_why": [
+        "max_items 20, not the package's 200. docs/PLAN/09 caps STORAGE at 200 photos;",
+        "this caps what one grid DISPLAYS. Twenty images is already a heavy page on the",
+        "3G connection docs/UI-UX/14 assumes, and the public page has a JS and bytes",
+        "budget that a gallery is the easiest way to spend."
+      ],
+      "section_key": "gallery",
+      "component": "GalleryGrid",
+      "enabled_by_default": true,
+      "configurable": true,
+      "max_items": 20,
+      "required_fields": ["gallery.photos"],
+      "optional_fields": ["gallery.photos.*.caption"],
+      "layout_variant": "grid-3col",
+      "layout_options": ["grid-3col", "carousel"]
+    },
+    {
+      "_why": [
+        "Coordinates are OPTIONAL even though this is the map section. docs/PLAN/08 says",
+        "maps_url is 'auto-generated from lat/long if empty', so a user who pasted a",
+        "Google Maps link and never touched the picker still has a working button. The",
+        "address is what is required, because it is what a guest reads.",
+        "",
+        "MapsStatic, not an interactive SDK: docs/PLAN/00 § Maps keeps the map SDK out of",
+        "the public page for JS budget and per-load cost, and links out instead."
+      ],
+      "section_key": "maps",
+      "component": "MapsStatic",
+      "enabled_by_default": true,
+      "configurable": true,
+      "required_fields": ["events.*.address"],
+      "optional_fields": [
+        "events.*.latitude",
+        "events.*.longitude",
+        "events.*.maps_url"
+      ]
+    },
+    {
+      "_why": [
+        "Enabled by default false, and this is the one section where that is a judgement",
+        "rather than a mechanic. Asking for money is a choice a couple makes deliberately;",
+        "a gift section that appears unless you turn it off asks on their behalf."
+      ],
+      "section_key": "gift",
+      "component": "GiftAccountList",
+      "enabled_by_default": false,
+      "configurable": true,
+      "required_fields": [
+        "gift.accounts.*.provider_name",
+        "gift.accounts.*.account_number",
+        "gift.accounts.*.account_holder"
+      ],
+      "optional_fields": ["gift.accounts.*.type"]
+    },
+    {
+      "_why": [
+        "No required_fields. RSVP entries are guest-submitted after publication, so a",
+        "template that required them would make publishing impossible by construction --",
+        "which is why the canonical registry has no rsvp.* path at all (P0-20)."
+      ],
+      "section_key": "rsvp",
+      "component": "RsvpForm",
+      "enabled_by_default": true,
+      "configurable": true,
+      "required_fields": [],
+      "optional_fields": []
+    },
+    {
+      "section_key": "guestbook",
+      "component": "GuestbookWall",
+      "enabled_by_default": true,
+      "configurable": true,
+      "required_fields": [],
+      "optional_fields": []
+    },
+    {
+      "_why": [
+        "Closing needs the nicknames again -- it is the thank-you, and it signs off. They",
+        "are already required by the hero, so this adds no new obstacle to publishing.",
+        "collectMissingRequiredFields reports a path once per section that needs it, so",
+        "the user sees which sections are blocked rather than one anonymous field."
+      ],
+      "section_key": "closing",
+      "component": "ClosingSimple",
+      "enabled_by_default": true,
+      "configurable": true,
+      "required_fields": ["couple.groom.nickname", "couple.bride.nickname"],
+      "optional_fields": []
+    }
+  ],
+
+  "theme": {
+    "colors": {
+      "primary": "#8b5e3c",
+      "secondary": "#f4ede4",
+      "accent": "#c9a876",
+      "text": "#2b2b2b"
+    },
+    "typography": {
+      "heading_font": "Playfair Display",
+      "body_font": "Lato",
+      "scale": "default"
+    },
+    "spacing": "comfortable",
+    "border_radius": "rounded"
+  },
+
+  "customizable_theme_keys": ["colors.primary"]
+}

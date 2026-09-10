@@ -87,6 +87,8 @@
 - [ ] No template identifier appears in a conditional anywhere in the package.
 - [ ] Rendering the reference template with demo data produces every enabled section, in order, in a test.
 - [ ] Disabled sections are absent from the DOM, not merely hidden with CSS — a hidden section is still a data leak in the page source.
+- [ ] **The parity test `P0-20` is owed** (ADR-037): every name in `@wi/schema`'s `COMPONENT_REGISTRY` has a component here, and every component here is named there. Until this exists, nothing proves the eleven names the reference template uses correspond to anything at all — the API validates against a list of strings.
+- [ ] **`P0-21`'s handoff**: the reference template and its demo invitation are already seeded (`pnpm --filter @wi/api db:seed`) and already proven complete against each other. What is unproven is that they *render*, which is the DoD item above this one.
 
 ---
 

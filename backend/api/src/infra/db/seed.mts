@@ -8,12 +8,16 @@
  *
  * Two guards below enforce that, because the discipline cannot rely on remembering.
  *
- * Seeds the master price tables (P0-10). The reference template and demo invitation
- * arrive with P0-21.
+ * Seeds the master price tables (P0-10), the reference template and its demo
+ * invitation (P0-21).
  */
 import { Pool } from "pg";
 
 import { loadMigrationEnv } from "./env.mts";
+import {
+  seedDemoInvitation,
+  seedReferenceTemplate,
+} from "./seed-data/seed-template.mts";
 
 /**
  * Master price tables. `docs/DATABASE/07` § Notes is explicit that these are SEED data
@@ -98,11 +102,10 @@ async function main(): Promise<void> {
     console.log(`seeding ${rows[0]?.db}`);
 
     await seedPackagesAndAddons(pool);
+    const templateVersionId = await seedReferenceTemplate(pool);
+    await seedDemoInvitation(pool, templateVersionId);
 
-    // P0-21 adds the reference template and its demo invitation.
-    console.log(
-      "done. (The reference template and demo data arrive with P0-21.)",
-    );
+    console.log("done.");
   } finally {
     await pool.end();
   }

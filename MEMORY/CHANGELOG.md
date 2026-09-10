@@ -10,6 +10,16 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — the product has a template
+
+**Added** — Elegant Rose v1.0.0 and its demo ([P0-21](./records/2026-09-10-P0-21-reference-template-and-demo.md))
+- **The template is a JSON file**, not a module. `docs/PLAN/07` § Core Principles forbids per-template code, and a template in a `.ts` file is one that *could* import something — the first that did would break the rule for every template after it. Ten sections in the `docs/UI-UX/14` order; hero and event non-configurable; gift off by default, because asking for money is a choice a couple makes deliberately.
+- **The demo is a real invitation**, owned by a system account that cannot be logged into (no password hash, no OAuth provider, an address under RFC 2606's reserved `.invalid`). `docs/PLAN/07` § Demo Data chose this over a fixture format so the catalogue renders through the production renderer reading the production public API shape, with no second code path to drift.
+- **A test proves the demo is publishable against its own template** — `collectMissingRequiredFields` returns nothing, checked once against the seed files and once against the rows the seed wrote. A catalogue demo with a hole in it fails on the one page whose job is setting expectations.
+- `pnpm --filter @wi/api db:seed` installs both, idempotently — running it twice is asserted to leave the same rows, because `docs/PLAN/07` says the demo is "refreshed by the same seed command".
+
+**Known and written down**: the gallery *rows* are seeded and the image *bytes* are not. The demo page shows broken images until the upload pipeline (`P1-16`) fills them.
+
 ### 2026-09-10 — templates become machine-checkable
 
 **Added** — `@wi/schema` stops being a placeholder ([P0-20](./records/2026-09-10-P0-20-template-schema-and-resolver.md))

@@ -1,0 +1,189 @@
+{
+  "_readme": [
+    "P0-21 — the demo invitation's content.",
+    "",
+    "docs/PLAN/07 § Demo Data: this is a seeded invitation owned by a system account, in",
+    "the same tables as any other invitation, so the catalogue demo renders through the",
+    "production renderer reading the production public API shape. There is no second code",
+    "path to drift.",
+    "",
+    "It must fill EVERY required_field of the reference template, and a test asserts",
+    "exactly that with P0-20's collectMissingRequiredFields -- so a demo that stopped",
+    "being renderable would fail before anyone saw a half-empty catalogue page.",
+    "",
+    "The content is Indonesian because the product is (docs/PLAN/00). A demo in English",
+    "would set the wrong expectation on the one page whose job is setting expectations."
+  ],
+
+  "internal_name": "Demo — Elegant Rose",
+
+  "people": [
+    {
+      "role": "groom",
+      "full_name": "Budi Santoso",
+      "nickname": "Budi",
+      "instagram": "budisantoso",
+      "father_name": "Bapak Santoso Wijaya",
+      "mother_name": "Ibu Rahayu Santoso",
+      "child_order": "Putra pertama dari dua bersaudara"
+    },
+    {
+      "role": "bride",
+      "full_name": "Siti Nurhaliza",
+      "nickname": "Siti",
+      "instagram": "sitinurhaliza",
+      "father_name": "Bapak Nurhalim Rahman",
+      "mother_name": "Ibu Dewi Rahman",
+      "child_order": "Putri kedua dari tiga bersaudara"
+    }
+  ],
+
+  "events": [
+    {
+      "type": "akad",
+      "title": "Akad Nikah",
+      "event_date": "2027-05-15",
+      "start_time": "08:00",
+      "end_time": "10:00",
+      "venue_name": "Masjid Agung Bandung",
+      "address": "Jl. Asia Afrika No. 1, Balonggede, Kec. Regol, Kota Bandung, Jawa Barat 40251",
+      "latitude": "-6.921690",
+      "longitude": "107.606690",
+      "description": "Mohon hadir 15 menit sebelum acara dimulai.",
+      "display_order": 0
+    },
+    {
+      "type": "reception",
+      "title": "Resepsi",
+      "event_date": "2027-05-15",
+      "start_time": "11:00",
+      "end_time": "14:00",
+      "venue_name": "Gedung Merdeka",
+      "address": "Jl. Asia Afrika No. 65, Braga, Kec. Sumur Bandung, Kota Bandung, Jawa Barat 40111",
+      "latitude": "-6.921310",
+      "longitude": "107.609790",
+      "description": "Sesi foto bersama keluarga pukul 13.00.",
+      "display_order": 1
+    }
+  ],
+
+  "quote": {
+    "text": "Dan di antara tanda-tanda kekuasaan-Nya ialah Dia menciptakan untukmu pasangan hidup dari jenismu sendiri, supaya kamu cenderung dan merasa tenteram kepadanya.",
+    "source": "QS. Ar-Rum: 21"
+  },
+
+  "gift_accounts": [
+    {
+      "type": "bank",
+      "provider_name": "BCA",
+      "account_number": "1234567890",
+      "account_holder": "Budi Santoso",
+      "display_order": 0
+    },
+    {
+      "type": "ewallet",
+      "provider_name": "GoPay",
+      "account_number": "081234567890",
+      "account_holder": "Siti Nurhaliza",
+      "display_order": 1
+    }
+  ],
+
+  "_gallery_note": [
+    "Six media rows, one cover. The BYTES are not seeded -- see seed.mts. The rows exist",
+    "so the demo satisfies the gallery section's required_fields and so the renderer has",
+    "the shape it expects; the images themselves arrive with the upload pipeline (P1-16)",
+    "or as template assets. Stated here rather than discovered by whoever opens the demo",
+    "page and sees six broken images."
+  ],
+  "gallery": [
+    {
+      "caption": "Prewedding di Lembang",
+      "is_cover": true,
+      "display_order": 0
+    },
+    {
+      "caption": "Sesi pagi di Kawah Putih",
+      "is_cover": false,
+      "display_order": 1
+    },
+    {
+      "caption": "Jalan-jalan di Braga",
+      "is_cover": false,
+      "display_order": 2
+    },
+    { "caption": "Sore di Dago Pakar", "is_cover": false, "display_order": 3 },
+    { "caption": null, "is_cover": false, "display_order": 4 },
+    { "caption": "Bersama keluarga", "is_cover": false, "display_order": 5 }
+  ],
+
+  "_settings_note": [
+    "enabled_sections omits `gift`, matching the reference template's",
+    "enabled_by_default: false for that section. The demo therefore also demonstrates a",
+    "disabled configurable section, which is the case BR-4.1 is about: the gift accounts",
+    "above are stored and simply not displayed.",
+    "",
+    "hero and event are absent from this list ON PURPOSE. They are configurable: false,",
+    "so docs/FRONTEND/04 step 2 renders them regardless -- and if this list were the only",
+    "thing keeping them on screen, a test asserting that would be asserting nothing."
+  ],
+  "settings": {
+    "enabled_sections": [
+      "quote",
+      "couple",
+      "gallery",
+      "maps",
+      "rsvp",
+      "guestbook",
+      "closing"
+    ],
+    "rsvp_enabled": true,
+    "guestbook_enabled": true,
+    "guestbook_moderation": true,
+    "seo_indexable": false
+  },
+
+  "_guestbook_note": [
+    "A few approved entries so the guestbook section has something to render. Moderation",
+    "is on, and one entry is left pending on purpose: the demo should show what an",
+    "unmoderated message looks like to nobody, which is the correct answer."
+  ],
+  "guestbook": [
+    {
+      "guest_name": "Andi Pratama",
+      "message": "Selamat menempuh hidup baru, Budi & Siti! Semoga sakinah, mawaddah, warahmah.",
+      "status": "approved"
+    },
+    {
+      "guest_name": "Rina Kusuma",
+      "message": "Turut berbahagia. Sampai jumpa di Bandung!",
+      "status": "approved"
+    },
+    {
+      "guest_name": "Spam Bot",
+      "message": "Kunjungi situs kami untuk penawaran menarik.",
+      "status": "pending"
+    }
+  ],
+
+  "guests": [
+    {
+      "guest_name": "Andi Pratama",
+      "attendance_status": "attending",
+      "guest_count": 2,
+      "message": "Kami sekeluarga akan hadir."
+    },
+    {
+      "guest_name": "Rina Kusuma",
+      "attendance_status": "maybe",
+      "guest_count": 1,
+      "message": null
+    },
+    {
+      "guest_name": "Dimas Prayoga",
+      "attendance_status": "not_attending",
+      "guest_count": 1,
+      "message": "Maaf, sedang di luar kota. Selamat berbahagia!"
+    }
+  ]
+}

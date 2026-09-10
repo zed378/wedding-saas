@@ -786,7 +786,7 @@ Raised by `P0-15`, which shipped the worker with a logger carrying the comment "
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-10 |
 | **Depends on** | P0-20 |
 | **Spec refs** | `docs/PLAN/07-TEMPLATE-SYSTEM.md`, `docs/UI-UX/14-PUBLIC-INVITATION-UX.md` § Section Order, `docs/PLAN/16` § Phase 0 |
 | **Spec required** | No |
@@ -803,10 +803,20 @@ Raised by `P0-15`, which shipped the worker with a logger carrying the comment "
 6. Write a fixture test asserting the reference template validates against `P0-20`'s schema, so a later schema change that breaks it fails CI.
 
 **Definition of Done**
-- [ ] The reference template exists as seed data, not as code.
-- [ ] It validates against the `P0-20` schema in a CI-run test.
-- [ ] Its `required_fields` reference only paths in the canonical registry.
-- [ ] Demo data renders the template end to end once `P2-02` exists — noted as a follow-up assertion on that task.
+- [x] `backend/api/src/infra/db/seed-data/reference-template.json` — a JSON file, and the format is the argument. A template in a `.ts` file is a template that *could* import something, and the first one that did would break `docs/PLAN/07` § Core Principles for every template after it.
+- [x] `backend/api/test/reference-template.spec.ts` validates it against the `P0-20` schema, reading **the same bytes the seed reads**. A test with its own copy would pass while `db:seed` wrote something else.
+- [x] Every referenced path is canonical — asserted directly rather than left to the validator, because that is the requirement the card states.
+- [x] End-to-end rendering is `P2-02`'s, and its DoD already carries it: "Rendering the reference template with demo data produces every enabled section, in order, in a test."
+
+**The strongest test is not on the card**: the demo invitation must fill every `required_field` of the template it ships beside, checked with `collectMissingRequiredFields` — twice, once against the seed files and once against the rows in the database. A catalogue demo with a hole in it fails on the one page whose job is setting expectations before a user commits.
+
+**The demo is a real invitation owned by a system account** (`docs/PLAN/07` § Demo Data, ADR-022), not a fixture format — so it renders through the production renderer reading the production public API shape, with no second code path to drift. There is no `is_demo` column: ownership is the marker, which is what the document says. `backend/api/src/shared/demo/demo-account.ts` holds the ids so `P5`'s dashboard has one answer to import rather than a literal to copy.
+
+**The system account cannot be logged into** — no password hash, no OAuth provider, and an address under RFC 2606's reserved `.invalid`. A seeded account with a known id and a usable credential is a back door that ships with the product; an integration test asserts all three.
+
+**The gallery rows exist and the image bytes do not.** The demo page will show broken images until the upload pipeline (`P1-16`) or a template asset fills them. Written into `demo-invitation.json` beside the gallery rather than left to be discovered by whoever opens the page.
+
+**JSON has no comments, so `_`-prefixed keys are annotations** and are stripped before validation. The reasoning behind each section — why gift defaults to off, why parents are optional, why `max_items` is 20 and not the package's 200 — belongs beside the value it explains. The cost is one shape of typo (`_section_key`) that `.strict()` would otherwise have caught.
 
 ---
 
