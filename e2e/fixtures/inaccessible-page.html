@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Broken fixture</title>
+  </head>
+  <body>
+    <!--
+      Deliberately broken, so the accessibility harness can be shown to FAIL.
+
+      An axe suite that only ever runs against a correct page proves nothing: it would
+      report zero violations whether it was working or silently doing nothing. This is
+      the negative control.
+
+      The violations: no lang attribute on <html>, an image with no alt text, an input
+      with no label, and text with insufficient contrast.
+    -->
+    <img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" />
+    <input type="text" name="unlabelled" />
+    <p style="color: #cccccc; background: #ffffff">Low contrast text</p>
+  </body>
+</html>

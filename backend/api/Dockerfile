@@ -38,6 +38,7 @@ COPY tsconfig.base.json turbo.json ./
 COPY packages/ packages/
 COPY backend/api/ backend/api/
 RUN pnpm --filter @wi/schema build \
+ && pnpm --filter @wi/storage build \
  && pnpm --filter @wi/api build \
  && pnpm --filter @wi/api --prod --legacy deploy /out
 

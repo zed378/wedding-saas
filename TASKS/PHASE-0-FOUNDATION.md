@@ -681,7 +681,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-10 |
 | **Depends on** | P0-05 |
 | **Spec refs** | `docs/TESTING/00-TEST-STRATEGY.md`, `docs/TESTING/02-INTEGRATION-TESTING.md`, `docs/BACKEND/09-TESTING.md`, `docs/FRONTEND/10-TESTING.md` |
 | **Spec required** | No |
@@ -699,10 +699,20 @@
 7. Prove the harness cannot pass vacuously: assert that the integration suite fails loudly when no database is reachable rather than skipping its tests.
 
 **Definition of Done**
-- [ ] Each of unit, integration, E2E and accessibility has at least one real passing test.
-- [ ] `createTwoTenants()` exists and is used by a demonstration IDOR test against the `P0-11` repository layer.
-- [ ] The integration suite fails, not skips, when its database is unavailable.
-- [ ] Test data is isolated per test; a run repeated twice gives the same result.
+- [x] All four layers have a real passing test. Two scope limits stated rather than hidden: `P0-22` builds the frontends, so E2E exercises the API over HTTP and the accessibility suite audits fixtures. Both would fail if the runner were misconfigured; neither audits a page a user will see.
+- [x] `createTwoTenants()` exists and three IDOR tests are built on it, including the `docs/SECURITY/05` § 7 cross-tenant child case.
+- [x] The integration suite **fails** without a database — verified, `vitest` exits **1**. Note the summary reads "15 skipped" because `beforeAll` threw; the exit code is what matters and what `verify.sh` acts on.
+- [x] Isolation proven by two **deliberately identical** tests — if it were broken the second would see two users.
+
+**This task found two real bugs, both invisible to every existing test because they only appear in the built artefact.**
+
+1. **The API crashed on startup in the container.** `pino-pretty` is a devDependency stripped by `pnpm deploy --prod`, but compose runs that image with `NODE_ENV=development`. The logger chose its transport on `NODE_ENV`, tried to load a module that was not there, and pino threw during module initialisation — the process exited before serving a request. Present since `P0-12`. `NODE_ENV` was the wrong signal; it now asks whether `pino-pretty` resolves.
+
+2. **The Dockerfile was two workspace members out of date.** It lists each member's `package.json` by hand for layer caching; `P0-16` added `packages/storage` and this task added `e2e`. The result was not an error — the image built and served whatever the cache last produced. E2E found it by asking for `/readyz`, a route that has existed since `P0-13`, and getting a 404.
+
+**A smaller one worth knowing**: Playwright's default `testMatch` is `*.spec.ts`/`*.test.ts`. These are `*.e2e.ts`, so `playwright test` reported **"No tests found"** — a green-looking way to run nothing.
+
+**The accessibility suite has a negative control** — a deliberately broken fixture with its violations named rather than counted. An axe suite that only ever sees a correct page reports zero violations whether it is working or doing nothing at all.
 
 ---
 
