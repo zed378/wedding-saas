@@ -10,6 +10,20 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — the worker, and three silent failure modes closed
+
+**Added** — the queue and worker skeleton ([P0-15](./records/2026-09-10-P0-15-queue-worker-skeleton.md))
+- A worker process separate from the API, with the three pools `docs/BACKEND/08` specifies. `media` is CPU-capped because it decodes untrusted images; `general` is IO-bound; `cron` must run as one logical instance.
+- **The documented idempotency pattern is racy and the implementation does not copy it.** `docs/BACKEND/08` shows check-then-mark as two operations — two workers can both pass the check before either marks, which for a payment webhook credits an order twice. `SET key value NX EX` makes the check and the claim one operation. Proven with ten concurrent claimers: exactly one wins.
+- **A failed attempt releases its claim.** Otherwise "retry 3 times" becomes "try once, then no-op twice, then dead-letter" — producing exactly the same log lines as three genuine failures.
+- One job catalogue holds every retry policy and an **explicit** dead-letter decision per job. `docs/ARCHITECTURE/07` says a failed high/medium job must never be silently dropped; a test asserts that directly. `analytics_counter_flush` is the only job permitted to lose work, and says so.
+- Cron leader election, so a second instance does not send every couple two reminder emails. It is a **lease, not consensus** — under a Redis failover two instances can briefly both lead, and what makes that safe is idempotency rather than the lock.
+- Cron schedules carry `tz: Asia/Jakarta`. The documented times are WIB, and a container in UTC would run "daily at 00:05 WIB" seven hours late, every day, with nothing looking wrong.
+
+**Known limitation** — the worker's logger does **not** redact. `P0-12`'s redactor lives in `@wi/api` and cannot cross the package boundary yet, so the worker logs only fields it constructs and never a whole payload. That is a discipline rather than a mechanism, which is what `docs/DEVOPS/06` says redaction must not be. A shared logging package is `P0-19`.
+
+**Testing** — 21 tests, 15 against a real Redis. Three mutation checks: a non-atomic claim, a missing release, and dead-lettering on every attempt each failed exactly the tests claiming to cover them.
+
 ### 2026-09-10 — changes that record themselves
 
 **Added** — the audit and status writers ([P0-14](./records/2026-09-10-P0-14-audit-status-writers.md))

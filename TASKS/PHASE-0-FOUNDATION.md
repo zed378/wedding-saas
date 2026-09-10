@@ -535,7 +535,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-10 |
 | **Depends on** | P0-05, P0-12 |
 | **Spec refs** | `docs/ARCHITECTURE/07-QUEUE-WORKER-ARCHITECTURE.md`, `docs/BACKEND/08-JOBS-WORKERS.md` |
 | **Spec required** | No |
@@ -552,11 +552,21 @@
 6. Register a no-op example job end to end, and a test that a failing job retries the configured number of times and then lands in the DLQ.
 
 **Definition of Done**
-- [ ] The worker runs as its own process and can be scaled without the API.
-- [ ] A job replayed with the same idempotency key does its work once, proven by a test.
-- [ ] A permanently failing job reaches the DLQ, and the DLQ depth is exposed as a metric for `docs/DEVOPS/07`'s alert.
-- [ ] Two cron runner instances execute a scheduled job once, not twice.
-- [ ] The media worker pool has CPU and memory limits, per `docs/BACKEND/04` § Resource Isolation.
+- [x] The worker is its own binary, its own Dockerfile and three compose services — one per pool.
+- [x] A job replayed with the same idempotency key does its work once, proven end to end against a real Redis.
+- [x] A permanently failing job reaches the DLQ with its payload and error preserved; `deadLetterDepth()` exposes the depth for `docs/DEVOPS/07`. **Exposing it to Prometheus is `P0-23`** — a function is not yet a metric.
+- [x] Three cron instances elect one leader; leadership passes cleanly on shutdown.
+- [x] The media pool has CPU and memory limits in compose, and already had them in the Helm chart.
+
+**The documented idempotency pattern is racy, and the implementation does not copy it.** `docs/BACKEND/08` shows check-then-mark as two operations; two workers can both pass the check before either marks, which for a payment webhook credits an order twice. `SET key value NX EX` makes it one operation. The document was not amended — its pseudocode is illustrative and its intent is right.
+
+**A failed attempt releases its claim.** Without that, "retry 3 times" becomes "try once, then no-op twice, then dead-letter" — producing exactly the same log lines as three genuine failures. I noticed while reviewing that the original retry test used no idempotency key, so this path was never exercised; the added test is the only one a mutation catches.
+
+**Leader election is a lease, not consensus.** Under a Redis failover two instances can briefly both lead. What makes that safe is idempotency, not the lock — so a future job that is not idempotent would silently depend on a guarantee this does not provide.
+
+**Handlers are deliberately not stubbed.** `media.process` is `P1-17`, `payment.webhook_process` is `P3-05`, `notification.send` is `P4-06`. A no-op stub reports success while doing nothing; an unregistered job stays visibly queued.
+
+**A real limitation**: the worker's logger does **not** redact — `P0-12`'s redactor lives in `@wi/api` and cannot be imported across the package boundary yet. The worker logs only fields it constructs, never a whole payload, which is a discipline rather than a mechanism. Extracting a shared logging package is `P0-19`.
 
 ---
 
