@@ -7,6 +7,9 @@ const valid = {
   APP_ORIGIN: "https://app.zedth.my.id",
   PUBLIC_INVITE_ORIGIN: "https://invitation.zedth.my.id",
   ADMIN_ORIGIN: "https://admin.zedth.my.id",
+  // The application role, not the owner. Migrations validate their own URL
+  // separately in src/infra/db/env.mts (P0-06).
+  DATABASE_URL: "postgres://wedding_app:pw@localhost:5432/wedding",
 } as NodeJS.ProcessEnv;
 
 describe("configuration", () => {

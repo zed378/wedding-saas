@@ -10,6 +10,21 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — migrations, and PostgreSQL 18
+
+**Added** — migration tooling ([P0-06](./records/2026-09-10-P0-06-migration-tooling.md))
+- `db:generate`, `db:migrate`, `db:rollback`, `db:seed`. Migrations are a deliberate step: nothing in the application imports the migrator, so a rolling deploy cannot have every replica race to alter the schema.
+- **Two roles, two URLs.** Migrations connect as the owner; the API connects as a role that cannot alter schema. That split is a precondition for row-level security — an owner connection bypasses every policy silently — and it is verified from the failing side: `CREATE TABLE` as the application role returns `permission denied`.
+- **The baseline creates no tables**, only `set_updated_at()`. Almost every table carries `updated_at DEFAULT NOW()`, and a default fires only on INSERT — without the trigger the column records creation time forever and lies on every edited row. The `WHEN (OLD.* IS DISTINCT FROM NEW.*)` clause keeps a no-op UPDATE from bumping it; both directions verified.
+- **No `CREATE EXTENSION`.** `gen_random_uuid()` has been core since PostgreSQL 13, and `CREATE EXTENSION` needs superuser — a privilege the migration role now never has to hold.
+- **Expand-contract is enforced, not documented.** A migration containing `DROP TABLE`/`DROP COLUMN`/`TRUNCATE` fails unless the file carries a `CONTRACT-PHASE:` justification. Drizzle emits `DROP COLUMN` for a simple rename, and that reads as routine in a diff.
+- Drizzle generates no down migrations (ADR-030), so they are written by hand and a gate fails when one is missing — or when one is orphaned by a deleted migration. **`db:rollback` is a development tool, not production recovery**: reversing schema over live data is lossy, and `docs/DEVOPS/08` relies on expand-contract instead.
+- `pnpm db:roundtrip` proves up → down → up against a real container, 9 assertions.
+
+**Changed** — **PostgreSQL 16 → 18** (ADR-029), at the owner's request.
+- The compose volume mount moved with it. PG18's image relocated `PGDATA` to `/var/lib/postgresql/18/docker` and declares `VOLUME /var/lib/postgresql`; the previous mount would **not** have errored — it would have mounted an empty named volume, written the real data to an anonymous one, and lost it on the first `docker compose down`, leaving a volume that still looked correct. Fix verified by writing a row, cycling the stack, and reading it back.
+- Any existing local volume holds a version-16 cluster an 18 server will refuse. `docker compose -f deploy/docker-compose.yml down -v` clears it — free today, which is the argument for doing this now rather than at `P0-23`.
+
 ### 2026-09-10 — CI deferred, and the one gate that could not go with it
 
 **Changed** — `P0-17` is **deferred**, not done ([record](./records/2026-09-10-P0-17-ci-deferred-local-gates.md), ADR-028)

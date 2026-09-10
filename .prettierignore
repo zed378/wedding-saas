@@ -25,3 +25,7 @@ coverage/
 # "Block collections are not allowed within flow collections", which points at
 # nothing. `helm lint` is the tool that checks these; deploy/helm/verify.sh runs it.
 deploy/helm/*/templates/
+
+# drizzle-kit writes these: the journal and one snapshot per migration. Formatting them
+# means the next `db:generate` reintroduces a format failure, every time.
+backend/api/migrations/meta/

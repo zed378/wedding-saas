@@ -88,7 +88,7 @@ The stack is decided and recorded — ADR-004 through ADR-017 in `MEMORY/DECISIO
 | Runtime | Node.js 24 LTS, TypeScript | One language across API, workers and all three frontends |
 | Repo | pnpm workspaces + Turborepo | `backend/{api,worker}`, `frontend/{web-app,public-invite}`, `admin/`, `packages/{schema,template-renderer,ui,api-client,config}` |
 | Backend | NestJS 12 | `Controller → Service → Repository`, constructor injection |
-| Database | PostgreSQL 16, Drizzle ORM 0.45.x + drizzle-kit | Migrations are a separate command, never run on startup |
+| Database | PostgreSQL 18, Drizzle ORM 0.45.x + drizzle-kit | Migrations are a separate command, never run on startup (ADR-029 raised 16 -> 18) |
 | Cache & queue | Redis 7, BullMQ 6.3.x | Cache, rate limiting and jobs share one Redis |
 | Validation | Zod 4.5.x in `packages/schema` | One schema for API validation, template schema, field registry and client forms |
 | Frontend | React 19; Next.js 16 (`web-app`, `public-invite`); Vite 8 (`admin`) | Public invitation is server-rendered — sharing bots do not run JS |
@@ -118,7 +118,24 @@ pnpm test               # unit and integration tests
 pnpm format             # prettier over code; docs/, TASKS/ and MEMORY/ are prose and excluded
 pnpm --filter @wi/api dev    # API in watch mode
 pnpm --filter @wi/api start  # API from dist/
+
+pnpm verify             # what CI would run: gates, format, lint, types, tests, build
 ```
+
+**Database (P0-06)** — migrations never run on startup, and never as the application role.
+
+```bash
+pnpm --filter @wi/api db:generate   # diff the schema, emit SQL to review
+pnpm --filter @wi/api db:migrate    # apply pending migrations (owner role)
+pnpm --filter @wi/api db:rollback   # reverse the latest one -- development only
+pnpm --filter @wi/api db:seed       # development data; refuses production
+pnpm db:roundtrip                   # up -> down -> up against a running container
+```
+
+Two URLs, two roles: `MIGRATION_DATABASE_URL` is the owner and can alter schema;
+`DATABASE_URL` is the application role and cannot. That split is a precondition for
+row-level security -- an owner connection bypasses every policy silently. See
+`backend/api/migrations/README.md` for the expand-contract rule that governs any `DROP`.
 
 Copy `.env.example` to `.env` first. The API validates its environment at startup and exits **78** naming every offending variable rather than failing later on the request that needed it (`backend/api/src/config/env.schema.ts`).
 

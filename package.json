@@ -17,7 +17,10 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,yml,yaml}\"",
     "prepare": "git config core.hooksPath .githooks || true",
-    "check:id-endpoints": "node scripts/check-id-endpoint-tests.mjs"
+    "check:id-endpoints": "node scripts/check-id-endpoint-tests.mjs",
+    "check:migrations": "node scripts/check-migration-pairs.mjs && node scripts/check-destructive-migration.mjs",
+    "db:roundtrip": "bash scripts/db-roundtrip.sh",
+    "verify": "bash scripts/verify.sh"
   },
   "devDependencies": {
     "prettier": "^3.9.6",

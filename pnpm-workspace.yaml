@@ -17,3 +17,4 @@ packages:
 # postinstall is not needed -- verified by loading the module and calling transformSync.
 allowBuilds:
   "@swc/core": false
+  esbuild: false

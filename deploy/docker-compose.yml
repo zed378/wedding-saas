@@ -28,14 +28,23 @@ name: wedding-invitation
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: wedding_owner
       POSTGRES_PASSWORD: wedding_owner_dev
       POSTGRES_DB: wedding
     ports: ["${POSTGRES_PORT:-5432}:5432"]
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # Mount the parent, NOT /var/lib/postgresql/data.
+      #
+      # PostgreSQL 18's official image moved PGDATA to /var/lib/postgresql/18/docker
+      # and declares VOLUME /var/lib/postgresql. Keeping the old
+      # `postgres-data:/var/lib/postgresql/data` mount here would not error: the named
+      # volume would mount and stay empty while the real data went to an anonymous
+      # volume Docker creates for the declared path. Everything works until the first
+      # `docker compose down`, and then the database is empty with the named volume
+      # still sitting there looking correct. See ADR-029.
+      - postgres-data:/var/lib/postgresql
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U wedding_owner -d wedding"]
@@ -129,8 +138,10 @@ services:
       APP_ORIGIN: http://localhost:3001
       PUBLIC_INVITE_ORIGIN: http://localhost:3002
       ADMIN_ORIGIN: http://localhost:3003
+      # The application role, not the owner (deploy/postgres/init/01-app-role.sql).
+      # Migrations use MIGRATION_DATABASE_URL and are never run from this container.
+      DATABASE_URL: postgres://wedding_app:wedding_app_dev@postgres:5432/wedding
       # Reserved until the task that uses them (see .env.example):
-      #   DATABASE_URL  P0-06   postgres://wedding_app:wedding_app_dev@postgres:5432/wedding
       #   REDIS_URL     P0-15   redis://redis:6379
     ports: ["${API_PORT:-3000}:3000"]
     depends_on:

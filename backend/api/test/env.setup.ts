@@ -7,3 +7,5 @@ process.env["PORT"] = "3000";
 process.env["APP_ORIGIN"] = "https://app.zedth.my.id";
 process.env["PUBLIC_INVITE_ORIGIN"] = "https://invitation.zedth.my.id";
 process.env["ADMIN_ORIGIN"] = "https://admin.zedth.my.id";
+process.env["DATABASE_URL"] =
+  "postgres://wedding_app:pw@localhost:5432/wedding";

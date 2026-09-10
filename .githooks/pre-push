@@ -58,4 +58,20 @@ else
   echo "! node not found; the :id-endpoint gate did not run." >&2
 fi
 
+# ---------------------------------------------------------------- 3. migrations (block)
+# Also compensating controls for the deferred CI (P0-06, ADR-028). Both are pure file
+# checks -- no database -- so they are fast enough to belong on every push.
+#
+# The destructive one matters most: `drizzle-kit generate` emits DROP COLUMN whenever a
+# field is renamed in the schema file, and that SQL reads as completely routine in a
+# diff. docs/DEVOPS/08 requires it to be a separate, deliberate contract-phase deploy.
+if command -v node >/dev/null 2>&1; then
+  if ! node scripts/check-migration-pairs.mjs || ! node scripts/check-destructive-migration.mjs; then
+    echo "" >&2
+    echo "  Push refused. See backend/api/migrations/README.md." >&2
+    echo "" >&2
+    exit 1
+  fi
+fi
+
 exit 0
