@@ -22,6 +22,18 @@ Nothing on the board is `BLOCKED`. The remaining questions shape work rather tha
 
 ## Open Questions — Remaining
 
+### OQ-17 — `invitations.template_id` is denormalized alongside `template_version_id`
+
+**Affects**: `P0-11`, `P2-*` — not blocking; the schema ships exactly as documented.
+
+`docs/DATABASE/04` stores both `template_id` and `template_version_id` on `invitations`, each with its own `ON DELETE RESTRICT`. The version row already knows its template, so the parent id is redundant — and nothing stops the two disagreeing: an invitation can point at template A while its version belongs to template B.
+
+That state is unreachable through any sensible service code, and reachable through a hand-written data fix during an incident, which is exactly when nobody checks.
+
+Options: leave it and enforce consistency in the repository layer; add a composite foreign key on `(template_id, template_version_id)` against a matching unique key on `template_versions`; or drop the column and join. The middle one is the only one that makes the invariant structural.
+
+`P0-09` kept it exactly as documented rather than deviating. Decide in `P0-11`, when the repository layer decides how invitations are loaded.
+
 ### OQ-16 — Should `media.purpose` have a CHECK constraint?
 
 **Affects**: `P1-17` — not blocking; the column ships exactly as documented.

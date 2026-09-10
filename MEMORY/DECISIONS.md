@@ -960,3 +960,31 @@ Three things close it:
 **Specification impact** — None. `docs/DATABASE/06-MEDIA.md` describes the end state, which is what the schema reaches at `0003`.
 
 ---
+### ADR-033 — `invitations.slug` is unique among live invitations only
+
+**Date** 2026-09-10 · **Status** Accepted · **Task** `P0-09` · **Amends** `docs/DATABASE/04-INVITATIONS.md` · **Follows** ADR-031
+
+**Context** — The same mistake ADR-031 corrected in `docs/DATABASE/02`, in a second file. `docs/DATABASE/04` declares:
+
+```sql
+slug VARCHAR(50) UNIQUE,
+CREATE UNIQUE INDEX idx_invitations_slug ON invitations(slug) WHERE deleted_at IS NULL;
+```
+
+What makes this one clearer than the `users.email` case is that the document then states the intent in its own Notes:
+
+> The `slug` unique constraint only applies to rows where `deleted_at IS NULL` (partial unique index) so a slug can be reused after the old invitation is truly deleted.
+
+A column-level `UNIQUE` applies to every row, soft-deleted ones included. With it in place that sentence is false and the partial index can never fire.
+
+**Decision** — The partial unique index is the only uniqueness rule on `invitations.slug`. The column-level `UNIQUE` is dropped and `docs/DATABASE/04` is amended, with a note explaining why the two cannot coexist.
+
+**Consequences** — A deleted invitation releases its public address immediately, which is what the document intends. Three tests cover it: a duplicate among live invitations is rejected, the slug is reusable after a soft delete, and a **third** live invitation is still refused — that last one because the obvious wrong fix, removing uniqueness altogether, would satisfy the second.
+
+A fourth test asserts that many invitations may have **no** slug at all. Drafts have none, and NULLs do not collide in a unique index; that is worth pinning rather than assuming, because it is the normal state of every invitation before publication.
+
+**Two files now share this correction.** That is a pattern rather than a coincidence — the specification was written with `UNIQUE` as a reflex on any column that ought to be unique, without considering soft deletes. Any remaining table with both `deleted_at` and a `UNIQUE` column should be checked before its schema task. `media` is the only other soft-deleted table and has no unique column, so `users` and `invitations` are the whole set.
+
+**Specification impact** — `docs/DATABASE/04-INVITATIONS.md` amended: `UNIQUE` removed from the `slug` column, and the Notes entry extended to say the column carries no constraint of its own and why.
+
+---

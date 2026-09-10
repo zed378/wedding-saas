@@ -316,11 +316,10 @@ describe("media", () => {
     expect(rows[0]!.t).toBe("bigint");
   });
 
-  it("does not yet constrain invitation_id — P0-09 adds the foreign key (ADR-032)", async () => {
-    // This test documents a known, temporary gap rather than approving of it. When
-    // P0-09 adds the constraint this test must be REPLACED by one asserting a bad
-    // invitation_id is rejected. Leaving it passing after P0-09 would mean the
-    // constraint never landed.
+  it("constrains invitation_id — P0-09 added the deferred foreign key (ADR-032)", async () => {
+    // This REPLACES the assertion that the constraint was absent. P0-08 shipped the
+    // column without its foreign key because `invitations` did not exist yet; P0-09
+    // added it. Keeping the old test would have meant the ALTER silently never landed.
     const { rows } = await pool.query<{ n: string }>(
       `SELECT count(*)::text AS n
          FROM information_schema.table_constraints tc
@@ -329,7 +328,7 @@ describe("media", () => {
           AND tc.constraint_type = 'FOREIGN KEY'
           AND k.column_name = 'invitation_id'`,
     );
-    expect(rows[0]!.n).toBe("0");
+    expect(rows[0]!.n).toBe("1");
   });
 });
 
