@@ -18,3 +18,6 @@
 // P0-07 — users, notification preferences, refresh tokens, single-use tokens,
 // MFA factors and recovery codes. docs/DATABASE/02-USERS.md.
 export * from "./users.ts";
+
+// P0-08 — the template catalog and media. docs/DATABASE/03 and 06.
+export * from "./templates.ts";

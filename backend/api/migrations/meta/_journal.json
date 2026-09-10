@@ -15,6 +15,13 @@
       "when": 1789012057709,
       "tag": "0001_users_and_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789012718341,
+      "tag": "0002_templates_and_media",
+      "breakpoints": true
     }
   ]
 }

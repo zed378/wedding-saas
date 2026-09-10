@@ -923,3 +923,40 @@ Under the document as literally written, a user who deleted their account could 
 **Specification impact** — `docs/DATABASE/02-USERS.md` amended: the `UNIQUE` keyword removed from the column, with a blockquote stating that uniqueness comes from `idx_users_email` and why. The `P0-07` DoD required exactly this — an ADR *and* the document corrected in the same change.
 
 ---
+### ADR-032 — `media.invitation_id`'s foreign key is added by `P0-09`, not `P0-08`
+
+**Date** 2026-09-10 · **Status** Accepted · **Task** `P0-08`
+
+**Context** — Three tables reference each other across a task boundary:
+
+```
+template_assets.media_id        -> media               (both P0-08)
+media.invitation_id             -> invitations         (P0-09)
+invitations.template_version_id -> template_versions   (P0-08)
+```
+
+`media` must exist in `P0-08` because `template_assets` references it. But `media.invitation_id` references `invitations`, which `P0-09` creates. There is no ordering of these four tables that satisfies every foreign key within one migration.
+
+The `P0-08` card notices half of this — step 5 says "`media` is created first in the same migration" — but not the half that crosses into the next task.
+
+**Decision** — Create the `invitation_id` **column** in `P0-08` exactly as documented (`UUID`, nullable, with `idx_media_invitation`), and add the **foreign key constraint** in `P0-09` with `ALTER TABLE media ADD CONSTRAINT ... FOREIGN KEY (invitation_id) REFERENCES invitations(id) ON DELETE CASCADE`.
+
+The final schema matches `docs/DATABASE/06-MEDIA.md` exactly. Only the moment the constraint appears differs, and it differs by one migration.
+
+**Alternatives considered**
+
+- **Move `media` into `P0-09`.** Then `template_assets` cannot be created in `P0-08` either, so `P0-08` becomes three tables and `P0-09` becomes eleven — moving the problem rather than solving it, and unbalancing two tasks that are already sized.
+- **Make `media.invitation_id` a plain UUID with no constraint, permanently.** Rejected outright: the referential rule is the thing that stops orphaned media accumulating when an invitation is deleted.
+- **Create a stub `invitations` table in `P0-08` and alter it later.** Worse in every way — a half-defined table that `P0-09` would have to reconcile against the document.
+
+**Consequences** — Between `0002` and `0003` there is a window where `media.invitation_id` accepts any UUID, including one that references nothing. Nothing writes to `media` in that window, so the exposure is theoretical, but the real risk is not the window: it is that **the constraint is simply forgotten** and the window never closes.
+
+Three things close it:
+
+1. `P0-09`'s task card gains an explicit step and a DoD line for the `ALTER TABLE`.
+2. A test in `P0-08` asserts the constraint is **absent**, with a comment saying it must be replaced — not deleted — when `P0-09` lands. A test that starts failing is a much louder reminder than a note.
+3. This ADR.
+
+**Specification impact** — None. `docs/DATABASE/06-MEDIA.md` describes the end state, which is what the schema reaches at `0003`.
+
+---
