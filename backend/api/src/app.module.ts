@@ -8,6 +8,7 @@ import { ReferenceModule } from "./modules/_reference/reference.module";
 import { DatabaseModule } from "./infra/db/client";
 import { TenancyModule } from "./shared/tenancy/tenancy.module";
 import { LoggingModule } from "./shared/logging/logging.module";
+import { AuditModule } from "./shared/audit/audit.module";
 
 /**
  * The middleware chain, in order. Positions later tasks fill are reserved here rather
@@ -39,6 +40,7 @@ import { LoggingModule } from "./shared/logging/logging.module";
     LoggingModule,
     DatabaseModule,
     TenancyModule,
+    AuditModule,
     // Scaffolding, not a feature. Removed once a real module exists on each surface.
     ...(process.env["NODE_ENV"] === "production" ? [] : [ReferenceModule]),
   ],

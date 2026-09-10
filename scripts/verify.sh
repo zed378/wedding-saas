@@ -46,6 +46,11 @@ step ":id endpoints have tests" node scripts/check-id-endpoint-tests.mjs
 # A handler that imports the table directly can be perfectly tested and still unscoped.
 step "tenant-scoped data access" node scripts/check-tenant-scope.mjs
 
+# docs/DATABASE/04: every status transition writes a history row, at the service layer.
+# One direct update in a hotfix and there is an invitation whose journey nobody can
+# reconstruct -- and the diff will look like two lines of obvious code.
+step "status changes go through the writer" node scripts/check-status-writes.mjs
+
 # ---------------------------------------------------------------------------
 # Migration gates (P0-06). Both are file checks, so they need no database and
 # belong here rather than in scripts/db-roundtrip.sh, which does.

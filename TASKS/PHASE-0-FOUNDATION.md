@@ -503,7 +503,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-10 |
 | **Depends on** | P0-10, P0-12 |
 | **Spec refs** | `docs/DATABASE/10-AUDIT-LOGS.md`, `docs/DATABASE/04-INVITATIONS.md` § Notes, `docs/PLAN/06-INVITATION-LIFECYCLE.md` § Transition Rules |
 | **Spec required** | Yes — audit |
@@ -519,9 +519,15 @@
 5. Write tests: a status change inside a rolled-back transaction leaves no history row; a status change through the service always writes exactly one row; audit `before_state` excludes sensitive fields.
 
 **Definition of Done**
-- [ ] `invitations.status` cannot be written except through the status history service; a CI grep enforces this.
-- [ ] Audit and history rows commit atomically with the change they describe, proven by a rollback test.
-- [ ] Sensitive fields never reach `before_state`/`after_state`.
+- [x] `invitations.status` is written only by `InvitationStatusService`. `scripts/check-status-writes.mjs` fails the build on a Drizzle `.set({ status })` or raw `UPDATE invitations SET status` anywhere else — blocking in `pre-push` and `verify.sh`, tested both ways.
+- [x] Audit and history rows commit atomically with their change — three rollback tests against a real database, because "both or neither" is a claim about a transaction that a mock cannot verify.
+- [x] Sensitive fields never reach `before_state`/`after_state`. The trimming reuses `P0-12`'s redactor rather than a second list: a value that must not sit in a 90-day log certainly must not sit in one with **2-year** retention, and two lists would drift within a phase.
+
+**The state machine is an allowlist**, covering `docs/PLAN/06` plus the refund edge from ADR-019 and the `DELETE /invitations/:id` soft-delete from `docs/API/04`. Anything absent is rejected, so a transition nobody designed cannot happen by accident.
+
+**`pending_payment → paid` is SYSTEM-only, admins included.** `docs/PLAN/06` allows it solely through validated webhook processing and `docs/SECURITY/07` makes payment status server-decided. An admin who can mark an order paid by hand can grant a free product — a fraud path wearing a helpful hat. Both refusals are tested and mutation-checked.
+
+**A shadowing bug the test loop caught.** The first lookup took the first matching rule, so from `expired` the SYSTEM 90-day sweep shadowed the user's own delete — a user could delete an invitation in every state **except** `expired`, the one they most want gone. A single-state test would have passed. One edge can legitimately have several rules, because it happens for several reasons.
 
 ---
 

@@ -10,6 +10,19 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — changes that record themselves
+
+**Added** — the audit and status writers ([P0-14](./records/2026-09-10-P0-14-audit-status-writers.md))
+- **`AuditLogService.record(tx, entry)` takes a transaction and cannot open one.** A caller physically cannot record an action and then have that action fail separately. An audit row that commits when the change rolled back is a false record — and the worst kind, because it is indistinguishable from a true one.
+- **`InvitationStatusService` is the only path that writes `invitations.status`**, enforced by `scripts/check-status-writes.mjs`. `docs/DATABASE/04` requires every transition to write history at the service layer, so `changed_by` and `reason` carry context a trigger could not see. The guarantee is only worth its exclusivity: one direct update in a hotfix produces an invitation whose journey nobody can reconstruct.
+- The state machine is an **allowlist** — `docs/PLAN/06` plus the ADR-019 refund edge and the `DELETE /invitations/:id` soft-delete. A transition nobody designed cannot happen by accident.
+- **`pending_payment → paid` is SYSTEM-only, admins included.** An admin who can mark an order paid by hand can grant a free product; that is a fraud path wearing a helpful hat. The correct fix for a missing webhook is a server-initiated provider query, which `docs/SECURITY/07` already allows.
+- Backward transitions require a reason. It is what someone reads months later deciding whether a refund was legitimate, and the only moment anyone knows it is when it happens.
+- The row is locked `FOR UPDATE` before the decision, so two concurrent transitions cannot write incompatible histories.
+- Snapshot trimming reuses `P0-12`'s redactor: a value that must not sit in a 90-day log certainly must not sit in a table with **2-year** retention.
+
+**Testing** — 19 tests, 169 across seven suites, with three rollback tests against a real database. Two mutation checks. A bug was caught by a test that loops over four starting states: a first-match rule lookup let the SYSTEM 90-day sweep shadow a user's own delete, so a user could delete an invitation in every state **except** `expired` — the one they most want gone. A single-state test would have passed.
+
 ### 2026-09-10 — one response shape, and errors that cannot leak
 
 **Added** — the HTTP contract ([P0-13](./records/2026-09-10-P0-13-envelope-errors-health.md))
