@@ -52,6 +52,24 @@ const ALLOWED = [
   "infra/db/migrate.mts",
   "infra/db/rollback.mts",
   "infra/db/seed.mts",
+
+  /**
+   * The status writer (P0-14). It is the ONLY module allowed to write
+   * `invitations.status` -- `scripts/check-status-writes.mjs` enforces that -- and it
+   * needs a `SELECT ... FOR UPDATE` and an `UPDATE` inside one transaction, which is not
+   * something the read-oriented tenancy repository exposes.
+   *
+   * THIS ENTRY IS A HOLE, and it is worth being blunt about it. That service takes an
+   * invitation id and does NOT check ownership; it assumes the caller already proved it
+   * through P0-11. If a future caller forgets, the status service will happily transition
+   * someone else's invitation and neither guard will notice.
+   *
+   * The P0-11 record predicted this exact pressure -- "ALLOWED is a list that will be
+   * asked to grow ... adding one is the cheapest possible way to reintroduce the hole".
+   * It was asked one task later. Every future addition deserves the same scrutiny and a
+   * sentence here saying what it costs.
+   */
+  "shared/invitation-status/",
 ];
 
 function walk(dir) {
