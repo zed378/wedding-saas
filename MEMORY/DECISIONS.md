@@ -801,3 +801,36 @@ The cost is a documented inconsistency. Anyone reading `docs/FRONTEND/00` alone 
 **Specification impact** — None, deliberately. `docs/FRONTEND/00` § Project Structure and `docs/DEVOPS/02` § docker-compose remain as written and are now known to differ from the repository.
 
 ---
+
+### ADR-028 — GitHub Actions is deferred; the gates run locally instead
+
+**Date** 2026-09-10 · **Status** Accepted · **Task** `P0-17` · **Supersedes** nothing
+
+**Context** — `P0-17` calls for the seven-step pull-request pipeline in `docs/DEVOPS/01-CI-CD.md`. The project owner asked to skip GitHub CI for now.
+
+That is a reasonable call for a single-developer project that merges locally: there are no pull requests to run a pull-request pipeline on, so a `pull_request` workflow would have been enforcing nothing while appearing to enforce everything. The appearance is the dangerous part.
+
+**Decision** — `P0-17` is **DEFERRED**, not dropped, and the gates it would have carried move to two local mechanisms:
+
+1. `scripts/verify.sh` — format, lint, typecheck, test, the `:id` gate, the Helm chart check, and build. Run before a merge to `main`.
+2. `.githooks/pre-push` — now **blocks** a push that adds an `:id` endpoint without touching a test.
+
+The second one is the one that matters. `docs/SECURITY/05` sets zero tolerance for cross-tenant leaks, and `scripts/check-id-endpoint-tests.mjs` was written in `P0-03` to enforce it. It was going to be wired into the pull-request workflow. Deferring CI without moving it would have left the project's highest-priority security rule with **no automated enforcement at all** — a checklist item in a document, which is what `P0-03` built the script to stop being.
+
+**Consequences** — What is lost is real and is not mitigated by any of the above:
+
+| Gate | Status now |
+|---|---|
+| Integration tests against real Postgres and Redis | Not run automatically anywhere |
+| Service-layer coverage floor, 80% (`docs/BACKEND/09`) | Not enforced |
+| SAST and dependency CVE scanning (`docs/SECURITY/11`) | Not run |
+| Reviewer approval before merge (`docs/DEVOPS/01`) | Not enforced |
+| Actions pinned by digest — supply-chain control | Not applicable yet |
+
+And local hooks are weaker than CI in three specific ways, all of which should be assumed to happen eventually: `--no-verify` bypasses them, a fresh clone has no hooks until `pnpm install` runs `prepare`, and nothing verifies a clean checkout — the class of bug that hid behind a stale `.tsbuildinfo` in `P0-04` is invisible to a local run by construction.
+
+**When this must be revisited** — before the payment code in Phase 3 is written, at the latest. `docs/SECURITY/07` and `P3-16` assume a pipeline that can reject a change, and "a reviewer approved it" is not a control that exists here yet. `P0-17` keeps its dependency chain so `P0-23` still sees it.
+
+**Specification impact** — None. `docs/DEVOPS/01-CI-CD.md` stands as the target; it is simply not implemented yet, which the task board now says explicitly.
+
+---

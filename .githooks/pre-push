@@ -1,32 +1,61 @@
 #!/bin/sh
-# Warn (do not block) when a branch name does not follow the convention.
+# Two jobs, deliberately different in severity.
 #
-# Blocking a push over a branch name would be obstruction, and a hook that obstructs gets
-# disabled -- after which it enforces nothing at all. The commit-msg hook already carries
-# the traceability requirement; this one only keeps the naming honest.
+#   1. Warn (never block) when a branch name does not follow the convention.
+#   2. BLOCK a push that adds an :id endpoint without touching a test.
 #
-# Expected: <type>/P<phase>-<nn>[.<sub>]-<slug>, e.g. feat/P0-02-monorepo-structure
-# A branch name should say which task it is. See TASKS/00-TASK-CONVENTIONS.md.
+# The split is the point. Blocking a push over a branch name would be obstruction,
+# and a hook that obstructs gets disabled -- after which it enforces nothing at all.
+# The second check earns its severity: docs/SECURITY/05 sets zero tolerance for
+# cross-tenant leaks, and with GitHub Actions deferred (ADR-028) this hook is the
+# only thing left that runs it.
 
 branch=$(git rev-parse --abbrev-ref HEAD)
 
+# ---------------------------------------------------------------- 1. naming (warn)
 case "$branch" in
-  main|develop) exit 0 ;;
+  main|develop) ;;
+  *)
+    if ! printf '%s' "$branch" | grep -Eq '^(feat|fix|chore|docs)/P[0-9]+[A-Z]?-[0-9]+(\.[0-9]+)?-[a-z0-9-]+$'; then
+      {
+        echo "! Branch name does not follow the convention:"
+        echo "    $branch"
+        echo ""
+        echo "  Expected: feat/P0-02-monorepo-structure"
+        echo "            <type>/P<phase>-<task>-<slug>, type in feat|fix|chore|docs"
+        echo ""
+        echo "  A branch name should say which task it is. A generic phase name hides"
+        echo "  every task behind one label. See TASKS/00-TASK-CONVENTIONS.md."
+        echo ""
+      } >&2
+    fi
+    ;;
 esac
 
-if printf '%s' "$branch" | grep -Eq '^(feat|fix|chore|docs)/P[0-9]+[A-Z]?-[0-9]+(\.[0-9]+)?-[a-z0-9-]+$'; then
-  exit 0
+# ---------------------------------------------------------------- 2. :id gate (block)
+# The compensating control for the deferred CI pipeline. In the pipeline this ran
+# on every pull request; there are no pull requests here, so it runs on push.
+#
+# It is not equivalent, and the difference is worth stating plainly: `--no-verify`
+# skips it, a fresh clone has no hooks until `pnpm install` runs `prepare`, and it
+# cannot judge whether the test it insists on is any good. It catches "nobody
+# thought about it", which is the case that actually happens.
+if command -v node >/dev/null 2>&1; then
+  if ! node scripts/check-id-endpoint-tests.mjs; then
+    {
+      echo ""
+      echo "  Push refused. This is the ONLY automated check on this rule right now:"
+      echo "  GitHub Actions is deferred (ADR-028), so nothing else will catch it --"
+      echo "  not a pull request, not a merge, not a deploy."
+      echo ""
+      echo "  If you are certain this is a false positive, --no-verify will bypass it."
+      echo "  Say so in the MEMORY record if you do (MEMORY/README.md, honesty rules)."
+      echo ""
+    } >&2
+    exit 1
+  fi
+else
+  echo "! node not found; the :id-endpoint gate did not run." >&2
 fi
 
-{
-  echo "! Branch name does not follow the convention:"
-  echo "    $branch"
-  echo ""
-  echo "  Expected: feat/P0-02-monorepo-structure"
-  echo "            <type>/P<phase>-<task>-<slug>, type in feat|fix|chore|docs"
-  echo ""
-  echo "  A branch name should say which task it is. A generic phase name hides"
-  echo "  every task behind one label. See TASKS/00-TASK-CONVENTIONS.md."
-  echo ""
-} >&2
 exit 0

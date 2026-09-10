@@ -10,6 +10,17 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — CI deferred, and the one gate that could not go with it
+
+**Changed** — `P0-17` is **deferred**, not done ([record](./records/2026-09-10-P0-17-ci-deferred-local-gates.md), ADR-028)
+- No GitHub Actions workflow was written. The project merges locally, so a `pull_request` pipeline would have triggered on nothing while sitting in the repository looking like a control.
+- **`.githooks/pre-push` now blocks** a push that adds an `:id` endpoint without touching a test. `scripts/check-id-endpoint-tests.mjs` was built in `P0-03` to enforce the zero-tolerance rule in `docs/SECURITY/05`, and the pipeline was going to be its only caller — deferring CI without moving it would have returned the project's most important security rule to being a checklist item. Tested both directions: refused on a diff with no test, passed once a test was added.
+- **`scripts/verify.sh`** runs what the pipeline would have run — format, lint, typecheck, test, the `:id` gate, the Helm chart, build. Run it before merging to `main`. Its output ends by listing what it does *not* cover, so a green run cannot be read as "CI passed".
+
+**Not running anywhere until `P0-17` is picked up** — integration tests against real Postgres and Redis, the 80% service-layer coverage floor, SAST, dependency CVE scanning, and required reviewer approval. Local hooks are also bypassable with `--no-verify` and absent on a fresh clone until `pnpm install`. **Revisit before Phase 3**: `docs/SECURITY/07` and `P3-16` assume a pipeline that can reject a change to payment code.
+
+**Fixed** — prettier was parsing Helm templates as YAML and failing `format:check` repository-wide. This shipped in `P0-26` because I ran lint, typecheck and test before committing but not `format:check`; the new `scripts/verify.sh` caught it on its first run, which is the argument for it existing.
+
 ### 2026-09-10 — the Kubernetes path exists on paper, and it lints
 
 **Added** — `deploy/helm/` ([P0-26](./records/2026-09-10-P0-26-helm-charts.md))

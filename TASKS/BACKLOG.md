@@ -171,3 +171,4 @@ Each of these is deliberately out of scope. They are recorded so the decision is
 | DF-07 | AI-generated content or photos | `docs/PLAN/00` § Out of Scope | Not planned |
 | DF-08 | White-label for organizers, integrated live streaming, gift tracking through the gateway | `docs/PLAN/00` § Future Scope | Revisit after the organizer persona is validated (`P7-07`) |
 | DF-09 | Background music and video uploads | `docs/PLAN/11` § Media Types (Phase 2) | The music **section** may ship with an externally hosted track; user audio upload does not |
+| DF-10 | GitHub Actions CI pipeline | `docs/DEVOPS/01-CI-CD.md`, `P0-17` | Deferred at the owner's request (ADR-028). The `:id` gate moved to `.githooks/pre-push`; `scripts/verify.sh` covers the rest. Integration tests, the 80% coverage floor, SAST and CVE scanning run **nowhere** until it is picked up — **revisit before Phase 3** |

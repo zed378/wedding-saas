@@ -533,7 +533,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DEFERRED — 2026-09-10, ADR-028. Gates moved to `scripts/verify.sh` and `.githooks/pre-push`. |
 | **Depends on** | P0-04 |
 | **Spec refs** | `docs/DEVOPS/01-CI-CD.md`, `docs/SECURITY/11-SECURITY-TESTING.md`, `docs/BACKEND/09-TESTING.md` § Coverage Target |
 | **Spec required** | No |
@@ -550,11 +550,21 @@
 6. Require at least one reviewer approval before merge, per `docs/DEVOPS/01`.
 7. Add the staging deploy pipeline shape now (build → migrate → deploy → E2E → notify) even if `P0-23` fills in the target later.
 
-**Definition of Done**
+**Definition of Done** — unchanged, and none of it is met. This task is deferred, not done.
 - [ ] All seven PR steps run and each can fail the build, demonstrated once per step.
 - [ ] Integration tests run against real Postgres and Redis in CI.
 - [ ] The coverage gate fails a PR that drops service-layer coverage below the threshold.
 - [ ] A dependency with a known critical CVE fails the build.
+
+---
+
+**Deferred 2026-09-10 at the project owner's request** (ADR-028). The project merges locally, so a `pull_request` workflow would have run on nothing while looking like a control — and that appearance is worse than an absence.
+
+**What moved, rather than being dropped**: `scripts/check-id-endpoint-tests.mjs` was built in `P0-03` to enforce the zero-tolerance rule in `docs/SECURITY/05`, and was going to run in this pipeline. It now **blocks** in `.githooks/pre-push`, verified both ways: a diff adding an `:id` route with no test is refused, and the same diff plus a test passes. `scripts/verify.sh` runs the rest of what the pipeline would have run.
+
+**What is simply gone until this task is picked up** — integration tests against real Postgres and Redis, the 80% service-layer coverage floor, SAST, dependency CVE scanning, and required reviewer approval. Local hooks are also bypassable with `--no-verify`, absent on a fresh clone until `pnpm install`, and never test a clean checkout.
+
+**Revisit before Phase 3.** `docs/SECURITY/07` and `P3-16` assume a pipeline that can reject a change to payment code.
 
 ---
 

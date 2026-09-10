@@ -78,13 +78,13 @@ The consequence today is the other half of that trade: a pod that cannot reach P
 
 ## What is not here yet
 
-| Missing | Why | Owner |
-|---|---|---|
-| `NetworkPolicy` | Nothing to isolate until the workloads talk to each other | `P0-23` |
-| `PodDisruptionBudget` | Meaningful once replicas are above one in a real cluster | `P0-23` |
-| PostgreSQL / Redis | Managed services or their own operators, not subcharts — a database whose lifecycle is bound to the application release is a database you can delete with `helm uninstall` | — |
-| Frontend surfaces | `web-app`, `public-invite` and `admin` are static/SSR bundles served from the CDN (ADR-013); only `admin` may later need a Deployment | `P0-22` |
-| Kubernetes schema validation | Requires a reachable API server — see below | `P0-23` |
+| Missing                      | Why                                                                                                                                                                        | Owner   |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `NetworkPolicy`              | Nothing to isolate until the workloads talk to each other                                                                                                                  | `P0-23` |
+| `PodDisruptionBudget`        | Meaningful once replicas are above one in a real cluster                                                                                                                   | `P0-23` |
+| PostgreSQL / Redis           | Managed services or their own operators, not subcharts — a database whose lifecycle is bound to the application release is a database you can delete with `helm uninstall` | —       |
+| Frontend surfaces            | `web-app`, `public-invite` and `admin` are static/SSR bundles served from the CDN (ADR-013); only `admin` may later need a Deployment                                      | `P0-22` |
+| Kubernetes schema validation | Requires a reachable API server — see below                                                                                                                                | `P0-23` |
 
 ## What has actually been verified
 
