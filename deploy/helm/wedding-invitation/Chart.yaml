@@ -1,0 +1,13 @@
+apiVersion: v2
+name: wedding-invitation
+description: >-
+  The wedding invitation platform: API, worker pools and the static frontend surfaces.
+  Not the MVP deployment path -- ADR-015 runs the MVP on a single VPS with Docker
+  Compose. This chart is the Kubernetes path that decision deferred, kept working so
+  the move is a deployment change rather than a project.
+type: application
+version: 0.1.0
+appVersion: "0.0.0"
+keywords: [wedding, invitation, saas]
+maintainers:
+  - name: zed378

@@ -1,0 +1,67 @@
+{{- if .Values.workers.enabled }}
+{{- range $pool, $cfg := .Values.workers.pools }}
+{{- $replicas := $cfg.replicaCount | default 1 }}
+{{- if and (eq $pool "cron") (gt (int $replicas) 1) }}
+{{- fail "workers.pools.cron.replicaCount must be 1: a second instance runs every scheduled job twice (docs/BACKEND/08). Add leader election before raising it." }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "wi.fullname" $ }}-worker-{{ $pool }}
+  labels:
+    {{- include "wi.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: worker-{{ $pool }}
+spec:
+  replicas: {{ $replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "wi.name" $ }}
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: worker-{{ $pool }}
+  strategy:
+    # Recreate for cron: two instances overlapping during a rollout would run the
+    # daily jobs twice, which is the same hazard as replicas > 1.
+    type: {{ if eq $pool "cron" }}Recreate{{ else }}RollingUpdate{{ end }}
+  template:
+    metadata:
+      labels:
+        {{- include "wi.labels" $ | nindent 8 }}
+        app.kubernetes.io/component: worker-{{ $pool }}
+    spec:
+      {{- with $.Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "wi.podSecurityContext" $ | nindent 8 }}
+      # A media job may be mid-transform; give it room to finish or fail cleanly
+      # rather than leaving a half-written object in storage.
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: worker
+          image: {{ include "wi.image" $ }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          securityContext:
+            {{- include "wi.containerSecurityContext" $ | nindent 12 }}
+          args: ["--pool", {{ $pool | quote }}]
+          env:
+            - name: WORKER_POOL
+              value: {{ $pool | quote }}
+            {{- include "wi.env" $ | nindent 12 }}
+          envFrom:
+            - secretRef:
+                name: {{ $.Values.secrets.existingSecret }}
+          resources:
+            {{- toYaml $cfg.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        # Upload staging for the media pool. emptyDir so it dies with the pod: a
+        # staging file that outlives its job is exactly what the hourly cleanup in
+        # docs/BACKEND/04 exists to catch.
+        - name: tmp
+          emptyDir: {}
+{{- end }}
+{{- end }}

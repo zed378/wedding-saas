@@ -1,0 +1,30 @@
+{{ .Chart.Name }} {{ .Chart.Version }} installed as {{ .Release.Name }}.
+
+Image: {{ include "wi.image" . }}
+
+Hosts:
+  app     https://{{ .Values.hosts.app }}
+  invite  https://{{ .Values.hosts.publicInvite }}
+  admin   https://{{ .Values.hosts.admin }}
+
+Before this serves traffic, check three things:
+
+1. The Secret "{{ .Values.secrets.existingSecret }}" exists in namespace
+   {{ .Release.Namespace }} and carries DATABASE_URL, REDIS_URL and the provider keys.
+   The chart never contains them (P0-18).
+
+{{- if eq .Values.api.probes.readiness .Values.api.probes.liveness }}
+2. Readiness is still pointing at liveness. Until P0-13 ships /readyz, a pod that
+   cannot reach PostgreSQL will still be sent traffic. Set api.probes.readiness once
+   it exists.
+{{- else }}
+2. Readiness is on {{ .Values.api.probes.readiness }}.
+{{- end }}
+
+{{- if not .Values.workers.enabled }}
+3. Workers are disabled. Nothing processes media, sends email or expires invitations
+   until P0-15 wires them and workers.enabled is set.
+{{- end }}
+
+This is not the MVP deployment path -- ADR-015 runs the MVP on a single VPS with
+Docker Compose (deploy/docker-compose.yml).

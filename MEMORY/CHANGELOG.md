@@ -10,6 +10,17 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — the Kubernetes path exists on paper, and it lints
+
+**Added** — `deploy/helm/` ([P0-26](./records/2026-09-10-P0-26-helm-charts.md))
+- A chart deploying the API and the three worker pools (`media`, `general`, `cron`), with an ingress that keeps the public invitation origin separate from the authenticated application (ADR-024).
+- **This is not the MVP deployment path.** ADR-015 stands: the MVP runs on one VPS with Docker Compose. The chart exists so that leaving a single host — risk R14 — is a deployment change rather than a project.
+- **Two configurations the chart refuses to render.** A missing `image.tag`, because "roll back to the previous image" is the whole recovery plan and a moving tag makes that sentence meaningless. And `workers.pools.cron.replicaCount > 1`, because a second cron instance runs every scheduled job twice — two reminder emails to a real couple, silently, not an error in a log. Both were triggered deliberately and both fired.
+- Every workload runs non-root with a read-only root filesystem, `seccompProfile: RuntimeDefault`, all capabilities dropped and resource limits set — asserted across all four rendered Deployments, not assumed from the helper.
+- No credential is in the chart. Secrets come from a Secret that already exists in the namespace, via `envFrom` (`P0-18`).
+
+**Known gap** — Kubernetes **schema** validation was not performed: `kubectl apply --dry-run` needs a reachable API server and there is no cluster here. The manifests are known to render and to be well-formed; they are not known to be accepted by a real Kubernetes version. `P0-23` owns that check.
+
 ### 2026-09-10 — the local stack runs
 
 **Added** — `deploy/` and the local environment ([P0-05](./records/2026-09-10-P0-05-local-environment.md))

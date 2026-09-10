@@ -10,6 +10,7 @@ Add a line here as part of writing the record — an unindexed record is a recor
 
 | Date | Task | Record | Hook |
 |---|---|---|---|
+| 2026-09-10 | P0-26 | [Helm charts for the Kubernetes path](./records/2026-09-10-P0-26-helm-charts.md) | Two configurations the chart refuses to render — a missing `image.tag`, and a second cron replica that would run every scheduled job twice. Kubernetes schema validation could **not** be performed: no cluster is reachable, so the manifests are known to render, not known to be accepted |
 | 2026-09-10 | P0-05 | [Local environment via Docker Compose](./records/2026-09-10-P0-05-local-environment.md) | The whole stack, verified by running it rather than reading it: buckets private (403 on anonymous GET), container non-root, startup gated on real health. `.dockerignore` beside the Dockerfile is silently ignored — Docker reads it from the context root, and the symptom points nowhere near the cause |
 | 2026-09-10 | P0-25 | [Surfaces separated into backend, frontend, admin](./records/2026-09-10-P0-25-surface-directories.md) | Layout now mirrors the trust boundaries rather than the languages, which is why `admin/` sits beside `frontend/` and not inside it. A knowing, recorded divergence: `docs/FRONTEND/00` still says `apps/` and was left unamended at the owner's instruction |
 | 2026-09-10 | P0-04 | [Backend service skeleton](./records/2026-09-10-P0-04-backend-service-skeleton.md) | The API runs: validated config that exits 78 naming every missing variable, three surfaces mounted separately, a bounded drain that releases idle keep-alive sockets but not busy ones. Found a build that reported success and emitted nothing — a stale `.tsbuildinfo` surviving `rm -rf dist`, invisible from CI because a clean checkout has none |
@@ -34,6 +35,7 @@ Add a line here as part of writing the record — an unindexed record is a recor
 ### Phase 0 — Foundation
 - `P0-01` — [The stack is decided](./records/2026-09-09-P0-01-stack-decision.md) — the constraint that chose the language was one sentence in `docs/FRONTEND/03`
 - `P0-05` — [Local environment](./records/2026-09-10-P0-05-local-environment.md) — an unprivileged database role and private buckets, set up before there is anything to protect
+- `P0-26` — [Helm charts](./records/2026-09-10-P0-26-helm-charts.md) — the escape route from the single-host risk, written while it is still cheap; guard rails that fail the render rather than the cluster
 - `P0-25` — [Surfaces separated](./records/2026-09-10-P0-25-surface-directories.md) — a deviation the owner asked not to close in `docs/`; carried in the record instead
 - `P0-04` — [Backend service skeleton](./records/2026-09-10-P0-04-backend-service-skeleton.md) — a green build that produced no artifact; and the shared-package boundary asserted rather than assumed
 - `P0-02`, `P0-03` — [Repository structure and gates](./records/2026-09-09-P0-02-P0-03-repo-scaffolding-and-conventions.md) — a checklist people are asked to remember is one that gets skipped invisibly; three of them are now build failures
