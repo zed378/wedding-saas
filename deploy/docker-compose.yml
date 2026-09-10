@@ -97,9 +97,11 @@ services:
       mc alias set local http://minio:9000 minio_dev minio_dev_password &&
       mc mb --ignore-existing local/user-media &&
       mc mb --ignore-existing local/template-assets &&
+      mc mb --ignore-existing local/staging &&
       mc anonymous set none local/user-media &&
       mc anonymous set none local/template-assets &&
-      echo 'buckets ready (private)'
+      mc anonymous set none local/staging &&
+      echo 'buckets ready (private): user-media, template-assets, staging'
       "
     restart: "no"
 
@@ -141,8 +143,13 @@ services:
       # The application role, not the owner (deploy/postgres/init/01-app-role.sql).
       # Migrations use MIGRATION_DATABASE_URL and are never run from this container.
       DATABASE_URL: postgres://wedding_app:wedding_app_dev@postgres:5432/wedding
-      # Reserved until the task that uses them (see .env.example):
-      #   REDIS_URL     P0-15   redis://redis:6379
+      REDIS_URL: redis://redis:6379
+      # Object storage (P0-16). MinIO locally, Cloudflare R2 in production (ADR-011).
+      # Every bucket is private; reads go through the CDN with origin access control,
+      # never a bucket URL (docs/ARCHITECTURE/05 § Access Control).
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ACCESS_KEY_ID: minio_dev
+      STORAGE_SECRET_ACCESS_KEY: minio_dev_password
     ports: ["${API_PORT:-3000}:3000"]
     depends_on:
       # Waits for genuinely ready, not merely started. `service_started` would race the

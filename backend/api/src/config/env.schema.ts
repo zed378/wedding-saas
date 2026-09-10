@@ -11,7 +11,6 @@ import { z } from "zod";
  * makes it required, so nobody has to guess whether an absent variable is an oversight:
  *
  *   REDIS_URL                 P0-15  queue, cache and rate limiting
- *   STORAGE_*                 P0-16  object storage (R2 / MinIO)
  *   JWT_SIGNING_KEY           P1-03  access token signing
  *   REFRESH_TOKEN_PEPPER      P1-03  refresh token hashing
  *   MIDTRANS_SERVER_KEY       P3-03  payment provider
@@ -52,6 +51,24 @@ export const envSchema = z.object({
    * something tried.
    */
   DATABASE_URL: z.string().min(1),
+
+  /**
+   * Object storage (P0-16). MinIO locally, Cloudflare R2 in production (ADR-011).
+   *
+   * Optional so that a test run needs no bucket -- the storage module falls back to the
+   * in-memory fake when NODE_ENV is `test` and no endpoint is set. Requiring them would
+   * mean every unit test needed MinIO, which is the friction that ends with people not
+   * running tests. `P0-23` makes them required in staging and production, where the
+   * fallback would be a silent data-loss bug rather than a convenience.
+   */
+  STORAGE_ENDPOINT: z.string().min(1).optional(),
+  STORAGE_ACCESS_KEY_ID: z.string().min(1).optional(),
+  STORAGE_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+
+  /** Bucket names, so an environment can prefix or rename them. */
+  STORAGE_BUCKET_USER_MEDIA: z.string().min(1).default("user-media"),
+  STORAGE_BUCKET_TEMPLATE_ASSETS: z.string().min(1).default("template-assets"),
+  STORAGE_BUCKET_STAGING: z.string().min(1).default("staging"),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -20,6 +20,7 @@
     "check:id-endpoints": "node scripts/check-id-endpoint-tests.mjs",
     "check:tenant-scope": "node scripts/check-tenant-scope.mjs",
     "check:status-writes": "node scripts/check-status-writes.mjs",
+    "check:storage-paths": "node scripts/check-storage-paths.mjs",
     "check:migrations": "node scripts/check-migration-pairs.mjs && node scripts/check-destructive-migration.mjs",
     "db:roundtrip": "bash scripts/db-roundtrip.sh",
     "verify": "bash scripts/verify.sh"

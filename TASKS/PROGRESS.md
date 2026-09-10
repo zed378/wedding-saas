@@ -3,8 +3,8 @@
 Single source of truth for where the project stands. Updated in the same commit as the work it describes (`00-TASK-CONVENTIONS.md` global DoD item 11).
 
 **Last updated**: 2026-09-10
-**Current phase**: Phase 0 — Foundation (18 / 26 done). **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
-**Overall**: 18 / 135 tasks done
+**Current phase**: Phase 0 — Foundation (19 / 26 done). **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
+**Overall**: 19 / 135 tasks done
 
 **No automated pipeline**: `P0-17` is deferred (ADR-028). Before merging to `main`, run `scripts/verify.sh`. The `:id`-endpoint gate blocks in `.githooks/pre-push`; integration tests, the coverage floor, SAST and dependency scanning are **not** running anywhere until `P0-17` is picked up — revisit before Phase 3 payment code.
 
@@ -21,7 +21,7 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 
 | Phase | Tasks | Done | Status | Gate to enter |
 |---|---|---|---|---|
-| [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 26 | 18 | **ACTIVE** | — |
+| [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 26 | 19 | **ACTIVE** | — |
 | [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 0 | Not started | Phase 0 exit criteria |
 | [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 14 | 0 | Not started | Phase 1 exit + `P1-25` |
 | [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 0 | Not started | Phase 2 exit |
@@ -57,7 +57,7 @@ Roadmap: Week 1-2. Exit criteria in the phase file.
 | P0-13 | Response envelope, errors, health | backend | M | **DONE** — allowlist error mapper; readiness separate from liveness | P0-04 |
 | P0-14 | Audit log and status history writers | backend | M | **DONE** — status writable only through the service, guard blocking on push | P0-10, P0-12 |
 | P0-15 | Queue and worker skeleton | worker | M | **DONE** — atomic idempotency, DLQ, cron leader election | P0-05, P0-12 |
-| P0-16 | Object storage abstraction | backend | M | TODO | P0-05 |
+| P0-16 | Object storage abstraction | backend | M | **DONE** — `@wi/storage`; branded keys; buckets private, verified 403 | P0-05 |
 | P0-17 | CI pipeline | infra | M | **DEFERRED** — ADR-028; gates moved to `scripts/verify.sh` + pre-push hook | P0-04 |
 | P0-18 | Secrets and configuration conventions | infra | S | TODO | P0-04 |
 | P0-19 | Test harness | backend, web-app | M | TODO | P0-05 |

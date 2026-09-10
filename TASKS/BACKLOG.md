@@ -22,6 +22,21 @@ Nothing on the board is `BLOCKED`. The remaining questions shape work rather tha
 
 ## Open Questions — Remaining
 
+### OQ-19 — Which media variants are actually produced?
+
+**Affects**: `P1-17` — not blocking; the path builder accepts anything either document sanctions.
+
+Two documents disagree, and neither is a superset of the other:
+
+- `docs/ARCHITECTURE/05` § Path Structure: `variant: original | large | thumbnail`
+- `docs/BACKEND/04` step 6: "thumbnail (300px), medium (800px), large (1600px)"
+
+`medium` is missing from the first, `original` from the second. Storing the original is useful — variants can be regenerated without asking the user to re-upload — and costly, since it is a full-resolution photo per media row held for the life of the invitation.
+
+`P0-16` accepted all four rather than choosing. The cost of guessing wrong is unusually high here: the filename is the CDN cache key (`docs/ARCHITECTURE/05` § CDN, immutable filenames), so a later rename is a rewrite of every stored object rather than a constant change.
+
+Decide in `P1-17`, when the pipeline is written and the storage cost of keeping originals can be estimated against a real photo count. Whichever set is chosen, amend the document that disagrees.
+
 ### OQ-18 — Should "one pending order per invitation" be a database constraint?
 
 **Affects**: `P3-01` — not blocking; the schema ships exactly as documented.
