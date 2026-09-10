@@ -22,6 +22,18 @@ Nothing on the board is `BLOCKED`. The remaining questions shape work rather tha
 
 ## Open Questions — Remaining
 
+### OQ-20 — What are the allowed values of `border_radius` and `typography.scale`?
+
+**Affects**: `P0-20` — **not blocking**; decided provisionally in ADR-038 so the phase could continue.
+
+`docs/PLAN/07` § Theme Variables shows a theme by example and gives exactly one value for each of these two keys: `"border_radius": "rounded"` and `"scale": "default"`. For `spacing` the prose names all three (`compact | comfortable | spacious`), so only these two are underspecified.
+
+`P0-20` enumerates them as `none | subtle | rounded | full` and `compact | default | large`. The alternative — accepting any string — was rejected because a theme value becomes a CSS custom property, and an unknown one renders as nothing rather than as an error: `border_radius: "roundeed"` would give square corners on every invitation using the template, with no signal anywhere.
+
+**Why it matters that this gets a real answer**: these are stored values in a `JSONB` column. Widening the enum later is free. Narrowing it is a data fix across every `template_versions` row — cheap today with one template, not cheap once an admin has authored several.
+
+**Who decides**: whoever owns the design system (`docs/UI-UX/06`–`09`). If the answer differs from ADR-038, the change is two `z.enum` calls plus a data fix, and `docs/PLAN/07` should gain the vocabularies so the next reader does not have to find the ADR.
+
 ### OQ-19 — Which media variants are actually produced?
 
 **Affects**: `P1-17` — not blocking; the path builder accepts anything either document sanctions.

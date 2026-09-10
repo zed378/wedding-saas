@@ -1087,3 +1087,63 @@ The build commands also lose their hand-kept list: `pnpm --filter @wi/api... bui
 **Specification impact** — None. `docs/DEVOPS/02` sketches a single-package Dockerfile; the monorepo already deviates from it and the deviation is not new here.
 
 ---
+### ADR-037 — The section keys and the component registry are closed, and the registry is append-only
+
+**Date** 2026-09-10 · **Status** Accepted · **Task** `P0-20`
+
+**Context** — `docs/PLAN/07` § Section System lists ten sections and shows a `component` field holding "component name in the renderer library". It does not say whether either vocabulary is closed. `docs/FRONTEND/04` § Component Registry resolves the name through a lookup table, which implies a fixed set at render time but says nothing about validation time.
+
+**Decision** — Three parts.
+
+1. **`section_key` is an enum of exactly ten values.** The reason is `docs/PLAN/07` § Template Compatibility & Migration: switching templates "matches the `section_key` present in both templates". With free-text keys, two templates that both mean "the gallery" but spell it `gallery` and `photos` silently drop the user's toggles and their section order on switch — data preserved, presentation scrambled, and no error anywhere.
+
+2. **`component` must be registered, and registered *for that section key*.** Binding a component to one section is stricter than the document asks. It costs a lookup and it rejects `{ "section_key": "gallery", "component": "HeroClassic" }`, which passes any name-only check and renders a hero where the gallery belongs.
+
+3. **The component registry is append-only.** `docs/PLAN/07` § Backward Compatibility already requires a breaking component change to ship as a new name (`GalleryGridV2`) "because older template versions explicitly reference the old component name". Combined with BR-3.1 — an invitation locks a version forever — removing a name breaks every invitation locked to a version that used it. That is R5 in `docs/PLAN/18`, and this makes it a rule the validator holds rather than a risk someone remembers.
+
+**Alternatives considered**
+
+- **Free-text `section_key` with a documented convention.** Rejected: the failure is silent and only appears on template switch, which is the one moment a user is already anxious about losing their data.
+- **Validate the component name only, not its section.** Rejected: it costs nothing to also check the pairing, and the mispairing is exactly the mistake a copy-pasted section entry makes.
+- **Keep the component registry in `packages/template-renderer`.** Rejected for now: the API must validate a definition without importing React. The names live in `@wi/schema`; the renderer owes it a parity test when it exists (`P0-22`/Phase 2), and that obligation is written into `component-registry.ts` rather than assumed.
+
+**Consequences** — Adding a section type is a deliberate edit in two places: a key here and a component there. That is the intended friction — a new section is a product decision, not a template-authoring one.
+
+The parity test does not exist yet, so today nothing proves these eleven names correspond to real components. They are a contract the renderer must satisfy, and until `P0-22` they are only a contract.
+
+**Specification impact** — None. Both closures are readings of existing requirements rather than new ones.
+
+---
+### ADR-038 — `border_radius` and `typography.scale` are enumerated, with values `docs/` does not give
+
+**Date** 2026-09-10 · **Status** Accepted · **Task** `P0-20` · **Open question** OQ-20
+
+**Context** — `docs/PLAN/07` § Theme Variables shows a theme by example:
+
+```json
+"typography": { "heading_font": "Playfair Display", "body_font": "Lato", "scale": "default" },
+"spacing": "comfortable",
+"border_radius": "rounded"
+```
+
+`spacing` is safe — the prose names all three values (`compact | comfortable | spacious`). For `scale` and `border_radius` the document gives exactly one example value each and no vocabulary.
+
+**Decision** — Enumerate both, and invent the missing values:
+
+- `typography.scale`: `compact | default | large`
+- `border_radius`: `none | subtle | rounded | full`
+
+Raised as **OQ-20** in `TASKS/BACKLOG.md` rather than decided silently, per `CLAUDE.md`.
+
+**Alternatives considered**
+
+- **Accept any string.** The honest option given the document, and rejected: a theme value becomes a CSS custom property, and an unknown one renders as *nothing* rather than as an error. A template with `border_radius: "roundeed"` would have square corners on every invitation and no signal anywhere.
+- **Block `P0-20` on the answer.** Rejected: `P0-20` is a hard prerequisite for editor work (`docs/PLAN/16` § Critical Dependencies), and blocking the template system on a design-token vocabulary would stop the phase for a question whose answer is cheap to change.
+
+**Consequences** — Widening an enum later is free: existing stored definitions stay valid. Narrowing it is a migration over JSONB in every `template_versions` row, which is precisely why enumerating now beats accepting any string now.
+
+The reference template (`P0-21`) will use `rounded` and `default`, so the invented values are unexercised until a second template exists. If the answer to OQ-20 differs, the change is a one-line edit to two `z.enum` calls and — if a stored definition used a value being removed — a data fix. With one template that is a single row.
+
+**Specification impact** — None yet. If OQ-20 is answered, `docs/PLAN/07` § Theme Variables should gain the vocabularies so the next reader does not have to find this ADR.
+
+---

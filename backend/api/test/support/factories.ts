@@ -1,5 +1,7 @@
 import type { Pool } from "pg";
 
+import { assertValidTemplateVersion } from "@wi/schema";
+
 import {
   tenantScope,
   type TenantScope,
@@ -55,30 +57,73 @@ export async function createTestUser(
   return { id: rows[0]!.id, email, scope: tenantScope(rows[0]!.id) };
 }
 
+/**
+ * A minimal template version that the `P0-20` validator accepts.
+ *
+ * Before `P0-20` this factory wrote `{ "--color-primary": "#b76e79" }` as a theme and a
+ * section with no `configurable` key -- neither of which is a shape anything can render.
+ * It did not matter while nothing read the column; it would have mattered the moment
+ * something did, and every integration test would have been carrying invalid data.
+ */
+const DEFAULT_SECTIONS = [
+  {
+    section_key: "hero",
+    component: "HeroClassic",
+    enabled_by_default: true,
+    configurable: false,
+    required_fields: ["couple.groom.nickname", "couple.bride.nickname"],
+  },
+];
+
+const DEFAULT_THEME = {
+  colors: {
+    primary: "#b76e79",
+    secondary: "#f4ede4",
+    accent: "#c9a876",
+    text: "#2b2b2b",
+  },
+  typography: {
+    heading_font: "Playfair Display",
+    body_font: "Lato",
+    scale: "default",
+  },
+  spacing: "comfortable",
+  border_radius: "rounded",
+};
+
 export async function createTestTemplateVersion(
   pool: Pool,
-  overrides: { version?: string; sections?: unknown; theme?: unknown } = {},
+  overrides: {
+    version?: string;
+    sections?: unknown;
+    theme?: unknown;
+    customizableThemeKeys?: readonly string[];
+  } = {},
 ): Promise<TestTemplateVersion> {
+  // docs/DATABASE/03 § Schema Validation: validated before being saved. A factory that
+  // wrote definitions the validator rejects would be a fixture generator for a state
+  // the application cannot produce.
+  const definition = assertValidTemplateVersion({
+    sections: overrides.sections ?? DEFAULT_SECTIONS,
+    theme: overrides.theme ?? DEFAULT_THEME,
+    customizable_theme_keys: overrides.customizableThemeKeys ?? [
+      "colors.primary",
+    ],
+  });
+
   const { rows: t } = await pool.query<{ id: string }>(
     "INSERT INTO templates (slug, name, status) VALUES ($1, 'Test Template', 'published') RETURNING id",
     [`tpl-${uniq()}`],
   );
   const { rows: v } = await pool.query<{ id: string }>(
-    `INSERT INTO template_versions (template_id, version, sections, theme, status)
-     VALUES ($1, $2, $3::jsonb, $4::jsonb, 'published') RETURNING id`,
+    `INSERT INTO template_versions (template_id, version, sections, theme, customizable_theme_keys, status)
+     VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, 'published') RETURNING id`,
     [
       t[0]!.id,
       overrides.version ?? "1.0.0",
-      JSON.stringify(
-        overrides.sections ?? [
-          {
-            section_key: "hero",
-            component: "HeroClassic",
-            enabled_by_default: true,
-          },
-        ],
-      ),
-      JSON.stringify(overrides.theme ?? { "--color-primary": "#b76e79" }),
+      JSON.stringify(definition.sections),
+      JSON.stringify(definition.theme),
+      definition.customizable_theme_keys,
     ],
   );
   return { templateId: t[0]!.id, versionId: v[0]!.id };

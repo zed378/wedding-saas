@@ -747,7 +747,7 @@ Raised by `P0-15`, which shipped the worker with a logger carrying the comment "
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-10 |
 | **Depends on** | P0-08 |
 | **Spec refs** | `docs/PLAN/07-TEMPLATE-SYSTEM.md`, `docs/DATABASE/03-TEMPLATES.md` § Schema Validation, `docs/PLAN/08-INVITATION-DATA-MODEL.md` |
 | **Spec required** | Yes — data model |
@@ -767,10 +767,18 @@ Raised by `P0-15`, which shipped the worker with a logger carrying the comment "
 7. Unit test the resolver against the shapes in `docs/PLAN/08`: present, absent, empty string, empty array, wildcard over multiple events, and a path into a section the user has disabled.
 
 **Definition of Done**
-- [ ] A section definition with an unknown field path is rejected with a message naming the path.
-- [ ] A section definition naming an unregistered component is rejected.
-- [ ] The resolver lives in one shared package imported by both the API and the frontend.
-- [ ] The resolver's "is this field empty" semantics are explicit and tested — empty string, empty array, and null all count as missing for publish validation (BR-4.2).
+- [x] An unknown field path is rejected **naming the path**, and suggesting the near miss — a typo is the realistic cause and there are 39 paths to search by hand.
+- [x] An unregistered component is rejected, and so is a **registered** one under the wrong `section_key` — a case the card did not ask for, which passes any name-only check while rendering a hero where the gallery belongs (R5).
+- [x] The resolver lives in `@wi/schema`. The API's import is asserted over real HTTP (`test/surfaces.spec.ts`); the frontends are `P0-22`, and nothing in the package is backend-specific — one dependency, `zod`, and no Node-only import.
+- [x] Emptiness is a table in `resolve-path.ts` with a case per row. The three carrying the most weight are the ones that must **not** count as empty: `0`, `false` and `"0"` — a `!value` check gets all three wrong and passes every test that only looks at the empty ones.
+
+**Two documents disagreed and neither was amended.** `customizable_theme_keys` is a **column** (`docs/DATABASE/03` and `docs/API/03` against `docs/PLAN/07`'s prose), and `event` is **one** section key whose component renders the collection (`docs/PLAN/07` draws Akad and Reception beneath it; `docs/PLAN/08` says 1..N events).
+
+**`docs/PLAN/07` § Theme Variables is genuinely incomplete** on `border_radius` and `typography.scale` — one example value each, no vocabulary. Enumerated provisionally (ADR-038) and raised as **OQ-20**, rather than accepting any string: an unknown CSS token renders as *nothing*, not as an error, so a typo would mean square corners on every invitation with no signal anywhere.
+
+**A build guard carries the "validate before write" requirement into Phase 5.** `sections` and `theme` are `JSONB`, so the database cannot enforce `docs/DATABASE/03` § Schema Validation — the only thing between a malformed definition and every invitation using the template is that somebody remembered. `scripts/check-template-version-writes.mjs` blocks in `verify.sh` and on push.
+
+**The test factory had been writing definitions nothing could render** — a CSS custom property where the theme belongs, and a section with no `configurable` key. Harmless while nothing read the column; every integration test would have carried invalid data the moment something did.
 
 ---
 

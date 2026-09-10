@@ -56,6 +56,11 @@ step "status changes go through the writer" node scripts/check-status-writes.mjs
 # at compile time; this catches the cast that would bypass it in one word.
 step "storage paths built by the port" node scripts/check-storage-paths.mjs
 
+# docs/DATABASE/03: sections and theme are validated in application code before the
+# write, because the columns are JSONB and Postgres will accept any well-formed JSON --
+# including a component no renderer provides.
+step "template definitions validated before write" node scripts/check-template-version-writes.mjs
+
 # docs/DEVOPS/06: redaction happens at the logger, not at the call site. A logger built
 # straight from pino() writes secrets in clear text and looks identical in every other
 # respect -- the worker shipped exactly that for four tasks (P0-15).

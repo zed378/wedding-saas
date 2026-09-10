@@ -3,12 +3,12 @@
 Single source of truth for where the project stands. Updated in the same commit as the work it describes (`00-TASK-CONVENTIONS.md` global DoD item 11).
 
 **Last updated**: 2026-09-10
-**Current phase**: Phase 0 — Foundation (22 / 27 done). **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
-**Overall**: 22 / 136 tasks done
+**Current phase**: Phase 0 — Foundation (23 / 27 done). **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
+**Overall**: 23 / 136 tasks done
 
 **No automated pipeline**: `P0-17` is deferred (ADR-028). Before merging to `main`, run `scripts/verify.sh`. The `:id`-endpoint gate blocks in `.githooks/pre-push`; integration tests, the coverage floor, SAST and dependency scanning are **not** running anywhere until `P0-17` is picked up — revisit before Phase 3 payment code.
 
-**Specification status**: all 17 gaps resolved and `docs/` amended (ADR-018 through ADR-022). Pricing, the publishing address and the gift account data question are decided (ADR-023 through ADR-025). **No task on this board is blocked** — four open questions remain in [`BACKLOG.md`](./BACKLOG.md) and all of them shape work rather than stopping it.
+**Specification status**: all 17 gaps resolved and `docs/` amended (ADR-018 through ADR-022). Pricing, the publishing address and the gift account data question are decided (ADR-023 through ADR-025). **No task on this board is blocked** — five open questions remain in [`BACKLOG.md`](./BACKLOG.md) and all of them shape work rather than stopping it.
 
 **Product decisions now fixed**: one package at **Rp 139,000 for 12 months**, free tier of **one draft**; invitations published at **`invitation.zedth.my.id/{slug}`** (path-based, no wildcard DNS), with per-invitation subdomains deferred to `P7-01`.
 
@@ -21,7 +21,7 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 
 | Phase | Tasks | Done | Status | Gate to enter |
 |---|---|---|---|---|
-| [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 27 | 22 | **ACTIVE** | — |
+| [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 27 | 23 | **ACTIVE** | — |
 | [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 0 | Not started | Phase 0 exit criteria |
 | [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 14 | 0 | Not started | Phase 1 exit + `P1-25` |
 | [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 0 | Not started | Phase 2 exit |
@@ -62,7 +62,7 @@ Roadmap: Week 1-2. Exit criteria in the phase file.
 | P0-18 | Secrets and configuration conventions | infra | S | **DONE** — the service refuses to boot on a mixed-environment configuration | P0-04 |
 | P0-19 | Test harness | backend, web-app | M | **DONE** — four layers; found a container startup crash and a stale-image bug | P0-05 |
 | P0-19.1 | Shared logging package | backend, packages | S | **DONE** — the worker redacts at last; a guard now refuses a `pino()` call outside `@wi/logging` | P0-12, P0-15, P0-19 |
-| P0-20 | Template schema definition and validator | backend, web-app | L | TODO | P0-08 |
+| P0-20 | Template schema definition and validator | backend, web-app | L | **DONE** — 39 canonical field paths, a closed component registry, and one resolver both surfaces share | P0-08 |
 | P0-21 | Reference template and demo seed data | backend, web-app | L | TODO | P0-20 |
 | P0-22 | Frontend skeletons and design system | frontend | L | TODO | P0-02 |
 | P0-23 | Staging, hosts and TLS | infra | L | TODO — addressing decided (ADR-024); `P0-17` deferred, so this no longer waits on it | P0-04 |
