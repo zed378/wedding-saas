@@ -3,6 +3,8 @@ import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { SCHEMA_CONTRACT_VERSION, INVITATION_FIELD_PATHS } from "@wi/schema";
+
 import { AppModule } from "../src/app.module";
 import { REQUEST_ID_HEADER } from "../src/http/request-id.middleware";
 import { SURFACE } from "../src/http/surfaces";
@@ -46,11 +48,21 @@ describe("HTTP surfaces", () => {
   it("reaches the shared @wi/schema package across the workspace boundary", async () => {
     // ADR-004 chose one language so the field-path registry is a shared package rather
     // than two implementations. If this import ever stops resolving, that argument is
-    // broken and P0-20 would be the expensive place to find out.
+    // broken.
+    //
+    // Asserted against the imported constant rather than a literal. The literal was `0`
+    // and P0-20 bumped it to `1`, which failed a test that was not about the number --
+    // and a literal makes every future bump an edit here for no signal.
+    //
+    // The version alone would be a weak claim, though: two zeros agreeing across a wire
+    // proves nothing. The second assertion is the one with content -- the package now
+    // carries the canonical field vocabulary (P0-20), and this process can see it.
     const response = await request(app.getHttpServer())
       .get(`/${SURFACE.AUTHENTICATED}/_reference`)
       .expect(200);
-    expect(response.body.schemaContractVersion).toBe(0);
+
+    expect(response.body.schemaContractVersion).toBe(SCHEMA_CONTRACT_VERSION);
+    expect(INVITATION_FIELD_PATHS).toContain("couple.groom.nickname");
   });
 
   it("assigns a request id to every response", async () => {

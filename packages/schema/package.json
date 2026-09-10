@@ -12,11 +12,19 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "lint": "echo \"[later] lint not wired yet\"",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "echo \"[P0-19] tests not wired yet\""
+    "lint": "echo \"[P0-17] lint not wired yet\"",
+    "typecheck": "tsc --noEmit -p tsconfig.build.json",
+    "test": "vitest run"
   },
   "files": [
     "dist"
-  ]
+  ],
+  "dependencies": {
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
 }

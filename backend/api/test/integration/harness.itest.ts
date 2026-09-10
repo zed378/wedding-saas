@@ -117,16 +117,48 @@ describe("factories", () => {
   });
 
   it("createTestTemplateVersion round-trips sections as JSONB", async () => {
+    // The override must be a definition P0-20's validator accepts. Before P0-20 this
+    // passed `{ section_key, component }` with nothing else, which is not a shape
+    // anything can render -- it only worked because nothing read the column.
+    const sections = [
+      {
+        section_key: "gallery",
+        component: "GalleryGrid",
+        enabled_by_default: true,
+        configurable: true,
+        max_items: 20,
+        required_fields: ["gallery.photos"],
+        optional_fields: [],
+      },
+    ];
+
     const { versionId } = await createTestTemplateVersion(harness.pool, {
-      sections: [{ section_key: "gallery", component: "GalleryGrid" }],
+      sections,
     });
     const { rows } = await harness.pool.query<{ sections: unknown[] }>(
       "SELECT sections FROM template_versions WHERE id = $1",
       [versionId],
     );
-    expect(rows[0]!.sections).toEqual([
-      { section_key: "gallery", component: "GalleryGrid" },
-    ]);
+    expect(rows[0]!.sections).toEqual(sections);
+  });
+
+  it("createTestTemplateVersion refuses a definition the validator rejects", async () => {
+    // docs/DATABASE/03 § Schema Validation requires validation before the write, and
+    // the factory is one of the only two writers that exist in Phase 0. A factory that
+    // could produce an invalid definition would be a generator for a state the
+    // application cannot reach -- and every test built on it would prove nothing.
+    await expect(
+      createTestTemplateVersion(harness.pool, {
+        sections: [
+          {
+            section_key: "gallery",
+            component: "HeroClassic", // registered, but for a different section
+            enabled_by_default: true,
+            configurable: true,
+          },
+        ],
+      }),
+    ).rejects.toThrow(/HeroClassic/);
   });
 
   it("createTestOrder and createTestMedia attach to an invitation", async () => {

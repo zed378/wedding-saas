@@ -10,6 +10,18 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — templates become machine-checkable
+
+**Added** — `@wi/schema` stops being a placeholder ([P0-20](./records/2026-09-10-P0-20-template-schema-and-resolver.md))
+- **39 canonical field paths** from `docs/PLAN/08`, one enumerated registry. A template asking for `couple.groom.nickmame` is now rejected at authoring time, naming the path and suggesting the near miss. Before this it was valid JSON that stored cleanly in a JSONB column and rendered an empty hero on every invitation using the template — forever, because BR-3.1 locks a version.
+- **A component registry where each name is bound to the one section it renders.** `{ section_key: "gallery", component: "HeroClassic" }` passes any name-only check and puts a hero where the gallery belongs. The registry is append-only, which is R5 in `docs/PLAN/18` written as a rule rather than a risk.
+- **One dot-notation resolver** for publish validation (`docs/BACKEND/03`) and the renderer (`docs/FRONTEND/04`), with a single definition of "empty". `0` and `false` are **not** empty — `order: 0` and `is_cover: false` are legitimate values that `!value` reports as missing. A wildcard path is missing when *any* element is empty: two events where one has no date is not a publishable invitation.
+- **A build guard** so `docs/DATABASE/03`'s "validated before being saved" survives into Phase 5. The columns are JSONB; Postgres will accept anything at all.
+
+**Raised** — **OQ-20**: `docs/PLAN/07` gives one example value each for `border_radius` and `typography.scale` and no vocabulary. Enumerated provisionally (ADR-038) rather than accepting any string, because an unknown CSS token renders as nothing rather than as an error.
+
+**Fixed** — the test factory had been writing template versions nothing could render: a CSS custom property where the theme belongs, and a section missing `configurable`. Harmless only while nothing read the column.
+
 ### 2026-09-10 — the worker finally redacts
 
 **Changed** — one logging package for both surfaces ([P0-19.1](./records/2026-09-10-P0-19.1-shared-logging.md))
