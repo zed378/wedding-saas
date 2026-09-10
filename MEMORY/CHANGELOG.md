@@ -10,6 +10,20 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — logs that cannot leak
+
+**Added** — structured logging ([P0-12](./records/2026-09-10-P0-12-structured-logging.md))
+- JSON in the shape `docs/DEVOPS/06` § Format specifies: `timestamp`, `level`, `service`, `request_id`, `message`, `context`.
+- **Redaction happens inside the logger.** `docs/DEVOPS/06` is explicit that it must not rely "on manual developer discipline each time", and that parenthetical is the whole design: a rule people have to remember holds until the first 2am incident, when someone logs the entire request object — which is exactly when the log is read by the most people and kept the longest.
+- It is a **walk keyed on field name at any depth**, not a list of paths. A path list needs an entry per shape and misses anything nested or renamed. It also scrubs bearer tokens and JWTs out of *values* under innocent keys, because `{ note: "Authorization: Bearer ..." }` is how a token actually reaches a log.
+- Secrets are removed; account numbers keep their last four digits and emails become `a***e@example.com`. A partial token has no debugging value; a partial account number is what support needs.
+- **`request_id` is ambient** via `AsyncLocalStorage`, so a line written three layers deep inside a repository still carries it. Threading a logger through every constructor fails the moment one is missed — and that line is invariably the one needed.
+- Bounded and cycle-safe: depth 8, arrays capped, circular references marked. Logging must never be what takes the service down.
+- **Security events are tagged `log_type: "security"`** so retention can differ — 1 year against 90 days (`docs/DEVOPS/06` § Log Retention). Separation is by field rather than a second file: the aggregator routes on it, and a security log that fills a disk stops being written.
+- The envelope that carries `request_id` across the queue exists and is tested through a JSON round trip. There is no queue until `P0-15`.
+
+**Testing** — 34 tests. Verified through the **compiled production path**, not only the test harness. Two mutation checks; the first exposed a flaw in the test design itself: the main redaction test generates its payload from the redactor's own key list, so deleting a key removes it from both sides. An independent backstop taken from `docs/DEVOPS/06` now catches that. **A test generated from the code it tests verifies consistency, never correctness.**
+
 ### 2026-09-10 — tenant isolation, built before the endpoints that need it
 
 **Added** — the tenant-scoped repository layer ([P0-11](./records/2026-09-10-P0-11-tenant-scoped-repository.md))

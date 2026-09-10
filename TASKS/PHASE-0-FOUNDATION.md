@@ -434,7 +434,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-10 |
 | **Depends on** | P0-04 |
 | **Spec refs** | `docs/DEVOPS/06-LOGGING.md`, `docs/SECURITY/09-PRIVACY-DATA-PROTECTION.md`, `docs/BACKEND/00-BACKEND-STANDARDS.md` § Logging |
 | **Spec required** | No |
@@ -451,10 +451,16 @@
 6. Write a test that logs an object containing every sensitive key name and asserts none of the values appear in the output.
 
 **Definition of Done**
-- [ ] Every log line is JSON and carries `request_id` where one exists.
-- [ ] The redaction test passes for all sensitive key names listed in `docs/DEVOPS/06`.
-- [ ] A worker job logs the `request_id` of the request that enqueued it.
-- [ ] Security events are separable from application logs by a field, so retention can differ.
+- [x] Every log line is JSON with the documented field names, and carries `request_id` where one exists — asserted in both directions, and verified through the **compiled production path**, not only the test harness.
+- [x] The redaction test passes for every sensitive key name in `docs/DEVOPS/06`, plus an independent backstop list and value-level scrubbing of bearer tokens and JWTs under innocent keys.
+- [x] A worker job carries the enqueuing request's `request_id` — **the mechanism is proven across a JSON round trip; there is no queue until `P0-15`**, which is the honest limit of what can be claimed here.
+- [x] Security events are tagged `log_type: "security"`, so retention can differ. `P0-23` configures the retention itself.
+
+**Redaction is a key-name walk, not a path list.** Pino's built-in `redact` needs a path per shape and misses anything nested or renamed. This decides by key name at any depth, normalised so `access_token`, `accessToken` and `Access-Token` are one key. The trade is false positives, which is the right direction to be wrong in.
+
+**A flaw in my own test, found by mutation.** The main redaction test builds its payload from the redactor's own exported key list, so deleting `"password"` from the set deletes it from both sides and the test still passes. An independent backstop list — taken from `docs/DEVOPS/06`, not from the source — now fails with a name that says what happened. **A test generated from the code it tests verifies consistency, never correctness.**
+
+**One deliberate inconsistency**: the logger reads `process.env` directly, which `config.module.ts` otherwise forbids. It has to exist before the DI container, because the most important line it ever writes is that container failing to start. The three variables change a label, a level or a format; redaction is not configurable.
 
 ---
 
