@@ -123,7 +123,7 @@ The stack is decided and recorded — ADR-004 through ADR-017 in `MEMORY/DECISIO
 | Layer | Choice | Notes |
 |---|---|---|
 | Runtime | Node.js 24 LTS, TypeScript | One language across API, workers and all three frontends |
-| Repo | pnpm workspaces + Turborepo | `apps/{api,worker,web-app,public-invite,admin}`, `packages/{schema,template-renderer,ui,api-client,config}` |
+| Repo | pnpm workspaces + Turborepo | `backend/{api,worker}`, `frontend/{web-app,public-invite}`, `admin/`, `packages/{schema,template-renderer,ui,api-client,config}` |
 | Backend | NestJS 12 | `Controller → Service → Repository`, constructor injection |
 | Database | PostgreSQL 16, Drizzle ORM 0.45.x + drizzle-kit | Migrations are a separate command, never run on startup |
 | Cache & queue | Redis 7, BullMQ 6.3.x | Cache, rate limiting and jobs share one Redis |
@@ -157,15 +157,26 @@ pnpm --filter @wi/api dev    # API in watch mode
 pnpm --filter @wi/api start  # API from dist/
 ```
 
-Copy `.env.example` to `.env` first. The API validates its environment at startup and exits **78** naming every offending variable rather than failing later on the request that needed it (`apps/api/src/config/env.schema.ts`).
+Copy `.env.example` to `.env` first. The API validates its environment at startup and exits **78** naming every offending variable rather than failing later on the request that needed it (`backend/api/src/config/env.schema.ts`).
 
 The local service stack — PostgreSQL, Redis, MinIO, Mailpit, ClamAV — arrives with `P0-05`.
 
-Target layout, per `docs/ARCHITECTURE/01-APPLICATION-ARCHITECTURE.md`:
+Repository layout — **`backend/`, `frontend/`, `admin/`, `packages/`**, not `apps/`. `docs/FRONTEND/00` § Project Structure still describes `apps/`; the code deliberately deviates and the document was deliberately left unamended at the project owner's instruction (ADR-027). Trust the layout below.
+
 ```
-apps/api/src/modules/{auth,user,invitation,template,media,order,payment,publishing,rsvp,guestbook,notification,admin}/
-apps/api/src/shared/{auth-middleware,validation,audit-log,rate-limit,sanitizer}/
-apps/api/src/infra/{db,cache,storage,queue}/
+backend/api/         NestJS REST API
+backend/worker/      Background job pools
+frontend/web-app/    Marketing, auth, dashboard, editor, checkout
+frontend/public-invite/  The public invitation, server-rendered
+admin/               Admin panel (own hostname, own session, own trust boundary)
+packages/            schema, template-renderer, ui, api-client, config
+```
+
+Inside the API, per `docs/ARCHITECTURE/01-APPLICATION-ARCHITECTURE.md`:
+```
+backend/api/src/modules/{auth,user,invitation,template,media,order,payment,publishing,rsvp,guestbook,notification,admin}/
+backend/api/src/shared/{auth-middleware,validation,audit-log,rate-limit,sanitizer}/
+backend/api/src/infra/{db,cache,storage,queue}/
 ```
 Layering inside each module: `Controller → Service → Repository → DB`. Business logic lives only in Service, and object-level authorization is enforced there (never only in a controller or a decorator), per `docs/SECURITY/04` § Implementation Principles.
 

@@ -38,6 +38,7 @@
 | P0-22 | Frontend skeletons and the design system package | web-app, public-invite, admin | L | P0-02 |
 | P0-23 | Staging environment, wildcard DNS and TLS | infra | L | P0-17 |
 | P0-24 | Adopt the TASKS/MEMORY working discipline | docs | S | — |
+| P0-25 | Separate surfaces into backend/frontend/admin | infra | S | P0-02 |
 
 **Suggested parallel tracks** once `P0-02` lands: backend (`P0-04` → `P0-05` → `P0-06` → `P0-07`…`P0-11`), platform (`P0-17` → `P0-18` → `P0-23`), frontend (`P0-22`), and template (`P0-20` → `P0-21`, which needs `P0-08` only).
 
@@ -97,6 +98,7 @@
    app/infra/{db,cache,storage,queue}/
    ```
 2. Create the frontend layout from `docs/FRONTEND/00`: `apps/web-app`, `apps/public-invite`, `apps/admin`, and `packages/{ui,template-renderer,api-client,schema}`.
+   *(Superseded by `P0-25`: these now live at `frontend/web-app`, `frontend/public-invite` and `admin/`.)*
 3. Add the workspace tooling chosen in `P0-01` (workspace file, task runner, shared TypeScript config), with one root command each for lint, type check, test, and build.
 4. Add a root `.gitignore` covering build output, `node_modules`/vendor, every `.env*` variant except `.env.example`, and local upload staging directories.
 5. Add a per-surface `README.md` stating what lives there and which specification document governs it.
@@ -104,7 +106,7 @@
 
 **Definition of Done**
 - [x] The backend module list matches `docs/ARCHITECTURE/01` exactly — same names, same nesting.
-- [x] `packages/template-renderer` exists and is importable from both `apps/web-app` and `apps/public-invite`; verified by the workspace symlinks after `pnpm install`.
+- [x] `packages/template-renderer` exists and is importable from both the web app and the public invitation app; verified by the workspace symlinks after `pnpm install`. *(Paths moved in `P0-25`.)*
 - [x] `.gitignore` makes committing any `.env` file impossible — verified with `git check-ignore` on `.env` and `.env.production`, with `.env.example` still tracked.
 - [x] The root `README.md` describes the repository and points at `docs/`, `TASKS/`, and `MEMORY/`.
 
@@ -727,6 +729,36 @@
 - [ ] The application host is served separately from the public invitation host, with distinct cookie scopes; the admin host follows at `P5-01`.
 - [ ] Staging carries no production data and no live payment credentials.
 - [ ] A merge to the integration branch reaches staging without a manual step, and the smoke test result is visible.
+
+---
+
+## P0-25 — Separate Surfaces into `backend/`, `frontend/`, `admin/`
+
+| | |
+|---|---|
+| **Status** | DONE — 2026-09-10 |
+| **Depends on** | P0-02 |
+| **Spec refs** | `docs/ARCHITECTURE/02-FRONTEND-ARCHITECTURE.md` § Logically Separate Applications, `docs/SECURITY/02-TRUST-BOUNDARIES.md`, `MEMORY/DECISIONS.md` ADR-027 |
+| **Spec required** | No |
+| **Surface** | infra |
+
+**Goal** — Replace the single `apps/` directory with three top-level groups, so the layout shows the trust boundaries instead of hiding them.
+
+**Why it exists** — Requested by the project owner. `P0-02` built `apps/{api,worker,web-app,public-invite,admin}` because `docs/FRONTEND/00` § Project Structure specifies it. The owner asked for the three surfaces to be separated, and for `docs/` to be left unamended. That makes this a **recorded deviation** rather than a specification change (ADR-027).
+
+**Steps**
+1. `git mv` each surface so history follows the files: `backend/{api,worker}`, `frontend/{web-app,public-invite}`, `admin/`.
+2. Update the workspace globs in `pnpm-workspace.yaml`.
+3. Fix relative link depth where a surface changed nesting level — `admin/` rose by one.
+4. Update every path reference in `README.md`, `packages/README.md`, `CLAUDE.md`, `AGENTS.md` and the task cards. `docs/` is deliberately untouched.
+5. Verify the whole pipeline from a cleared cache: nothing may depend on the old paths.
+
+**Definition of Done**
+- [x] `apps/` no longer exists; the five surfaces resolve as workspace projects from the new locations.
+- [x] `git status` shows renames, not delete-plus-add, so `git log --follow` still works on every moved file.
+- [x] Build, typecheck, test and format all pass from a cleared turbo cache and deleted `dist/`.
+- [x] `CLAUDE.md` and `AGENTS.md` state the real layout **and** that `docs/FRONTEND/00` deliberately disagrees, so the next reader is not misled by either.
+- [x] The deviation is recorded as an ADR.
 
 ---
 

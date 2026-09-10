@@ -11,7 +11,9 @@ An invitation is published at `https://invitation.zedth.my.id/{slug}`.
 | [`docs/`](./docs/README.md)     | **The specification** — product, architecture, API contract, database schema, security, UX, testing. 123 documents. Reference material: amended deliberately, never as a side effect of implementation. |
 | [`TASKS/`](./TASKS/README.md)   | **The execution plan** — 133 tasks across 8 phases, each naming the documents it implements and how it is judged done. Start at [`PROGRESS.md`](./TASKS/PROGRESS.md).                                   |
 | [`MEMORY/`](./MEMORY/README.md) | **The record** — what was built, why, and what to watch. Decisions live in [`DECISIONS.md`](./MEMORY/DECISIONS.md).                                                                                     |
-| `apps/`                         | The five deployable surfaces.                                                                                                                                                                           |
+| `backend/`                      | REST API and background workers.                                                                                                                                                                        |
+| `frontend/`                     | The user-facing app and the public invitation renderer.                                                                                                                                                 |
+| `admin/`                        | The admin panel — its own trust boundary, its own hostname.                                                                                                                                             |
 | `packages/`                     | Code shared between them.                                                                                                                                                                               |
 
 `CLAUDE.md` and `AGENTS.md` are the operating instructions for anyone — human or agent — working in this repository. Read `TASKS/PROGRESS.md` before starting anything.
@@ -19,12 +21,15 @@ An invitation is published at `https://invitation.zedth.my.id/{slug}`.
 ## Repository layout
 
 ```
-apps/
+backend/
   api/             NestJS — REST API, twelve domain modules (docs/ARCHITECTURE/01)
   worker/          Background jobs: media, general, cron pools (docs/BACKEND/08)
+
+frontend/
   web-app/         Next.js — marketing, auth, dashboard, editor, checkout   → app.zedth.my.id
   public-invite/   Next.js — the public invitation, server-rendered          → invitation.zedth.my.id
-  admin/           Vite + React — admin panel, static build                  → admin.zedth.my.id
+
+admin/             Vite + React — admin panel, static build                  → admin.zedth.my.id
 
 packages/
   schema/              Zod schemas, the canonical field-path registry, the dot-notation resolver
@@ -34,12 +39,14 @@ packages/
   config/              Shared tsconfig / eslint / prettier
 ```
 
+The three top-level groups mirror the trust boundaries rather than the languages. `admin/` sits beside `backend/` and `frontend/` instead of inside either because `docs/SECURITY/02` puts it behind its own boundary, on its own hostname, with its own session — a separation the layout should make obvious rather than hide (ADR-027).
+
 Two of these carry more weight than their size suggests:
 
 - **`packages/schema`** holds one definition of every field path. The API uses it to decide whether an invitation may publish; the editor uses it to render the form and the completeness checklist. One package, so the two cannot disagree — this is the reason the whole stack is one language ([ADR-004](./MEMORY/DECISIONS.md)).
 - **`packages/template-renderer`** is imported by both the editor preview and the public page. That shared import is what `docs/FRONTEND/04` means by "the same renderer", and it is what makes the editor a real preview rather than an approximation.
 
-`public-invite` runs on its own hostname on purpose. Guest-submitted content (RSVP names, guestbook messages) renders there, and keeping it off the application's origin means a stored XSS cannot act against a logged-in user ([ADR-024](./MEMORY/DECISIONS.md), `docs/SECURITY/02`).
+`frontend/public-invite` runs on its own hostname on purpose. Guest-submitted content (RSVP names, guestbook messages) renders there, and keeping it off the application's origin means a stored XSS cannot act against a logged-in user ([ADR-024](./MEMORY/DECISIONS.md), `docs/SECURITY/02`).
 
 ## Stack
 

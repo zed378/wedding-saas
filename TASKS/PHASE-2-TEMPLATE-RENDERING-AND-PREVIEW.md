@@ -82,7 +82,7 @@
 6. Never branch on a template id or slug anywhere in the renderer. A grep-based CI check enforces it.
 
 **Definition of Done**
-- [ ] The renderer is imported by both `apps/web-app` and `apps/public-invite` from one package.
+- [ ] The renderer is imported by both `frontend/web-app` and `frontend/public-invite` from one package.
 - [ ] A template version naming an unregistered component fails CI.
 - [ ] No template identifier appears in a conditional anywhere in the package.
 - [ ] Rendering the reference template with demo data produces every enabled section, in order, in a test.

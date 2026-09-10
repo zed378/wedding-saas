@@ -761,3 +761,43 @@ The commit convention is unchanged and remains strict: subjects start with the t
 **Note on this record** — an earlier form of this ADR, written during the same session and never committed, specified phase branches. It was corrected in place rather than superseded, because it had not yet landed anywhere a reader could have relied on it. The alternatives section above keeps the rejected option and the reason, which is the part worth preserving.
 
 ---
+
+### ADR-027 — Surfaces live in `backend/`, `frontend/` and `admin/`, and `docs/FRONTEND/00` is left unamended
+
+| | |
+|---|---|
+| **Date** | 2026-09-10 |
+| **Status** | Accepted |
+| **Task** | `P0-25` |
+| **Deciders** | Project owner |
+
+**Context** — `P0-02` created `apps/{api,worker,web-app,public-invite,admin}` because `docs/FRONTEND/00-FRONTEND-STANDARDS.md` § Project Structure specifies exactly that shape, and ADR-005 recorded it. The project owner asked for the three surfaces to be separated into their own top-level directories, and — asked a second time — that `docs/` not be amended to match.
+
+**Decision** — Four top-level groups:
+
+```
+backend/    api, worker
+frontend/   web-app, public-invite
+admin/      the admin panel
+packages/   schema, template-renderer, ui, api-client, config
+```
+
+`docs/FRONTEND/00` § Project Structure keeps describing `apps/`. It is **knowingly** out of step with the repository, at the owner's instruction, and this ADR is the record of that.
+
+**Alternatives considered**
+
+- **Keeping `apps/`**, the specified shape. Rejected by the owner.
+- **Amending `docs/FRONTEND/00`** to describe the new layout, which is what `CLAUDE.md` § "When docs and reality disagree" and the deviation protocol in `TASKS/00-TASK-CONVENTIONS.md` normally require. Explicitly declined by the owner, so the divergence is carried here instead. This is the part worth flagging: the protocol exists so that code and specification never drift silently, and the compensating control is that both agent instruction files now say plainly that the document disagrees and which one to trust.
+- **Putting `admin/` under `frontend/`**, since it is also a React application. Rejected on the stronger grouping: `docs/SECURITY/02` § boundary 3→4 places the admin panel behind its own trust boundary, on its own hostname, with a session deliberately separate from the user application (ADR-024). Filing it beside the surface it is isolated from would make the layout argue against the architecture.
+
+**Consequences**
+
+The layout now mirrors the trust boundaries rather than the languages, which is the more useful thing for a reader to see first: the two backend processes deploy together, the two user-facing apps share a renderer, and the admin panel shares nothing with either.
+
+The cost is a documented inconsistency. Anyone reading `docs/FRONTEND/00` alone will build the wrong mental model, and `docs/DEVOPS/02-CONTAINERIZATION.md`'s compose example still names `./apps/api`. The mitigation is narrow but real: `CLAUDE.md` and `AGENTS.md` are read first by every session and now state both the true layout and the fact that the document disagrees. A one-line note in `docs/FRONTEND/00` would close it whenever the owner wants.
+
+`git mv` was used throughout, so `git log --follow` still traces every moved file. Prior MEMORY records and ADR-005 keep their original paths — they describe what was true when written, and rewriting them would break the property that makes the record trustworthy.
+
+**Specification impact** — None, deliberately. `docs/FRONTEND/00` § Project Structure and `docs/DEVOPS/02` § docker-compose remain as written and are now known to differ from the repository.
+
+---

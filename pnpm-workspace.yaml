@@ -1,5 +1,7 @@
 packages:
-  - "apps/*"
+  - "backend/*"
+  - "frontend/*"
+  - "admin"
   - "packages/*"
 
 # Install scripts are blocked by default: a postinstall is arbitrary code execution at

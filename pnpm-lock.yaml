@@ -18,19 +18,19 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
-  apps/admin:
+  admin:
     dependencies:
       '@wi/api-client':
         specifier: workspace:*
-        version: link:../../packages/api-client
+        version: link:../packages/api-client
       '@wi/schema':
         specifier: workspace:*
-        version: link:../../packages/schema
+        version: link:../packages/schema
       '@wi/ui':
         specifier: workspace:*
-        version: link:../../packages/ui
+        version: link:../packages/ui
 
-  apps/api:
+  backend/api:
     dependencies:
       '@nestjs/common':
         specifier: ^12.0.1
@@ -97,7 +97,13 @@ importers:
         specifier: ^5.0.0
         version: 5.0.0(@types/node@22.20.1)(vite@8.2.2(@types/node@22.20.1))
 
-  apps/public-invite:
+  backend/worker:
+    dependencies:
+      '@wi/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+
+  frontend/public-invite:
     dependencies:
       '@wi/api-client':
         specifier: workspace:*
@@ -112,7 +118,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
 
-  apps/web-app:
+  frontend/web-app:
     dependencies:
       '@wi/api-client':
         specifier: workspace:*
@@ -126,12 +132,6 @@ importers:
       '@wi/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-
-  apps/worker:
-    dependencies:
-      '@wi/schema':
-        specifier: workspace:*
-        version: link:../../packages/schema
 
   packages/api-client: {}
 

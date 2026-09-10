@@ -1,6 +1,6 @@
 # packages/
 
-Code shared between the five surfaces in `apps/`.
+Code shared between the five surfaces in `backend/`, `frontend/` and `admin/`.
 
 | Package             | Purpose                                                                   |
 | ------------------- | ------------------------------------------------------------------------- |

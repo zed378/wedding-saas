@@ -10,6 +10,14 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — surfaces separated
+
+**Changed** — repository layout ([P0-25](./records/2026-09-10-P0-25-surface-directories.md), [ADR-027](./DECISIONS.md))
+- `apps/` replaced by **`backend/{api,worker}`**, **`frontend/{web-app,public-invite}`** and **`admin/`**, alongside the unchanged `packages/`.
+- `admin/` sits beside `frontend/` rather than inside it because `docs/SECURITY/02` puts it behind its own trust boundary, on its own hostname, with its own session. The layout should argue for the architecture, not against it.
+- Moved with `git mv`, so `git log --follow` still traces every file.
+- **A knowing divergence**: `docs/FRONTEND/00` § Project Structure still describes `apps/` and was left unamended at the project owner's instruction. `CLAUDE.md` and `AGENTS.md` now state both the real layout and the fact that the document disagrees, so a session reading them first is not misled.
+
 ### 2026-09-10 — the API runs
 
 **Added** — backend service skeleton ([P0-04](./records/2026-09-10-P0-04-backend-service-skeleton.md))
