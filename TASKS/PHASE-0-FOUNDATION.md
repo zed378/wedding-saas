@@ -307,7 +307,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-10 |
 | **Depends on** | P0-08 |
 | **Spec refs** | `docs/DATABASE/04-INVITATIONS.md`, `docs/DATABASE/05-EVENTS.md`, `docs/DATABASE/06-MEDIA.md`, `docs/DATABASE/09-GUESTS.md`, `docs/PLAN/06-INVITATION-LIFECYCLE.md` |
 | **Spec required** | Yes — data model |
@@ -325,11 +325,17 @@
 7. Write integration tests for the constraints that encode business rules: a third `invitation_people` row for one invitation is rejected; `guest_count` outside 1..10 is rejected; deleting an invitation cascades its children; two live invitations cannot share a slug but a soft-deleted one frees it.
 
 **Definition of Done**
-- [ ] Every table, column, constraint and index in `docs/DATABASE/04`, `05`, `06` (invitation children) and `09` exists.
-- [ ] `invitation_settings.seo_indexable` defaults to `false`.
-- [ ] The constraint tests above pass.
-- [ ] `invitation_status_history` accepts a null `changed_by`, since system jobs change status with no acting user.
-- [ ] **`media.invitation_id` has its foreign key** (ADR-032), and the `P0-08` test asserting the constraint is absent has been **replaced** by one asserting a bad `invitation_id` is rejected. That test failing is the reminder; deleting it instead of replacing it would lose the guarantee silently.
+- [x] Every table, column, constraint and index in `docs/DATABASE/04`, `05`, `06` (invitation children) and `09` exists — **and `11`**, see below.
+- [x] `invitation_settings.seo_indexable` defaults to `false` — mutation-checked by flipping the default to `true`.
+- [x] The constraint tests pass — 51 new, 93 across the three schema suites.
+- [x] `invitation_status_history` accepts a null `changed_by`, and a null `from_status` for the first transition.
+- [x] **`media.invitation_id` has its foreign key** (ADR-032); the `P0-08` test was **replaced**, not deleted. Dropping the constraint fails 3 tests.
+
+**Thirteen tables, not the ten the card lists.** `docs/DATABASE/04` also defines `invitation_preview_tokens`, and `docs/DATABASE/11` defines `invitation_view_counts` — which `docs/DATABASE/00` lists as an invitation child. No other schema task owns either (`P0-10` is the commercial tables), so without them `P2-*` and `P4-09` would each add a table from a task about endpoints.
+
+**A contradiction, the same one as `P0-07` (ADR-033).** `docs/DATABASE/04` declared `slug VARCHAR(50) UNIQUE` and then stated in its own Notes that a slug can be reused after the old invitation is truly deleted. A column-level `UNIQUE` covers soft-deleted rows and makes that sentence false. The partial index wins; `docs/DATABASE/04` is amended. Two files have now needed this correction — the specification used `UNIQUE` as a reflex without accounting for soft delete. `users` and `invitations` are the complete set; `media` is the only other soft-deleted table and has no unique column.
+
+**A sweep test worth keeping**: `every table with updated_at has a trigger maintaining it` queries `information_schema` rather than naming tables, so it also covers tables that do not exist yet. It catches the mistake this project is most likely to repeat.
 
 ---
 

@@ -10,6 +10,20 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — the invitation aggregate
+
+**Added** — thirteen tables ([P0-09](./records/2026-09-10-P0-09-invitations-schema.md))
+- The invitation parent, eleven children, and the daily view counter, matching `docs/DATABASE/04`, `05`, `06`, `09` and `11`.
+- **Two directions of referential rule, deliberately opposite.** Everything an invitation *owns* cascades away with it — eleven children plus its media. Everything an invitation *depends on* refuses deletion while in use: owner, template and template version are all `RESTRICT`. Both directions are tested, because neither is visible from reading the migration.
+- `seo_indexable` defaults to **false**. A wedding invitation carries names, addresses, times and a guest list; it must not enter a search index because nobody thought to turn indexing off.
+- `invitation_status_history.changed_by` is nullable — an expiry sweep or a payment webhook has no acting user, and `NOT NULL` would force a fake actor into the audit trail.
+- `invitation_preview_tokens` and `invitation_view_counts` are included although the task card lists neither: no other schema task owns them, and the goal says the aggregate exists in full.
+- **ADR-032 closed** — `media.invitation_id` now has its foreign key, `ON DELETE CASCADE`.
+
+**Fixed** — **`docs/DATABASE/04-INVITATIONS.md` contradicted its own Notes** and is amended (ADR-033). It declared `slug VARCHAR(50) UNIQUE` while stating two sections later that a slug can be reused after the old invitation is truly deleted — which a column-level `UNIQUE` makes false. This is the second file needing the same correction after `users.email` (ADR-031): the specification used `UNIQUE` as a reflex without accounting for soft delete. `users` and `invitations` are the complete affected set.
+
+**Testing** — 93 constraint tests across three suites. Four mutation checks: dropping the `guest_count` range, the `(invitation_id, role)` uniqueness, the `seo_indexable` default, and the ADR-032 foreign key each failed exactly the tests claiming to cover them. A sweep test asserts that every table with an `updated_at` column has a trigger maintaining it — written against `information_schema` so it covers tables that do not exist yet.
+
 ### 2026-09-10 — the template catalog and media
 
 **Added** — four tables ([P0-08](./records/2026-09-10-P0-08-templates-media-schema.md))

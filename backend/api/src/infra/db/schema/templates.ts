@@ -16,6 +16,10 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { users } from "./users.ts";
+// Circular by necessity: invitations.ts imports media/templates from here, and media
+// references invitations. Drizzle's `.references(() => ...)` stores a callback rather
+// than reading the table at module-evaluation time, so the cycle resolves. See ADR-032.
+import { invitations } from "./invitations.ts";
 
 /**
  * The template catalog and the media table. `docs/DATABASE/03-TEMPLATES.md` and the
@@ -120,10 +124,10 @@ export const templateVersions = pgTable(
  * Polymorphic media. `invitation_id` NULL is what distinguishes a template asset from
  * a user upload (`docs/DATABASE/00`).
  *
- * **The `invitation_id` FOREIGN KEY is added by `P0-09`, not here** -- `invitations`
- * does not exist yet, and `template_assets` needs `media` to exist now. The column,
- * its type, its nullability and its index are all exactly as documented; only the
- * constraint arrives one migration later. See ADR-032.
+ * The `invitation_id` FOREIGN KEY was added one migration later than this table, by
+ * `P0-09` -- `invitations` did not exist when `media` was created and `template_assets`
+ * needed `media` immediately. ADR-032 records why; the end state matches
+ * `docs/DATABASE/06` exactly.
  */
 export const media = pgTable(
   "media",
@@ -131,8 +135,14 @@ export const media = pgTable(
     id: uuid("id")
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    /** FK to invitations added in P0-09 (ADR-032). Nullable by design. */
-    invitationId: uuid("invitation_id"),
+    /**
+     * Nullable by design: NULL is what marks a row as a template asset rather than a
+     * user upload. CASCADE, so deleting an invitation takes its media with it instead
+     * of leaving rows pointing at nothing.
+     */
+    invitationId: uuid("invitation_id").references(() => invitations.id, {
+      onDelete: "cascade",
+    }),
     uploadedBy: uuid("uploaded_by").references(() => users.id),
     purpose: varchar("purpose", { length: 30 }).notNull(),
     /**

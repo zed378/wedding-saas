@@ -21,3 +21,6 @@ export * from "./users.ts";
 
 // P0-08 — the template catalog and media. docs/DATABASE/03 and 06.
 export * from "./templates.ts";
+
+// P0-09 — the invitation aggregate. docs/DATABASE/04, 05, 06, 09 and 11.
+export * from "./invitations.ts";

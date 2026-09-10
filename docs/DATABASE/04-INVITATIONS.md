@@ -9,7 +9,7 @@ CREATE TABLE invitations (
   template_version_id        UUID NOT NULL REFERENCES template_versions(id) ON DELETE RESTRICT,
   status                     VARCHAR(20) NOT NULL DEFAULT 'draft'
                               CHECK (status IN ('draft','pending_payment','paid','published','expired','soft_deleted')),
-  slug                        VARCHAR(50) UNIQUE,
+  slug                        VARCHAR(50),                     -- uniqueness via idx_invitations_slug below, not a column constraint
   published_at                TIMESTAMPTZ,
   expiry_date                  DATE,
   created_at                   TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -81,5 +81,5 @@ CREATE TABLE invitation_custom_domains (
 ```
 
 ## Notes
-- The `slug` unique constraint only applies to rows where `deleted_at IS NULL` (partial unique index) so a slug can be reused after the old invitation is truly deleted.
+- The `slug` unique constraint only applies to rows where `deleted_at IS NULL` (partial unique index) so a slug can be reused after the old invitation is truly deleted. **The column carries no `UNIQUE` of its own** — it was removed in `P0-09` (ADR-033, following ADR-031 for `users.email`). A column-level `UNIQUE` covers soft-deleted rows too, which would make the partial index unreachable and this very sentence false.
 - Every `status` transition MUST write a new row to `invitation_status_history` (see PLAN/06-INVITATION-LIFECYCLE.md) — done at the service layer, not via a DB trigger, so `changed_by`/`reason` can be filled from the application context.
