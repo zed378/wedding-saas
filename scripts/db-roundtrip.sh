@@ -116,6 +116,24 @@ denied=$(docker compose -f deploy/docker-compose.yml exec -T postgres \
   psql -U wedding_app -d wedding -c "CREATE TABLE must_not_exist(id int);" 2>&1 | grep -c 'permission denied' || true)
 expect "wedding_app cannot create tables" "1" "$denied"
 
+# audit_logs is append-only by permission (P0-10, docs/DATABASE/10). Asserted here as
+# well as in the test suite because the migration applies it from a DO block that skips
+# silently when the role is missing -- this proves it survived a migration from empty,
+# which is the path a real deployment takes.
+grants=$(q "SELECT string_agg(privilege_type, ',' ORDER BY privilege_type)
+              FROM information_schema.role_table_grants
+             WHERE grantee = 'wedding_app' AND table_name = 'audit_logs';")
+expect "audit_logs grants INSERT+SELECT only" "INSERT,SELECT" "$grants"
+
+# ---------------------------------------------------------------- reseed
+# The down migrations drop packages and addons, so a round trip leaves the database
+# with no master price rows -- and the orders integration suite then fails in a way
+# that looks like a schema bug. Leave the database usable.
+echo
+echo "== reseed"
+(cd "$API" && node src/infra/db/seed.mts >/dev/null 2>&1) || true
+expect "master price tables reseeded" "1"   "$(q "SELECT count(*) FROM packages WHERE is_active;")"
+
 # ---------------------------------------------------------------- verdict
 echo
 if [ "$fails" -eq 0 ]; then

@@ -10,6 +10,20 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — the commercial tables, and the schema is complete
+
+**Added** — five tables ([P0-10](./records/2026-09-10-P0-10-orders-payments-schema.md))
+- `packages`, `addons`, `orders`, `payments`, `audit_logs`, matching `docs/DATABASE/07`, `08` and `10`. **Phase 0's schema is now complete at 28 tables.**
+- **`UNIQUE (provider, provider_reference_id)` is the entire webhook idempotency story.** A provider retrying a delivery is normal traffic, not an error, and this lives in the database rather than in application code because a guarantee depending on every future handler remembering to check first is not a guarantee. The `ON CONFLICT DO NOTHING` upsert the service will use is verified here, so `P3-05` builds on something tested.
+- **`audit_logs` is append-only by permission**, not by convention: the migration revokes `UPDATE` and `DELETE` from the application role. An audit trail the application can rewrite is not an audit trail — the code an attacker would be running is exactly the actor it exists to constrain. The revoke is scoped, and a test proves ordinary tables are still writable.
+- `signature_valid` is a nullable three-state, so a forged callback is **recorded** rather than dropped. A spike in `false` is an alerting condition (`docs/DEVOPS/07`), and you cannot alert on rows you threw away.
+- Money is `BIGINT` rupiah in all four price and amount columns, asserted by type rather than trusted. `orders.amount_total` is a snapshot: a test changes the package price and confirms existing orders are untouched.
+- Seeded per ADR-023: one active package, `standard`, Rp 139,000, 12 months, 200 photos, no watermark. Both addons ship **inactive** — `custom_domain` is not sellable until `P7-01` (ADR-022), and `extended_validity` is redundant beside a 12-month package.
+
+**Fixed** — `scripts/db-roundtrip.sh` now reseeds the master price tables and asserts the append-only grant. The `0004` down migration drops `packages`, so a round trip previously left the orders suite failing on a missing package — a failure that looks like a schema bug and is not.
+
+**Testing** — 123 constraint tests across four suites. The append-only tests connect as the **application role**; run as the owner they would pass whether or not the revoke ever happened. Two mutation checks: granting `UPDATE`/`DELETE` back, and narrowing the payments unique index, each failed exactly the tests claiming to cover them.
+
 ### 2026-09-10 — the invitation aggregate
 
 **Added** — thirteen tables ([P0-09](./records/2026-09-10-P0-09-invitations-schema.md))

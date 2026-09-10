@@ -17,7 +17,10 @@ import { MIGRATIONS_FOLDER, assertMigrationsFolder } from "./paths.mts";
 async function main(): Promise<void> {
   assertMigrationsFolder();
   const env = loadMigrationEnv();
-  const pool = new Pool({ connectionString: env.MIGRATION_DATABASE_URL, max: 1 });
+  const pool = new Pool({
+    connectionString: env.MIGRATION_DATABASE_URL,
+    max: 1,
+  });
 
   try {
     const { rows } = await pool.query<{ db: string; usr: string }>(
@@ -33,7 +36,9 @@ async function main(): Promise<void> {
     const applied = await pool.query<{ n: string }>(
       "SELECT count(*)::text AS n FROM drizzle.__drizzle_migrations",
     );
-    console.log(`ok - ${applied.rows[0]?.n ?? "?"} migration(s) recorded as applied`);
+    console.log(
+      `ok - ${applied.rows[0]?.n ?? "?"} migration(s) recorded as applied`,
+    );
   } finally {
     await pool.end();
   }

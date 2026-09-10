@@ -22,6 +22,23 @@ Nothing on the board is `BLOCKED`. The remaining questions shape work rather tha
 
 ## Open Questions — Remaining
 
+### OQ-18 — Should "one pending order per invitation" be a database constraint?
+
+**Affects**: `P3-01` — not blocking; the schema ships exactly as documented.
+
+`docs/DATABASE/07` § Notes calls this an **application-level** constraint, checked in the service before insert and reported as `ACTIVE_ORDER_EXISTS` (`docs/API/06`).
+
+A partial unique index would make it structural:
+
+```sql
+CREATE UNIQUE INDEX idx_orders_one_pending
+  ON orders(invitation_id) WHERE status = 'pending';
+```
+
+The argument for adding it: a race between two checkout requests can pass the service check twice and create two pending orders, each with its own payment intent. The argument against: the database would then reject the second insert with an opaque `23505` where the API contract specifies a named error, so the service check is still needed and the constraint only changes what happens when it is bypassed.
+
+`P0-10` left it out rather than deviating from the document. Decide in `P3-01`, when the checkout race is real rather than hypothetical — the answer is probably "both", with the service check for the message and the index for the guarantee.
+
 ### OQ-17 — `invitations.template_id` is denormalized alongside `template_version_id`
 
 **Affects**: `P0-11`, `P2-*` — not blocking; the schema ships exactly as documented.

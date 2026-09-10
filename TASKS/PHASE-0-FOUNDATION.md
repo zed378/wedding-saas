@@ -343,7 +343,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-10 |
 | **Depends on** | P0-09 |
 | **Spec refs** | `docs/DATABASE/07-ORDERS.md`, `docs/DATABASE/08-PAYMENTS.md`, `docs/DATABASE/10-AUDIT-LOGS.md`, `docs/SECURITY/07-PAYMENT-SECURITY.md` |
 | **Spec required** | Yes — data model, payment |
@@ -359,6 +359,16 @@
 5. Create `audit_logs` with its three indexes, and revoke `UPDATE`/`DELETE` on it from the application database role — `docs/DATABASE/10` § Policy asks for append-only enforcement at the permission level where possible.
 6. Seed `packages` and `addons` as a **seed**, not a migration, with the values from `OQ-05`. Until pricing is answered, seed the shape from `docs/PLAN/09` § Packages with placeholder amounts and mark them clearly. Seed `custom_domain` with `is_active = false` (ADR-022) — it is not sellable until `P7-01` ships the feature.
 7. Write tests: inserting a duplicate `(provider, provider_reference_id)` is rejected; an `UPDATE` on `audit_logs` from the application role fails; an order cannot reference a non-existent package.
+
+**Done — 30 tests, 123 across four suites.** Both load-bearing constraints were mutation-checked: granting `UPDATE`/`DELETE` back on `audit_logs` failed 2 tests, and narrowing the payments unique index to the reference alone failed 2 more.
+
+**The append-only tests connect as `wedding_app`, not the owner.** A permission test run as the owner passes whether or not the `REVOKE` ever happened — which would make it worse than no test. `applicationPool()` in `test/integration/helpers.ts` exists for this.
+
+**The `REVOKE` is guarded on the role existing** and raises a `NOTICE` either way, so a deployment whose application role has a different name does not fail the migration but also does not pass silently. `P0-23` must check for that notice.
+
+**`scripts/db-roundtrip.sh` now reseeds.** The `0004` down migration drops `packages`, so a round trip used to leave the orders suite failing on a missing `standard` package — which looks like a schema bug and is not. The script also asserts the append-only grant survived a migration from empty.
+
+**Phase 0's schema is complete: 28 tables.** The next schema change is a real migration against real data, where expand-contract and the destructive-migration gate start to matter. Everything so far has been `CREATE`.
 
 **Definition of Done**
 - [ ] All five tables match `docs/DATABASE/07`, `08` and `10`.
