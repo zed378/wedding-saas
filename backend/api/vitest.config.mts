@@ -9,6 +9,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // *.itest.ts is deliberately absent: those need a real database and run under
+    // vitest.integration.config.mts. `pnpm test` must work with nothing started.
     include: ['test/**/*.spec.ts', 'src/**/*.spec.ts'],
     setupFiles: ['./test/env.setup.ts'],
   },

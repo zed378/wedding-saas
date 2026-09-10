@@ -3,7 +3,7 @@
 ```sql
 CREATE TABLE users (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email               VARCHAR(255) NOT NULL UNIQUE,
+  email               VARCHAR(255) NOT NULL,      -- uniqueness via idx_users_email below, not a column constraint
   password_hash       VARCHAR(255),              -- NULL if OAuth-only login
   full_name           VARCHAR(100) NOT NULL,
   phone               VARCHAR(20),
@@ -20,6 +20,14 @@ CREATE TABLE users (
 CREATE UNIQUE INDEX idx_users_email ON users(email) WHERE deleted_at IS NULL;
 CREATE INDEX idx_users_oauth ON users(oauth_provider, oauth_subject_id) WHERE oauth_provider IS NOT NULL;
 ```
+
+> **Email uniqueness is enforced only by `idx_users_email`** — deliberately not by a
+> column-level `UNIQUE` (amended in `P0-07`, ADR-031). A column constraint applies to
+> every row including soft-deleted ones, which would make the partial index unreachable
+> and hold a deleted account's address hostage until the hard delete ran days later
+> (SECURITY/09). The two cannot both be in force; the partial index is the one that
+> matches the intent.
+
 
 ## Supporting Tables
 ```sql

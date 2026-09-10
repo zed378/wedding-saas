@@ -63,7 +63,7 @@
 4. Decide monorepo versus separate repositories. `docs/FRONTEND/00` § Project Structure assumes shared packages (`ui`, `template-renderer`, `api-client`, `schema`) — the renderer in particular is shared between the editor preview and the public page (`docs/FRONTEND/04`), so a monorepo is the path of least resistance.
 5. Choose the queue technology, the cache client, and the object storage SDK, consistent with `docs/ARCHITECTURE/05`, `06`, `07`.
 6. Choose the payment provider for the MVP — Midtrans or Xendit (`OQ-02`). This is a Phase 3 dependency but a Phase 0 decision, because `docs/BACKEND/05` and `docs/SECURITY/07` describe provider-specific signature verification.
-7. Choose hosting, object storage, email provider, maps provider and CAPTCHA vendor (`OQ-03`, `OQ-04`, `OQ-06`, `OQ-09`) — each is a dependency of a later phase and cheapest to decide once, here.
+7. Choose hosting, object storage, email provider, maps provider and CAPTCHA vendor (`OQ-03`, `OQ-04`, `OQ-06`, `OQ-15`) — each is a dependency of a later phase and cheapest to decide once, here.
 8. Write one ADR per decision in `MEMORY/DECISIONS.md`, each naming at least one rejected alternative and why.
 
 **Definition of Done**
@@ -244,7 +244,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-10 |
 | **Depends on** | P0-06 |
 | **Spec refs** | `docs/DATABASE/02-USERS.md`, `docs/DATABASE/00-DATA-MODEL.md` § Principles |
 | **Spec required** | Yes — data model |
@@ -259,10 +259,16 @@
 4. Write integration tests that prove the constraints exist rather than assuming the migration ran: a duplicate active email is rejected; the same email is accepted once the first row is soft-deleted; a `role` outside the CHECK list is rejected; a `refresh_tokens` row cascades away with its user.
 
 **Definition of Done**
-- [ ] Columns, types, defaults, CHECK constraints and indexes match `docs/DATABASE/02` exactly.
-- [ ] `password_hash` is nullable, since OAuth-only users have none.
-- [ ] Constraint behaviour is proven by integration tests, not by reading the migration.
-- [ ] Any deviation is recorded as an ADR **and** `docs/DATABASE/02` is amended in the same change.
+- [x] Columns, types, defaults, CHECK constraints and indexes match `docs/DATABASE/02` exactly — one deliberate difference, ADR-031.
+- [x] `password_hash` is nullable — asserted, not assumed.
+- [x] Constraint behaviour proven by 22 integration tests. Three were **mutation-checked**: dropping `idx_users_email`, `users_role_check` and the `updated_at` trigger each failed exactly the tests that claim to cover them, then were restored.
+- [x] The deviation is an ADR **and** `docs/DATABASE/02-USERS.md` is amended in the same change.
+
+**A contradiction in the spec, found and resolved (ADR-031).** `docs/DATABASE/02` defined email uniqueness twice and incompatibly: `email VARCHAR(255) NOT NULL UNIQUE` *and* `CREATE UNIQUE INDEX ... WHERE deleted_at IS NULL`. A column-level `UNIQUE` covers soft-deleted rows, which makes the partial index unreachable and holds a deleted account's address until the hard delete runs — contradicting this card's own goal and the retention model in `docs/SECURITY/09`. The partial index wins; the column constraint is gone.
+
+**Six tables, not three.** Step 1 names three; `docs/DATABASE/02` also defines `user_tokens`, `user_mfa_factors` and `user_recovery_codes` under auth support, and the DoD requires matching the document. Shipping three would leave `P1-04` and `P5-02` adding tables from tasks that are not about schema.
+
+**Integration tests run separately** (`pnpm --filter @wi/api test:integration`) against a running container, and **fail rather than skip** when none is reachable. They are deliberately **not** in `scripts/verify.sh`, which must work with nothing started — so nothing forces them to run. `P0-19` should close that when Testcontainers removes the precondition.
 
 ---
 
