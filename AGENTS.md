@@ -122,7 +122,15 @@ pnpm --filter @wi/api start  # API from dist/
 
 Copy `.env.example` to `.env` first. The API validates its environment at startup and exits **78** naming every offending variable rather than failing later on the request that needed it (`backend/api/src/config/env.schema.ts`).
 
-The local service stack — PostgreSQL, Redis, MinIO, Mailpit, ClamAV — arrives with `P0-05`.
+**Local service stack**
+
+```bash
+docker compose -f deploy/docker-compose.yml up -d          # postgres, redis, minio, mailpit, api
+docker compose -f deploy/docker-compose.yml --profile media up -d   # adds ClamAV (slow first start)
+docker compose -f deploy/docker-compose.yml down           # add -v to discard the data volumes
+```
+
+Host ports are overridable when something already holds one — `REDIS_PORT=56379 docker compose … up -d`. See `deploy/README.md`.
 
 Repository layout — **`backend/`, `frontend/`, `admin/`, `packages/`**, not `apps/`. `docs/FRONTEND/00` § Project Structure still describes `apps/`; the code deliberately deviates and the document was deliberately left unamended at the project owner's instruction (ADR-027). Trust the layout below.
 

@@ -1,0 +1,25 @@
+# Docker reads .dockerignore from the ROOT OF THE BUILD CONTEXT, not from beside the
+# Dockerfile. Every image here is built with the repository root as context (the workspace
+# has to be available), so this file must live here -- a copy next to a Dockerfile is
+# silently ignored, and the symptom is host node_modules landing in the image and
+# overwriting the symlink farm pnpm created inside it.
+
+**/node_modules
+**/dist
+**/.turbo
+**/coverage
+**/*.tsbuildinfo
+
+.git
+.github
+.githooks
+
+# Not needed to build an image, and large.
+docs
+TASKS
+MEMORY
+
+# Never, under any circumstances.
+**/.env
+**/.env.*
+!**/.env.example

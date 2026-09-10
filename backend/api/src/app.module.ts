@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, type NestModule } from "@nestjs/common";
 import { ConfigModule } from "./config/config.module";
+import { HealthController } from "./http/health.controller";
 import { RequestIdMiddleware } from "./http/request-id.middleware";
 import { ReferenceModule } from "./modules/_reference/reference.module";
 
@@ -23,6 +24,7 @@ import { ReferenceModule } from "./modules/_reference/reference.module";
  * than route-scoped. Everything route-scoped is applied below.
  */
 @Module({
+  controllers: [HealthController],
   imports: [
     ConfigModule,
     // Scaffolding, not a feature. Removed once a real module exists on each surface.

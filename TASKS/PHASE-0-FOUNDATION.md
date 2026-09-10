@@ -178,7 +178,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-10 |
 | **Depends on** | P0-04 |
 | **Spec refs** | `docs/DEVOPS/02-CONTAINERIZATION.md`, `docs/DEVOPS/00-ENVIRONMENTS.md`, `docs/ARCHITECTURE/05-STORAGE-ARCHITECTURE.md` |
 | **Spec required** | No |
@@ -194,12 +194,16 @@
 5. Write `.env.example` documenting every variable with safe placeholders; the real `.env` stays git-ignored.
 6. Gate startup ordering on health checks, so the API waits for Postgres and Redis to be genuinely ready rather than merely started.
 
-**Definition of Done**
-- [ ] `docker compose up` from a clean checkout yields an API answering `/health`.
-- [ ] Runtime containers run as a non-root user.
-- [ ] No secret value appears in any committed file — only placeholders.
-- [ ] Both storage buckets exist and are private; an unauthenticated GET against a bucket object URL is refused.
-- [ ] `AGENTS.md` § Dev environment documents the real command.
+**Definition of Done** — each item checked against the running stack, not read off the file.
+- [x] `docker compose up` yields an API answering `/health` — `{"status":"ok"}` from the host, container reporting `healthy`.
+- [x] Runtime containers run as a non-root user — `node`, uid 1000.
+- [x] No secret value appears in any committed file — only local-development credentials, labelled as such in the compose header and `deploy/README.md`.
+- [x] Both storage buckets exist and are private — both listed `private`; unauthenticated GET returns **403**.
+- [x] `AGENTS.md` § Dev environment documents the real command.
+
+**Deferred from step 1**: the worker has no compose service until `P0-15` — there are no jobs to run, and a container that starts and idles is noise. Named in the compose file rather than left to be noticed.
+
+**Borrowed from `P0-13`**: a minimal `/health` (liveness only, touches no dependency) was added here because the container healthcheck needs one. `P0-13` still owns readiness, and the compose gate should move to it then.
 
 ---
 

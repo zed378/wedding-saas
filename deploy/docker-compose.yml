@@ -1,0 +1,152 @@
+# Local development stack (docs/DEVOPS/02-CONTAINERIZATION.md, P0-05).
+#
+#   docker compose -f deploy/docker-compose.yml up -d
+#
+# Image tags are pinned rather than `latest`: a moving tag means the stack can change
+# under you between two runs, which is exactly the "works on my machine" variable this
+# file exists to remove (docs/DEVOPS/02, SECURITY §15 supply chain).
+#
+# ClamAV sits behind a profile because it downloads a signature database on first start
+# and holds around a gigabyte of memory. Nothing needs it before P1-18, and a stack that
+# is slow to start is a stack people stop starting:
+#
+#   docker compose -f deploy/docker-compose.yml --profile media up -d
+
+# Host ports are overridable so the stack can coexist with whatever else is already
+# listening. A hardcoded port turns "something else uses 1025" into "the stack will not
+# start", which is the opposite of what this file is for. Container ports are fixed; only
+# the host side moves:
+#
+#   MAILPIT_SMTP_PORT=2025 docker compose -f deploy/docker-compose.yml up -d
+
+# The credentials below are local-development values, deliberately committed so the stack
+# starts with one command. They are not secrets and must never appear in any other
+# environment: staging and production read theirs from the secret store (P0-18,
+# docs/DEVOPS/00-ENVIRONMENTS.md). A `.env` file is git-ignored and stays that way.
+
+name: wedding-invitation
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: wedding_owner
+      POSTGRES_PASSWORD: wedding_owner_dev
+      POSTGRES_DB: wedding
+    ports: ["${POSTGRES_PORT:-5432}:5432"]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wedding_owner -d wedding"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    # Cache, rate limiting AND the job queue share this instance (ADR-009), so it is
+    # started with persistence rather than as a pure cache: losing the queue on restart
+    # would lose enqueued media processing and notifications.
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["${REDIS_PORT:-6379}:6379"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:RELEASE.2025-01-20T14-49-07Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: minio_dev
+      MINIO_ROOT_PASSWORD: minio_dev_password
+    ports:
+      - "${MINIO_PORT:-9000}:9000" # S3 API
+      - "${MINIO_CONSOLE_PORT:-9001}:9001" # console
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # One-shot: creates the two buckets from docs/ARCHITECTURE/05 and leaves both PRIVATE.
+  # Public access is only ever through the CDN with origin access control -- a bucket
+  # readable directly by URL would make every uploaded photo enumerable.
+  minio-init:
+    image: minio/minio:RELEASE.2025-01-20T14-49-07Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minio_dev minio_dev_password &&
+      mc mb --ignore-existing local/user-media &&
+      mc mb --ignore-existing local/template-assets &&
+      mc anonymous set none local/user-media &&
+      mc anonymous set none local/template-assets &&
+      echo 'buckets ready (private)'
+      "
+    restart: "no"
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    # Phase 1 sends verification and reset email; it has to land somewhere visible.
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025" # SMTP
+      - "${MAILPIT_UI_PORT:-8025}:8025" # web UI
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  clamav:
+    image: clamav/clamav:1.4
+    profiles: ["media"]
+    ports: ["${CLAMAV_PORT:-3310}:3310"]
+    volumes:
+      - clamav-data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  api:
+    build:
+      context: ..
+      dockerfile: backend/api/Dockerfile
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      APP_ORIGIN: http://localhost:3001
+      PUBLIC_INVITE_ORIGIN: http://localhost:3002
+      ADMIN_ORIGIN: http://localhost:3003
+      # Reserved until the task that uses them (see .env.example):
+      #   DATABASE_URL  P0-06   postgres://wedding_app:wedding_app_dev@postgres:5432/wedding
+      #   REDIS_URL     P0-15   redis://redis:6379
+    ports: ["${API_PORT:-3000}:3000"]
+    depends_on:
+      # Waits for genuinely ready, not merely started. `service_started` would race the
+      # first query against a database still running its init scripts.
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+  # worker: wired by P0-15, when there are jobs to run.
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+  clamav-data:

@@ -10,6 +10,18 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-10 — the local stack runs
+
+**Added** — `deploy/` and the local environment ([P0-05](./records/2026-09-10-P0-05-local-environment.md))
+- `docker compose -f deploy/docker-compose.yml up -d` brings up PostgreSQL, Redis, MinIO, Mailpit and the API. The API waits for its dependencies to report **healthy**, not merely started.
+- Multi-stage API image: non-root runtime with no package manager, no source and no dev dependencies. Healthcheck runs the app's own runtime rather than adding curl to the image.
+- **Two things set up before there is anything to protect.** The application connects as a role that does not own its tables and has neither `SUPERUSER` nor `BYPASSRLS` — the moment row-level policies exist, an owner connection would bypass every one of them and no test would fail. Both storage buckets are created private; an unauthenticated GET returns 403, verified.
+- ClamAV sits behind a compose profile: it holds about a gigabyte and nothing needs it before `P1-18`. A stack that is slow to start is a stack people stop starting.
+- Host ports are overridable — forced by three real collisions (1025, 8025, 6379) on the development machine. A hardcoded host port turns "something else uses 6379" into "the stack will not start".
+- A minimal `/health` (liveness only) was added ahead of `P0-13`, because the container healthcheck needs one. `P0-13` still owns readiness.
+
+**Fixed** — `.dockerignore` was beside the `Dockerfile`, where Docker never reads it. Every image builds from the repository root, so it belongs there; until it was moved, host `node_modules` was copied into the image and overwrote pnpm's symlink farm, failing as `MODULE_NOT_FOUND` on `tsc`.
+
 ### 2026-09-10 — surfaces separated
 
 **Changed** — repository layout ([P0-25](./records/2026-09-10-P0-25-surface-directories.md), [ADR-027](./DECISIONS.md))
