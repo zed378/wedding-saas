@@ -1147,3 +1147,73 @@ The reference template (`P0-21`) will use `rounded` and `default`, so the invent
 **Specification impact** — None yet. If OQ-20 is answered, `docs/PLAN/07` § Theme Variables should gain the vocabularies so the next reader does not have to find this ADR.
 
 ---
+### ADR-039 — Design tokens are CSS, not a JavaScript config
+
+**Date** 2026-09-11 · **Status** Accepted · **Task** `P0-22`
+
+**Context** — `docs/UI-UX/06` makes the token set "the single source of truth for application UI components" and `docs/FRONTEND/00` names "utility-first CSS (Tailwind) + design tokens". Three applications consume them: `web-app` and `public-invite` on Next.js, `admin` on Vite.
+
+The conventional arrangement is a `tailwind.config.js` exporting a theme object, imported by each app, plus a parallel set of CSS custom properties for anything Tailwind cannot express. That is two declarations of every value.
+
+**Decision** — The tokens live in `packages/ui/src/tokens.css` as a Tailwind v4 `@theme` block, and nothing else declares a colour, size or spacing value.
+
+Tailwind v4 reads `@theme` and does two things with it: emits every entry as a custom property on `:root`, and generates the utility classes named after it. So `bg-primary-600`, `var(--color-primary-600)` and the value in the file are the same declaration — they cannot disagree, because there is only one.
+
+A **semantic layer** sits on top: `--color-surface`, `--color-text`, `--color-border-strong`. Components reference those, never a ramp step. That is the structure `docs/UI-UX/08` § Dark Mode asks to be left possible — "all the tokens above have a paired dark variant whose structure is already planned in the design tokens (not hard-coded colors per component)" — so a dark theme becomes a second block of definitions with no component touched.
+
+**Alternatives considered**
+
+- **A JavaScript config object.** Rejected: two declarations, and the CSS half is the one that drifts because nothing type-checks it.
+- **Plain CSS with hand-written classes, no Tailwind.** Tempting for a package, and rejected because `docs/FRONTEND/00` names Tailwind and because the arbitrary-value escape hatch (`bg-[#fff]`) is the exact thing `scripts/check-design-tokens.mjs` can grep for. A bespoke class system gives the guard nothing to look at.
+
+**Consequences** — Every app imports one stylesheet. `admin` and `web-app` import `@wi/ui/tokens.css`; **`public-invite` deliberately does not** — it imports bare Tailwind, because an invitation's colours come from `template_versions.theme` and inheriting the dashboard's indigo would give every wedding the same palette.
+
+`scripts/check-design-tokens.mjs` enforces the rule mechanically, with `tokens.css` itself exempt. A rule forbidding colours in the file whose job is declaring colours would be incoherent.
+
+**Specification impact** — None.
+
+---
+### ADR-040 — `@wi/ui` is an ESM package, so `"use client"` survives compilation
+
+**Date** 2026-09-11 · **Status** Accepted · **Task** `P0-22`
+
+**Context** — Next.js's App Router renders on the server by default. A component holding state, using a ref, or receiving an event handler must declare `"use client"` as the **first statement** in its module.
+
+Every other package in this repository emits CommonJS. `tsc` prepends `"use strict"` to a CommonJS module, which puts it in front of `"use client"`, and Next then does not see the directive at all. The symptom is a build error naming the app, not the library.
+
+**Decision** — `packages/ui` sets `"type": "module"`. ESM output carries no `"use strict"` prologue, so the directive stays first.
+
+Two further consequences were forced by the same rule and are worth recording:
+
+1. **Only the interactive components carry the directive.** `Badge`, `Card`, `Skeleton`, `Avatar`, `Stepper` and `Spinner` render on the server; marking them would pull them into the client bundle for nothing.
+2. **`InteractiveCard` and `buttonClassName` moved out of their original files.** Anything exported from a client module is unreachable from the server — *including a pure function*. The home page renders a `<Link>` styled as a button, and the build failed with "Attempted to call buttonClassName() from the server". The class recipe now lives in `button-class.ts` with no directive, and `InteractiveCard` in its own file so `Card` can stay on the server.
+
+**Alternatives considered**
+
+- **Ship source and let each app transpile it.** `transpilePackages` is configured anyway, but the package's imports use NodeNext `.js` specifiers, which bundlers do not rewrite to `.tsx`. It would have meant changing every import in the package to suit one consumer.
+- **Put `"use client"` on the barrel.** It does not work: the directive applies per module, and the barrel re-exporting a server component does not make it one.
+
+**Consequences** — `@wi/ui` is ESM while the backend packages are CommonJS. That is not an inconsistency to tidy up: the backend runs on Node and the UI package is consumed only by bundlers, and the two have different correct answers.
+
+**Specification impact** — None.
+
+---
+### ADR-041 — The component workbench is a route in the app, not Storybook
+
+**Date** 2026-09-11 · **Status** Accepted · **Task** `P0-22`
+
+**Context** — `P0-22` step 8 asks for "a component workbench (Storybook or equivalent) with an axe check per story".
+
+**Decision** — `frontend/web-app/src/app/workbench` renders every component in every state, each wrapped in a `<section data-story="...">`. `e2e/tests/workbench.e2e.ts` enumerates those sections from the DOM and runs axe against each one.
+
+**Why not Storybook** — It is a second build, a second dev server, a second set of framework adapters, and a second place a component can be configured differently from how it ships. Its axe addon audits Storybook's rendering, not the application's.
+
+A route inside the real app is compiled by the app's build, uses the app's stylesheet and the app's token values, and is audited by the E2E harness `P0-19` already built — **in a real browser**, which is the only environment where `color-contrast` can run at all. The jsdom pass in `@wi/ui` disables that rule because jsdom has no layout engine.
+
+**Consequences** — This is not a free choice; it has a cost that the task's own findings demonstrate. The browser pass caught a contrast failure (`Dropzone`'s `opacity-60` blending to 4.49:1) that neither the jsdom axe pass nor the arithmetic token test could see, because neither renders pixels. Storybook would have caught it too. What it would not have caught is that the failure is in what the app actually ships.
+
+The stories are read from the DOM rather than from a list, so adding a component to the workbench is what puts it under the browser audit — and nothing else does. That is the rule, and it is written at the top of both files.
+
+**Specification impact** — None. `docs/UI-UX/17` § Testing asks for "axe-core/Lighthouse accessibility audit in CI for key pages"; this is that, for the component library.
+
+---

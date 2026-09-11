@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      The admin panel is never indexed and never previewed. It is behind authentication
+      on its own hostname (docs/SECURITY/02); a crawler reaching it would find a login
+      form and nothing else, and listing that serves nobody.
+    -->
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Admin · Undangan Digital</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

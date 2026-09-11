@@ -10,6 +10,20 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-11 — the product has a face
+
+**Added** — three applications and one design system ([P0-22](./records/2026-09-11-P0-22-frontend-skeletons-design-system.md))
+- **`packages/ui`** — the tokens from `docs/UI-UX/06`–`09` as a single Tailwind v4 `@theme` block, so the utility class, the CSS variable and the declared value cannot disagree; plus the thirteen core components with every state `docs/UI-UX/06` lists.
+- **`packages/api-client`** — the centralised interceptor from `docs/FRONTEND/08`, and an access token that lives in a closure variable with no persistent branch to configure wrongly. Six concurrent 401s share one refresh, because a rotating refresh token would treat the other five as theft.
+- **`web-app`**, **`public-invite`** (server-rendered `/[slug]`, as `docs/FRONTEND/07` requires) and **`admin`** (a separate Vite app on its own trust boundary, `docs/SECURITY/02`).
+- **A component workbench** at `/workbench`, audited by axe in a real browser, per component — not Storybook, so it audits what actually ships (ADR-041).
+
+**Fixed before anyone saw them** — three token choices failed WCAG AA on the first run of the contrast test. The worst was the control border at **1.48:1** on white, which is the most common accessibility defect in modern form design and a WCAG 2.1 § 1.4.11 failure. `--color-border` and `--color-border-strong` exist as two tokens because of it.
+
+**Worth knowing** — the browser pass caught a contrast failure at **4.49:1** that neither the jsdom axe pass nor the arithmetic token test could see: `opacity` on a disabled state blends to a colour nobody declared and no test can check. Disabled states now use chosen colours.
+
+**Blocked** — `P0-23` (staging, hosts, TLS) is marked BLOCKED rather than TODO. It needs a provisioned VPS, DNS control for `zedth.my.id` and Cloudflare credentials; its whole point is proving TLS and host routing against the real hostnames, and a simulation would report green while proving nothing.
+
 ### 2026-09-10 — the product has a template
 
 **Added** — Elegant Rose v1.0.0 and its demo ([P0-21](./records/2026-09-10-P0-21-reference-template-and-demo.md))

@@ -824,7 +824,7 @@ Raised by `P0-15`, which shipped the worker with a logger carrying the comment "
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-11 |
 | **Depends on** | P0-02 |
 | **Spec refs** | `docs/UI-UX/06-DESIGN-SYSTEM.md`, `docs/UI-UX/07-TYPOGRAPHY.md`, `docs/UI-UX/08-COLOR-SYSTEM.md`, `docs/UI-UX/09-SPACING-GRID.md`, `docs/FRONTEND/00-FRONTEND-STANDARDS.md` |
 | **Spec required** | No |
@@ -843,11 +843,19 @@ Raised by `P0-15`, which shipped the worker with a logger carrying the comment "
 8. Add a component workbench (Storybook or equivalent) with an axe check per story.
 
 **Definition of Done**
-- [ ] Three apps build and serve a page.
-- [ ] No colour, font size or spacing value is hard-coded in an app; a lint rule enforces token use.
-- [ ] Every core component has all states and passes an automated accessibility check.
-- [ ] The API client has no code path that writes an access token to persistent storage.
-- [ ] The status badge map exists in exactly one place.
+- [x] `web-app` prerenders `/` and `/workbench`; `public-invite` **server-renders `/[slug]` on demand**, which is what `docs/FRONTEND/07` requires and not merely what it builds; `admin` builds a 228 kB bundle.
+- [x] `scripts/check-design-tokens.mjs`, blocking in `verify.sh` and on push, mutation-verified. A script rather than an ESLint rule because `P0-17` is deferred (ADR-028) — it blocks today and moves later in one edit.
+- [x] All thirteen components, audited twice: axe per component in jsdom, and axe per story in a **real browser**, which is the only place `color-contrast` can run at all.
+- [x] Proven two ways: the package's own test reads its source with comments stripped and asserts no storage API appears in an executable line, and `scripts/check-token-storage.mjs` extends that to the other 132 files.
+- [x] `Badge.tsx`, with a test that every status `docs/DATABASE/04`'s CHECK constraint allows has a presentation — the status list transcribed by hand, not generated from the map it checks.
+
+**The browser pass earned its place immediately.** `Dropzone`'s disabled state used `opacity-60`, which axe blends to 4.49:1 — one hundredth under the 4.5:1 `docs/UI-UX/08` requires. Neither the jsdom axe pass (no layout engine, colour rules disabled) nor the arithmetic token test (nobody declares a blend) could see it. Disabled states now use chosen colours, in `Dropzone` and in `Field`, and both pairs are measured.
+
+**Three token choices failed contrast on the first run**, the worst being `neutral-300` as the control border at **1.48:1** on white — the most common accessibility defect in modern form design, and a WCAG 2.1 § 1.4.11 failure. That is why there are two border tokens: `--color-border` separates things and has no floor; `--color-border-strong` is the boundary of a control and holds 3:1.
+
+**Storybook was not used**, which the card allows ("or equivalent"). The workbench is a route in the real app, so it is compiled by the app's build with the app's tokens and audited by the `P0-19` harness in a real browser (ADR-041). The cost is stated there: a component with no story is a component the browser audit never sees.
+
+**`public-invite` deliberately does not import the design tokens.** `docs/UI-UX/07` and `08` both describe application chrome; an invitation's palette is per-template data (`docs/PLAN/07`). Importing them would give every wedding the dashboard's indigo.
 
 ---
 
@@ -855,13 +863,19 @@ Raised by `P0-15`, which shipped the worker with a logger carrying the comment "
 
 | | |
 |---|---|
-| **Status** | TODO — domain and address strategy decided (ADR-024) |
+| **Status** | **BLOCKED** — needs infrastructure nobody has provisioned yet (see below); addressing decided (ADR-024) |
 | **Depends on** | P0-17 |
 | **Spec refs** | `docs/DEVOPS/00-ENVIRONMENTS.md`, `docs/ARCHITECTURE/08-DEPLOYMENT-ARCHITECTURE.md`, `docs/DEVOPS/03-REVERSE-PROXY.md`, `docs/PLAN/10-DOMAIN-PUBLISHING.md` |
 | **Spec required** | No |
 | **Surface** | infra |
 
 **Goal** — A staging environment that mirrors production's topology, including the host and path routing the product's publishing model depends on.
+
+**What it is blocked on** — not a task, but access. Every step needs something that does not exist in the repository and cannot be created from it: a provisioned VPS in Singapore or Jakarta (ADR-015), control of DNS for `zedth.my.id`, and a Cloudflare account for the CDN, DNS and Turnstile. Steps 3 and 7 are specifically about proving TLS issuance and host routing **against the real hostnames**, which is the entire reason the task sits in Phase 0 — a simulation of it would prove nothing and would report green.
+
+Everything that could be built without that infrastructure already has been: `deploy/docker-compose.yml` is the topology (`P0-05`), `deploy/helm/` is the Kubernetes path (`P0-26`), and the three applications it would serve are built (`P0-22`). What remains is provisioning and verification, in that order.
+
+**Unblocking it** takes the VPS, the DNS zone and the Cloudflare credentials. It does **not** wait on `P0-17`: CI is deferred (ADR-028), so step 5 becomes a manual deploy until it is picked up.
 
 **Why addressing belongs in Phase 0** — `docs/PLAN/10` (as amended by ADR-024) publishes invitations at `invitation.zedth.my.id/{slug}`, with the application on `app.zedth.my.id`. If routing and certificates are only set up in Phase 3 alongside publishing, the first time anyone discovers a DNS or TLS problem is the week publishing is supposed to ship.
 

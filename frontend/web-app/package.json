@@ -3,16 +3,28 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "echo \"[P0-22] build not wired yet\"",
-    "dev": "echo \"[P0-22] dev not wired yet\"",
-    "lint": "echo \"[P0-22] lint not wired yet\"",
-    "typecheck": "echo \"[P0-22] typecheck not wired yet\"",
-    "test": "echo \"[P0-19] tests not wired yet\""
+    "build": "next build",
+    "dev": "next dev --port 3100",
+    "start": "next start --port 3100",
+    "lint": "echo \"[P0-17] lint not wired yet\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "echo \"[P0-22] no unit tests here yet -- the components are tested in @wi/ui\""
   },
   "dependencies": {
+    "@wi/api-client": "workspace:*",
     "@wi/schema": "workspace:*",
     "@wi/template-renderer": "workspace:*",
     "@wi/ui": "workspace:*",
-    "@wi/api-client": "workspace:*"
+    "next": "^16.3.4",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "tailwindcss": "^4.3.3",
+    "@tailwindcss/postcss": "^4.3.3",
+    "typescript": "^7.0.2"
   }
 }

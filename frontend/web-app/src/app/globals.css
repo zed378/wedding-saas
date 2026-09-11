@@ -1,0 +1,13 @@
+/*
+ * The one stylesheet the app imports.
+ *
+ * `@wi/ui/tokens.css` pulls in Tailwind and declares the `@theme`, so every utility in
+ * this app is generated from the same token values the component library uses. There is
+ * no second theme and no per-app override -- `docs/UI-UX/06` makes the token set "the
+ * single source of truth for application UI components", and two sources would not be
+ * one.
+ */
+@import "@wi/ui/tokens.css";
+
+/* Scan this app's own source for utility classes, in addition to @wi/ui's. */
+@source "../";

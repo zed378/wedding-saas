@@ -1,5 +1,17 @@
 {
   "extends": "../tsconfig.base.json",
-  "compilerOptions": { "noEmit": true, "types": ["node"] },
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    /*
+     * The DOM lib is here because `page.evaluate()` callbacks are compiled as part of
+     * this project but RUN IN THE BROWSER. `document`, `HTMLButtonElement` and the rest
+     * are real at runtime and must be real to the type checker too -- without this,
+     * every accessibility assertion that inspects the live DOM is a compile error, and
+     * the alternative (casting through `any`) would remove the checking exactly where
+     * the tests are most fiddly.
+     */
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
+  },
   "include": ["tests/**/*", "*.ts", "playwright.config.ts"]
 }

@@ -9,11 +9,20 @@ import { defineConfig, devices } from "@playwright/test";
  * and a suite that is slow is a suite people stop running. The full matrix belongs to a
  * pre-release check (`P6-*`), which is where cross-browser differences actually matter.
  *
- * NOTE ON SCOPE: `P0-22` builds the frontends. Until then the only thing E2E can
- * genuinely exercise is the API over HTTP, and the accessibility suite runs against a
- * fixture page rather than a real one. Both are real tests -- they would fail if the
- * runner were misconfigured -- but neither is auditing a page a user will see. That is
- * stated here rather than left for someone to discover from a green tick.
+ * SCOPE, as of `P0-22`: the suite now audits a real page. `workbench.e2e.ts` drives the
+ * running `web-app` and runs axe over every component in every state -- which is the only
+ * place `color-contrast` can run at all, because the jsdom pass in `@wi/ui` has no layout
+ * engine and disables that rule.
+ *
+ * `accessibility.e2e.ts` keeps its fixture pair regardless. The broken fixture is the
+ * negative control that proves the axe harness is doing something, and it stays useful
+ * exactly because it is not a real page: a real page gets fixed, and a control that gets
+ * fixed stops being a control.
+ *
+ * Two servers have to be up, and the suite says nothing useful if they are not:
+ *
+ *   docker compose -f deploy/docker-compose.yml up -d       # the API, for api-health
+ *   pnpm --filter @wi/web-app build && pnpm --filter @wi/web-app start   # for workbench
  */
 
 const fullMatrix = process.env["E2E_FULL_MATRIX"] === "1";
