@@ -2,7 +2,7 @@
 
 A SaaS platform for creating and publishing digital wedding invitations from versioned, data-driven templates: template catalogue → editor with live preview → checkout → publish → a public invitation page with RSVP and a guestbook, plus an admin panel.
 
-An invitation is published at `https://invitation.zedth.my.id/{slug}`.
+An invitation is published at `https://invitation.vizunicum.my.id/{slug}`.
 
 ## Where things are
 
@@ -26,10 +26,10 @@ backend/
   worker/          Background jobs: media, general, cron pools (docs/BACKEND/08)
 
 frontend/
-  web-app/         Next.js — marketing, auth, dashboard, editor, checkout   → app.zedth.my.id
-  public-invite/   Next.js — the public invitation, server-rendered          → invitation.zedth.my.id
+  web-app/         Next.js — marketing, auth, dashboard, editor, checkout   → app.vizunicum.my.id
+  public-invite/   Next.js — the public invitation, server-rendered          → invitation.vizunicum.my.id
 
-admin/             Vite + React — admin panel, static build                  → admin.zedth.my.id
+admin/             Vite + React — admin panel, static build                  → admin.vizunicum.my.id
 
 packages/
   schema/              Zod schemas, the canonical field-path registry, the dot-notation resolver

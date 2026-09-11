@@ -5,7 +5,7 @@
 An invitation is published at a **path on a fixed hostname**:
 
 ```
-https://invitation.zedth.my.id/{slug}
+https://invitation.vizunicum.my.id/{slug}
 ```
 
 There is **no wildcard DNS record and no wildcard certificate** at MVP. See MEMORY ADR-024 for the reasoning; the short version is that programmatic DNS management is not in place yet, and a wildcard is precisely the thing that needs it.
@@ -15,13 +15,15 @@ There is **no wildcard DNS record and no wildcard certificate** at MVP. See MEMO
 
 ### Hostnames
 
-Three fixed hostnames, no wildcards, each added when the surface that needs it is built:
+Three fixed hostnames, no wildcards, each added when the surface that needs it is built.
+
+The domain is `vizunicum.my.id`, on Cloudflare since 2026-09-10 (ADR-042 — it replaced `zedth.my.id`, which ADR-024 had assumed). **None of the three records exist yet**; all three are created by `P0-23`.
 
 | Host | Serves | Added at |
 |---|---|---|
-| `invitation.zedth.my.id` | Public invitations at `/{slug}`, share previews at `/preview/{token}`, and `/public/*` proxied to the API so guest submissions stay same-origin | exists today |
-| `app.zedth.my.id` | Marketing, catalogue, auth, dashboard, editor, checkout, plus `/api/v1/*` and `/api/webhooks/*` | Phase 0 (`P0-23`) |
-| `admin.zedth.my.id` | Admin panel and the admin API paths it proxies | Phase 5 (`P5-01`) |
+| `invitation.vizunicum.my.id` | Public invitations at `/{slug}`, share previews at `/preview/{token}`, and `/public/*` proxied to the API so guest submissions stay same-origin | Phase 0 (`P0-23`) |
+| `app.vizunicum.my.id` | Marketing, catalogue, auth, dashboard, editor, checkout, plus `/api/v1/*` and `/api/webhooks/*` | Phase 0 (`P0-23`) |
+| `admin.vizunicum.my.id` | Admin panel and the admin API paths it proxies | Phase 5 (`P5-01`) |
 
 **The public host serves nothing but invitations.** Guest-submitted content (RSVP names, guestbook messages) is rendered there, and keeping it on its own origin means a stored XSS that survives sanitization cannot act against the authenticated application — the browser's same-origin policy contains it. Under the original wildcard design every invitation had its own origin and this came for free; on a shared host it has to be a deliberate arrangement. SECURITY/02-TRUST-BOUNDARIES.md depends on it.
 
@@ -34,7 +36,7 @@ Because invitations sit at the root of their host, any other route on that host 
 
 ### Migration to per-invitation subdomains
 
-The target remains `{slug}.invitation.zedth.my.id`, reached once a Cloudflare API token can create records against the tunnel. This is the same capability the Phase 2 custom domain feature needs, so the work is shared rather than duplicated.
+The target remains `{slug}.invitation.vizunicum.my.id`, reached once a Cloudflare API token can create records against the tunnel. This is the same capability the Phase 2 custom domain feature needs, so the work is shared rather than duplicated.
 
 Slug resolution is implemented **once**, reading the slug from either a path segment or the `Host` header according to configuration (BACKEND/06-PUBLISHING.md). Migration is then a configuration change plus DNS, with one hard requirement:
 

@@ -37,8 +37,8 @@ backup)
 - Media processing (CPU-intensive) should ideally be in a separate worker pool from the email/notification worker so they don't starve each other's resources.
 
 ## TLS/SSL
-- **MVP: three fixed hostnames, three certificates, no wildcard** — `invitation.zedth.my.id` (public invitations, path-based), `app.zedth.my.id` (application and API), `admin.zedth.my.id` (admin, from Phase 5). Issued and renewed automatically by the origin proxy (MEMORY ADR-015, ADR-024).
-- A wildcard certificate for `*.invitation.zedth.my.id` arrives with the migration to per-invitation subdomains, which needs programmatic DNS.
+- **MVP: three fixed hostnames, three certificates, no wildcard** — `invitation.vizunicum.my.id` (public invitations, path-based), `app.vizunicum.my.id` (application and API), `admin.vizunicum.my.id` (admin, from Phase 5). Issued and renewed automatically by the origin proxy (MEMORY ADR-015, ADR-024).
+- A wildcard certificate for `*.invitation.vizunicum.my.id` arrives with the migration to per-invitation subdomains, which needs programmatic DNS.
 - Custom domain (Phase 2): on-demand SSL provisioning per domain (see PLAN/10-DOMAIN-PUBLISHING.md) — the same capability as the wildcard migration.
 
 ## Zero-downtime Deployment

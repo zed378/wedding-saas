@@ -51,7 +51,7 @@ The values in `docker-compose.yml` are local-development credentials, deliberate
 
 ### Two things the stack does on purpose
 
-**The application connects as a role that does not own its tables**, with neither `SUPERUSER` nor `BYPASSRLS` (`postgres/init/01-app-role.sql`). This matters before there is anything to protect: the moment row-level policies exist, a superuser or table-owner connection would bypass every one of them and no test would fail. The migration role and the application role are separate for the same reason.
+**The application connects as a role that does not own its tables**, with neither `SUPERUSER` nor `BYPASSRLS` (`postgres/init/01-app-role.sh`). This matters before there is anything to protect: the moment row-level policies exist, a superuser or table-owner connection would bypass every one of them and no test would fail. The migration role and the application role are separate for the same reason.
 
 **Both object storage buckets are created private** (`user-media`, `template-assets`, per `docs/ARCHITECTURE/05`). Public reads only ever go through a CDN with origin access control — a bucket readable directly by URL makes every uploaded photo enumerable, which is exactly what `docs/SECURITY/06` § Storage isolation is guarding against. Verified: an unauthenticated `GET` against either bucket returns 403.
 

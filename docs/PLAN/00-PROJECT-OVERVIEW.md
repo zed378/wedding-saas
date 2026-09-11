@@ -15,7 +15,7 @@ Enable engaged couples to create, publish, and share digital wedding invitations
 - Professional digital invitations without needing a designer/developer.
 - Templates can be customized (not just text content, but sections, colors, limited layout).
 - Complete wedding features: RSVP, digital gift envelope (bank account/e-wallet), gallery, maps, countdown, guestbook.
-- Publish to a free address on the platform's domain (`invitation.zedth.my.id/{slug}` at MVP — see PLAN/10-DOMAIN-PUBLISHING.md), with a custom domain planned for Phase 2.
+- Publish to a free address on the platform's domain (`invitation.vizunicum.my.id/{slug}` at MVP — see PLAN/10-DOMAIN-PUBLISHING.md), with a custom domain planned for Phase 2.
 
 ## Business Model
 - **Freemium/Pay-per-invitation**: a user holds **one free draft** (watermarked preview, cannot publish) → pays **once** to publish.
@@ -30,7 +30,7 @@ Enable engaged couples to create, publish, and share digital wedding invitations
 3. Invitation editor (couple info, event, gallery, maps, gift/bank account, quote, RSVP, guestbook).
 4. Real-time preview (desktop & mobile).
 5. Checkout & payment (minimum 1 local payment gateway — Midtrans/Xendit).
-6. Publish to a platform address (`invitation.zedth.my.id/{slug}` at MVP — see PLAN/10-DOMAIN-PUBLISHING.md).
+6. Publish to a platform address (`invitation.vizunicum.my.id/{slug}` at MVP — see PLAN/10-DOMAIN-PUBLISHING.md).
 7. Public invitation page (mobile-first, responsive, shareable link).
 8. Public RSVP & guestbook (stored, viewable by the owner).
 9. Basic admin panel (manage users, orders, templates, moderation).

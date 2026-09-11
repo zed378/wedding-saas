@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 /**
  * P0-22 — the invitation route, as a shell.
  *
- * `P0-23`'s DoD requires that `invitation.zedth.my.id/{slug}` "reaches the public-invite
+ * `P0-23`'s DoD requires that `invitation.vizunicum.my.id/{slug}` "reaches the public-invite
  * app over HTTPS with the slug available to the handler". This is the handler, and it is
  * the thing that proves the routing end to end before publishing exists to depend on it.
  *

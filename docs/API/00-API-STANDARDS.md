@@ -1,8 +1,8 @@
 # 00 - API Standards
 
 ## Base URL & Versioning
-- `https://app.zedth.my.id/api/v1/...` for the authenticated/internal API.
-- `https://invitation.zedth.my.id/public/...` for the public API (no auth: get a public invitation, submit RSVP/guestbook). It is proxied to the same backend, but served from the public invitation host so a guest's submission is same-origin with the page they are reading (PLAN/10, SECURITY/02).
+- `https://app.vizunicum.my.id/api/v1/...` for the authenticated/internal API.
+- `https://invitation.vizunicum.my.id/public/...` for the public API (no auth: get a public invitation, submit RSVP/guestbook). It is proxied to the same backend, but served from the public invitation host so a guest's submission is same-origin with the page they are reading (PLAN/10, SECURITY/02).
 - Version in the path (`/v1/`) — breaking changes require a new version (`/v2/`), the old version is kept for at least 6 months.
 
 ## Format

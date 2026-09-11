@@ -2,7 +2,7 @@
 
 Marketing, template catalogue, authentication, dashboard, editor and checkout. Next.js.
 
-**Host**: `app.zedth.my.id`.
+**Host**: `app.vizunicum.my.id`.
 
 **Governed by**: `docs/FRONTEND/` (standards, routing, state, forms, editor),
 `docs/UI-UX/` (design system, editor UX, checkout UX).

@@ -16,7 +16,7 @@
 
 ## Public Invitation App (separate, SSR)
 
-Served on its own hostname, `invitation.zedth.my.id` (PLAN/10-DOMAIN-PUBLISHING.md, MEMORY ADR-024):
+Served on its own hostname, `invitation.vizunicum.my.id` (PLAN/10-DOMAIN-PUBLISHING.md, MEMORY ADR-024):
 
 ```
 /{slug}             The invitation
@@ -28,7 +28,7 @@ Everything else on this host is a 404. That is deliberate: with invitations at t
 
 Resolution is **path-based at MVP** and moves to host-based later without a rewrite — the slug is read by a configured strategy (BACKEND/06-PUBLISHING.md). Path URLs will redirect permanently to subdomain URLs when that happens.
 
-The authenticated application lives on a different hostname (`app.zedth.my.id`). Keeping guest-submitted content on its own origin is a security boundary, not a cosmetic split (SECURITY/02).
+The authenticated application lives on a different hostname (`app.vizunicum.my.id`). Keeping guest-submitted content on its own origin is a security boundary, not a cosmetic split (SECURITY/02).
 
 ## Admin Panel
 ```
@@ -38,7 +38,7 @@ The authenticated application lives on a different hostname (`app.zedth.my.id`).
 /moderation/guestbook
 /audit-logs
 ```
-Served on its own hostname (`admin.zedth.my.id`) with its own cookie scope — conventional internal routing within it (SECURITY/02 boundary 3→4).
+Served on its own hostname (`admin.vizunicum.my.id`) with its own cookie scope — conventional internal routing within it (SECURITY/02 boundary 3→4).
 
 ## Route Guards
 - Protected route: redirect to `/login` if the token is invalid/expired, save the intended URL to redirect back after a successful login.

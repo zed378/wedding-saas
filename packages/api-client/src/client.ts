@@ -66,7 +66,7 @@ export interface RequestOptions {
 }
 
 export interface ApiClientConfig {
-  /** e.g. `https://app.zedth.my.id/api/v1`. From an env var, never hard-coded. */
+  /** e.g. `https://app.vizunicum.my.id/api/v1`. From an env var, never hard-coded. */
   readonly baseUrl: string;
   readonly tokenStore?: TokenStore;
   readonly fetch?: typeof globalThis.fetch;

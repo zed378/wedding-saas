@@ -871,25 +871,25 @@ Raised by `P0-15`, which shipped the worker with a logger carrying the comment "
 
 **Goal** — A staging environment that mirrors production's topology, including the host and path routing the product's publishing model depends on.
 
-**What it is blocked on** — not a task, but access. Every step needs something that does not exist in the repository and cannot be created from it: a provisioned VPS in Singapore or Jakarta (ADR-015), control of DNS for `zedth.my.id`, and a Cloudflare account for the CDN, DNS and Turnstile. Steps 3 and 7 are specifically about proving TLS issuance and host routing **against the real hostnames**, which is the entire reason the task sits in Phase 0 — a simulation of it would prove nothing and would report green.
+**What it is blocked on** — not a task, but access. Every step needs something that does not exist in the repository and cannot be created from it: a provisioned VPS in Singapore or Jakarta (ADR-015), control of DNS for `vizunicum.my.id`, and a Cloudflare account for the CDN, DNS and Turnstile. Steps 3 and 7 are specifically about proving TLS issuance and host routing **against the real hostnames**, which is the entire reason the task sits in Phase 0 — a simulation of it would prove nothing and would report green.
 
 Everything that could be built without that infrastructure already has been: `deploy/docker-compose.yml` is the topology (`P0-05`), `deploy/helm/` is the Kubernetes path (`P0-26`), and the three applications it would serve are built (`P0-22`). What remains is provisioning and verification, in that order.
 
 **Unblocking it** takes the VPS, the DNS zone and the Cloudflare credentials. It does **not** wait on `P0-17`: CI is deferred (ADR-028), so step 5 becomes a manual deploy until it is picked up.
 
-**Why addressing belongs in Phase 0** — `docs/PLAN/10` (as amended by ADR-024) publishes invitations at `invitation.zedth.my.id/{slug}`, with the application on `app.zedth.my.id`. If routing and certificates are only set up in Phase 3 alongside publishing, the first time anyone discovers a DNS or TLS problem is the week publishing is supposed to ship.
+**Why addressing belongs in Phase 0** — `docs/PLAN/10` (as amended by ADR-024) publishes invitations at `invitation.vizunicum.my.id/{slug}`, with the application on `app.vizunicum.my.id`. If routing and certificates are only set up in Phase 3 alongside publishing, the first time anyone discovers a DNS or TLS problem is the week publishing is supposed to ship.
 
 **Steps**
 1. Provision staging with the topology from `docs/ARCHITECTURE/08` on the target chosen in ADR-015 — a single VPS running Docker Compose behind Caddy, Cloudflare in front, R2 for object storage: reverse proxy, API, worker pools, web app, public-invite, admin static files, Postgres, Redis, ClamAV.
-2. Configure routing per `docs/DEVOPS/03`: `invitation.zedth.my.id` → public-invite (`/{slug}`, `/preview/{token}`, `/public/*` proxied to the API), `app.zedth.my.id` → web app plus `/api/*`. The admin host follows in `P5-01`. **No wildcard record** — that is deliberate (ADR-024), and the two hosts are separate so guest-submitted content never shares an origin with the authenticated application.
+2. Configure routing per `docs/DEVOPS/03`: `invitation.vizunicum.my.id` → public-invite (`/{slug}`, `/preview/{token}`, `/public/*` proxied to the API), `app.vizunicum.my.id` → web app plus `/api/*`. The admin host follows in `P5-01`. **No wildcard record** — that is deliberate (ADR-024), and the two hosts are separate so guest-submitted content never shares an origin with the authenticated application.
 3. Let Caddy issue and renew a certificate per hostname; verify renewal actually happens rather than assuming it.
 4. Apply the environment separation rules from `docs/DEVOPS/00`: sandbox payment credentials, seeded data rather than a production copy, internal access restriction.
 5. Wire the staging deploy pipeline from `P0-17`: migrate, deploy, smoke test, notify.
 6. Add synthetic uptime checks from outside the infrastructure (`docs/DEVOPS/05` § Synthetic Monitoring).
-7. Deploy a placeholder and confirm end to end that `invitation.zedth.my.id/some-slug` resolves, terminates TLS, and reaches the public-invite app with the slug available to the handler — and that `invitation.zedth.my.id/dashboard` does **not** reach the application, because that host serves only invitations.
+7. Deploy a placeholder and confirm end to end that `invitation.vizunicum.my.id/some-slug` resolves, terminates TLS, and reaches the public-invite app with the slug available to the handler — and that `invitation.vizunicum.my.id/dashboard` does **not** reach the application, because that host serves only invitations.
 
 **Definition of Done**
-- [ ] `invitation.zedth.my.id/{slug}` reaches the public-invite app over HTTPS with the slug available to the handler, and nothing else on that host reaches any other app.
+- [ ] `invitation.vizunicum.my.id/{slug}` reaches the public-invite app over HTTPS with the slug available to the handler, and nothing else on that host reaches any other app.
 - [ ] No wildcard DNS record or wildcard certificate exists — the MVP does not need one (ADR-024).
 - [ ] The application host is served separately from the public invitation host, with distinct cookie scopes; the admin host follows at `P5-01`.
 - [ ] Staging carries no production data and no live payment credentials.

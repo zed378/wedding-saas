@@ -56,6 +56,22 @@ RUN pnpm install --prefer-offline --frozen-lockfile \
  && pnpm --filter @wi/api... build \
  && pnpm --filter @wi/api --prod --legacy deploy /out
 
+# ---------------------------------------------------------------- migrator
+# Migrations run from SOURCE, not from dist: `db:migrate` executes `migrate.mts` and Node
+# strips the types itself (P0-06). The runtime image below cannot do that -- `pnpm deploy
+# --prod` leaves it with dist/ and production dependencies only -- so the one image that
+# can is this one, which is the build stage with an entrypoint.
+#
+# It is a separate target rather than a flag on the runtime image on purpose: the thing
+# that can alter the schema should not be the thing serving traffic. docs/DEVOPS/08 and
+# the two-role split in backend/api/migrations/README.md both depend on that separation,
+# and an image that could do both would make MIGRATION_DATABASE_URL reachable from the
+# process handling requests.
+FROM build AS migrator
+WORKDIR /repo/backend/api
+ENTRYPOINT ["node"]
+CMD ["src/infra/db/migrate.mts"]
+
 # ---------------------------------------------------------------- runtime
 FROM node:24-alpine AS runtime
 ENV NODE_ENV=production

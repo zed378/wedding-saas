@@ -636,7 +636,7 @@ The watermark's role narrows sharply. With no paid tier carrying one, it appears
 | | |
 |---|---|
 | **Date** | 2026-09-09 |
-| **Status** | Accepted |
+| **Status** | Accepted — **hostnames superseded by ADR-042**; the structure (path-based, three fixed hosts, no wildcard) stands unchanged |
 | **Task** | `P0-23`, `P3-11` — resolves `OQ-08` |
 | **Deciders** | Project owner |
 
@@ -1215,5 +1215,46 @@ A route inside the real app is compiled by the app's build, uses the app's style
 The stories are read from the DOM rather than from a list, so adding a component to the workbench is what puts it under the browser audit — and nothing else does. That is the rule, and it is written at the top of both files.
 
 **Specification impact** — None. `docs/UI-UX/17` § Testing asks for "axe-core/Lighthouse accessibility audit in CI for key pages"; this is that, for the component library.
+
+---
+### ADR-042 — The domain is `vizunicum.my.id`, not `zedth.my.id`
+
+**Date** 2026-09-11 · **Status** Accepted · **Task** `P0-23` · **Supersedes** the hostname table in ADR-024 · **Deciders** Project owner
+
+**Context** — ADR-024 fixed the publishing addresses on `zedth.my.id` and described `invitation.zedth.my.id` as "already in service". `P0-23` was blocked partly on DNS control; the project owner supplied a Cloudflare account token for **`vizunicum.my.id`** instead and confirmed it replaces the old domain entirely.
+
+Verified rather than assumed:
+
+| | |
+|---|---|
+| Zone | `vizunicum.my.id`, `active`, Free plan |
+| Zone ID | `2fba520cb97a047fefdd89b3e710dd0a` |
+| Nameservers | `ned.ns.cloudflare.com`, `raquel.ns.cloudflare.com` |
+| Moved from | Rumahweb (`nsid1-4.rumahweb.*`), registrar PT Digital Registra Indonesia |
+| Activated | 2026-09-10 |
+| `app` / `invitation` / `admin` | **NXDOMAIN** — none of them exist |
+
+That last row is why this is an ADR and not a find-and-replace. ADR-024 recorded one host as already serving traffic; on the new domain nothing is. `docs/PLAN/10` § Hostnames said "exists today" and was corrected in the same change.
+
+**Decision** — Every hostname becomes `*.vizunicum.my.id`:
+
+| Host | Serves | Added at |
+|---|---|---|
+| `invitation.vizunicum.my.id` | Public invitations at `/{slug}` | `P0-23` |
+| `app.vizunicum.my.id` | The application and `/api/*` | `P0-23` |
+| `admin.vizunicum.my.id` | The admin panel | `P5-01` |
+
+**Nothing else about ADR-024 changes.** Path-based publishing, three fixed hosts, no wildcard DNS, no wildcard certificate, the public host serving only invitations, and the `slug_blocklist` collision defence all stand. This is a change of domain, not of address strategy — which is why ADR-024 keeps its status and gains a pointer rather than being rewritten.
+
+**Alternatives considered**
+
+- **Keep `zedth.my.id` for production and use `vizunicum.my.id` for staging only.** Put to the project owner as an explicit option and rejected: the whole domain moves.
+- **Rewrite ADR-024 in place.** Rejected. `MEMORY/` is append-only, and an ADR edited to match the present erases the fact that the decision changed — which is the one thing a reader six months from now needs to see. The same reasoning kept `MEMORY/records/2026-09-09-pricing-and-publishing-address.md` untouched: it was accurate when written.
+
+**Consequences** — 37 files changed outside `MEMORY/`: `docs/`, `TASKS/`, the two Next configs, the Helm values, the API's config tests and the api-client. `MEMORY/` was deliberately excluded and still says `zedth.my.id` in four places, all of them historical.
+
+The domain is on Cloudflare's **Free** plan. That is fine for DNS, universal TLS and the tunnel; it does **not** include the WAF rule sets `docs/SECURITY/10` assumes for rate limiting at the edge. Not a blocker for staging — the API rate-limits itself (`P1-08`) — but production should not be planned around edge WAF rules that are not on this plan.
+
+**Specification impact** — `docs/PLAN/10` § Hostnames amended: the domain named, the provenance recorded, and "exists today" corrected to `P0-23` because it is no longer true.
 
 ---

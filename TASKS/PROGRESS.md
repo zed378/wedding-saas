@@ -10,7 +10,7 @@ Single source of truth for where the project stands. Updated in the same commit 
 
 **Specification status**: all 17 gaps resolved and `docs/` amended (ADR-018 through ADR-022). Pricing, the publishing address and the gift account data question are decided (ADR-023 through ADR-025). **No task on this board is blocked** — five open questions remain in [`BACKLOG.md`](./BACKLOG.md) and all of them shape work rather than stopping it.
 
-**Product decisions now fixed**: one package at **Rp 139,000 for 12 months**, free tier of **one draft**; invitations published at **`invitation.zedth.my.id/{slug}`** (path-based, no wildcard DNS), with per-invitation subdomains deferred to `P7-01`.
+**Product decisions now fixed**: one package at **Rp 139,000 for 12 months**, free tier of **one draft**; invitations published at **`invitation.vizunicum.my.id/{slug}`** (path-based, no wildcard DNS), with per-invitation subdomains deferred to `P7-01`.
 
 Status values: `TODO` · `BLOCKED` · `SPEC` · `WIP` · `REVIEW` · `DONE` · `DROPPED`
 Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` must be split
@@ -65,7 +65,7 @@ Roadmap: Week 1-2. Exit criteria in the phase file.
 | P0-20 | Template schema definition and validator | backend, web-app | L | **DONE** — 39 canonical field paths, a closed component registry, and one resolver both surfaces share | P0-08 |
 | P0-21 | Reference template and demo seed data | backend, web-app | L | **DONE** — one template as JSON, and a demo invitation proven publishable against it | P0-20 |
 | P0-22 | Frontend skeletons and design system | frontend | L | **DONE** — three apps, 13 components, and a browser axe pass that found a contrast bug the unit tests could not | P0-02 |
-| P0-23 | Staging, hosts and TLS | infra | L | **BLOCKED** — needs a VPS, DNS control for `zedth.my.id` and Cloudflare credentials. Addressing decided (ADR-024); does *not* wait on `P0-17` | P0-04 |
+| P0-23 | Staging, hosts and TLS | infra | L | **BLOCKED** — needs a VPS, DNS control for `vizunicum.my.id` and Cloudflare credentials. Addressing decided (ADR-024); does *not* wait on `P0-17` | P0-04 |
 | P0-24 | Adopt the TASKS/MEMORY discipline | docs | S | **DONE** | — |
 | P0-25 | Separate surfaces into backend/frontend/admin | infra | S | **DONE** | P0-02 |
 | P0-26 | Helm charts for the Kubernetes path | infra | M | **DONE** — K8s schema validation deferred to `P0-23`, no cluster reachable | P0-05 |

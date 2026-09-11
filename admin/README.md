@@ -2,7 +2,7 @@
 
 The admin panel: templates, users, orders and refunds, moderation, audit log.
 
-**Host**: `admin.zedth.my.id` — separate hostname, separate cookie scope, so an XSS in the user
+**Host**: `admin.vizunicum.my.id` — separate hostname, separate cookie scope, so an XSS in the user
 application cannot reach an admin session (`docs/SECURITY/02` boundary 3->4).
 
 Built with Vite as a static SPA, so the admin host runs no server-side JavaScript at all
