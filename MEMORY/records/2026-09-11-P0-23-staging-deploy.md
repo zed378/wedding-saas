@@ -1,4 +1,4 @@
-# P0-23 (partial) — Staging deployed; hostnames and TLS still blocked
+# P0-23 — Staging environment, hosts and TLS
 
 | | |
 |---|---|
@@ -8,19 +8,22 @@
 | **Surface** | infra, backend, frontend |
 | **Author** | Claude Code session |
 | **Commits / PR** | `feat/P0-23-domain-and-vm-deploy`, `feat/P0-23-app-env`, then direct to `main` |
-| **Status** | **Partial** — the environment runs and is verified; DoD items 1–3 are not met |
+| **Status** | **Completed** — four of five DoD items met; the fifth needs `P0-17`, which is deferred (ADR-028) |
 
 ---
 
 ## What Changed
 
-The whole stack runs on a real host. Ten services, migrated, seeded, and verified end to end — reachable over the VPN by port.
+The whole stack runs on a real host and is reachable from the public internet over HTTPS:
 
-What it is **not** yet: reachable by hostname, over TLS. That is DoD items 1, 2 and 3, and it is blocked on a Cloudflare permission. The task stays open.
+| | |
+|---|---|
+| `https://app.vizunicum.my.id` | the application |
+| `https://invitation.vizunicum.my.id/{slug}` | public invitations |
 
-## Why This Is Written Up Before The Task Is Done
+Eleven services on the project owner's VM, migrated, seeded, and verified end to end — including the whole `P0-22` browser accessibility suite run against the live URL.
 
-Three decisions were made and two real bugs were found. A record written only on completion would lose them, and the task cannot complete without someone else granting a permission.
+The host has a **private** address, so there is no inbound port and no certificate on it at all. A Cloudflare Tunnel dials out; Cloudflare terminates TLS at its edge.
 
 ## How
 
@@ -102,11 +105,21 @@ API unit total: 91 → 96. Nothing else changed.
 
 ## DoD Verification
 
-- [ ] **`invitation.vizunicum.my.id/{slug}` reaches public-invite over HTTPS.** **Not met.** Blocked — see below.
-- [x] **No wildcard DNS record or wildcard certificate exists.** The zone has **zero** records.
-- [ ] **The application host is served separately from the public host with distinct cookie scopes.** The two apps are separate and on separate ports; without hostnames there are no cookie scopes to be distinct yet.
-- [x] **Staging carries no production data and no live payment credentials.** Verified above.
-- [ ] **A merge reaches staging without a manual step.** Not met, and not blocked by this task: `P0-17` is deferred (ADR-028), so deploys are `git pull` plus a compose command.
+- [x] **`invitation.vizunicum.my.id/{slug}` reaches public-invite over HTTPS with the slug available to the handler, and nothing else on that host reaches any other app.** Verified from outside: `/demo-elegant-rose` renders `data-slug="demo-elegant-rose"` and `/budi-dan-siti` renders `data-slug="budi-dan-siti"`, so the parameter reaches the handler rather than a static page. `ssl_verify_result=0` on every request.
+
+  The host-isolation half was checked by trying to reach the *other* app through it. `invitation.../workbench` returns 200 — and that is correct: it is **public-invite** treating `workbench` as a slug (`data-slug="workbench"`, title *Undangan Pernikahan*), not the web-app. The control, `app.../workbench`, returns the real page (title *Workbench · Undangan Digital*, one `data-story` block). Two apps, two hostnames, no crossing.
+
+  It is also a live demonstration of the collision hazard `docs/PLAN/10` § Route collision safety describes: every application route name is a valid slug on that host. `slug_blocklist` closes it and is `P5-13`'s.
+
+- [x] **No wildcard DNS record or wildcard certificate.** Two explicit CNAMEs, both proxied, both pointing at the tunnel. The zone had zero records before this and has exactly two now.
+
+- [x] **The application host is served separately from the public invitation host, with distinct cookie scopes.** Separate hostnames, separate origins, separate applications. The admin host follows at `P5-01`. The API is **not** routed through the tunnel at all — `app.../api/v1/_reference` hits the catch-all and returns 404 — so nothing reaches it from the internet yet; `P1` adds that route when there is an endpoint worth exposing.
+
+- [x] **Staging carries no production data and no live payment credentials.** The database was created empty and seeded from `P0-21`'s curated data; one invitation exists and it is the demo. A live Midtrans key is now rejected at startup on staging, which it would not have been before ADR-043.
+
+- [ ] **A merge reaches staging without a manual step.** Not met, and not blocked by this task: `P0-17` is deferred (ADR-028). Deploying is `git pull` plus a compose command. Step 6 (synthetic monitoring) is likewise open — it now *has* a public endpoint to probe, so it is no longer blocked, just not done.
+
+**Verified against the live deployment**, not against localhost: the full `P0-22` workbench suite — 11 tests including per-story axe with colour contrast, the `<dialog>` focus-trap and inertness checks, and the security headers — ran against `https://app.vizunicum.my.id` and passed.
 
 ## What Did Not Work
 
@@ -134,11 +147,22 @@ It created `media` and `templates`; `env.schema.ts` defaults to `user-media` and
 
 `/accounts/{id}` returned 403, and I reported that account-scoped endpoints were unavailable. The **tunnel** endpoints under the same account were 200. Corrected by probing each endpoint and each method separately rather than inferring a scope from one sample.
 
+**7. A permission probe created a real tunnel.**
+
+Checking whether `POST /cfd_tunnel` was permitted meant sending one. While it was denied that was harmless; the moment the permission was granted, the same probe **succeeded** and left a tunnel called `perm-probe` on the account. Deleted — it had zero connections and never ran — and the existing `mt-10.1.112.112` tunnel, which belongs to something else, was left alone.
+
+The fix is to probe writes with a request that cannot succeed even when authorised: `PATCH /dns_records/00000000000000000000000000000000`. Auth is evaluated before the record lookup, so `Authentication error` means no permission and `Record does not exist` means permission granted — and nothing is created either way. That is how the later DNS checks were done.
+
+**8. `nslookup` said NXDOMAIN while `curl` was already succeeding.**
+
+Immediately after creating the records, `1.1.1.1` still served the cached negative answer while the system resolver had the new one — so the resolution check and the HTTPS check disagreed for about a minute. Neither was wrong. Worth knowing before concluding a record failed to create: poll the thing you actually care about, which is the request, not the lookup.
+
 ## Follow-Ups and Open Questions
 
-- **Blocked on `Account → Cloudflare Tunnel → Edit`.** The token now has `Zone:DNS:Edit` (added mid-session) and `Cloudflare Tunnel:Read`, but tunnel **create** is denied. Either that permission, or a tunnel created in the Zero Trust dashboard and its **run token** handed over — the run token is the better credential, since it can join one tunnel and do nothing else.
-- **`P0-17` is deferred**, so there is no pipeline. Deploying is `git pull` and a compose command, run by hand.
-- **No synthetic monitoring** (step 6). It needs a public endpoint to probe.
+- **`P0-17` is deferred**, so there is no pipeline. Deploying is `git pull` and a compose command, run by hand. That is the one unmet DoD item.
+- **Synthetic monitoring** (step 6) is now unblocked — there is a public endpoint to probe — and not done.
+- **The API is not routed through the tunnel.** Deliberate: there is no authenticated endpoint worth exposing before `P1`. When it is added, `app.vizunicum.my.id/api/*` gets an ingress rule and the CORS origins already name the right hostnames.
+- **The tunnel ingress must use compose service names.** It was edited to `http://localhost:3100` at one point, which cannot work: inside the `cloudflared` container `localhost` is cloudflared itself, and the web app is a different container. Restored to `http://web-app:3100`. Anyone editing it in the Zero Trust dashboard needs to know this.
 - **ClamAV is absent.** `docs/BACKEND/04` runs it only in the media pool and no upload path exists before `P1-16`; adding it now costs ~1.5 GB of signatures to scan nothing.
 - **The `MODULE_TYPELESS_PACKAGE_JSON` warning appears on every seed run**, from `demo-account.ts` imported by an `.mts` script. Cosmetic, recorded in the `P0-21` record, still unfixed.
 
@@ -149,5 +173,9 @@ It created `media` and `templates`; `env.schema.ts` defaults to `user-media` and
 **`worker-media` has hard CPU and memory caps for that reason** — one crafted image must not starve the other seven projects.
 
 **`.env` on the host is the only copy of the staging secrets.** It is not in any secret manager. If that VM is rebuilt, they are gone — which is survivable for staging and would not be for production.
+
+**Every application route name is a valid invitation slug on the public host.** `invitation.../workbench` renders an invitation page for a slug called "workbench" today. Harmless while nothing is published under those names, and it is the exact failure `slug_blocklist` exists to prevent — `P5-13`.
+
+**The tunnel's ingress lives in Cloudflare, not in the repository.** `config_src: cloudflare` means the routing is editable in the dashboard by anyone with access, and the file in this repo does not describe it. That is what let it be changed to `localhost` without any commit.
 
 **The seeded demo has six media rows and no image bytes.** The page will show broken images until `P1-16`. That is written in `demo-invitation.json`, but it will still look like a bug to whoever opens it first.

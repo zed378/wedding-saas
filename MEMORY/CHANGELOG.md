@@ -21,7 +21,11 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 **Changed** — **`APP_ENV` is now separate from `NODE_ENV`** (ADR-043). `docs/DEVOPS/00` defines four environments; `NODE_ENV` has three values and belongs to Node and the bundlers. Staging must run a production *build* to satisfy parity while being a non-production *environment* with sandbox credentials and seed data. The visible symptom was `db:seed` refusing to run on the one deployed environment that is required to be seeded. The quiet one was worse: **a live payment key on staging would have passed the one check `secret-rules.ts` exists for.**
 
-**Still blocked** — hostnames and TLS. The host has a private address, so the answer is a Cloudflare Tunnel; the service is wired and waiting behind `--profile tunnel`, and the supplied token can read tunnels but not create one.
+**Live** — `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, over a Cloudflare Tunnel. The host has a private address and therefore no inbound port and no certificate of its own; `cloudflared` dials out and Cloudflare terminates TLS at its edge. Two CNAMEs, no wildcard anywhere.
+
+Verified from the public internet rather than from localhost: the slug reaches the handler, the application and invitation hosts do not cross, and the full `P0-22` workbench accessibility suite — 11 tests including per-story colour contrast — passes against the live URL.
+
+The one thing still missing is automated deployment, which is `P0-17`'s and deferred (ADR-028).
 
 ### 2026-09-11 — the product has a face
 

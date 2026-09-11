@@ -863,7 +863,7 @@ Raised by `P0-15`, which shipped the worker with a logger carrying the comment "
 
 | | |
 |---|---|
-| **Status** | **PARTIAL / BLOCKED** — deployed and verified on the VM 2026-09-11; hostnames and TLS blocked on a Cloudflare permission (see below) |
+| **Status** | DONE — 2026-09-11 (4/5 DoD; automated deploy needs `P0-17`, deferred) |
 | **Depends on** | P0-17 |
 | **Spec refs** | `docs/DEVOPS/00-ENVIRONMENTS.md`, `docs/ARCHITECTURE/08-DEPLOYMENT-ARCHITECTURE.md`, `docs/DEVOPS/03-REVERSE-PROXY.md`, `docs/PLAN/10-DOMAIN-PUBLISHING.md` |
 | **Spec required** | No |
@@ -871,25 +871,17 @@ Raised by `P0-15`, which shipped the worker with a logger carrying the comment "
 
 **Goal** — A staging environment that mirrors production's topology, including the host and path routing the product's publishing model depends on.
 
-**What is done** (2026-09-11, [record](../MEMORY/records/2026-09-11-P0-23-staging-deploy.md)) — steps 1 and 4. The stack runs on the project owner's VM at `10.1.200.13`: PostgreSQL 18, Redis, MinIO, the API, three worker pools and all three frontends. Migrated with the separate `migrate` service, seeded with `P0-21`'s reference template and demo invitation, and verified end to end — `/readyz` reports the database up, all three surfaces serve, and `/demo-elegant-rose` routes to the public-invite handler.
+**Live** at `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}` ([record](../MEMORY/records/2026-09-11-P0-23-staging-deploy.md)).
 
-The domain moved to `vizunicum.my.id` (ADR-042) and `APP_ENV` split from `NODE_ENV` (ADR-043) — the second because staging must run a production *build* while being a non-production *environment*, and one variable could not say both.
+Eleven services on the project owner's VM: PostgreSQL 18, Redis, MinIO, the API, three worker pools, all three frontends and `cloudflared`. Migrated with a separate `migrate` image, seeded with `P0-21`'s reference template and demo invitation.
 
-**What it is blocked on** — one Cloudflare permission. The host has a **private** address, so Let's Encrypt HTTP-01 cannot reach it and Cloudflare cannot proxy to it; the answer is a Cloudflare Tunnel, and `deploy/docker-compose.staging.yml` has the `cloudflared` service ready behind `--profile tunnel`. The supplied token can read tunnels but not create one.
+**The host has a private address**, so there is no inbound port and no certificate on it. Caddy and Let's Encrypt do not apply — HTTP-01 cannot reach a private IP, and a renewal that fails forever trains people to ignore logs. A Cloudflare Tunnel dials out instead and Cloudflare terminates TLS at its edge.
 
-Either route unblocks it:
+Two decisions came out of deploying it: the domain moved to `vizunicum.my.id` (ADR-042), and **`APP_ENV` split from `NODE_ENV`** (ADR-043) because staging must run a production *build* while being a non-production *environment*. The second closed a real hole — keyed on `NODE_ENV`, a **live payment key on staging would have passed** the one check `secret-rules.ts` exists for.
 
-1. Add **Account → Cloudflare Tunnel → Edit** to the API token, or
-2. Create the tunnel in Zero Trust → Networks → Tunnels and hand over its **run token** — the better credential, since it joins one tunnel and can do nothing else.
+Verified from the public internet, not from localhost: the slug reaches the handler (`/demo-elegant-rose` and `/budi-dan-siti` render their own `data-slug`), the two hosts do not cross, and the full `P0-22` workbench accessibility suite — 11 tests including per-story colour contrast — passes against the live URL.
 
-Then two public hostnames in Zero Trust, which creates their DNS records in the same action:
-
-| Hostname | Service |
-|---|---|
-| `app.vizunicum.my.id` | `http://web-app:3100` |
-| `invitation.vizunicum.my.id` | `http://public-invite:3200` |
-
-**Steps 5 and 6 remain open regardless.** `P0-17` is deferred (ADR-028), so deploys are `git pull` plus a compose command; synthetic monitoring needs a public endpoint to probe.
+**The one unmet DoD item is automated deployment**, which belongs to `P0-17` (deferred, ADR-028). Deploying is `git pull` plus a compose command.
 
 **Why addressing belongs in Phase 0** — `docs/PLAN/10` (as amended by ADR-024) publishes invitations at `invitation.vizunicum.my.id/{slug}`, with the application on `app.vizunicum.my.id`. If routing and certificates are only set up in Phase 3 alongside publishing, the first time anyone discovers a DNS or TLS problem is the week publishing is supposed to ship.
 
