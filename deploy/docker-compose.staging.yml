@@ -168,7 +168,7 @@ services:
       APP_ENV: ${APP_ENV:?required}
       MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:?required}
     depends_on:
-      postgres: {condition: service_healthy}
+      postgres: { condition: service_healthy }
 
   api:
     build:

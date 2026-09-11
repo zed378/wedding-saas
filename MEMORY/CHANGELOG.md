@@ -10,6 +10,19 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-11 — it runs somewhere other than a laptop
+
+**Added** — a staging environment ([P0-23, partial](./records/2026-09-11-P0-23-staging-deploy.md))
+- Ten services on the project owner's VM: PostgreSQL 18, Redis, MinIO, the API, three worker pools and all three frontends. Migrated with a separate `migrate` image — the runtime image cannot run migrations, and the thing that can alter the schema should not be the thing serving traffic — and seeded with the reference template and demo invitation.
+- The three frontends gained Dockerfiles; both Next apps build to standalone output, and admin's runtime is nginx with no Node in it at all.
+- Secrets are generated on the host and live in a git-ignored `.env` at mode 600. None has been typed anywhere else.
+
+**Changed** — the domain is `vizunicum.my.id` (ADR-042). `zedth.my.id` is gone from everything except `MEMORY/`, which keeps it because it was true when written. ADR-024 keeps its text and gains a forward pointer.
+
+**Changed** — **`APP_ENV` is now separate from `NODE_ENV`** (ADR-043). `docs/DEVOPS/00` defines four environments; `NODE_ENV` has three values and belongs to Node and the bundlers. Staging must run a production *build* to satisfy parity while being a non-production *environment* with sandbox credentials and seed data. The visible symptom was `db:seed` refusing to run on the one deployed environment that is required to be seeded. The quiet one was worse: **a live payment key on staging would have passed the one check `secret-rules.ts` exists for.**
+
+**Still blocked** — hostnames and TLS. The host has a private address, so the answer is a Cloudflare Tunnel; the service is wired and waiting behind `--profile tunnel`, and the supplied token can read tunnels but not create one.
+
 ### 2026-09-11 — the product has a face
 
 **Added** — three applications and one design system ([P0-22](./records/2026-09-11-P0-22-frontend-skeletons-design-system.md))

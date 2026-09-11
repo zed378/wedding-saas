@@ -863,7 +863,7 @@ Raised by `P0-15`, which shipped the worker with a logger carrying the comment "
 
 | | |
 |---|---|
-| **Status** | **BLOCKED** — needs infrastructure nobody has provisioned yet (see below); addressing decided (ADR-024) |
+| **Status** | **PARTIAL / BLOCKED** — deployed and verified on the VM 2026-09-11; hostnames and TLS blocked on a Cloudflare permission (see below) |
 | **Depends on** | P0-17 |
 | **Spec refs** | `docs/DEVOPS/00-ENVIRONMENTS.md`, `docs/ARCHITECTURE/08-DEPLOYMENT-ARCHITECTURE.md`, `docs/DEVOPS/03-REVERSE-PROXY.md`, `docs/PLAN/10-DOMAIN-PUBLISHING.md` |
 | **Spec required** | No |
@@ -871,11 +871,25 @@ Raised by `P0-15`, which shipped the worker with a logger carrying the comment "
 
 **Goal** — A staging environment that mirrors production's topology, including the host and path routing the product's publishing model depends on.
 
-**What it is blocked on** — not a task, but access. Every step needs something that does not exist in the repository and cannot be created from it: a provisioned VPS in Singapore or Jakarta (ADR-015), control of DNS for `vizunicum.my.id`, and a Cloudflare account for the CDN, DNS and Turnstile. Steps 3 and 7 are specifically about proving TLS issuance and host routing **against the real hostnames**, which is the entire reason the task sits in Phase 0 — a simulation of it would prove nothing and would report green.
+**What is done** (2026-09-11, [record](../MEMORY/records/2026-09-11-P0-23-staging-deploy.md)) — steps 1 and 4. The stack runs on the project owner's VM at `10.1.200.13`: PostgreSQL 18, Redis, MinIO, the API, three worker pools and all three frontends. Migrated with the separate `migrate` service, seeded with `P0-21`'s reference template and demo invitation, and verified end to end — `/readyz` reports the database up, all three surfaces serve, and `/demo-elegant-rose` routes to the public-invite handler.
 
-Everything that could be built without that infrastructure already has been: `deploy/docker-compose.yml` is the topology (`P0-05`), `deploy/helm/` is the Kubernetes path (`P0-26`), and the three applications it would serve are built (`P0-22`). What remains is provisioning and verification, in that order.
+The domain moved to `vizunicum.my.id` (ADR-042) and `APP_ENV` split from `NODE_ENV` (ADR-043) — the second because staging must run a production *build* while being a non-production *environment*, and one variable could not say both.
 
-**Unblocking it** takes the VPS, the DNS zone and the Cloudflare credentials. It does **not** wait on `P0-17`: CI is deferred (ADR-028), so step 5 becomes a manual deploy until it is picked up.
+**What it is blocked on** — one Cloudflare permission. The host has a **private** address, so Let's Encrypt HTTP-01 cannot reach it and Cloudflare cannot proxy to it; the answer is a Cloudflare Tunnel, and `deploy/docker-compose.staging.yml` has the `cloudflared` service ready behind `--profile tunnel`. The supplied token can read tunnels but not create one.
+
+Either route unblocks it:
+
+1. Add **Account → Cloudflare Tunnel → Edit** to the API token, or
+2. Create the tunnel in Zero Trust → Networks → Tunnels and hand over its **run token** — the better credential, since it joins one tunnel and can do nothing else.
+
+Then two public hostnames in Zero Trust, which creates their DNS records in the same action:
+
+| Hostname | Service |
+|---|---|
+| `app.vizunicum.my.id` | `http://web-app:3100` |
+| `invitation.vizunicum.my.id` | `http://public-invite:3200` |
+
+**Steps 5 and 6 remain open regardless.** `P0-17` is deferred (ADR-028), so deploys are `git pull` plus a compose command; synthetic monitoring needs a public endpoint to probe.
 
 **Why addressing belongs in Phase 0** — `docs/PLAN/10` (as amended by ADR-024) publishes invitations at `invitation.vizunicum.my.id/{slug}`, with the application on `app.vizunicum.my.id`. If routing and certificates are only set up in Phase 3 alongside publishing, the first time anyone discovers a DNS or TLS problem is the week publishing is supposed to ship.
 

@@ -3,7 +3,7 @@
 Single source of truth for where the project stands. Updated in the same commit as the work it describes (`00-TASK-CONVENTIONS.md` global DoD item 11).
 
 **Last updated**: 2026-09-10
-**Current phase**: Phase 0 — Foundation (25 / 27 done; the two remaining are `P0-17`, deferred by ADR-028, and `P0-23`, blocked on infrastructure nobody has provisioned). **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
+**Current phase**: Phase 0 — Foundation (25 / 27 done). `P0-17` is deferred (ADR-028). `P0-23` is **partially delivered**: the staging stack runs on the VM at `10.1.200.13` — ten services, migrated, seeded, verified — but its hostnames and TLS are blocked on one Cloudflare permission (`Account → Cloudflare Tunnel → Edit`), so its first three DoD items are not met. **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
 **Overall**: 25 / 136 tasks done
 
 **No automated pipeline**: `P0-17` is deferred (ADR-028). Before merging to `main`, run `scripts/verify.sh`. The `:id`-endpoint gate blocks in `.githooks/pre-push`; integration tests, the coverage floor, SAST and dependency scanning are **not** running anywhere until `P0-17` is picked up — revisit before Phase 3 payment code.
@@ -65,7 +65,7 @@ Roadmap: Week 1-2. Exit criteria in the phase file.
 | P0-20 | Template schema definition and validator | backend, web-app | L | **DONE** — 39 canonical field paths, a closed component registry, and one resolver both surfaces share | P0-08 |
 | P0-21 | Reference template and demo seed data | backend, web-app | L | **DONE** — one template as JSON, and a demo invitation proven publishable against it | P0-20 |
 | P0-22 | Frontend skeletons and design system | frontend | L | **DONE** — three apps, 13 components, and a browser axe pass that found a contrast bug the unit tests could not | P0-02 |
-| P0-23 | Staging, hosts and TLS | infra | L | **BLOCKED** — needs a VPS, DNS control for `vizunicum.my.id` and Cloudflare credentials. Addressing decided (ADR-024); does *not* wait on `P0-17` | P0-04 |
+| P0-23 | Staging, hosts and TLS | infra | L | **PARTIAL / BLOCKED** — deployed, migrated, seeded and verified on the VM; hostnames and TLS need `Account → Cloudflare Tunnel → Edit` or a tunnel run token | P0-04 |
 | P0-24 | Adopt the TASKS/MEMORY discipline | docs | S | **DONE** | — |
 | P0-25 | Separate surfaces into backend/frontend/admin | infra | S | **DONE** | P0-02 |
 | P0-26 | Helm charts for the Kubernetes path | infra | M | **DONE** — K8s schema validation deferred to `P0-23`, no cluster reachable | P0-05 |
