@@ -278,7 +278,15 @@ services:
     restart: unless-stopped
     command: ["tunnel", "--no-autoupdate", "run"]
     environment:
-      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?required with --profile tunnel}
+      # `:-` and not `:?`. Compose interpolates EVERY service in the file, including
+      # ones behind an inactive profile, so `:?required` here made `up` fail for the
+      # whole stack whenever the tunnel was not in use -- which is most of the time and
+      # was exactly how this was found.
+      #
+      # An empty value reaches cloudflared instead, and it exits immediately saying the
+      # token is not valid. A worse message in a rarer case, in exchange for the common
+      # case working at all.
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
     depends_on:
       api: { condition: service_healthy }
 
