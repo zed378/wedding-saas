@@ -1297,3 +1297,73 @@ The four `NODE_ENV: "staging"` lines in `secret-rules.spec.ts` became `APP_ENV: 
 **Specification impact** — None. `docs/DEVOPS/00` already described four environments; the code now has a way to say which one it is.
 
 ---
+### ADR-044 — The breached-password check fails open, loudly
+
+**Date** 2026-09-11 · **Status** Accepted · **Task** `P1-01`
+
+**Context** — `docs/SECURITY/03` § Password recommends checking a new password "against a list of common/breached passwords (e.g., via the haveibeenpwned k-anonymity API)". It does not say what to do when that API cannot be reached, and `P1-01` step 4 requires the answer to be decided and recorded rather than defaulted into.
+
+The check sits on the registration path and on password change. Both are moments a user is actively waiting.
+
+**Decision** — **Fail open, and emit a security event every time.**
+
+An unreachable API, a timeout, a non-200, or a body that does not parse all produce `{ status: "unavailable" }`, the password is accepted on the strength of the remaining rules, and `logSecurityEvent("auth.breach_check_unavailable", …)` fires at `warn`.
+
+`checkBreached` reports `unavailable` as a **distinct value** from `safe`. That is the load-bearing part: folding them together would make the caller unable to tell a clean bill of health from a control that is switched off, and the fail-open decision would become unobservable by construction.
+
+**Alternatives considered**
+
+- **Fail closed.** Rejected. It blocks a couple from registering during a third party's outage, for a control the specification itself calls *recommended* — while the controls it makes mandatory (minimum length, and `P1-07`'s five-attempts-per-fifteen-minutes) keep working. A wedding invitation is bought once, often late at night, often on a phone; "try again later" is a lost customer for a reason they will never understand.
+- **Fail open silently.** The default if nobody thinks about it, and the reason this is an ADR. A control that can be down for a month without anyone knowing is not a control.
+- **Queue the check and validate asynchronously.** Rejected: by then the password is stored, and the only remaining action is emailing the user to say their password is bad — which is worse for them than a rejection at the moment they chose it.
+
+**Consequences** — During an HIBP outage, weak-but-long passwords that are not the user's own name will be accepted. That is the accepted cost, bounded by the other rules.
+
+The security event is the compensating control and it is only as good as whoever watches it. `docs/DEVOPS/07` § Alerting has no rule for it yet; `P0-17`/`P6` should add one, because a warn-level line nobody alerts on is the silent failure this ADR exists to avoid, one step removed.
+
+The check is deliberately **not** run at login. Holding a plaintext password against a third-party call on the hottest auth path buys nothing: the account already exists, and the only available action is one the user did not ask for.
+
+**Specification impact** — None. `docs/SECURITY/03` left this open; it is now decided.
+
+---
+### ADR-045 — argon2id at 64 MiB, t=3, p=1, measured on the deployment host
+
+**Date** 2026-09-11 · **Status** Accepted · **Task** `P1-01`
+
+**Context** — `docs/SECURITY/03` § Password requires argon2id (or bcrypt ≥ 12) but names no parameters. `P1-01` step 2 asks for them to be "measured on hardware resembling the deployment target rather than copying values from a blog post".
+
+The deployment target exists as of `P0-23`, so this was measured on it rather than on something resembling it: Ubuntu 24.04, 4 cores, 15 GiB, inside `node:24-alpine` with `--cpus 4`. Median of five hashes after a warm-up:
+
+| memory | t | p | median |
+|---|---|---|---|
+| 32 MiB | 2 | 1 | 94 ms |
+| 32 MiB | 3 | 1 | 126 ms |
+| 64 MiB | 2 | 1 | 195 ms |
+| **64 MiB** | **3** | **1** | **277 ms** |
+| 64 MiB | 3 | 2 | 162 ms |
+| 64 MiB | 4 | 1 | 359 ms |
+| 128 MiB | 3 | 1 | 580 ms |
+
+**Decision** — `memoryCost: 65536` (64 MiB), `timeCost: 3`, `parallelism: 1`, argon2id.
+
+**Over three times OWASP's floor on the dimension that matters.** The current OWASP minimum for argon2id is m=19 MiB, t=2, p=1. Memory is what makes argon2 expensive to attack on a GPU, so it is where the budget goes.
+
+**277 ms is affordable *here*.** A wedding invitation service sees logins per minute, not per second — a couple signs in, edits, and leaves. With `P1-07`'s rate limiting the sustained hash rate an attacker can force is negligible. On a service with a morning login storm this would be the wrong number, which is why the measurement and the reasoning are recorded together rather than just the values.
+
+**p=1 although p=2 is faster.** 64 MiB/t=3/p=2 is 162 ms, but parallelism spends *cores per hash*, and this host has four shared with eight other compose projects. One core per login is predictable; two makes concurrent logins contend with everything else on the box. Latency is not the binding constraint.
+
+**Alternatives considered**
+
+- **128 MiB.** 580 ms, and 128 MiB of resident memory per concurrent login on a shared 15 GiB host. The memory pressure is the real objection, not the latency.
+- **bcrypt cost 12**, the documented fallback. Rejected: it has no memory-hardness parameter at all, which is the property being bought here.
+- **Copy OWASP's numbers unmeasured.** They would have been *lower* than these, and nobody would have known whether the host could afford more.
+
+**Consequences** — Raising these later does not rehash what already exists. `needsRehash` is implemented and exported for that, and `P1-03` is the only place it can be used — the sole moment a plaintext password and a stored hash are both in hand. That obligation is written into `password.service.ts` beside the function rather than left to be rediscovered.
+
+The encoded hash is 97 characters, verified against the `varchar(255)` column in `docs/DATABASE/02` by a test rather than by arithmetic.
+
+If production ever runs on materially different hardware, re-measure. These numbers are a property of that host, not of the algorithm.
+
+**Specification impact** — None. `docs/SECURITY/03` names the algorithm and leaves the parameters to implementation.
+
+---

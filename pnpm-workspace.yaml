@@ -17,6 +17,13 @@ packages:
 # @swc/core: denied. It ships its platform binary as an optional dependency, so the
 # postinstall is not needed -- verified by loading the module and calling transformSync.
 allowBuilds:
+  # argon2: denied. Its postinstall runs node-gyp-build, which is only needed when no
+  # prebuilt binding matches -- and one does. Verified by installing with
+  # --ignore-scripts and hashing a password, BOTH on the development machine and on
+  # node:24-alpine, which is what the runtime image is. Alpine is the one that mattered:
+  # musl prebuilds are frequently missing where glibc ones are present, and a binding
+  # that loads on a laptop and not in the container is a P0-19-shaped failure.
+  argon2: false
   "@swc/core": false
   # cpu-features: denied -- optional native probe used by ssh2; it degrades to a JS path when absent.
   cpu-features: false

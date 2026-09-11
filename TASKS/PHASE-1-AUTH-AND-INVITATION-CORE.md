@@ -50,7 +50,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-11 |
 | **Depends on** | P0-07, P0-19 |
 | **Spec refs** | `docs/SECURITY/03-AUTHENTICATION-SECURITY.md` § Password, `docs/DATABASE/02-USERS.md` § Notes |
 | **Spec required** | Yes — authentication |
@@ -67,10 +67,16 @@
 6. Unit test: correct password verifies, wrong fails, hash format is argon2id, a policy violation is rejected with a field-level error, and timing does not diverge between unknown-user and wrong-password paths.
 
 **Definition of Done**
-- [ ] No plaintext password is ever written to a log or a database column.
-- [ ] Parameters are recorded in an ADR with the measurement that produced them.
-- [ ] The breached-password failure mode is decided, recorded, and observable.
-- [ ] The timing-equality test passes.
+- [x] This task writes no column; the redactor covers the log path (`password` is in `REDACTED_KEY_NAMES` since `P0-12`), and a test asserts the plaintext appears in none of the messages the policy produces.
+- [x] **ADR-045**, with the full measurement grid — run on the `P0-23` deployment host itself rather than on something resembling it. 64 MiB / t=3 / p=1 at **277 ms**.
+- [x] **ADR-044**: fails **open**, and emits `auth.breach_check_unavailable`. `checkBreached` reports `unavailable` as a value distinct from `safe`, which is what makes the decision observable rather than invisible.
+- [x] Passes — and fails under two separate mutations, which is the part worth stating.
+
+**A mutation disproved a claim in the spec.** It predicted that removing the `null` guard in `verifyPassword` would fail "a null hash never verifies". It does not: `argon2.verify(null, …)` throws, the `catch` returns `false`, and the test passes — the right answer, far too quickly. The **timing** tests are what catch it. So that guard is a timing control and the correctness test protects nothing about it; both files now say so, because the next person to simplify that branch will be right about the behaviour and wrong about the consequence.
+
+**`p=1` although `p=2` is measurably faster** (162 ms vs 277 ms). Parallelism spends cores per hash, and the host has four shared with eight other compose projects. One core per login is predictable; latency is not the binding constraint at this login rate.
+
+**argon2's install script is denied**, verified by hashing a password with `--ignore-scripts` on the dev machine **and on `node:24-alpine`**. Musl prebuilds are frequently missing where glibc ones are present, and a binding that loads on a laptop but not in the container is a `P0-19`-shaped failure discovered at deploy time.
 
 **Abuse cases to test**
 | Abuse case | Source | Expectation |
