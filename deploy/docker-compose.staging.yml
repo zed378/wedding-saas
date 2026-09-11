@@ -20,6 +20,10 @@
 #
 #   docker compose -f deploy/docker-compose.staging.yml --env-file .env run --rm migrate
 #
+# Seed data, likewise deliberate (docs/DEVOPS/00 § Environment List):
+#
+#   docker compose -f deploy/docker-compose.staging.yml --env-file .env run --rm seed
+#
 # ## Ports
 #
 # This host is shared -- it already runs eight other compose projects. Everything here
@@ -133,6 +137,38 @@ services:
       MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:?required}
     depends_on:
       postgres: { condition: service_healthy }
+
+  # Seed data, as its own service rather than an argument to `migrate`.
+  #
+  # `docs/DEVOPS/00` § Environment List requires staging to carry "realistic dummy data,
+  # periodically reset ... from curated seed data". This installs the reference template
+  # and its demo invitation (`P0-21`).
+  #
+  # It exists as a service because the obvious alternative is a trap:
+  #
+  #   docker compose run --rm migrate node src/infra/db/seed.mts     # WRONG
+  #
+  # The migrator's ENTRYPOINT is already `node`, so that runs `node node src/...` and
+  # fails with MODULE_NOT_FOUND pointing at nothing useful. Naming the service removes
+  # the chance to get it wrong.
+  #
+  #   docker compose -f deploy/docker-compose.staging.yml --env-file .env run --rm seed
+  #
+  # It refuses when APP_ENV=production (ADR-043), which is the guard that matters: the
+  # deployment, not the build.
+  seed:
+    profiles: [seed]
+    build:
+      context: ..
+      dockerfile: backend/api/Dockerfile
+      target: migrator
+    command: ["src/infra/db/seed.mts"]
+    environment:
+      NODE_ENV: production
+      APP_ENV: ${APP_ENV:?required}
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:?required}
+    depends_on:
+      postgres: {condition: service_healthy}
 
   api:
     build:
