@@ -180,9 +180,9 @@ Follow-on effects: `addons` ships with no active rows, checkout stops being a co
 
 ### ~~OQ-08 — Domain name~~ — ANSWERED 2026-09-09
 
-**Answer**: `invitation.zedth.my.id`, with invitations published **path-based** at `/{slug}` rather than on wildcard subdomains, because programmatic DNS is not yet in place. Per-invitation subdomains arrive later, via a Cloudflare API token creating records against a tunnel. Recorded as ADR-024.
+**Answer**: `invitation.vizunicum.my.id`, with invitations published **path-based** at `/{slug}` rather than on wildcard subdomains, because programmatic DNS is not yet in place. Per-invitation subdomains arrive later, via a Cloudflare API token creating records against a tunnel. Recorded as ADR-024.
 
-Three fixed hostnames, no wildcards: `invitation.zedth.my.id` for public invitations, `app.zedth.my.id` for the application and API, `admin.zedth.my.id` for the admin panel from Phase 5. The public surface is kept on its own origin deliberately — guest-submitted content renders there, and sharing an origin with the authenticated app would give a stored XSS a path it does not currently have.
+Three fixed hostnames, no wildcards: `invitation.vizunicum.my.id` for public invitations, `app.vizunicum.my.id` for the application and API, `admin.vizunicum.my.id` for the admin panel from Phase 5. The public surface is kept on its own origin deliberately — guest-submitted content renders there, and sharing an origin with the authenticated app would give a stored XSS a path it does not currently have.
 
 This answer creates one new risk, **R15** in `docs/PLAN/18`: with invitations at the root of their host, an unreserved application route could shadow a published invitation. Closed by construction — that host serves nothing but invitations, and CI fails on a route that is not in `slug_blocklist`.
 

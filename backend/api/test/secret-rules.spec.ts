@@ -15,9 +15,9 @@ import { SecretRuleError } from "../src/config/secret-rules";
 
 const base = {
   NODE_ENV: "production",
-  APP_ORIGIN: "https://app.zedth.my.id",
-  PUBLIC_INVITE_ORIGIN: "https://invitation.zedth.my.id",
-  ADMIN_ORIGIN: "https://admin.zedth.my.id",
+  APP_ORIGIN: "https://app.vizunicum.my.id",
+  PUBLIC_INVITE_ORIGIN: "https://invitation.vizunicum.my.id",
+  ADMIN_ORIGIN: "https://admin.vizunicum.my.id",
   DATABASE_URL: "postgres://wedding_app:pw@db.internal:5432/wedding",
 };
 

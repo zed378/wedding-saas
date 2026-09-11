@@ -2,7 +2,7 @@
 
 The public invitation page. Next.js, server-rendered.
 
-**Host**: `invitation.zedth.my.id` — its own hostname, deliberately.
+**Host**: `invitation.vizunicum.my.id` — its own hostname, deliberately.
 
 Guest-submitted content renders here: RSVP names and guestbook messages. Keeping this surface
 off the application origin means a stored XSS that survives sanitization cannot act against a

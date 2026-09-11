@@ -40,7 +40,7 @@
 
 **Goal** — A couple can point their own domain at their invitation, with DNS verification and automatic certificate provisioning — and, from the same capability, the platform moves from path-based addresses to per-invitation subdomains.
 
-**Scope note (ADR-024)**: the MVP publishes at `invitation.zedth.my.id/{slug}` because programmatic DNS is not in place. This task is where that changes. Building `{slug}.invitation.zedth.my.id` and customer-owned domains are the same underlying work — a Cloudflare API token creating records against the tunnel, plus a certificate per hostname — so they are done together rather than twice.
+**Scope note (ADR-024)**: the MVP publishes at `invitation.vizunicum.my.id/{slug}` because programmatic DNS is not in place. This task is where that changes. Building `{slug}.invitation.vizunicum.my.id` and customer-owned domains are the same underlying work — a Cloudflare API token creating records against the tunnel, plus a certificate per hostname — so they are done together rather than twice.
 
 **Steps**
 1. Use the `invitation_custom_domains` table created in `P0-09` — the schema is already specified in `docs/DATABASE/04`.

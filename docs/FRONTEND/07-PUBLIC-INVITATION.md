@@ -21,7 +21,7 @@ If using Next.js: dynamic `generateMetadata` per slug + ISR (on-demand `revalida
 - Does NOT affect the primary SSR/cache key (to keep the cache efficient for many different guests) — read & rendered client-side (during hydration) from `window.location.search`; the related element is rendered as part that's allowed to flash/update post-hydration (an acceptable trade-off, a small non-critical part for SEO).
 
 ## Address & Host
-- At MVP the invitation is at `https://invitation.zedth.my.id/{slug}` — path-based on a fixed host, no wildcard DNS (PLAN/10, ADR-024). The slug arrives as a path segment and is validated before use, exactly as a `Host`-derived slug would be.
+- At MVP the invitation is at `https://invitation.vizunicum.my.id/{slug}` — path-based on a fixed host, no wildcard DNS (PLAN/10, ADR-024). The slug arrives as a path segment and is validated before use, exactly as a `Host`-derived slug would be.
 - The canonical URL and `og:url` use this address. When per-invitation subdomains arrive, the canonical changes and the path form redirects permanently.
 
 ## Fallback & Error State

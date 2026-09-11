@@ -44,7 +44,7 @@
 **Goal** — The admin panel runs on its own subdomain with a session that has nothing to do with the user application's.
 
 **Steps**
-1. Serve the admin app at `admin.zedth.my.id` — one static DNS record, no wildcard — with cookies scoped to that host, so an XSS in the user application cannot reach an admin session (`docs/SECURITY/02` boundary 3→4, ADR-024).
+1. Serve the admin app at `admin.vizunicum.my.id` — one static DNS record, no wildcard — with cookies scoped to that host, so an XSS in the user application cannot reach an admin session (`docs/SECURITY/02` boundary 3→4, ADR-024).
 2. Apply a stricter Content-Security-Policy than the user app — the admin surface has no third-party embeds to accommodate.
 3. Shorten the admin session to about four hours, per `docs/SECURITY/03` § Admin Session.
 4. Build the shell: navigation for dashboard, users, templates, orders, moderation, audit logs (`docs/UI-UX/02` § Admin sitemap), desktop-first per `docs/UI-UX/15`.

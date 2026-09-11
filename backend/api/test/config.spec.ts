@@ -4,9 +4,9 @@ import { ConfigValidationError, loadEnv } from "../src/config/env.schema";
 const valid = {
   NODE_ENV: "test",
   PORT: "3000",
-  APP_ORIGIN: "https://app.zedth.my.id",
-  PUBLIC_INVITE_ORIGIN: "https://invitation.zedth.my.id",
-  ADMIN_ORIGIN: "https://admin.zedth.my.id",
+  APP_ORIGIN: "https://app.vizunicum.my.id",
+  PUBLIC_INVITE_ORIGIN: "https://invitation.vizunicum.my.id",
+  ADMIN_ORIGIN: "https://admin.vizunicum.my.id",
   // The application role, not the owner. Migrations validate their own URL
   // separately in src/infra/db/env.mts (P0-06).
   DATABASE_URL: "postgres://wedding_app:pw@localhost:5432/wedding",

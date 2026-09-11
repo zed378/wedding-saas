@@ -18,21 +18,21 @@
 
 ## Sitemap (Public Invitation)
 ```
-invitation.zedth.my.id/{slug}            Main invitation page (all sections in one scroll)
-invitation.zedth.my.id/{slug}?to=Name     Guest name personalization
-invitation.zedth.my.id/preview/{token}    Share-preview, watermarked, noindex
+invitation.vizunicum.my.id/{slug}            Main invitation page (all sections in one scroll)
+invitation.vizunicum.my.id/{slug}?to=Name     Guest name personalization
+invitation.vizunicum.my.id/preview/{token}    Share-preview, watermarked, noindex
 ```
-Path-based at MVP; moving to `{slug}.invitation.zedth.my.id` later, with permanent redirects (PLAN/10).
+Path-based at MVP; moving to `{slug}.invitation.vizunicum.my.id` later, with permanent redirects (PLAN/10).
 
 ## Sitemap (Admin Panel — separate subdomain)
 ```
-admin.zedth.my.id/dashboard
-admin.zedth.my.id/users
-admin.zedth.my.id/templates
-admin.zedth.my.id/templates/:id/versions/:vid/edit
-admin.zedth.my.id/orders
-admin.zedth.my.id/moderation
-admin.zedth.my.id/audit-logs
+admin.vizunicum.my.id/dashboard
+admin.vizunicum.my.id/users
+admin.vizunicum.my.id/templates
+admin.vizunicum.my.id/templates/:id/versions/:vid/edit
+admin.vizunicum.my.id/orders
+admin.vizunicum.my.id/moderation
+admin.vizunicum.my.id/audit-logs
 ```
 
 ## Main Navigation (Authenticated App)

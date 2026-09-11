@@ -22,9 +22,9 @@ image:
 # stays on its own host so guest-submitted content never shares an origin with the
 # authenticated application (docs/SECURITY/02).
 hosts:
-  publicInvite: invitation.zedth.my.id
-  app: app.zedth.my.id
-  admin: admin.zedth.my.id
+  publicInvite: invitation.vizunicum.my.id
+  app: app.vizunicum.my.id
+  admin: admin.vizunicum.my.id
 
 # ---------------------------------------------------------------- config
 config:

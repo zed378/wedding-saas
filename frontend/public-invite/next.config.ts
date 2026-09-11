@@ -1,9 +1,11 @@
+import { join } from "node:path";
+
 import type { NextConfig } from "next";
 
 /**
  * P0-22 — the public invitation renderer.
  *
- * A separate application on a separate host (`invitation.zedth.my.id`), and the
+ * A separate application on a separate host (`invitation.vizunicum.my.id`), and the
  * separation is a trust boundary rather than a deployment convenience: `docs/SECURITY/02`
  * keeps guest-submitted content -- RSVP names, guestbook messages -- off the same origin
  * as the authenticated application, so a stored-XSS escape on an invitation page cannot
@@ -20,6 +22,17 @@ import type { NextConfig } from "next";
  */
 const config: NextConfig = {
   reactStrictMode: true,
+
+  // `standalone` emits a self-contained server plus only the node_modules it actually
+  // reaches, so the runtime image carries neither the monorepo nor pnpm's store. Without
+  // it a Next image in a workspace has to copy the whole thing to find its dependencies
+  // through the symlink farm.
+  output: "standalone",
+
+  // The workspace root, not this directory. Next traces dependencies from here; left to
+  // infer, it picks `frontend/web-app` and silently omits every `@wi/*` package.
+  outputFileTracingRoot: join(import.meta.dirname, "../.."),
+
   transpilePackages: ["@wi/api-client", "@wi/schema", "@wi/template-renderer"],
 
   async headers() {

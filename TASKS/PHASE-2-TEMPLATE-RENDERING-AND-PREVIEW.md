@@ -252,7 +252,7 @@
 | **Spec required** | Yes — public surface |
 | **Surface** | public-invite |
 
-**Goal** — The invitation renders server-side at `invitation.zedth.my.id/{slug}`, with the slug resolved by the configured strategy.
+**Goal** — The invitation renders server-side at `invitation.vizunicum.my.id/{slug}`, with the slug resolved by the configured strategy.
 
 **Steps**
 1. Implement slug resolution per `docs/BACKEND/06` § Slug Resolution — **one** implementation reading the slug from a path segment (MVP) or a `Host` label (later) according to configuration, with custom domains checked first in Phase 7. Validate the resolved slug's shape before querying: a path segment and a proxy-set header are both untrusted input.

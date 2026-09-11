@@ -17,7 +17,7 @@ At MVP there is **no wildcard host** — invitations are addressed by path on a 
 # Public invitations — path-based. Serves ONLY invitations, previews and the public API.
 # Kept on its own origin so guest-submitted content cannot act against the authenticated app.
 server {
-  server_name invitation.zedth.my.id;
+  server_name invitation.vizunicum.my.id;
 
   location /public/ {
     limit_req zone=public_api burst=20 nodelay;
@@ -32,7 +32,7 @@ server {
 
 # Authenticated application + API
 server {
-  server_name app.zedth.my.id;
+  server_name app.vizunicum.my.id;
 
   location /api/webhooks/ {
     # NOT rate-limited with general public traffic: a provider retry storm is legitimate traffic
@@ -47,7 +47,7 @@ server {
 
 # Admin panel — separate host, separate cookie scope (Phase 5, SECURITY/02 boundary 3→4)
 server {
-  server_name admin.zedth.my.id;
+  server_name admin.vizunicum.my.id;
   location /api/ { proxy_pass http://backend_api; }
   location /     { proxy_pass http://admin_app; }   # static SPA build
 }

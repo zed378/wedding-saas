@@ -1,7 +1,7 @@
 /**
  * The host root.
  *
- * `invitation.zedth.my.id` serves invitations at `/{slug}` and nothing else
+ * `invitation.vizunicum.my.id` serves invitations at `/{slug}` and nothing else
  * (`docs/PLAN/10`, ADR-024, and `P0-23`'s DoD: "nothing else on that host reaches any
  * other app"). The bare host is not a landing page -- it points at the application host
  * and stops.

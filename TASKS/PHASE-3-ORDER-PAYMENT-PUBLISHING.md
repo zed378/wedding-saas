@@ -6,7 +6,7 @@
 
 **Gate before deploying to production**: `docs/PLAN/16` § Critical Dependencies requires `docs/SECURITY/07` to be reviewed before the payment API reaches production. That review is `P3-16`, and it is a hard gate, not a formality.
 
-**Exit criteria**: checkout through webhook to `paid` works end to end against the provider's sandbox, including the failure, expiry, replay and forged-signature paths; publishing produces a live page at `invitation.zedth.my.id/{slug}` within five seconds; an owner's content edit invalidates the cache; the daily expiry job transitions invitations correctly.
+**Exit criteria**: checkout through webhook to `paid` works end to end against the provider's sandbox, including the failure, expiry, replay and forged-signature paths; publishing produces a live page at `invitation.vizunicum.my.id/{slug}` within five seconds; an owner's content edit invalidates the cache; the daily expiry job transitions invitations correctly.
 
 **Roadmap reference**: `docs/PLAN/16-IMPLEMENTATION-ROADMAP.md` § Phase 3 (Week 8-9).
 
@@ -364,7 +364,7 @@
 6. Verify with a real published invitation, not a placeholder.
 
 **Definition of Done**
-- [ ] A real published invitation is reachable at `invitation.zedth.my.id/{slug}` over HTTPS.
+- [ ] A real published invitation is reachable at `invitation.vizunicum.my.id/{slug}` over HTTPS.
 - [ ] A request for a reserved path on that host does not reach the public invitation app, and the reserved list matches `slug_blocklist` (R15).
 - [ ] Certificate renewal is automated and alerted on.
 - [ ] Media upload survives a slow connection that a normal API timeout would kill.

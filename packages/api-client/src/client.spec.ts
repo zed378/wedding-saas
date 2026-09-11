@@ -10,7 +10,7 @@ import { createTokenStore } from "./token-store.js";
  * Every test injects its own `fetch`, so nothing here touches a network.
  */
 
-const BASE = "https://app.zedth.my.id/api/v1";
+const BASE = "https://app.vizunicum.my.id/api/v1";
 
 function jsonResponse(
   body: unknown,

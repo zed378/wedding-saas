@@ -31,7 +31,7 @@ Once complete (via GET media or polling):
 {
   "id": "uuid",
   "status": "ready",
-  "url": "https://cdn.zedth.my.id/invitations/{invitation_id}/media/{media_id}/large.webp",
+  "url": "https://cdn.vizunicum.my.id/invitations/{invitation_id}/media/{media_id}/large.webp",
   "thumbnail_url": ".../thumbnail.webp",
   "width": 1600,
   "height": 1200
