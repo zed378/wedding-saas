@@ -29,7 +29,15 @@ export interface SecretRuleViolation {
 }
 
 interface Checked {
-  NODE_ENV: string;
+  /**
+   * The DEPLOYMENT environment, not the build mode. `docs/DEVOPS/00` § Environment List.
+   *
+   * Every rule below asks "is this production", and the honest answer comes from
+   * `APP_ENV`: staging runs a production BUILD (parity) while being a non-production
+   * ENVIRONMENT. Keyed on `NODE_ENV`, a live Midtrans key on staging would have passed
+   * the one check this file exists for.
+   */
+  APP_ENV: string;
   MIDTRANS_SERVER_KEY?: string | undefined;
   MIDTRANS_CLIENT_KEY?: string | undefined;
   APP_ORIGIN: string;
@@ -48,7 +56,7 @@ interface Checked {
  */
 export function checkSecretRules(env: Checked): SecretRuleViolation[] {
   const violations: SecretRuleViolation[] = [];
-  const isProduction = env.NODE_ENV === "production";
+  const isProduction = env.APP_ENV === "production";
 
   // ---------------------------------------------------------------- payment keys
   //
@@ -65,8 +73,8 @@ export function checkSecretRules(env: Checked): SecretRuleViolation[] {
       violations.push({
         variable: name,
         message:
-          `looks like a LIVE key (no "${MIDTRANS_SANDBOX_PREFIX}" prefix) but NODE_ENV is ` +
-          `"${env.NODE_ENV}". docs/DEVOPS/00 requires sandbox credentials outside ` +
+          `looks like a LIVE key (no "${MIDTRANS_SANDBOX_PREFIX}" prefix) but APP_ENV is ` +
+          `"${env.APP_ENV}". docs/DEVOPS/00 requires sandbox credentials outside ` +
           `production. A live key here charges real cards from a test.`,
       });
     }
@@ -78,7 +86,7 @@ export function checkSecretRules(env: Checked): SecretRuleViolation[] {
       violations.push({
         variable: name,
         message:
-          `is a SANDBOX key ("${MIDTRANS_SANDBOX_PREFIX}" prefix) but NODE_ENV is ` +
+          `is a SANDBOX key ("${MIDTRANS_SANDBOX_PREFIX}" prefix) but APP_ENV is ` +
           `"production". Payments would succeed against the provider's test environment ` +
           `and no money would arrive.`,
       });

@@ -32,10 +32,9 @@
 #
 # ## What is NOT here yet
 #
-#   - TLS and the public hostnames. The host has a private address (10.1.200.13), so
-#     Let's Encrypt HTTP-01 cannot reach it and Cloudflare cannot proxy to it. The answer
-#     is a Cloudflare Tunnel, which needs a token this deployment does not yet have.
-#     Until then the stack is reachable over the VPN by IP and port.
+#   - Public hostnames, until CLOUDFLARE_TUNNEL_TOKEN is set and `--profile tunnel` is
+#     used. Without it the stack is reachable over the VPN by IP and port, which is
+#     enough to verify everything except the hostnames themselves.
 #   - ClamAV. `docs/BACKEND/04` runs it only in the media pool, and no upload path exists
 #     before `P1-16`. Adding it now would cost ~1.5GB of signatures to scan nothing.
 
@@ -130,6 +129,7 @@ services:
       target: migrator
     environment:
       NODE_ENV: production
+      APP_ENV: ${APP_ENV:?required}
       MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:?required}
     depends_on:
       postgres: { condition: service_healthy }
@@ -141,6 +141,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
+      APP_ENV: ${APP_ENV:?required}
       PORT: "3000"
       SERVICE_NAME: api
       APP_ORIGIN: ${APP_ORIGIN:?required}
@@ -228,6 +229,58 @@ services:
     build: { context: .., dockerfile: admin/Dockerfile }
     restart: unless-stopped
     ports: ["${STAGING_ADMIN_PORT:-18300}:8080"]
+
+  # Cloudflare Tunnel. `P0-23`.
+  #
+  # The host has a PRIVATE address (10.1.200.13). Cloudflare cannot proxy to it and
+  # Let's Encrypt HTTP-01 cannot reach it, so the usual "point an A record at the box"
+  # does not apply. `cloudflared` solves it from the other direction: it dials OUT to
+  # Cloudflare and traffic arrives down that connection, so the host needs no inbound
+  # port open at all and no certificate of its own -- Cloudflare terminates TLS at its
+  # edge.
+  #
+  # No Caddy in front of it, deliberately. Its ACME challenge would fail forever behind
+  # a tunnel, producing a service that works while logging certificate errors -- the kind
+  # of permanent-warning state that trains people to ignore logs.
+  #
+  # ## Getting the token
+  #
+  # Zero Trust -> Networks -> Tunnels -> Create a tunnel -> Docker. Copy the token from
+  # the command it shows (the long `ey...` value) into CLOUDFLARE_TUNNEL_TOKEN in .env.
+  #
+  # It is a RUN token, not an API token: it lets this container join one tunnel and
+  # nothing else. It cannot read DNS, create records or touch the account -- which is
+  # why it is the right credential to put on a shared host.
+  #
+  # ## Routing
+  #
+  # Public hostnames are configured in the Zero Trust dashboard, not here
+  # (`config_src: cloudflare`). Adding one there ALSO creates its DNS record
+  # automatically, which is why this deployment needs no Zone:DNS:Edit permission:
+  #
+  #   app.vizunicum.my.id         -> http://web-app:3100
+  #   invitation.vizunicum.my.id  -> http://public-invite:3200
+  #   admin.vizunicum.my.id       -> http://admin:8080          (P5-01, not before)
+  #
+  # The service names resolve on this compose network, so nothing is published to the
+  # host for the tunnel's sake.
+  #
+  # ## Why it is behind a profile
+  #
+  # The stack has to come up and be verifiable without a tunnel -- that is how it was
+  # brought up the first time, reachable over the VPN by port. `--profile tunnel` adds
+  # public reachability as a deliberate second step:
+  #
+  #   docker compose -f deploy/docker-compose.staging.yml --env-file .env   #     --profile tunnel up -d
+  cloudflared:
+    profiles: [tunnel]
+    image: cloudflare/cloudflared:2025.8.1
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?required with --profile tunnel}
+    depends_on:
+      api: { condition: service_healthy }
 
 volumes:
   postgres-data:
