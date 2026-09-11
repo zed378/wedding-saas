@@ -94,6 +94,13 @@ services:
       timeout: 5s
       retries: 10
 
+  # One-shot. The names are the API's defaults (env.schema.ts: STORAGE_BUCKET_USER_MEDIA,
+  # STORAGE_BUCKET_TEMPLATE_ASSETS, STORAGE_BUCKET_STAGING) and the ones docs/ARCHITECTURE/05
+  # specifies. A bucket the application does not look for is a bucket that is empty
+  # forever while uploads fail with NoSuchBucket.
+  #
+  # All three stay PRIVATE. Public reads go through the CDN with origin access control,
+  # never a bucket URL.
   minio-init:
     image: minio/mc:RELEASE.2025-04-16T18-13-26Z
     depends_on:
@@ -103,8 +110,8 @@ services:
       - -c
       - |
         mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
-        mc mb --ignore-existing local/media local/templates local/staging
-        echo "buckets ready"
+        mc mb --ignore-existing local/user-media local/template-assets local/staging
+        echo "buckets ready (private): user-media, template-assets, staging"
     environment:
       MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY_ID:?required}
       MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_ACCESS_KEY:?required}
