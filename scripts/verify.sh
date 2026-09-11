@@ -56,6 +56,15 @@ step "status changes go through the writer" node scripts/check-status-writes.mjs
 # at compile time; this catches the cast that would bypass it in one word.
 step "storage paths built by the port" node scripts/check-storage-paths.mjs
 
+# docs/FRONTEND/02: the access token lives in memory and nowhere else. A token in
+# localStorage turns every XSS from a session-length problem into a permanent one.
+step "no auth token in browser storage" node scripts/check-token-storage.mjs
+
+# docs/UI-UX/06: the tokens are the single source of truth for application UI, and
+# docs/UI-UX/08's dark mode depends on it. One literal is one thing that will not change
+# when the theme does.
+step "design tokens, not literals" node scripts/check-design-tokens.mjs
+
 # docs/DATABASE/03: sections and theme are validated in application code before the
 # write, because the columns are JSONB and Postgres will accept any well-formed JSON --
 # including a component no renderer provides.

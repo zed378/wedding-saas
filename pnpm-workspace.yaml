@@ -31,3 +31,8 @@ allowBuilds:
   protobufjs: false
   # ssh2: denied -- the native crypto binding is an accelerator; testcontainers only uses ssh2 for remote Docker hosts, which this project does not use.
   ssh2: false
+
+minimumReleaseAgeExclude:
+  - react-dom@19.3.0
+  - react@19.3.0
+  - scheduler@0.28.0

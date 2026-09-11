@@ -2,16 +2,29 @@
   "name": "@wi/admin",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "build": "echo \"[P0-22] build not wired yet\"",
-    "dev": "echo \"[P0-22] dev not wired yet\"",
-    "lint": "echo \"[P0-22] lint not wired yet\"",
-    "typecheck": "echo \"[P0-22] typecheck not wired yet\"",
-    "test": "echo \"[P0-19] tests not wired yet\""
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "dev": "vite --port 3300",
+    "preview": "vite preview --port 3300",
+    "lint": "echo \"[P0-17] lint not wired yet\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "echo \"[P5-01] no unit tests here yet -- admin screens arrive in Phase 5\""
   },
   "dependencies": {
+    "@wi/api-client": "workspace:*",
     "@wi/schema": "workspace:*",
     "@wi/ui": "workspace:*",
-    "@wi/api-client": "workspace:*"
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
   }
 }

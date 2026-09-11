@@ -1,0 +1,269 @@
+/*
+ * P0-22 — the design tokens. `docs/UI-UX/06`, `07`, `08`, `09`.
+ *
+ * Tailwind v4 reads `@theme` and does two things with it: emits every entry as a CSS
+ * custom property on `:root`, and generates the utility classes named after them. That
+ * is why the tokens live in CSS rather than in a JavaScript config — there is one
+ * declaration, and `bg-primary-600`, `var(--color-primary-600)` and the value in this
+ * file cannot disagree.
+ *
+ * ## Everything here is application chrome
+ *
+ * `docs/UI-UX/07` and `08` both open by saying so, and it matters more than it sounds.
+ * An invitation's colours and fonts come from `template_versions.theme` (`docs/PLAN/07`)
+ * and are per-template data. Nothing in this file may reach the public invitation page:
+ * if it did, every template would inherit the dashboard's indigo.
+ *
+ * ## Dark mode
+ *
+ * `docs/UI-UX/08` § Dark Mode: not required for the MVP, but "all the tokens above have
+ * a paired dark variant whose structure is already planned in the design tokens (not
+ * hard-coded colors per component)". The semantic layer at the bottom is that structure.
+ * A component references `--color-surface`, never `--color-neutral-50`, so adding dark
+ * mode is a second block of definitions and no component changes.
+ */
+
+@import "tailwindcss";
+
+/* Scan the component library from whichever app imports this file. */
+@source "../src";
+
+@theme {
+  /* ---------------------------------------------------------------- colour
+   * docs/UI-UX/08 § Core Palette. The document names one value per role; the
+   * surrounding ramp is the standard Tailwind palette for that hue, so a hover or a
+   * subtle background does not have to be invented per component.
+   *
+   * The documented value is marked on each ramp. Those five are the contract.
+   */
+
+  /* Primary: #4F46E5 (indigo) — main buttons, active links, brand elements. */
+  --color-primary-50: #eef2ff;
+  --color-primary-100: #e0e7ff;
+  --color-primary-200: #c7d2fe;
+  --color-primary-300: #a5b4fc;
+  --color-primary-400: #818cf8;
+  --color-primary-500: #6366f1;
+  --color-primary-600: #4f46e5; /* docs/UI-UX/08 */
+  --color-primary-700: #4338ca;
+  --color-primary-800: #3730a3;
+  --color-primary-900: #312e81;
+
+  /* Secondary: #F59E0B (amber) — accents, promo highlights, premium badges. */
+  --color-secondary-50: #fffbeb;
+  --color-secondary-100: #fef3c7;
+  --color-secondary-200: #fde68a;
+  --color-secondary-400: #fbbf24;
+  --color-secondary-500: #f59e0b; /* docs/UI-UX/08 */
+  --color-secondary-600: #d97706;
+  --color-secondary-700: #b45309;
+  --color-secondary-900: #78350f;
+
+  /* Neutral: #FAFAFA (50) → #171717 (900). Both endpoints are documented. */
+  --color-neutral-50: #fafafa; /* docs/UI-UX/08 */
+  --color-neutral-100: #f5f5f5;
+  --color-neutral-200: #e5e5e5;
+  --color-neutral-300: #d4d4d4;
+  --color-neutral-400: #a3a3a3;
+  --color-neutral-500: #737373;
+  --color-neutral-600: #525252;
+  --color-neutral-700: #404040;
+  --color-neutral-800: #262626;
+  --color-neutral-900: #171717; /* docs/UI-UX/08 */
+
+  /* Success: #16A34A — published status, success confirmations. */
+  --color-success-50: #f0fdf4;
+  --color-success-100: #dcfce7;
+  --color-success-600: #16a34a; /* docs/UI-UX/08 */
+  --color-success-700: #15803d;
+  --color-success-800: #166534;
+
+  /* Warning: #F59E0B — pending status, warnings. Same hue as secondary by design:
+   * docs/UI-UX/08 gives both the same value. Kept as separate token names because they
+   * mean different things, and a future palette revision will want to move one. */
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-500: #f59e0b; /* docs/UI-UX/08 */
+  --color-warning-700: #b45309;
+  --color-warning-800: #92400e;
+
+  /* Danger: #DC2626 — errors, destructive actions, expired status. */
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-600: #dc2626; /* docs/UI-UX/08 */
+  --color-danger-700: #b91c1c;
+  --color-danger-800: #991b1b;
+
+  /* Info: #0EA5E9 — informational notifications. */
+  --color-info-50: #f0f9ff;
+  --color-info-100: #e0f2fe;
+  --color-info-500: #0ea5e9; /* docs/UI-UX/08 */
+  --color-info-700: #0369a1;
+  --color-info-800: #075985;
+
+  /* ------------------------------------------------------------ typography
+   * docs/UI-UX/07. Two families, maximum — "don't add decorative fonts to the app
+   * chrome (leave the decorative character to the templates)".
+   *
+   * The stacks start with a webfont and fall back to the system UI font. No font file
+   * is bundled: a self-hosted Inter is a real decision about bytes and licensing, and
+   * the fallback is legible on every platform the product targets.
+   */
+  --font-sans:
+    "Inter", "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* The scale from docs/UI-UX/07 § Type Scale, with its line heights. Named for the
+   * ROLE rather than the size, because that is how the document names them and because
+   * `text-h1` survives a redesign that `text-28` does not. */
+  --text-display: 2.25rem; /* 36px */
+  --text-display--line-height: 1.2;
+  --text-h1: 1.75rem; /* 28px */
+  --text-h1--line-height: 1.25;
+  --text-h2: 1.375rem; /* 22px */
+  --text-h2--line-height: 1.3;
+  --text-h3: 1.125rem; /* 18px */
+  --text-h3--line-height: 1.4;
+  --text-body-lg: 1rem; /* 16px */
+  --text-body-lg--line-height: 1.5;
+  --text-body: 0.875rem; /* 14px */
+  --text-body--line-height: 1.5;
+  --text-body-sm: 0.75rem; /* 12px */
+  --text-body-sm--line-height: 1.5;
+  --text-button: 0.875rem; /* 14px */
+  --text-button--line-height: 1;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* --------------------------------------------------------------- spacing
+   * docs/UI-UX/09 § Base Unit: 4px base, scale 4, 8, 12, 16, 24, 32, 48, 64, 96.
+   *
+   * Tailwind's default `--spacing` multiplier already produces exactly that scale at
+   * 1,2,3,4,6,8,12,16,24. Declared explicitly so the number in this file matches the
+   * number in the document, rather than being a property of a default someone would
+   * have to know.
+   */
+  --spacing: 0.25rem; /* 4px */
+
+  /* ---------------------------------------------------------------- radius
+   * docs/UI-UX/06 § Design Tokens: sm(4px), md(8px), lg(12px), full.
+   */
+  --radius-sm: 0.25rem; /* 4px */
+  --radius-md: 0.5rem; /* 8px */
+  --radius-lg: 0.75rem; /* 12px */
+  --radius-full: 9999px;
+
+  /* --------------------------------------------------------------- shadow */
+  --shadow-sm: 0 1px 2px 0 rgb(23 23 23 / 0.05);
+  --shadow-md:
+    0 4px 6px -1px rgb(23 23 23 / 0.1), 0 2px 4px -2px rgb(23 23 23 / 0.1);
+  --shadow-lg:
+    0 10px 15px -3px rgb(23 23 23 / 0.1), 0 4px 6px -4px rgb(23 23 23 / 0.1);
+
+  /* ----------------------------------------------------------- breakpoints
+   * docs/UI-UX/09 § Breakpoints: mobile < 640, tablet 640–1024, desktop > 1024.
+   */
+  --breakpoint-sm: 40rem; /* 640px */
+  --breakpoint-lg: 64rem; /* 1024px */
+
+  /* The 1280px max-width container from docs/UI-UX/09 § Grid System. */
+  --container-page: 80rem; /* 1280px */
+}
+
+/*
+ * The semantic layer.
+ *
+ * Components reference these, never a ramp step. Two reasons, and the second is the one
+ * that matters: a component asking for "the surface colour" says what it means, and a
+ * dark theme is then a second block of these definitions with no component touched --
+ * which is exactly the structure `docs/UI-UX/08` § Dark Mode asks to be left possible.
+ */
+@theme {
+  --color-surface: var(--color-neutral-50);
+  --color-surface-raised: #ffffff;
+  --color-surface-sunken: var(--color-neutral-100);
+  /*
+   * Two border tokens, and the difference is a WCAG requirement rather than taste.
+   *
+   * `--color-border` separates things: a card's edge, a row divider, the line under a
+   * tab list. It is decoration, and WCAG sets no contrast floor for decoration.
+   *
+   * `--color-border-strong` is the BOUNDARY OF A CONTROL -- a text input, a select, the
+   * dropzone, a secondary button. WCAG 2.1 § 1.4.11 requires 3:1 for those against
+   * their background, because the border is the only thing saying "this is a control
+   * you can type in". `tokens.spec.ts` measures it.
+   *
+   * neutral-300 was the first choice and fails outright: #d4d4d4 on white is 1.48:1.
+   * That is the single most common accessibility defect in modern form design -- a
+   * hairline input border that looks tasteful and is invisible to anyone with reduced
+   * contrast sensitivity.
+   */
+  --color-border: var(--color-neutral-200);
+  --color-border-strong: var(--color-neutral-500);
+  --color-text: var(--color-neutral-900);
+  /*
+   * neutral-600, not neutral-500. `#737373` reaches 4.5:1 on white and on the page
+   * background but only 4.35:1 on a sunken panel -- and muted text inside a sunken
+   * panel is exactly where helper text lives. The floor has to hold on the worst
+   * background it is used on, not the best.
+   */
+  --color-text-muted: var(--color-neutral-600);
+  --color-text-inverse: #ffffff;
+
+  /* The focus ring. One definition, because `docs/UI-UX/17` requires a visible focus
+   * indicator everywhere and a per-component ring is how one screen ends up without. */
+  --color-focus: var(--color-primary-600);
+}
+
+/*
+ * The minimum touch target. `docs/UI-UX/09` § Touch Target: 44x44px.
+ *
+ * A utility rather than a token, because it is a floor rather than a value: a component
+ * applies it and grows past it, and nothing should be able to set a target *to* 44px in
+ * a way that reads as arbitrary.
+ */
+@utility touch-target {
+  min-height: 2.75rem; /* 44px */
+  min-width: 2.75rem;
+}
+
+/*
+ * The focus ring, once.
+ *
+ * `docs/UI-UX/17` requires a visible focus indicator on every interactive element, and
+ * `:focus-visible` rather than `:focus` so a mouse click does not leave a ring behind --
+ * which is the reason people reach for `outline: none`, which is the thing that breaks
+ * keyboard navigation.
+ */
+@utility focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    color: var(--color-text);
+    background-color: var(--color-surface);
+  }
+
+  /* docs/UI-UX/17: respect the user's motion preference. A product full of transitions
+   * is a product that makes some people ill. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

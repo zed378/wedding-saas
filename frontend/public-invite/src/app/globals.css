@@ -1,0 +1,14 @@
+/*
+ * The public invitation's base stylesheet.
+ *
+ * Tailwind WITHOUT `@wi/ui/tokens.css`, and that omission is the point. Those tokens are
+ * the application's chrome (`docs/UI-UX/07`, `08`); an invitation's colours, fonts and
+ * spacing come from `template_versions.theme` and are applied as CSS custom properties
+ * at the renderer's root (`docs/FRONTEND/04` § Theme Application).
+ *
+ * `P2-02` builds that renderer. Until then this file exists so the app has a stylesheet
+ * and the build is real.
+ */
+@import "tailwindcss";
+
+@source "../";

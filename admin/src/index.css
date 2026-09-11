@@ -1,0 +1,12 @@
+/*
+ * The admin panel uses the same design system as the application.
+ *
+ * `docs/UI-UX/06` § Purpose makes the token set "the single source of truth for
+ * application UI components", and the admin panel is application UI. A separate trust
+ * boundary is not a reason for a separate visual language -- it is the same people
+ * building the same kind of screens, and two palettes would mean two places to fix a
+ * contrast failure.
+ */
+@import "@wi/ui/tokens.css";
+
+@source "../";

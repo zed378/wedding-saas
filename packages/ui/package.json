@@ -2,21 +2,47 @@
   "name": "@wi/ui",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./tokens.css": "./src/tokens.css",
+    "./src/*": "./src/*"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "lint": "echo \"[later] lint not wired yet\"",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "echo \"[P0-19] tests not wired yet\""
+    "lint": "echo \"[P0-17] lint not wired yet\"",
+    "typecheck": "tsc --noEmit -p tsconfig.build.json",
+    "test": "vitest run"
   },
   "files": [
-    "dist"
-  ]
+    "dist",
+    "src"
+  ],
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "dependencies": {
+    "@wi/schema": "workspace:*"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^22.20.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "axe-core": "^4.11.1",
+    "jsdom": "^30.0.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
 }

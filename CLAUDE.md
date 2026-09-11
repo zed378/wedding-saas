@@ -186,6 +186,30 @@ docker compose -f deploy/docker-compose.yml down           # add -v to discard t
 
 Host ports are overridable when something already holds one — `REDIS_PORT=56379 docker compose … up -d`. See `deploy/README.md`.
 
+**Frontends (P0-22)** — three separate applications, on three ports.
+
+```bash
+pnpm --filter @wi/web-app dev          # :3100  dashboard, editor, checkout
+pnpm --filter @wi/public-invite dev    # :3200  the public invitation, SSR
+pnpm --filter @wi/admin dev            # :3300  admin panel, separate trust boundary
+```
+
+`@wi/ui` owns every colour, size and spacing value (`packages/ui/src/tokens.css`), and
+`scripts/check-design-tokens.mjs` refuses a literal anywhere else. `@wi/ui/tokens.css` is
+imported by `web-app` and `admin` and **deliberately not** by `public-invite` — those are
+application chrome, and an invitation's palette is per-template data (`docs/PLAN/07`).
+
+Every component is on one page at `/workbench`, audited by axe in a real browser:
+
+```bash
+pnpm --filter @wi/web-app build && pnpm --filter @wi/web-app start
+E2E_WEB_APP_URL=http://localhost:3100 pnpm --filter @wi/e2e test:e2e
+```
+
+A component with no story there is a component the browser accessibility pass never
+sees — jsdom cannot check colour contrast, so that page is the only place it is checked
+against rendered pixels.
+
 Repository layout — **`backend/`, `frontend/`, `admin/`, `packages/`**, not `apps/`. `docs/FRONTEND/00` § Project Structure still describes `apps/`; the code deliberately deviates and the document was deliberately left unamended at the project owner's instruction (ADR-027). Trust the layout below.
 
 ```

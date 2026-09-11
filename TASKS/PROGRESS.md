@@ -3,8 +3,8 @@
 Single source of truth for where the project stands. Updated in the same commit as the work it describes (`00-TASK-CONVENTIONS.md` global DoD item 11).
 
 **Last updated**: 2026-09-10
-**Current phase**: Phase 0 — Foundation (24 / 27 done). **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
-**Overall**: 24 / 136 tasks done
+**Current phase**: Phase 0 — Foundation (25 / 27 done; the two remaining are `P0-17`, deferred by ADR-028, and `P0-23`, blocked on infrastructure nobody has provisioned). **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
+**Overall**: 25 / 136 tasks done
 
 **No automated pipeline**: `P0-17` is deferred (ADR-028). Before merging to `main`, run `scripts/verify.sh`. The `:id`-endpoint gate blocks in `.githooks/pre-push`; integration tests, the coverage floor, SAST and dependency scanning are **not** running anywhere until `P0-17` is picked up — revisit before Phase 3 payment code.
 
@@ -21,7 +21,7 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 
 | Phase | Tasks | Done | Status | Gate to enter |
 |---|---|---|---|---|
-| [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 27 | 24 | **ACTIVE** | — |
+| [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 27 | 25 | **ACTIVE** | — |
 | [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 0 | Not started | Phase 0 exit criteria |
 | [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 14 | 0 | Not started | Phase 1 exit + `P1-25` |
 | [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 0 | Not started | Phase 2 exit |
@@ -64,8 +64,8 @@ Roadmap: Week 1-2. Exit criteria in the phase file.
 | P0-19.1 | Shared logging package | backend, packages | S | **DONE** — the worker redacts at last; a guard now refuses a `pino()` call outside `@wi/logging` | P0-12, P0-15, P0-19 |
 | P0-20 | Template schema definition and validator | backend, web-app | L | **DONE** — 39 canonical field paths, a closed component registry, and one resolver both surfaces share | P0-08 |
 | P0-21 | Reference template and demo seed data | backend, web-app | L | **DONE** — one template as JSON, and a demo invitation proven publishable against it | P0-20 |
-| P0-22 | Frontend skeletons and design system | frontend | L | TODO | P0-02 |
-| P0-23 | Staging, hosts and TLS | infra | L | TODO — addressing decided (ADR-024); `P0-17` deferred, so this no longer waits on it | P0-04 |
+| P0-22 | Frontend skeletons and design system | frontend | L | **DONE** — three apps, 13 components, and a browser axe pass that found a contrast bug the unit tests could not | P0-02 |
+| P0-23 | Staging, hosts and TLS | infra | L | **BLOCKED** — needs a VPS, DNS control for `zedth.my.id` and Cloudflare credentials. Addressing decided (ADR-024); does *not* wait on `P0-17` | P0-04 |
 | P0-24 | Adopt the TASKS/MEMORY discipline | docs | S | **DONE** | — |
 | P0-25 | Separate surfaces into backend/frontend/admin | infra | S | **DONE** | P0-02 |
 | P0-26 | Helm charts for the Kubernetes path | infra | M | **DONE** — K8s schema validation deferred to `P0-23`, no cluster reachable | P0-05 |
