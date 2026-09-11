@@ -130,6 +130,7 @@ services:
       target: migrator
     environment:
       NODE_ENV: production
+      APP_ENV: ${APP_ENV:?required}
       MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:?required}
     depends_on:
       postgres: { condition: service_healthy }
@@ -141,6 +142,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
+      APP_ENV: ${APP_ENV:?required}
       PORT: "3000"
       SERVICE_NAME: api
       APP_ORIGIN: ${APP_ORIGIN:?required}

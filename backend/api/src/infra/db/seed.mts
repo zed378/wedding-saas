@@ -67,9 +67,19 @@ async function seedPackagesAndAddons(pool: Pool): Promise<void> {
 
 async function main(): Promise<void> {
   // Guard 1: refuse outright in production.
-  if (process.env.NODE_ENV === "production") {
+  //
+  // Keyed on APP_ENV, the DEPLOYMENT environment, not NODE_ENV, the build mode.
+  // `docs/DEVOPS/00` § Environment List requires staging to carry "realistic dummy data,
+  // periodically reset ... from curated seed data", AND § Parity requires staging to run
+  // what production runs -- which means NODE_ENV=production. Keyed on NODE_ENV this
+  // guard refused to seed the one deployed environment that is supposed to be seeded.
+  //
+  // APP_ENV falls back to NODE_ENV when unset, so a developer who has never heard of it
+  // gets the old behaviour exactly.
+  const appEnv = process.env.APP_ENV ?? process.env.NODE_ENV;
+  if (appEnv === "production") {
     console.error(
-      "refusing to seed: NODE_ENV=production. Seeds are development data.",
+      "refusing to seed: APP_ENV=production. Seeds are development and staging data.",
     );
     process.exit(1);
   }

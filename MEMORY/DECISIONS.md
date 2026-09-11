@@ -1258,3 +1258,42 @@ The domain is on Cloudflare's **Free** plan. That is fine for DNS, universal TLS
 **Specification impact** — `docs/PLAN/10` § Hostnames amended: the domain named, the provenance recorded, and "exists today" corrected to `P0-23` because it is no longer true.
 
 ---
+### ADR-043 — `APP_ENV` is the deployment environment; `NODE_ENV` stays the build mode
+
+**Date** 2026-09-11 · **Status** Accepted · **Task** `P0-23`
+
+**Context** — `docs/DEVOPS/00` § Environment List defines **four** environments: development, test, staging and production. `NODE_ENV` has **three** legal values and is read by Node, React and every bundler as a build mode.
+
+The code used `NODE_ENV` for both, and deploying staging made the collision concrete:
+
+- `docs/DEVOPS/00` § Parity requires staging to be "as close as possible to production … the difference should only be resource/data scale". That means a production **build**: `NODE_ENV=production`.
+- `docs/DEVOPS/00` § Environment List requires staging to carry "realistic dummy data, periodically reset … from curated seed data", and § Configuration requires **sandbox** payment credentials.
+
+With one variable those are contradictory. `backend/api/src/infra/db/seed.mts` refused to run because `NODE_ENV=production` — on the one deployed environment that is supposed to be seeded. Worse and quieter: `secret-rules.ts` asked `NODE_ENV === "production"` before deciding whether a **live Midtrans key** was acceptable, so a production build on staging would have accepted one. That is the single check that file exists for.
+
+The test suite had already noticed. `backend/api/test/secret-rules.spec.ts` passed `NODE_ENV: "staging"` in four places — a value `NODE_ENV` never allowed — because "staging" was what the assertions meant.
+
+**Decision** — Two axes.
+
+| | Values | Read by | Answers |
+|---|---|---|---|
+| `NODE_ENV` | development, test, production | Node, React, bundlers | How was this built? |
+| `APP_ENV` | development, test, staging, production | This application | Which deployment is this? |
+
+`APP_ENV` defaults to `NODE_ENV` when unset, so development and test need no new variable and behave exactly as before. A deployed environment sets it explicitly; staging runs `NODE_ENV=production APP_ENV=staging`.
+
+Every environment decision in the application now reads `APP_ENV`: the live/sandbox payment key rules, the production-only origin and signing-key checks, the localhost-database check, and the seed guard.
+
+**Alternatives considered**
+
+- **Add `staging` to `NODE_ENV`.** Rejected: it is not ours to extend. React's development build ships with different code, bundlers branch on it, and a value they do not recognise sends them down the development path — which would put a development React build on staging and break parity in the one direction the document forbids.
+- **Key the seed on the database host instead.** The seed already has that check (`looksRemote`), and it is not enough: it passes for any compose stack, including a production one.
+- **Leave it and seed staging with `NODE_ENV=development` for one command.** What I nearly did. Rejected: it bypasses a guard rather than fixing the model, and it leaves the live-payment-key hole open, which is the serious half.
+
+**Consequences** — `.env.example` and `deploy/staging.env.example` gain `APP_ENV`. Five new tests pin the behaviour, including "refuses a live payment key on staging", which fails against the old code.
+
+The four `NODE_ENV: "staging"` lines in `secret-rules.spec.ts` became `APP_ENV: "staging"` and are now legal values rather than a value the schema would have rejected had the test ever gone through it.
+
+**Specification impact** — None. `docs/DEVOPS/00` already described four environments; the code now has a way to say which one it is.
+
+---
