@@ -25,7 +25,7 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 Verified from the public internet rather than from localhost: the slug reaches the handler, the application and invitation hosts do not cross, and the full `P0-22` workbench accessibility suite — 11 tests including per-story colour contrast — passes against the live URL.
 
-The one thing still missing is automated deployment, which is `P0-17`'s and deferred (ADR-028).
+Automated deployment was **waived by the project owner** on 2026-09-11 — deploying is `git pull` plus a compose command. The waiver covers deployment only: lint, dependency auditing and SAST still run nowhere, which is the one Phase 0 exit criterion left unmet and the reason `P0-17` stays on the board.
 
 ### 2026-09-11 — the product has a face
 

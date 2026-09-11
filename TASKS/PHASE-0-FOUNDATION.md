@@ -6,6 +6,21 @@
 
 **Exit criteria**: `docker compose up` produces an API that answers `/health`, connects to Postgres, Redis and object storage, has every table in `docs/DATABASE/02` through `10` applied by migration, emits structured JSON logs with a `request_id` and redaction, and runs a worker against a queue. A push runs lint, type check, unit and integration tests, dependency audit and SAST. One reference template exists as `template_versions` data with a matching component set, renderable with demo seed data.
 
+**Status against those criteria** (2026-09-11): everything is met except the pipeline, and one item is deferred by design.
+
+| Criterion | State |
+|---|---|
+| `docker compose up` gives an API answering `/health` | Met — and beyond it: the stack runs on a real host at `https://app.vizunicum.my.id` |
+| Connects to Postgres, Redis and object storage | Met — `/readyz` reports the database; MinIO and Redis are healthy on the compose network |
+| Every `docs/DATABASE/02`–`10` table applied by migration | Met — 5 migrations, 28 tables, 123 constraint tests |
+| Structured JSON logs with `request_id` and redaction | Met — `P0-12`, extracted to `@wi/logging` in `P0-19.1` so the worker redacts too |
+| A worker runs against a queue | Met — three pools; the cron pool elects a leader |
+| **A push runs lint, type check, unit and integration tests, dependency audit and SAST** | **NOT met.** `P0-17`, deferred (ADR-028). `scripts/verify.sh` and eleven blocking git hooks cover type check, tests and the project's own guards. **Lint, dependency audit and SAST have never run anywhere.** |
+| One reference template as `template_versions` data with a matching component set, renderable with demo seed data | Met as data (`P0-21`), **not yet renderable** — the component set is names in `@wi/schema`; the components are `P2-02`'s, and `P0-21`'s DoD already recorded that handoff |
+
+The two gaps are known, recorded and different in kind: the renderer is scheduled work in Phase 2, while the missing SAST and dependency audit are a **security** gap with no scheduled owner until `P0-17` is picked up. `docs/SECURITY/11` assumes both. Worth revisiting before Phase 3 touches payment code.
+
+
 **Roadmap reference**: `docs/PLAN/16-IMPLEMENTATION-ROADMAP.md` § Phase 0 (Week 1-2).
 
 ---
@@ -881,7 +896,7 @@ Two decisions came out of deploying it: the domain moved to `vizunicum.my.id` (A
 
 Verified from the public internet, not from localhost: the slug reaches the handler (`/demo-elegant-rose` and `/budi-dan-siti` render their own `data-slug`), the two hosts do not cross, and the full `P0-22` workbench accessibility suite — 11 tests including per-story colour contrast — passes against the live URL.
 
-**The one unmet DoD item is automated deployment**, which belongs to `P0-17` (deferred, ADR-028). Deploying is `git pull` plus a compose command.
+**The one unmet DoD item, automated deployment, was waived by the project owner on 2026-09-11.** Deploying is `git pull` plus a compose command, and that is the accepted state. The waiver covers deployment only — the lint, dependency-audit and SAST half of `P0-17` is untouched by it and remains the one Phase 0 exit criterion not met.
 
 **Why addressing belongs in Phase 0** — `docs/PLAN/10` (as amended by ADR-024) publishes invitations at `invitation.vizunicum.my.id/{slug}`, with the application on `app.vizunicum.my.id`. If routing and certificates are only set up in Phase 3 alongside publishing, the first time anyone discovers a DNS or TLS problem is the week publishing is supposed to ship.
 

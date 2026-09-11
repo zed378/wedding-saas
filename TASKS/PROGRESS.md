@@ -3,7 +3,9 @@
 Single source of truth for where the project stands. Updated in the same commit as the work it describes (`00-TASK-CONVENTIONS.md` global DoD item 11).
 
 **Last updated**: 2026-09-10
-**Current phase**: Phase 0 — Foundation (26 / 27 done). The only task left is `P0-17` (CI/CD), deferred by ADR-028. **Staging is live**: `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port. `P0-23`'s one unmet DoD item is automated deployment, which is `P0-17`'s. **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
+**Current phase**: Phase 0 — Foundation (26 / 27 done). **Staging is live**: `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
+
+The only task left is `P0-17` (CI/CD), deferred by ADR-028. Its **deployment** half was waived by the project owner on 2026-09-11; deploying is `git pull` plus a compose command. Its **verification** half was not waived and is the one Phase 0 exit criterion still unmet — see below. **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
 **Overall**: 26 / 136 tasks done
 
 **No automated pipeline**: `P0-17` is deferred (ADR-028). Before merging to `main`, run `scripts/verify.sh`. The `:id`-endpoint gate blocks in `.githooks/pre-push`; integration tests, the coverage floor, SAST and dependency scanning are **not** running anywhere until `P0-17` is picked up — revisit before Phase 3 payment code.
@@ -65,7 +67,7 @@ Roadmap: Week 1-2. Exit criteria in the phase file.
 | P0-20 | Template schema definition and validator | backend, web-app | L | **DONE** — 39 canonical field paths, a closed component registry, and one resolver both surfaces share | P0-08 |
 | P0-21 | Reference template and demo seed data | backend, web-app | L | **DONE** — one template as JSON, and a demo invitation proven publishable against it | P0-20 |
 | P0-22 | Frontend skeletons and design system | frontend | L | **DONE** — three apps, 13 components, and a browser axe pass that found a contrast bug the unit tests could not | P0-02 |
-| P0-23 | Staging, hosts and TLS | infra | L | **DONE** — live at `app.` and `invitation.vizunicum.my.id` over HTTPS through a Cloudflare Tunnel; 4/5 DoD, the fifth needs `P0-17` | P0-04 |
+| P0-23 | Staging, hosts and TLS | infra | L | **DONE** — live at `app.` and `invitation.vizunicum.my.id` over HTTPS through a Cloudflare Tunnel; automated deploy waived by the project owner 2026-09-11 | P0-04 |
 | P0-24 | Adopt the TASKS/MEMORY discipline | docs | S | **DONE** | — |
 | P0-25 | Separate surfaces into backend/frontend/admin | infra | S | **DONE** | P0-02 |
 | P0-26 | Helm charts for the Kubernetes path | infra | M | **DONE** — K8s schema validation deferred to `P0-23`, no cluster reachable | P0-05 |

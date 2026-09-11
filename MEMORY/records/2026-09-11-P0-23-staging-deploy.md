@@ -8,7 +8,7 @@
 | **Surface** | infra, backend, frontend |
 | **Author** | Claude Code session |
 | **Commits / PR** | `feat/P0-23-domain-and-vm-deploy`, `feat/P0-23-app-env`, then direct to `main` |
-| **Status** | **Completed** — four of five DoD items met; the fifth needs `P0-17`, which is deferred (ADR-028) |
+| **Status** | **Completed** — four of five DoD items met; the fifth **waived by the project owner** on 2026-09-11 |
 
 ---
 
@@ -117,7 +117,11 @@ API unit total: 91 → 96. Nothing else changed.
 
 - [x] **Staging carries no production data and no live payment credentials.** The database was created empty and seeded from `P0-21`'s curated data; one invitation exists and it is the demo. A live Midtrans key is now rejected at startup on staging, which it would not have been before ADR-043.
 
-- [ ] **A merge reaches staging without a manual step.** Not met, and not blocked by this task: `P0-17` is deferred (ADR-028). Deploying is `git pull` plus a compose command. Step 6 (synthetic monitoring) is likewise open — it now *has* a public endpoint to probe, so it is no longer blocked, just not done.
+- [–] **A merge reaches staging without a manual step.** **WAIVED.** The project owner said on 2026-09-11 that automated deployment can be skipped for now. Deploying is therefore `git pull` plus a compose command, run by hand, and that is the accepted state rather than an oversight.
+
+  **What the waiver does not cover.** `P0-17` is a CI *pipeline*, not just a deploy step, and Phase 0's exit criteria ask for more than deployment: "A push runs lint, type check, unit and integration tests, dependency audit and **SAST**." Only the deployment half was waived. Lint is still not wired anywhere (`P0-17`), and dependency auditing and SAST have never run — `scripts/verify.sh` says so in its own closing output. `scripts/verify.sh` and the eleven blocking git hooks are the compensating control and they do not cover those three. That gap is `P0-17`'s and it is still open.
+
+  Step 6 (synthetic monitoring) is likewise not done. It is no longer *blocked* — there is a public endpoint to probe now — just not done.
 
 **Verified against the live deployment**, not against localhost: the full `P0-22` workbench suite — 11 tests including per-story axe with colour contrast, the `<dialog>` focus-trap and inertness checks, and the security headers — ran against `https://app.vizunicum.my.id` and passed.
 
