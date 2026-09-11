@@ -26,6 +26,12 @@ import { currentRequestContext } from "./request-context.js";
 
 export type SecurityEventType =
   | "auth.login_failed"
+  /**
+   * The breached-password check could not run, so the password was accepted without it
+   * (ADR-044, `P1-01`). A control that fails open has to be one that somebody can see
+   * failing, or it is just a control that is off.
+   */
+  | "auth.breach_check_unavailable"
   | "auth.token_reuse_detected"
   | "authz.idor_attempt"
   | "payment.invalid_signature"

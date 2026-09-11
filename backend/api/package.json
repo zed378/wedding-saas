@@ -24,6 +24,7 @@
     "@wi/logging": "workspace:*",
     "@wi/schema": "workspace:*",
     "@wi/storage": "workspace:*",
+    "argon2": "^0.45.1",
     "drizzle-orm": "^0.45.2",
     "express": "^5.2.1",
     "helmet": "^8.3.0",

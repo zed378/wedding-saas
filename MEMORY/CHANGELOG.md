@@ -10,6 +10,16 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-11 — Phase 1 begins: passwords
+
+**Added** — hashing, verification and policy ([P1-01](./records/2026-09-11-P1-01-password-hashing.md))
+- **argon2id at 64 MiB, t=3, p=1**, measured on the actual deployment host across a grid rather than copied from a recommendation (ADR-045). 277 ms per hash — over three times OWASP's floor on memory, which is the dimension that makes argon2 expensive to attack.
+- **Verification costs the same whether the account exists or not.** `docs/SECURITY/03` requires the response not to distinguish an unregistered email from a wrong password, and that is a claim about time, not just about the message. A missing hash is verified against a dummy built from the current parameters, so its cost cannot drift away from the real one.
+- **The breached-password check fails open and says so** (ADR-044). `docs/SECURITY/03` calls it *recommended*; failing closed would block a couple registering during someone else's outage. It reports "unavailable" as a value distinct from "safe" and emits a security event — a control that can be down unnoticed is not a control.
+- Only the first five characters of the password's SHA-1 ever leave the process, and a test asserts the request contains neither the password nor the rest of the hash.
+
+**Worth knowing** — a mutation disproved a claim written in the feature spec. The `null` guard in `verifyPassword` is a **timing** control, not a correctness one: delete it and the test named "a null hash never verifies" still passes, because argon2 throws and the catch returns false anyway. Only the timing tests catch it. Third time in this project a test has verified less than its name suggested, and third time only running the mutation found it.
+
 ### 2026-09-11 — it runs somewhere other than a laptop
 
 **Added** — a staging environment ([P0-23, partial](./records/2026-09-11-P0-23-staging-deploy.md))
