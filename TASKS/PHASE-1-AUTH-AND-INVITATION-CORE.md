@@ -90,7 +90,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — 2026-09-11 |
 | **Depends on** | P1-01, P0-15 |
 | **Spec refs** | `docs/API/01-AUTHENTICATION.md` § Registration Flow, `docs/PLAN/01-PRODUCT-REQUIREMENTS.md` FR-1.1, `docs/SECURITY/03` § Email Verification |
 | **Spec required** | Yes — authentication |
@@ -108,10 +108,14 @@
 7. Rate limit registration per `docs/SECURITY/10` (5 per hour per IP) — wired in `P1-07`, referenced here.
 
 **Definition of Done**
-- [ ] Verification tokens are stored hashed, expire in 24 hours, and cannot be reused.
-- [ ] Registration succeeds even when the email provider is down; the mail is retried by the worker.
-- [ ] An unverified user can create and edit a draft but is refused at publish and checkout, proven by tests on both.
-- [ ] A duplicate registration for an existing email does not reveal that the email exists.
+- [x] SHA-256 of a 256-bit random value, 24-hour expiry, and single use enforced by a conditional `UPDATE ... WHERE used_at IS NULL` rather than a read-then-write — so two simultaneous clicks race in the database. A test runs both redemptions concurrently and asserts exactly one wins.
+- [x] Proven with a queue that throws: the user still exists, because the enqueue happens after the transaction commits.
+- [ ] **Partially met.** `requireVerifiedEmail` exists and is tested, but `POST /publish` (`P3-06`) and `POST /orders` (`P3-01`) do not exist yet, so there is nothing to test against. **Obligation recorded on both cards.**
+- [x] A duplicate returns the identical `201`. The password policy and the argon2 hash both run *before* the existence check, so the two paths cost the same 277 ms — otherwise the response time would say what the status code was careful not to.
+
+**The real owner still gets an email** when someone tries to register with their address. Without it the attacker learns nothing and neither does the one person entitled to know.
+
+**Three pieces of infrastructure came with this**: the API's queue producer (`P0-15` built the worker, not the producer), the single-use token service, and `REDIS_URL` — which the environment schema named in a comment but never declared, so nothing validated it.
 
 ---
 

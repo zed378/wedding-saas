@@ -10,6 +10,7 @@ const valid = {
   // The application role, not the owner. Migrations validate their own URL
   // separately in src/infra/db/env.mts (P0-06).
   DATABASE_URL: "postgres://wedding_app:pw@localhost:5432/wedding",
+  REDIS_URL: "redis://localhost:6379",
 } as NodeJS.ProcessEnv;
 
 describe("configuration", () => {
