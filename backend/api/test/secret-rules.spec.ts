@@ -175,6 +175,7 @@ describe("APP_ENV is the deployment, NODE_ENV is the build (P0-23)", () => {
     PUBLIC_INVITE_ORIGIN: "https://invitation.vizunicum.my.id",
     ADMIN_ORIGIN: "https://admin.vizunicum.my.id",
     DATABASE_URL: "postgres://wedding_app:pw@postgres:5432/wedding",
+    REDIS_URL: "redis://redis:6379",
   };
 
   it("defaults APP_ENV to NODE_ENV when it is not set", () => {
@@ -241,6 +242,7 @@ describe("loadEnv enforces the rules, not just the fields", () => {
         PUBLIC_INVITE_ORIGIN: "http://localhost:3200",
         ADMIN_ORIGIN: "http://localhost:3300",
         DATABASE_URL: "postgres://wedding_app:pw@localhost:5432/wedding",
+        REDIS_URL: "redis://localhost:6379",
         MIDTRANS_SERVER_KEY: LIVE_KEY,
       } as NodeJS.ProcessEnv),
     ).toThrow(SecretRuleError);
@@ -257,6 +259,7 @@ describe("loadEnv enforces the rules, not just the fields", () => {
         PUBLIC_INVITE_ORIGIN: "http://localhost:3200",
         ADMIN_ORIGIN: "http://localhost:3300",
         DATABASE_URL: "postgres://wedding_app:pw@localhost:5432/wedding",
+        REDIS_URL: "redis://localhost:6379",
         MIDTRANS_SERVER_KEY: SANDBOX_KEY,
       } as NodeJS.ProcessEnv),
     ).not.toThrow();

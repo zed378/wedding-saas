@@ -10,6 +10,8 @@ import { TenancyModule } from "./shared/tenancy/tenancy.module";
 import { LoggingModule } from "./shared/logging/logging.module";
 import { AuditModule } from "./shared/audit/audit.module";
 import { StorageModule } from "./infra/storage/storage.module";
+import { QueueModule } from "./infra/queue/queue.module";
+import { AuthModule } from "./modules/auth/auth.module";
 
 /**
  * The middleware chain, in order. Positions later tasks fill are reserved here rather
@@ -43,6 +45,8 @@ import { StorageModule } from "./infra/storage/storage.module";
     TenancyModule,
     AuditModule,
     StorageModule,
+    QueueModule,
+    AuthModule,
     // Scaffolding, not a feature. Removed once a real module exists on each surface.
     ...(process.env["NODE_ENV"] === "production" ? [] : [ReferenceModule]),
   ],

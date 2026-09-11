@@ -10,6 +10,17 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-11 — you can create an account
+
+**Added** — registration, email verification and resend ([P1-02](./records/2026-09-11-P1-02-registration-and-verification.md))
+- **`POST /auth/register` cannot be used to find out who has an account.** A duplicate address returns the same `201` and the same body as a new one, and takes the same time: the password policy runs and the argon2 hash is computed *before* the existence check, so the 277 ms from `P1-01` lands on both paths. The real owner still gets an email saying somebody tried — otherwise they are the only person the defence keeps in the dark.
+- **A verification token is single-use because of the `UPDATE`, not because of a read.** One conditional `UPDATE … WHERE used_at IS NULL` decides the winner, so a mail client prefetching the link while the user clicks races in the database rather than in application code. Issuing a token revokes the previous unused one, so "resend" does not leave a trail of live links.
+- Tokens are 256 bits stored as SHA-256; a database dump does not yield a working link. Twenty-four-hour expiry per `docs/SECURITY/03`.
+- Registration survives the queue being down — the notification job is enqueued after the transaction commits and its failure is logged, not propagated.
+- The API gained a **queue producer** (`P0-15` built the consumer), and `REDIS_URL` is now actually declared in the environment schema instead of only being named in a comment.
+
+**Worth knowing** — the unverified-user gate exists and is tested, but the DoD asks for tests on `POST /publish` and `POST /orders`, and neither endpoint exists yet. Recorded as an obligation on `P3-06` and `P3-01` rather than ticked.
+
 ### 2026-09-11 — Phase 1 begins: passwords
 
 **Added** — hashing, verification and policy ([P1-01](./records/2026-09-11-P1-01-password-hashing.md))

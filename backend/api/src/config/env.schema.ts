@@ -77,6 +77,16 @@ export const envSchema = z
     DATABASE_URL: z.string().min(1),
 
     /**
+     * Redis, for the job queue (`P1-02` producer, `P0-15` worker), the cache and rate
+     * limiting -- one instance shared by all three (ADR-008).
+     *
+     * Required rather than optional: every deployed surface needs it, and an API that
+     * started without it would fail on the first registration instead of at boot, which
+     * is the failure mode `loadEnv` exists to prevent.
+     */
+    REDIS_URL: z.string().min(1),
+
+    /**
      * Object storage (P0-16). MinIO locally, Cloudflare R2 in production (ADR-011).
      *
      * Optional so that a test run needs no bucket -- the storage module falls back to the
