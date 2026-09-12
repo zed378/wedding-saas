@@ -11,7 +11,10 @@ PATCH  /api/v1/invitations/:id                   Partial update (settings, etc.)
 DELETE /api/v1/invitations/:id                   Soft-delete
 POST   /api/v1/invitations/:id/change-template   { template_id }
 POST   /api/v1/invitations/:id/upgrade-template-version   Move to the latest published version of the SAME template
+GET    /api/v1/invitations/slug-available?slug=&exclude_invitation_id=   Is this address usable?
 ```
+
+`slug-available` is **advisory**. It answers `{ available, slug, reason?, message? }` where `reason` is `format`, `blocked` or `taken` — the three kinds stay distinct because "not a valid address", "reserved" and "somebody got there first" are different problems for the person typing. Between its answer and the `POST /invitations` that uses it, another user can claim the slug, so **the creation call remains authoritative** and a client must still handle 409 `SLUG_TAKEN`. Authenticated and rate limited despite a slug being a public address by design: the endpoint is a yes/no oracle over every published invitation's URL, and bulk-harvesting which addresses exist should not be convenient. Added by `P1-21` (gap `PG-18`).
 
 `change-template` and `upgrade-template-version` are separate endpoints because they are separate user intentions and carry different warnings. Changing templates may hide sections the new template does not support (BR-4.1); upgrading a version keeps the same design and is the conscious action BR-3.2 promises. Neither is ever automatic — an invitation stays on the `template_version_id` it locked at creation until the user acts (BR-3.1).
 

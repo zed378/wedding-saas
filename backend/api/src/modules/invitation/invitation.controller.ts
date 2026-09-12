@@ -30,7 +30,7 @@ import { GiftService, QuoteService } from "./gift.service";
 import { SettingsService } from "./settings.service";
 import { ChangeTemplateService } from "./change-template.service";
 import { GalleryService } from "./gallery.service";
-import { SLUG_MAX_LENGTH, SLUG_MIN_LENGTH } from "./slug.service";
+import { SlugService, SLUG_MAX_LENGTH, SLUG_MIN_LENGTH } from "./slug.service";
 import { sanitizeFields } from "../../shared/sanitizer/sanitize";
 import { TEXT_FIELDS } from "../../shared/sanitizer/registry";
 
@@ -289,6 +289,21 @@ const galleryReorderSchema = z
   .object({ ordered_photo_ids: z.array(z.uuid()).min(1).max(200) })
   .strict();
 
+/**
+ * `GET /invitations/slug-available?slug=…`. `P1-21`.
+ *
+ * **Not in `docs/API/04` before this task**, and the document is amended rather than the
+ * endpoint invented quietly — `P1-21`'s DoD requires availability to be checked before
+ * submission, and there was nothing to check it with. Raised as `PG-18`.
+ */
+const slugAvailabilitySchema = z
+  .object({
+    slug: z.string().trim().min(SLUG_MIN_LENGTH).max(SLUG_MAX_LENGTH),
+    /** Excluded from the taken check, so an invitation does not collide with itself. */
+    exclude_invitation_id: z.uuid().optional(),
+  })
+  .strict();
+
 const listQuerySchema = z
   .object({
     page: z.coerce.number().int().min(1).optional(),
@@ -364,6 +379,7 @@ export class InvitationController {
     private readonly settings: SettingsService,
     private readonly changeTemplate: ChangeTemplateService,
     private readonly gallery: GalleryService,
+    private readonly slugs: SlugService,
   ) {}
 
   /**
@@ -427,6 +443,52 @@ export class InvitationController {
   }
 
   /** The full aggregate. `docs/API/04` § Example Response. */
+  // ------------------------------------------------------------ slug checking
+
+  /**
+   * Is this address usable? `P1-21` step 5.
+   *
+   * **Advisory, and the creation call is still authoritative.** Between this answer and the
+   * `POST /invitations` that uses it, somebody else can claim the slug — so the wizard shows
+   * this result while typing and still handles a 409 on submit. An availability check that a
+   * client treated as a promise would produce a confusing failure at the worst moment.
+   *
+   * Authenticated and rate limited even though a slug is a public address by design: the
+   * answer is a yes/no oracle over every published invitation's URL, and bulk-harvesting
+   * which addresses exist is not something to make convenient.
+   */
+  /*
+   * Declared BEFORE `@Get(":id")`, and that is not style. Nest matches routes in
+   * declaration order, so a parameterised route declared first swallows every literal
+   * sibling: with `:id` above, `GET /invitations/slug-available` is an invitation lookup
+   * for the id "slug-available" and answers 404. It was written that way first and eight
+   * tests caught it.
+   */
+  @Get("slug-available")
+  @UseGuards(rateLimit("general-authenticated"))
+  async slugAvailable(@Query() query: unknown) {
+    const input = parse(slugAvailabilitySchema, query);
+
+    const rejection = await this.slugs.check(
+      input.slug,
+      input.exclude_invitation_id,
+    );
+
+    return ok(
+      rejection === undefined
+        ? { available: true, slug: input.slug }
+        : {
+            available: false,
+            slug: input.slug,
+            // The three kinds stay distinct: "not a valid address", "reserved" and
+            // "somebody got there first" are different problems for the person typing, and
+            // collapsing them would make the inline hint useless.
+            reason: rejection.kind,
+            message: rejection.message,
+          },
+    );
+  }
+
   @Get(":id")
   async getInvitation(
     @CurrentUserParam() user: CurrentUser,

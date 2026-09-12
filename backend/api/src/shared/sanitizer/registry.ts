@@ -86,6 +86,8 @@ export const NOT_USER_TEXT: Readonly<Record<string, string>> = {
   ordered_photo_ids:
     "a list of UUIDs, each validated by `z.uuid()` and then checked to be exactly this invitation's photos (P1-19)",
   invitation_id: "a UUID, validated by `z.uuid()`; not rendered as text",
+  exclude_invitation_id:
+    "a UUID, validated by `z.uuid()`; used only to exclude one row from a slug lookup (P1-21)",
   user_id: "a UUID, validated by `z.uuid()`; not rendered as text",
   event_id: "a UUID, validated by `z.uuid()`; not rendered as text",
   photo_media_id:

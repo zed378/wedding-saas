@@ -1608,3 +1608,41 @@ addressed to the POOL is never delivered"* which encodes the old bug as a bug.
 **Follow-up** — the envelope type is declared twice, once on each side. It wants to be a
 shared package. `P4-06` is the task that will care, because `notification.send` is the next
 job to get a handler.
+
+### ADR-057 — `slug-available` is advisory, and the creation call stays authoritative
+
+**Date** 2026-09-12 · **Status** Accepted · **Task** `P1-21` · **Closes** `PG-18`
+
+**Context** — `P1-21`'s definition of done requires slug availability to be "checked before
+submission, and the server result still wins on conflict". `docs/API/04` specified no way to
+check: creation and settings both discover a collision by failing, which is the correct
+behaviour for them and a poor experience for somebody typing an address into a wizard.
+
+`P1-09`'s `SlugService.check` already answers the question — format, blocklist and
+taken-ness, as three distinct kinds. Only the endpoint was missing.
+
+**Decision** — `GET /api/v1/invitations/slug-available?slug=&exclude_invitation_id=`,
+authenticated, rate limited on the existing `general-authenticated` policy, answering
+`{ available, slug, reason?, message? }`.
+
+**It is advisory, and the word is load-bearing.** Between this answer and the `POST
+/invitations` that uses it, another user can claim the slug. The endpoint cannot reserve
+anything, and it deliberately does not try: a reservation would need a lock held across a
+user's typing, an expiry, and a way to release one abandoned mid-wizard — a great deal of
+machinery for a collision that is rare and already handled. So the wizard shows this result
+while the user types and **still handles 409 `SLUG_TAKEN` on submit**, and a test asserts
+the second path works.
+
+A client that treated the check as a promise would produce its confusing failure at the
+worst possible moment, which is why the contract says so explicitly in `docs/API/04`.
+
+**Why authenticated, for a value that is a public URL** — a slug is public by design; the
+endpoint is not the slug, it is a **yes/no oracle over every published invitation's
+address**. Answering it a thousand times a second to an anonymous caller makes harvesting the
+platform's entire live address space a convenience. Requiring a session and a rate limit
+costs a legitimate user nothing.
+
+**The three `reason` kinds stay distinct.** `format`, `blocked` and `taken` are different
+problems for the person typing — "that is not a valid address", "that word is reserved",
+"somebody got there first" — and collapsing them into "unavailable" would make the inline
+hint useless at exactly the moment it is supposed to help.

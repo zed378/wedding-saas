@@ -102,3 +102,58 @@ test.describe("auth screens", () => {
     expect(Object.keys(stored.session)).toEqual([]);
   });
 });
+
+/**
+ * P1-21 DoD item 4 — the dashboard at 360px.
+ *
+ * "Usable at 360px" is a statement about **layout**, and layout is the one thing jsdom has
+ * none of. The check that matters is not a screenshot: it is that nothing forces the document
+ * wider than the viewport, because a page that scrolls sideways on a phone hides its own
+ * actions off the right edge and `docs/UI-UX/15` is specifically about this.
+ *
+ * The dashboard is behind the route guard, so an unauthenticated visit lands on `/login`.
+ * That is the page this measures — which is the honest scope until `P1-25`'s suite can
+ * authenticate. The list's own responsive behaviour is covered by its component test's grid
+ * classes and by this same check once a session exists.
+ */
+test.describe("mobile layout (docs/UI-UX/15)", () => {
+  test.skip(BASE === undefined, "Set E2E_WEB_APP_URL to the running web app.");
+
+  for (const path of ["/login", "/register", "/dashboard"]) {
+    test(`${path} does not scroll sideways at 360px`, async ({ page }) => {
+      await page.setViewportSize({ width: 360, height: 740 });
+      await page.goto(`${BASE}${path}`);
+      await page.waitForSelector("h1, p[role='status']");
+
+      const overflow = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }));
+
+      // One pixel of tolerance for sub-pixel rounding; anything more is a real overflow.
+      expect(
+        overflow.scrollWidth - overflow.clientWidth,
+        `${JSON.stringify(overflow)}`,
+      ).toBeLessThanOrEqual(1);
+    });
+  }
+
+  test("every tap target on the login form is at least 44px tall", async ({
+    page,
+  }) => {
+    // `docs/UI-UX/15` and WCAG 2.5.5. A 28px button is reachable with a mouse and a
+    // coin-toss with a thumb.
+    await page.setViewportSize({ width: 360, height: 740 });
+    await page.goto(`${BASE}/login`);
+    await page.waitForSelector("h1");
+
+    const heights = await page
+      .locator("main button, main input")
+      .evaluateAll((nodes) =>
+        nodes.map((n) => Math.round(n.getBoundingClientRect().height)),
+      );
+
+    expect(heights.length).toBeGreaterThan(0);
+    for (const height of heights) expect(height).toBeGreaterThanOrEqual(44);
+  });
+});
