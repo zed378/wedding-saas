@@ -56,6 +56,30 @@ const SKIP_DIRS = new Set(["node_modules", "dist", ".next", ".turbo", "coverage"
 
 /** The token definition itself, plus anything whose job is to be a fixture. */
 const ALLOWED = ["packages/ui/src/tokens.css"];
+
+/**
+ * Two kinds of file that cannot use a token, for reasons that are not laziness.
+ *
+ * **`global-error.tsx`** is Next's app-root boundary (`P2-04`, `docs/FRONTEND/08`). It
+ * catches a failure in the root layout — which is the file that imports `globals.css` and
+ * `@wi/ui`. If the layout threw, neither is reliably present, so a boundary styled with
+ * tokens would render unstyled at best and throw again at worst, producing the blank
+ * white screen that document names as the outcome to avoid. It styles itself inline
+ * precisely because it must not depend on the thing it exists to survive.
+ *
+ * **`frontend/public-invite`'s own chrome** — its error and not-found pages. `CLAUDE.md`
+ * and `deploy/README.md` both record that `@wi/ui/tokens.css` is **deliberately not
+ * imported** by this surface: an invitation's palette is per-template data
+ * (`docs/PLAN/07`), and importing the application's tokens there would give every wedding
+ * the dashboard's indigo. So there is no token to use. The invitation content itself is
+ * themed by `@wi/template-renderer`, which is outside this rule for the same reason.
+ *
+ * Both are narrow: a filename, and a surface that has no token source at all.
+ */
+const OUTSIDE_THE_RULE = [
+  /(^|\/)global-error\.tsx$/,
+  /^frontend\/public-invite\//,
+];
 const isTest = (rel) => /\.(spec|itest|e2e|test)\.(ts|mts|tsx)$/.test(rel);
 
 const PATTERNS = [
@@ -111,6 +135,7 @@ let checked = 0;
 for (const file of files) {
   const rel = relative(".", file).split(sep).join("/");
   if (ALLOWED.includes(rel)) continue;
+  if (OUTSIDE_THE_RULE.some((re) => re.test(rel))) continue;
   if (isTest(rel)) continue;
 
   checked += 1;

@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 
 import { resolveComponent } from "./registry.js";
 import { SECTION_STYLES } from "./sections/styles.js";
+import { SectionBoundary } from "./SectionBoundary.js";
 import { resolveSectionData } from "./resolve-data.js";
 import { mergeTheme, themeToCustomProperties } from "./theme.js";
 import type {
@@ -46,6 +47,8 @@ export function TemplateRenderer({
   themeOverride,
   mode,
   onSectionIssue,
+  onSectionError,
+  sectionFallback,
 }: TemplateRendererProps) {
   const theme = mergeTheme(
     templateVersion.theme,
@@ -96,13 +99,27 @@ export function TemplateRenderer({
             data-section={section.section_key}
             data-component={section.component}
           >
-            <Component
-              data={resolveSectionData(invitationData, fieldsOf(section))}
-              theme={theme}
-              layoutVariant={section.layout_variant}
-              mode={mode}
-              maxItems={section.max_items}
-            />
+            {/*
+             * `docs/FRONTEND/08`: one section's failure must not reach another. The
+             * boundary is INSIDE the `<section>` rather than around it so a failed
+             * section still leaves its element in the document — which keeps the page's
+             * structure stable and means a `data-section` query finds it whether it
+             * rendered or not.
+             */}
+            <SectionBoundary
+              sectionKey={section.section_key}
+              component={section.component}
+              onError={onSectionError}
+              fallback={sectionFallback}
+            >
+              <Component
+                data={resolveSectionData(invitationData, fieldsOf(section))}
+                theme={theme}
+                layoutVariant={section.layout_variant}
+                mode={mode}
+                maxItems={section.max_items}
+              />
+            </SectionBoundary>
           </section>
         );
       })}

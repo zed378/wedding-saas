@@ -12,6 +12,16 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ### 2026-09-12 — Phase 2 opens: the catalog, and the renderer everything else runs through
 
+**Added** — all three error boundary levels, and the editor protection ([P2-04](./records/2026-09-12-P2-04-error-boundaries.md))
+
+- **One broken section never takes down an invitation.** `docs/FRONTEND/08` states the stake plainly: RSVP and event details "must never disappear because another section broke". A guest who cannot find the venue because a gallery row is corrupt is the outcome this prevents, on a page hundreds of people open from a WhatsApp link at a time nobody is watching a dashboard.
+- **The editor's boundary is the expensive one.** On the public page a broken section costs a guest some content; in the editor an unhandled render error unmounts everything and takes the properties panel and every unsaved keystroke with it — losing by a different route exactly what `P1-22` protects on the save path.
+- **A failed section shows nothing on the public page and a message in the editor.** Different audiences: a guest cannot act on it and an error box in a wedding invitation is worse for the couple than a missing section, while the person in the editor *is* the one who needs to know — and needs to know their edits are safe.
+- **The report carries no section data.** The obvious thing to attach to a render error is the props that caused it, and for this renderer those props are sometimes the couple's bank account numbers (`docs/SECURITY/09`). It reports the section key, the component and the error; `invitation_id` is the caller's to add, because the renderer has no concept of which invitation it is showing.
+- **Route and app-root pages show no error message or digest.** An unhandled error's text can carry an internal path or an identifier, and an error page is read by whoever is at the screen — and anyone behind them.
+
+**Still a seam**: nothing forwards these reports to error tracking yet. A boundary makes a crash quiet, which is the point and also the risk — a section failing for every invitation now fails invisibly until somebody notices a missing gallery.
+
 **Added** — the ten sections every template is assembled from ([P2-03](./records/2026-09-12-P2-03-section-components.md))
 
 - **Not one colour and not one font name in them.** Every visual value is `var(--…)`, set from the template's theme, and the guard now fails the build for a literal — mutation-verified. The single exemption is the hero's achromatic scrim: a cover photo is chosen by the couple and can be any brightness, so darkening the image is the only way to guarantee contrast, and making that themeable would let a template author break `docs/UI-UX/17`.
