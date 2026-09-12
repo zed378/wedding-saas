@@ -40,13 +40,25 @@ export class ValidationError extends AppError {
   }
 }
 
-/** 401. No credentials, or credentials that are not valid. */
+/**
+ * 401. No credentials, or credentials that are not valid.
+ *
+ * The code is a parameter because `docs/API/01` § Error Cases names a second one,
+ * `INVALID_CREDENTIALS`, for a failed login — and only for a failed login. Everything
+ * else that is 401 (no token, expired token, forged token, spent refresh token) must stay
+ * `UNAUTHENTICATED` and indistinguishable, which is why this is a closed union rather
+ * than a free string.
+ */
 export class UnauthenticatedError extends AppError {
   readonly status = 401;
-  readonly code = "UNAUTHENTICATED";
+  readonly code: "UNAUTHENTICATED" | "INVALID_CREDENTIALS";
 
-  constructor(message = "Authentication is required.") {
+  constructor(
+    message = "Authentication is required.",
+    code: "UNAUTHENTICATED" | "INVALID_CREDENTIALS" = "UNAUTHENTICATED",
+  ) {
     super(message);
+    this.code = code;
   }
 }
 

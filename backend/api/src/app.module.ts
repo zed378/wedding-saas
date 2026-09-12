@@ -24,6 +24,7 @@ import { AuthModule } from "./modules/auth/auth.module";
  *   3. CORS                       explicit origin allowlist     (main.ts)
  *   4. security headers           helmet                        (main.ts)
  *   5. body parsing + size limit  express.json({ limit })       (main.ts)
+ *  5b. cookie parsing            cookie-parser, unsigned        (main.ts)
  *   6. rate limiting              Redis sliding window          P1-07
  *   7. authentication             requireAuth, injects user     P1-06
  *   -- route handler --

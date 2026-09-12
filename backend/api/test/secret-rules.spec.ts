@@ -7,7 +7,7 @@
 import { describe, it, expect } from "vitest";
 
 import { checkSecretRules } from "../src/config/secret-rules";
-import { loadEnv } from "../src/config/env.schema";
+import { ConfigValidationError, loadEnv } from "../src/config/env.schema";
 import { SecretRuleError } from "../src/config/secret-rules";
 
 /**
@@ -25,6 +25,19 @@ const base = {
   PUBLIC_INVITE_ORIGIN: "https://invitation.vizunicum.my.id",
   ADMIN_ORIGIN: "https://admin.vizunicum.my.id",
   DATABASE_URL: "postgres://wedding_app:pw@db.internal:5432/wedding",
+};
+
+/** A complete, valid development environment. Every required variable, nothing more. */
+const developmentEnv = {
+  NODE_ENV: "development",
+  APP_ENV: "development",
+  APP_ORIGIN: "http://localhost:3100",
+  PUBLIC_INVITE_ORIGIN: "http://localhost:3200",
+  ADMIN_ORIGIN: "http://localhost:3300",
+  DATABASE_URL: "postgres://wedding_app:pw@localhost:5432/wedding",
+  REDIS_URL: "redis://localhost:6379",
+  JWT_SIGNING_KEY: "s".repeat(48),
+  REFRESH_TOKEN_PEPPER: "p".repeat(48),
 };
 
 /**
@@ -109,28 +122,46 @@ describe("payment keys cannot cross environments", () => {
 });
 
 describe("production-only rules", () => {
-  it("refuses a short signing key", () => {
-    // A key short enough to brute force is worse than none, because it looks like
-    // security. docs/SECURITY/03 § Tokens.
-    const violations = checkSecretRules({ ...base, JWT_SIGNING_KEY: "short" });
-    expect(violations.map((v) => v.variable)).toContain("JWT_SIGNING_KEY");
-  });
+  it.each(["JWT_SIGNING_KEY", "REFRESH_TOKEN_PEPPER"] as const)(
+    "refuses %s when it is still the .env.example placeholder",
+    (name) => {
+      // Long, valid, and published. Every per-field check passes and every deployment
+      // that copied the file shares one signing key.
+      const violations = checkSecretRules({
+        ...base,
+        [name]: "changeme-dev-jwt-signing-key-not-a-real-secret",
+      });
+      expect(violations.map((v) => v.variable)).toContain(name);
+    },
+  );
 
-  it("accepts a long signing key", () => {
+  it("accepts a generated signing key", () => {
     expect(
       checkSecretRules({ ...base, JWT_SIGNING_KEY: "a".repeat(48) }),
     ).toEqual([]);
   });
 
-  it("does not apply the length rule outside production", () => {
-    // A developer should not need a 32-character key to run the stack locally.
+  it("does not apply the placeholder rule outside production", () => {
+    // The placeholder is what a developer is SUPPOSED to be running locally.
     expect(
       checkSecretRules({
         ...base,
         APP_ENV: "development",
-        JWT_SIGNING_KEY: "short",
+        JWT_SIGNING_KEY: "changeme-dev-jwt-signing-key-not-a-real-secret",
       }),
     ).toEqual([]);
+  });
+
+  it("length is enforced by the schema, in every environment, not by this file", () => {
+    // P1-03 moved it. checkSecretRules no longer sees a short key as its business --
+    // loadEnv refuses one before these rules run, in development too.
+    expect(checkSecretRules({ ...base, JWT_SIGNING_KEY: "short" })).toEqual([]);
+    expect(() =>
+      loadEnv({
+        ...developmentEnv,
+        JWT_SIGNING_KEY: "short",
+      } as NodeJS.ProcessEnv),
+    ).toThrow(ConfigValidationError);
   });
 
   it.each(["APP_ORIGIN", "PUBLIC_INVITE_ORIGIN", "ADMIN_ORIGIN"] as const)(
@@ -161,7 +192,7 @@ describe("production-only rules", () => {
       ...base,
       APP_ORIGIN: "http://a.example.com",
       ADMIN_ORIGIN: "http://b.example.com",
-      JWT_SIGNING_KEY: "short",
+      JWT_SIGNING_KEY: "changeme-dev-jwt-signing-key-not-a-real-secret",
       MIDTRANS_SERVER_KEY: SANDBOX_KEY,
     });
     expect(violations.length).toBeGreaterThanOrEqual(4);
@@ -176,6 +207,8 @@ describe("APP_ENV is the deployment, NODE_ENV is the build (P0-23)", () => {
     ADMIN_ORIGIN: "https://admin.vizunicum.my.id",
     DATABASE_URL: "postgres://wedding_app:pw@postgres:5432/wedding",
     REDIS_URL: "redis://redis:6379",
+    JWT_SIGNING_KEY: "s".repeat(48),
+    REFRESH_TOKEN_PEPPER: "p".repeat(48),
   };
 
   it("defaults APP_ENV to NODE_ENV when it is not set", () => {
@@ -243,6 +276,8 @@ describe("loadEnv enforces the rules, not just the fields", () => {
         ADMIN_ORIGIN: "http://localhost:3300",
         DATABASE_URL: "postgres://wedding_app:pw@localhost:5432/wedding",
         REDIS_URL: "redis://localhost:6379",
+        JWT_SIGNING_KEY: "s".repeat(48),
+        REFRESH_TOKEN_PEPPER: "p".repeat(48),
         MIDTRANS_SERVER_KEY: LIVE_KEY,
       } as NodeJS.ProcessEnv),
     ).toThrow(SecretRuleError);
@@ -260,6 +295,8 @@ describe("loadEnv enforces the rules, not just the fields", () => {
         ADMIN_ORIGIN: "http://localhost:3300",
         DATABASE_URL: "postgres://wedding_app:pw@localhost:5432/wedding",
         REDIS_URL: "redis://localhost:6379",
+        JWT_SIGNING_KEY: "s".repeat(48),
+        REFRESH_TOKEN_PEPPER: "p".repeat(48),
         MIDTRANS_SERVER_KEY: SANDBOX_KEY,
       } as NodeJS.ProcessEnv),
     ).not.toThrow();

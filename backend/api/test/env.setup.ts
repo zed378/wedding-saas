@@ -12,3 +12,10 @@ process.env["DATABASE_URL"] =
 // Required since P1-02 added the queue producer. Nothing in the unit suite connects to
 // it; the value exists so `loadEnv` succeeds.
 process.env["REDIS_URL"] = "redis://localhost:6379";
+// Required since P1-03. 32 characters minimum in every environment -- a short HMAC key is
+// brute-forceable offline wherever it runs, so the schema does not make an exception for
+// tests either. These are not secrets: nothing signed with them leaves the test process.
+process.env["JWT_SIGNING_KEY"] =
+  "test-signing-key-not-used-outside-vitest-0000";
+process.env["REFRESH_TOKEN_PEPPER"] =
+  "test-pepper-not-used-outside-vitest-000000000";

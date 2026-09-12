@@ -6,7 +6,7 @@ Single source of truth for where the project stands. Updated in the same commit 
 **Current phase**: Phase 0 — Foundation (26 / 27 done). **Staging is live**: `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
 
 The only task left is `P0-17` (CI/CD), deferred by ADR-028. Its **deployment** half was waived by the project owner on 2026-09-11; deploying is `git pull` plus a compose command. Its **verification** half was not waived and is the one Phase 0 exit criterion still unmet — see below. **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
-**Overall**: 28 / 136 tasks done
+**Overall**: 29 / 136 tasks done
 
 **No automated pipeline**: `P0-17` is deferred (ADR-028). Before merging to `main`, run `scripts/verify.sh`. The `:id`-endpoint gate blocks in `.githooks/pre-push`; integration tests, the coverage floor, SAST and dependency scanning are **not** running anywhere until `P0-17` is picked up — revisit before Phase 3 payment code.
 
@@ -24,7 +24,7 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 | Phase | Tasks | Done | Status | Gate to enter |
 |---|---|---|---|---|
 | [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 27 | 26 | **ACTIVE** | — |
-| [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 2 | **ACTIVE** | Phase 0 exit criteria |
+| [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 3 | **ACTIVE** | Phase 0 exit criteria |
 | [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 14 | 0 | Not started | Phase 1 exit + `P1-25` |
 | [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 0 | Not started | Phase 2 exit |
 | [Phase 4 — Engagement](./PHASE-4-ENGAGEMENT.md) | 12 | 0 | Not started | Phase 3 exit |
@@ -86,7 +86,7 @@ Roadmap: Week 3-5.
 |---|---|---|---|---|---|
 | P1-01 | Password hashing and policy | backend | M | **DONE** — argon2id measured on the deploy host; the breach check fails open and says so | P0-07, P0-19 |
 | P1-02 | Registration and email verification | backend | M | **DONE** — uniform response for a duplicate address; DoD item 3 half-met, the rest owed by P3-01 and P3-06 | P1-01, P0-15 |
-| P1-03 | Login, access tokens, refresh rotation | backend | L | TODO | P1-01 |
+| P1-03 | Login, access tokens, refresh rotation | backend | L | **DONE** — reuse of a spent refresh token revokes every session; role and status re-read from the database on every request | P1-01 |
 | P1-04 | Google OAuth | backend | M | TODO | P1-03 |
 | P1-05 | Forgot and reset password | backend | M | TODO | P1-03, P0-15 |
 | P1-06 | Auth, role and ownership middleware | backend | L | TODO | P1-03, P0-11 |

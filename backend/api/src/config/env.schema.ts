@@ -108,12 +108,17 @@ export const envSchema = z
     STORAGE_BUCKET_STAGING: z.string().min(1).default("staging"),
 
     /**
-     * Auth secrets (P1-03). Optional until then; `checkSecretRules` enforces a minimum
-     * length in production, because a signing key short enough to brute force is worse
-     * than none -- it looks like security.
+     * Auth secrets. Required as of `P1-03`: without them nobody can log in, and "nobody
+     * can log in" should be a refusal to boot rather than a 500 on the first attempt.
+     *
+     * 32 characters in EVERY environment, not just production. A short HMAC key is
+     * brute-forceable offline from one captured token, and a development environment that
+     * gets away with a short one is where the short one comes from. `checkSecretRules`
+     * used to apply this in production only; that hole is closed here, in the schema,
+     * where the length is a property of the value rather than of the deployment.
      */
-    JWT_SIGNING_KEY: z.string().min(1).optional(),
-    REFRESH_TOKEN_PEPPER: z.string().min(1).optional(),
+    JWT_SIGNING_KEY: z.string().min(32),
+    REFRESH_TOKEN_PEPPER: z.string().min(32),
 
     /**
      * Payment provider (P3-03, P3-05).

@@ -45,6 +45,7 @@ interface Checked {
   ADMIN_ORIGIN: string;
   DATABASE_URL: string;
   JWT_SIGNING_KEY?: string | undefined;
+  REFRESH_TOKEN_PEPPER?: string | undefined;
 }
 
 /**
@@ -95,14 +96,27 @@ export function checkSecretRules(env: Checked): SecretRuleViolation[] {
 
   // ---------------------------------------------------------------- production only
   if (isProduction) {
-    // A signing key short enough to brute force is worse than none, because it looks
-    // like security. docs/SECURITY/03 wants HS256/RS256 from a secret manager.
-    if (env.JWT_SIGNING_KEY !== undefined && env.JWT_SIGNING_KEY.length < 32) {
-      violations.push({
-        variable: "JWT_SIGNING_KEY",
-        message:
-          "must be at least 32 characters in production (docs/SECURITY/03 § Tokens).",
-      });
+    // The auth secrets must not be the placeholder from `.env.example`.
+    //
+    // Length is no longer checked here: as of `P1-03` the schema requires 32 characters
+    // in EVERY environment, because a short HMAC key is brute-forceable offline wherever
+    // it runs and a development environment that tolerates one is where it comes from. A
+    // rule that is unreachable is a rule whose test lies about what the system does.
+    //
+    // What is left is the thing length cannot catch and only production cares about: a
+    // key that is long, valid, and public, because it was copied out of the example file
+    // and never replaced. Every deployment sharing one published secret is worse than a
+    // short one, and passes every per-field check.
+    for (const name of ["JWT_SIGNING_KEY", "REFRESH_TOKEN_PEPPER"] as const) {
+      const value = env[name];
+      if (value !== undefined && /changeme/i.test(value)) {
+        violations.push({
+          variable: name,
+          message:
+            "is still the placeholder from .env.example. Generate one with " +
+            "`openssl rand -base64 48` (docs/SECURITY/03 § Tokens).",
+        });
+      }
     }
 
     // Every origin must be HTTPS. An http:// origin in production means cookies without

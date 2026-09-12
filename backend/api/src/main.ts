@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
+import cookieParser from "cookie-parser";
 import express from "express";
 import helmet from "helmet";
 import type { Server } from "node:http";
@@ -70,6 +71,12 @@ async function bootstrap(): Promise<void> {
   //    multipart and size-capped at the edge before the body is read (P1-17).
   app.use(express.json({ limit: env.BODY_LIMIT }));
   app.use(express.urlencoded({ extended: false, limit: env.BODY_LIMIT }));
+
+  // 5b. Cookie parsing. Unsigned deliberately: the only cookie this API sets is the
+  //     refresh token (P1-03), which is 256 bits of randomness checked against a hash in
+  //     the database. A signature would add a second secret to protect a value whose
+  //     integrity is already established by the lookup that uses it.
+  app.use(cookieParser());
 
   await app.listen(env.PORT);
   const server = app.getHttpServer() as Server;
