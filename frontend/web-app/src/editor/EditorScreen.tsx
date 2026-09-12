@@ -6,6 +6,7 @@ import { useAuth } from "../lib/auth";
 import { toFriendlyError } from "../lib/error-messages";
 import { EditorProvider } from "./EditorProvider";
 import { EditorShell } from "./EditorShell";
+import { PropertiesPanel } from "./PropertiesPanel";
 import type { TemplateDefinition } from "./store";
 
 /**
@@ -121,7 +122,7 @@ export function EditorScreen({
         title={detail.internal_name ?? "Undangan tanpa nama"}
         dashboardHref="/dashboard"
         preview={<PreviewPlaceholder />}
-        properties={<PropertiesPlaceholder />}
+        properties={<PropertiesPanel />}
       />
     </EditorProvider>
   );
@@ -138,14 +139,5 @@ function PreviewPlaceholder() {
     <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-text-muted">
       Pratinjau langsung akan tersedia setelah komponen template siap.
     </div>
-  );
-}
-
-/** `P1-23` builds the schema-driven form that goes here. */
-function PropertiesPlaceholder() {
-  return (
-    <p className="text-sm text-text-muted">
-      Isian akan muncul di sini setelah panel properti siap.
-    </p>
   );
 }

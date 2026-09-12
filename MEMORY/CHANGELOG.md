@@ -10,6 +10,21 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — the schema-driven form, and a guard that caught its own author
+
+**Added** — the properties panel and `scripts/check-no-hardcoded-fields.mjs` ([P1-23](./records/2026-09-12-P1-23-properties-panel.md))
+
+- **The form is a loop over the template's own lists.** Adding a field to a section's `required_fields` changes the rendered form with **no frontend change at all** — demonstrated by rendering twice with one string different in a fixture.
+- **Two registries, one vocabulary.** `@wi/schema` owns the paths and is shared with the backend; the frontend registry adds labels, control types and column widths. A test asserts both directions, so adding a field to `docs/PLAN/08` without a label fails the frontend build.
+- **Client validation mirrors the server and never replaces it**, including the `^https?://` check `P1-12` added after measuring that Zod's `.url()` accepts `javascript:alert(1)`. An invalid value is still **sent** — a mirror that is stricter than the original silently blocks legitimate input.
+- **It deliberately does not sanitize.** `docs/SECURITY/08` puts that on the server and `P1-16` built it there; a frontend that stripped tags would make the server's sanitiser look unnecessary to whoever reads the code next. There is a test asserting the client leaves a script tag alone.
+
+**Worth knowing** — `CLAUDE.md`'s first "what not to do" is now a build guard, and it caught one of its own author's files on the first run.
+
+No component may name a section key or a canonical field path. `defaultGroupFor` in `autosave.ts` held `couple`, `events` and `bank_accounts` — a second home for the field vocabulary in a file whose job is timing and queuing. It moved to `transport.ts`, which already held the endpoint table, so exactly one file knows the mapping. The workbench's Tabs story used real section keys as demo ids and was **renamed rather than exempted**: an exemption would be a hole in the guard for the sake of a fixture.
+
+The guard reads both vocabularies from `@wi/schema`'s **source** rather than its build, because it runs before the build step — and a copy inside the guard would drift from the thing it guards, which is the one failure that makes a guard worse than useless.
+
 ### 2026-09-12 — the editor, where the whole guarantee is that nothing is lost
 
 **Added** — the three-column editor, its store and its autosave ([P1-22](./records/2026-09-12-P1-22-editor-shell.md))

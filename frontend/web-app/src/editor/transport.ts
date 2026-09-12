@@ -1,7 +1,8 @@
 import type { ApiClient } from "@wi/api-client";
 
 import { getAtPath } from "./store";
-import type { AutosaveTransport, SaveGroup } from "./autosave";
+import type { AutosaveTransport, SaveGroup, SaveGroupKey } from "./autosave";
+import type { FieldPath } from "./store";
 
 /**
  * P1-22 — turning a save group into the right `PATCH`. `docs/API/04`.
@@ -30,6 +31,29 @@ interface Endpoint {
   readonly path: string;
   /** Strips the group prefix, so `couple.groom.nickname` becomes `nickname`. */
   readonly fieldName: (path: string) => string;
+}
+
+/**
+ * Which sub-resource owns a path. `docs/API/04`.
+ *
+ * The first one or two segments, because that is the shape of the endpoint tree:
+ * `couple.groom.*` is one endpoint and `couple.bride.*` is another, while everything under
+ * `settings.*` is one PATCH. An unknown prefix groups by its first segment rather than
+ * throwing — a new sub-resource should produce its own requests, not break the editor.
+ *
+ * It lives here, beside `endpointFor`, so **one file** holds the path-to-endpoint mapping.
+ * It was in `autosave.ts` first, and `scripts/check-no-hardcoded-fields.mjs` flagged it:
+ * the manager is about timing and queuing, and the moment it also knew that `couple.groom.*`
+ * is one endpoint it was a second home for the field vocabulary.
+ */
+export function defaultGroupFor(path: FieldPath): SaveGroupKey {
+  const [head, second] = path.split(".");
+  if (head === "couple" && second !== undefined) return `couple:${second}`;
+  if (head === "events" && second !== undefined) return `events:${second}`;
+  if (head === "bank_accounts" && second !== undefined) {
+    return `bank_accounts:${second}`;
+  }
+  return head ?? "invitation";
 }
 
 /**

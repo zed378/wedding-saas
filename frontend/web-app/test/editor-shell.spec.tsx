@@ -168,8 +168,15 @@ describe("the save status indicator (card DoD 3)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "edit" }));
 
-    const status = await screen.findByRole("status");
-    expect(status).toHaveAttribute("aria-live", "assertive");
+    // Wait for the FAILURE state specifically. `findByRole("status")` resolves against the
+    // polite region that is already on screen, so asserting straight after the click was a
+    // race the test lost about half the time.
+    await screen.findByRole("button", { name: /coba lagi/i });
+
+    expect(screen.getByRole("status")).toHaveAttribute(
+      "aria-live",
+      "assertive",
+    );
   });
 
   it("retries through the manager and reaches 'saved'", async () => {

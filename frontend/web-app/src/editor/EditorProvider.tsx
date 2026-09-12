@@ -12,7 +12,7 @@ import { useStore } from "zustand";
 
 import { useAuth } from "../lib/auth";
 import { AutosaveManager, type AutosaveTransport } from "./autosave";
-import { createTransport } from "./transport";
+import { createTransport, defaultGroupFor } from "./transport";
 import { createEditorStore, type EditorInit, type EditorStore } from "./store";
 
 /**
@@ -79,6 +79,7 @@ export function EditorProvider({
           // correctly.
           readData: () => store.getState().data,
         }),
+      groupFor: defaultGroupFor,
       callbacks: {
         onBeginSave: (fields) => {
           store.getState().beginSave(fields);
