@@ -427,6 +427,7 @@
 4. Serve the friendly "invitation has ended" page for an expired invitation (`docs/UI-UX/14` § Special States), while the API still returns an undifferentiated 404 (`docs/API/08`).
 5. Implement the retention chain from BR-9: expired for 90 days without renewal → soft delete, then hard delete 30 days later, with three notifications before deletion. The notification wiring lands in `P4-07`; the job and its schedule belong here.
 6. Delete storage objects for hard-deleted invitations through the grace-period job, per `docs/ARCHITECTURE/05` § Quota & Lifecycle.
+6b. **Owed by `P1-19`**: the same job must also hard-delete **individually removed photos**. `docs/PLAN/11` § Deletion asks for the physical file to go "after a grace period (e.g., 7 days)" once a user removes a photo from the gallery — a shorter clock than the invitation retention chain above, and a different trigger. `P1-19` soft-deletes `media` on removal and nothing currently collects them, so a busy editor accumulates orphaned objects in `user-media` forever. The variants to remove are `mediaKey(invitation_id, media_id, variant)` for each of `thumbnail | medium | large` (ADR-055).
 
 **Definition of Done**
 - [ ] Expiry happens only in the scheduled job; a request never mutates status.

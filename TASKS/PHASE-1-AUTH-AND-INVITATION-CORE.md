@@ -34,7 +34,7 @@
 | P1-16 | Free-text sanitization pipeline | backend | M | P0-13 | ✅
 | P1-17 | Media upload — synchronous validation stage | backend | L | P1-10, P0-16 |
 | P1-18 | Media processing worker | worker | L | P1-17, P0-15 | ✅
-| P1-19 | Gallery sub-resource, reorder, cover, quota | backend | M | P1-18 |
+| P1-19 | Gallery sub-resource, reorder, cover, quota | backend | M | P1-18 | ✅
 | P1-20 | Frontend — authentication screens | web-app | M | P0-22, P1-03 |
 | P1-21 | Frontend — dashboard and creation wizard | web-app | L | P1-20, P1-09 |
 | P1-22 | Frontend — editor shell, store, autosave | web-app | L | P1-21, P1-10 |
@@ -684,7 +684,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-19-gallery.md) |
 | **Depends on** | P1-18 |
 | **Spec refs** | `docs/API/04-INVITATION-API.md` § Gallery, `docs/DATABASE/06-MEDIA.md`, `docs/PLAN/02` § BR-8.1 |
 | **Spec required** | No |
@@ -701,10 +701,14 @@
 6. Delete removes the gallery entry and soft-deletes the media; the physical file is removed later by the grace-period job (`docs/PLAN/11` § Deletion).
 
 **Definition of Done**
-- [ ] Attaching another invitation's media returns 404.
-- [ ] Exactly one cover photo can exist; a test asserts the previous one is cleared.
-- [ ] Reorder with a foreign or missing id is rejected wholesale, not applied partially.
-- [ ] Quota holds under concurrent requests.
+- [x] Attaching another invitation's media returns 404. **Three** variants of "another": a different tenant, a template asset, and — the one a looser check would let through — **another invitation of the same user**. The predicate is `media.invitation_id = :this_invitation`, not "does this user own the media"; `P1-11` found the same distinction on `photo_media_id`. 404 rather than 422 because the id came from a request body, so "belongs to someone else" and "does not exist" must be indistinguishable (ADR-018).
+- [x] Exactly one cover photo can exist; a test asserts the previous one is cleared. **Two** paths can set a cover — attach and update — and both call `clearCover` first. A mutation removing it from only the update path fails one test and not the other, which is why both exist.
+- [x] Reorder with a foreign or missing id is rejected wholesale, not applied partially. Four bad lists, each asserting the rows are byte-identical afterwards. The "no foreign id" half is also a **tenancy control**: without it, another invitation's photo would have its `display_order` rewritten by a request shaped like a preference.
+- [x] Quota holds under concurrent requests. Six concurrent attaches, **and** a deterministic probe holding `FOR NO KEY UPDATE` — the shape `P1-17` arrived at after its race test turned out to pass with the lock removed.
+
+**Also** — only `ready` media may be attached. A `processing` row has not been scanned, decoded or EXIF-stripped and a `failed` one has no file; attaching either puts an unscanned or absent image on a page hundreds of guests open, which is what `P1-18` exists to prevent arriving through a different door.
+
+**Delete removes the placement and *soft*-deletes the media**, with the status left at `ready`: the photo was fine, it is retired rather than rejected. The grace-period hard delete (`docs/PLAN/11` § Deletion) does not exist yet and belongs with the Phase 4 sweeps — recorded there rather than left implied.
 
 ---
 

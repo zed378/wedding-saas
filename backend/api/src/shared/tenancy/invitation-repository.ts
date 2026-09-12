@@ -125,6 +125,20 @@ export type InvitationSettingsRow = typeof invitationSettings.$inferSelect;
  */
 export type MediaRow = typeof media.$inferSelect;
 
+/** One gallery row. */
+export type InvitationGalleryRow = typeof invitationGallery.$inferSelect;
+
+/**
+ * A gallery entry with the media it points at. `P1-19`.
+ *
+ * Always read as a pair: a placement without its media says nothing a client can render, and
+ * two round trips to assemble one row is how an N+1 starts.
+ */
+export interface GalleryEntry {
+  readonly photo: InvitationGalleryRow;
+  readonly media: MediaRow;
+}
+
 /** One quote row. */
 export type InvitationQuoteRow = typeof invitationQuote.$inferSelect;
 
@@ -718,6 +732,342 @@ export class InvitationRepository {
       .limit(1);
 
     return rows[0] ?? null;
+  }
+
+  /**
+   * The gallery of an owned invitation, in display order. `P1-19`.
+   *
+   * Joined to `media` because a gallery entry on its own says nothing a client can render:
+   * the status decides whether the photo is showable at all, and the dimensions are what a
+   * grid needs to lay out without reflow.
+   */
+  async findOwnedGallery(
+    invitationId: string,
+    scope: TenantScope,
+  ): Promise<GalleryEntry[]> {
+    const rows = await this.db
+      .select({ photo: invitationGallery, media })
+      .from(invitationGallery)
+      .innerJoin(
+        invitations,
+        eq(invitationGallery.invitationId, invitations.id),
+      )
+      .innerJoin(media, eq(invitationGallery.mediaId, media.id))
+      .where(
+        and(
+          eq(invitationGallery.invitationId, invitationId),
+          eq(invitations.ownerId, scope),
+          isNull(invitations.deletedAt),
+        ),
+      )
+      .orderBy(invitationGallery.displayOrder);
+
+    return rows.map((row) => ({ photo: row.photo, media: row.media }));
+  }
+
+  /**
+   * Attach a ready photo to an owned invitation's gallery. `P1-19`, BR-8.1.
+   *
+   * Four conditions, all of them inside one transaction holding a `FOR UPDATE` lock on the
+   * invitation row:
+   *
+   *   the invitation is this scope's — the lock statement carries the owner predicate;
+   *   the media belongs to **this invitation** and is `ready` — `docs/SECURITY/05` § 6's
+   *     two-step rule, and the case the document names explicitly: attaching another
+   *     invitation's photo;
+   *   the media is not already in this gallery — a second entry for one file would let 200
+   *     uploads become 400 gallery slots, and means nothing to a viewer either way;
+   *   the gallery is under the cap.
+   *
+   * The lock is what makes the cap a cap. `P1-17`'s upload path learned this the hard way:
+   * a count followed by an insert cannot bound anything, because under READ COMMITTED every
+   * concurrent reader sees the same count and every one of them is right.
+   *
+   * Returns a discriminated result rather than `null` for everything, because the caller
+   * owes the user four different answers and cannot recover them from an absence.
+   */
+  async attachGalleryPhoto(
+    invitationId: string,
+    scope: TenantScope,
+    input: {
+      readonly mediaId: string;
+      readonly caption?: string | null | undefined;
+      readonly isCover?: boolean | undefined;
+      readonly maxPhotos: number;
+    },
+  ): Promise<
+    | { readonly kind: "attached"; readonly entry: GalleryEntry }
+    | { readonly kind: "not_found" }
+    | { readonly kind: "media_not_usable" }
+    | { readonly kind: "already_attached" }
+    | { readonly kind: "quota_exceeded" }
+  > {
+    return this.db.transaction(async (tx) => {
+      const [owned] = await tx
+        .select({ id: invitations.id })
+        .from(invitations)
+        .where(
+          and(
+            eq(invitations.id, invitationId),
+            eq(invitations.ownerId, scope),
+            isNull(invitations.deletedAt),
+          ),
+        )
+        .for("update")
+        .limit(1);
+
+      if (owned === undefined) return { kind: "not_found" as const };
+
+      // The media id comes from the request body, so this is the whole tenancy check for
+      // it: `invitation_id` must be THIS invitation, not merely some invitation this user
+      // owns. `P1-11` found the same distinction on `photo_media_id` -- a photo from
+      // another invitation of the SAME user is still the wrong photo.
+      const [usable] = await tx
+        .select({ id: media.id, status: media.status })
+        .from(media)
+        .where(
+          and(
+            eq(media.id, input.mediaId),
+            eq(media.invitationId, invitationId),
+            isNull(media.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      if (usable === undefined || usable.status !== "ready") {
+        return { kind: "media_not_usable" as const };
+      }
+
+      const existing = await tx
+        .select({
+          id: invitationGallery.id,
+          mediaId: invitationGallery.mediaId,
+          displayOrder: invitationGallery.displayOrder,
+        })
+        .from(invitationGallery)
+        .where(eq(invitationGallery.invitationId, invitationId));
+
+      if (existing.some((row) => row.mediaId === input.mediaId)) {
+        return { kind: "already_attached" as const };
+      }
+
+      if (existing.length >= input.maxPhotos) {
+        return { kind: "quota_exceeded" as const };
+      }
+
+      if (input.isCover === true) {
+        await clearCover(tx, invitationId);
+      }
+
+      const nextOrder = existing.reduce(
+        (max, row) => Math.max(max, row.displayOrder + 1),
+        0,
+      );
+
+      const [inserted] = await tx
+        .insert(invitationGallery)
+        .values({
+          invitationId,
+          mediaId: input.mediaId,
+          ...(input.caption !== undefined ? { caption: input.caption } : {}),
+          displayOrder: nextOrder,
+          isCover: input.isCover === true,
+        })
+        .returning();
+
+      const [row] = await tx
+        .select()
+        .from(media)
+        .where(eq(media.id, input.mediaId))
+        .limit(1);
+
+      return {
+        kind: "attached" as const,
+        entry: { photo: inserted!, media: row! },
+      };
+    });
+  }
+
+  /**
+   * Update a gallery entry, scoped by BOTH its invitation and that invitation's owner.
+   * `P1-19`, `docs/SECURITY/05` § 7.
+   *
+   * Setting `isCover: true` clears every other cover **in the same transaction**. Two
+   * covers is not a cosmetic problem: the public renderer picks one, the editor shows
+   * another, and neither is wrong from where it is standing.
+   */
+  async updateGalleryPhoto(
+    photoId: string,
+    invitationId: string,
+    scope: TenantScope,
+    changes: {
+      readonly caption?: string | null | undefined;
+      readonly displayOrder?: number | undefined;
+      readonly isCover?: boolean | undefined;
+    },
+  ): Promise<GalleryEntry | null> {
+    return this.db.transaction(async (tx) => {
+      const [owned] = await tx
+        .select({ id: invitationGallery.id })
+        .from(invitationGallery)
+        .innerJoin(
+          invitations,
+          eq(invitationGallery.invitationId, invitations.id),
+        )
+        .where(
+          and(
+            eq(invitationGallery.id, photoId),
+            eq(invitationGallery.invitationId, invitationId),
+            eq(invitations.ownerId, scope),
+            isNull(invitations.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      if (owned === undefined) return null;
+
+      if (changes.isCover === true) await clearCover(tx, invitationId);
+
+      const patch: Record<string, unknown> = {};
+      if (changes.caption !== undefined) patch["caption"] = changes.caption;
+      if (changes.displayOrder !== undefined) {
+        patch["displayOrder"] = changes.displayOrder;
+      }
+      if (changes.isCover !== undefined) patch["isCover"] = changes.isCover;
+
+      if (Object.keys(patch).length > 0) {
+        await tx
+          .update(invitationGallery)
+          .set(patch)
+          .where(eq(invitationGallery.id, photoId));
+      }
+
+      const [row] = await tx
+        .select({ photo: invitationGallery, media })
+        .from(invitationGallery)
+        .innerJoin(media, eq(invitationGallery.mediaId, media.id))
+        .where(eq(invitationGallery.id, photoId))
+        .limit(1);
+
+      return { photo: row!.photo, media: row!.media };
+    });
+  }
+
+  /**
+   * Remove a gallery entry and **soft**-delete its media. `P1-19` step 6.
+   *
+   * `docs/PLAN/11` § Deletion: "soft-delete the media record when a user removes it from
+   * the gallery (so it can be restored temporarily); hard-deletion of the physical file is
+   * done by an async job after a grace period". So the file survives this call, and the row
+   * carries `deleted_at` rather than vanishing.
+   *
+   * The gallery entry itself IS deleted, and the distinction is deliberate: a gallery entry
+   * is a placement, not content. Keeping a soft-deleted placement would mean every reader of
+   * the gallery filtering on it forever, for a row that says only "this photo used to be
+   * third".
+   *
+   * The soft delete also gives the quota slot back — `P1-17` counts media rows with
+   * `deleted_at IS NULL`.
+   */
+  async deleteGalleryPhoto(
+    photoId: string,
+    invitationId: string,
+    scope: TenantScope,
+  ): Promise<boolean> {
+    return this.db.transaction(async (tx) => {
+      const [owned] = await tx
+        .select({
+          id: invitationGallery.id,
+          mediaId: invitationGallery.mediaId,
+        })
+        .from(invitationGallery)
+        .innerJoin(
+          invitations,
+          eq(invitationGallery.invitationId, invitations.id),
+        )
+        .where(
+          and(
+            eq(invitationGallery.id, photoId),
+            eq(invitationGallery.invitationId, invitationId),
+            eq(invitations.ownerId, scope),
+            isNull(invitations.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      if (owned === undefined) return false;
+
+      await tx
+        .delete(invitationGallery)
+        .where(eq(invitationGallery.id, photoId));
+
+      await tx
+        .update(media)
+        .set({ deletedAt: new Date() })
+        .where(eq(media.id, owned.mediaId));
+
+      return true;
+    });
+  }
+
+  /**
+   * Reorder the whole gallery from an exact list of ids. `P1-19` step 5.
+   *
+   * **All or nothing.** The supplied set must match the invitation's photos exactly — no
+   * foreign id, none missing, no duplicate — and the check happens inside the transaction
+   * that does the writing. A partial application is the worst outcome available here: the
+   * user sees an order they did not ask for, and there is nothing to tell them why.
+   *
+   * The "no foreign id" half is also a tenancy control. Without it, a caller could pass
+   * another invitation's photo id and have its `display_order` rewritten — a cross-tenant
+   * write through a list that looks like a preference.
+   */
+  async reorderGallery(
+    invitationId: string,
+    scope: TenantScope,
+    orderedPhotoIds: readonly string[],
+  ): Promise<"reordered" | "not_found" | "mismatched"> {
+    return this.db.transaction(async (tx) => {
+      const [owned] = await tx
+        .select({ id: invitations.id })
+        .from(invitations)
+        .where(
+          and(
+            eq(invitations.id, invitationId),
+            eq(invitations.ownerId, scope),
+            isNull(invitations.deletedAt),
+          ),
+        )
+        .for("update")
+        .limit(1);
+
+      if (owned === undefined) return "not_found" as const;
+
+      const current = await tx
+        .select({ id: invitationGallery.id })
+        .from(invitationGallery)
+        .where(eq(invitationGallery.invitationId, invitationId));
+
+      const have = new Set(current.map((row) => row.id));
+      const want = new Set(orderedPhotoIds);
+
+      if (
+        want.size !== orderedPhotoIds.length ||
+        have.size !== want.size ||
+        orderedPhotoIds.some((id) => !have.has(id))
+      ) {
+        return "mismatched" as const;
+      }
+
+      for (const [index, id] of orderedPhotoIds.entries()) {
+        await tx
+          .update(invitationGallery)
+          .set({ displayOrder: index })
+          .where(eq(invitationGallery.id, id));
+      }
+
+      return "reordered" as const;
+    });
   }
 
   /**
@@ -1596,4 +1946,27 @@ export class InvitationRepository {
       return row ?? null;
     });
   }
+}
+
+/**
+ * Clear every cover on an invitation. `P1-19` step 3.
+ *
+ * A function rather than a repeated statement because it is called from two places — attach
+ * and update — and "exactly one cover" is only true if BOTH of them clear first. The
+ * condition on `is_cover` keeps it to the one row that is actually set, so the common case
+ * writes nothing.
+ */
+async function clearCover(
+  tx: Transaction,
+  invitationId: string,
+): Promise<void> {
+  await tx
+    .update(invitationGallery)
+    .set({ isCover: false })
+    .where(
+      and(
+        eq(invitationGallery.invitationId, invitationId),
+        eq(invitationGallery.isCover, true),
+      ),
+    );
 }

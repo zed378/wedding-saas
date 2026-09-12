@@ -10,6 +10,18 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — the gallery, where an entry is a placement rather than a photo
+
+**Added** — the five gallery endpoints ([P1-19](./records/2026-09-12-P1-19-gallery.md))
+
+- **A gallery entry is a placement, not a photo.** The photo is the `media` row; the entry says where on this invitation it appears. That separation is what makes `docs/PLAN/11` § Deletion coherent — removing a photo deletes a *placement* and **soft**-deletes a *file*, with the status left at `ready` because the photo was fine: it is retired, not rejected.
+- **Only `ready` media may be attached.** A `processing` row has not been scanned, decoded or EXIF-stripped and a `failed` one has no file; attaching either puts an unscanned image on a page hundreds of guests open.
+- **"Not this invitation's media" is a 404**, never a 422. The id arrives in a request body, so `docs/SECURITY/05` § 6 applies and a helpful "that photo is not ready yet" would confirm the id exists. The predicate is `media.invitation_id = :this_invitation` rather than "does this user own it" — a photo from the user's *other* wedding is still the wrong photo, which is the distinction `P1-11` found on `photo_media_id`.
+- **Exactly one cover**, cleared by both paths that can set one. A mutation removing it from only the update path fails one test and not the other, which is why both tests exist.
+- **Reorder is wholesale or nothing.** A list containing a foreign id, a missing id, a duplicate or an extra changes nothing at all. The foreign-id half is a tenancy control as much as a validation rule: without it, another invitation's photo would have its order rewritten by a request shaped like a preference.
+
+**Also fixed** — `password.spec.ts`'s timing test had failed two gates as a **timeout**, not on its assertion: fifteen argon2 operations at 64 MiB against vitest's 5s default, under the full suite in parallel. It had been noted as "probably flaky" at the start of the session and left; acting on that guess a week later would have been the same work at a worse moment.
+
 ### 2026-09-12 — the media worker, and six tasks of jobs that went nowhere
 
 **Added** — `media.process` and `media_cleanup_staging` ([P1-18](./records/2026-09-12-P1-18-media-processing-worker.md))
