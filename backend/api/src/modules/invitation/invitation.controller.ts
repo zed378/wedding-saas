@@ -28,6 +28,7 @@ import { CoupleService, type PersonRole } from "./couple.service";
 import { EventsService } from "./events.service";
 import { GiftService, QuoteService } from "./gift.service";
 import { SettingsService } from "./settings.service";
+import { ChangeTemplateService } from "./change-template.service";
 import { SLUG_MAX_LENGTH, SLUG_MIN_LENGTH } from "./slug.service";
 import { sanitizeFields } from "../../shared/sanitizer/sanitize";
 import { TEXT_FIELDS } from "../../shared/sanitizer/registry";
@@ -239,6 +240,20 @@ const settingsSchema = z
   })
   .strict();
 
+/**
+ * `POST /invitations/:id/change-template`. `docs/API/04` line 12. ONE field.
+ *
+ * `template_version_id` is absent on purpose: BR-3.3 says a draft or deprecated version is
+ * not offered for new use, and a client that could name a version could pin an invitation to
+ * one and walk around the rule. The server resolves the target's newest published version.
+ *
+ * `enabled_sections` and `theme_override` are absent for a different reason — they are the
+ * *consequences* the server computes. A client that could send them alongside could enable a
+ * section the new template does not define and undo `P1-14`'s boundary in the one request
+ * that rewrites the field.
+ */
+const changeTemplateSchema = z.object({ template_id: z.uuid() }).strict();
+
 const listQuerySchema = z
   .object({
     page: z.coerce.number().int().min(1).optional(),
@@ -312,6 +327,7 @@ export class InvitationController {
     private readonly gift: GiftService,
     private readonly quote: QuoteService,
     private readonly settings: SettingsService,
+    private readonly changeTemplate: ChangeTemplateService,
   ) {}
 
   /**
@@ -722,6 +738,35 @@ export class InvitationController {
           ? { confirmSlugChange: input.confirm_slug_change }
           : {}),
       }),
+    );
+  }
+
+  // ---------------------------------------------------------- change template
+
+  /**
+   * `POST /invitations/:id/change-template`. `P1-15`, BR-3.1 and BR-4.1.
+   *
+   * 200 rather than 204 because the response is the point: `docs/UI-UX/05` § Change Template
+   * Flow shows a confirmation modal listing the fields that will stop displaying, and this
+   * is where that list comes from.
+   *
+   * Rate limited on `general-authenticated` — the baseline `docs/SECURITY/10` already
+   * declares for authenticated endpoints. Not a new policy: nothing about this endpoint asks
+   * for a tighter number than the document's own default, and inventing one would put a
+   * limit in the code that the table does not know about.
+   */
+  @Post(":id/change-template")
+  @HttpCode(200)
+  @UseGuards(rateLimit("general-authenticated"))
+  async postChangeTemplate(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const input = parse(changeTemplateSchema, body);
+
+    return ok(
+      await this.changeTemplate.change(user.scope, id, input.template_id),
     );
   }
 }

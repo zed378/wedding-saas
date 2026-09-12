@@ -30,7 +30,7 @@
 | P1-12 | Events sub-resource | backend | M | P1-10 | ✅
 | P1-13 | Bank accounts and quote sub-resources | backend | M | P1-10 | ✅
 | P1-14 | Settings sub-resource and slug rules | backend | M | P1-10 | ✅
-| P1-15 | Change template without data loss | backend | M | P1-10, P0-20 |
+| P1-15 | Change template without data loss | backend | M | P1-10, P0-20 | ✅
 | P1-16 | Free-text sanitization pipeline | backend | M | P0-13 | ✅
 | P1-17 | Media upload — synchronous validation stage | backend | L | P1-10, P0-16 |
 | P1-18 | Media processing worker | worker | L | P1-17, P0-15 |
@@ -528,7 +528,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-15-change-template.md), [spec](../MEMORY/specs/P1-15-change-template.md) |
 | **Depends on** | P1-10, P0-20 |
 | **Spec refs** | `docs/PLAN/02` § BR-3, BR-4.1, `docs/PLAN/07` § Template Compatibility & Migration, `docs/API/04` § change-template |
 | **Spec required** | Yes — data model |
@@ -545,10 +545,18 @@
 6. Record the change in the invitation's history or an update trail so support can answer "why did my gallery disappear".
 
 **Definition of Done**
-- [ ] No delete statement runs anywhere in this code path.
-- [ ] The round-trip test (template A → B → A) restores full rendering with no data loss.
-- [ ] The response names the sections that will stop displaying.
-- [ ] Theme overrides invalid under the new template are dropped, not silently kept and ignored.
+- [x] No delete statement runs anywhere in this code path. Proven **three** ways, because an absence cannot be read off a diff: row counts across all seven child tables, the round trip below comparing every row, and a source-level test that reads `change-template.service.ts` and the body of `InvitationRepository.changeTemplate` and fails on the word `delete`. A mutation adding `delete(invitationGallery)` fails all three.
+- [x] The round-trip test (template A → B → A) restores full rendering with no data loss. `enabled_sections` returns to `["hero", "gallery", "gift"]` and every child row is identical, gallery photo ids included. `docs/PLAN/17` line 8 asks for exactly this scenario as a product acceptance criterion.
+- [x] The response names the sections that will stop displaying. `hidden_sections`, for `docs/UI-UX/05`'s confirmation modal. `docs/API/04` amended with the response shape, which it had not specified.
+- [x] Theme overrides invalid under the new template are dropped, not silently kept and ignored. `dropped_theme_keys` names each one. ADR-054 draws the line between this and BR-4.1 — **who owns the key namespace**: a gallery photo is the couple's and the template only decides whether to show it, whereas `colors.accent` means whatever this template says it means.
+
+**Beyond the card — the recompute rule is "the old template did not have it", not "it was not enabled".** Step 2 says to add the new template's defaults "that were not previously known", and *known* means defined by the old template. A section the old template offered and the user deliberately switched off must stay off. The other reading fails on the case a user notices immediately: turn the gallery off, change template, find it back on the page. A mutation keying arrivals on the previous *selection* fails a named test.
+
+**Also beyond the card — a non-configurable section of the NEW template is forced on.** `P1-14` refuses to let anyone disable one, so a recomputed selection omitting a structural section is a state the API cannot produce and cannot repair: every later settings save 422s with `SECTION_NOT_CONFIGURABLE` on a value the server itself wrote.
+
+**The IDOR finding, for the fourth time**: removing the `owner_id` predicate from `changeTemplate` failed **only** the repository-level test — `requireOwnership` in the service refuses the request before the repository is reached. `P1-12`'s rule stands: every remaining sub-resource task needs repository-level tests, not only service-level ones.
+
+**Raised, not decided**: `OQ-23` — may a *published* invitation change template, and must BR-4.2's required-field check re-run? Allowed and logged at `warn` for now; needs an answer before `P2-06`. And `PG-16` (`upgrade-template-version`) still has no owning card.
 
 ---
 

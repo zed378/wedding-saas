@@ -22,6 +22,25 @@ Nothing on the board is `BLOCKED`. The remaining questions shape work rather tha
 
 ## Open Questions — Remaining
 
+### OQ-23 — May a `published` invitation change template, and must the publish check re-run?
+
+**Affects**: `P1-15` — **not blocking**; implemented as allowed, and logged at `warn`. Needs an answer before `P2-06` builds the publish check.
+
+Nothing in `docs/` forbids changing the template of a live invitation, and BR-2.5's "data is not lost" ethos points towards allowing it. `P1-15` therefore allows it, because refusing would be inventing a rule.
+
+But two consequences are unaddressed:
+
+1. **BR-4.2 does not re-run.** A template's `required_fields` must be non-empty at publish time. A change can move a live invitation onto a template requiring a field the couple never filled — and nothing re-validates, because the check belongs to publishing and no publish happens. The page is live and incomplete.
+2. **The design changes under the guests.** Several hundred people may hold the link. There is no confirmation step, unlike BR-6.2's for a slug change, and the reason BR-6.2 gives — that the user is changing something already shared — applies here just as directly.
+
+Three candidate answers, none of which should be picked while coding:
+
+- **Allow, and re-run the publish check**, refusing the change when the new template's required fields are not satisfied. Correct, and it makes `P1-15` depend on `P2-06`, which is a phase inversion.
+- **Allow, but require a confirmation field**, the way BR-6.2 does for a slug. Cheap, consistent, and does nothing about the required-field hole.
+- **Refuse while `published`**, asking the user to unpublish first. Safest and the most annoying; it also gives "unpublish" a second meaning.
+
+Until then, the `warn` line `invitation.template_changed_while_published` makes it visible in production rather than silent.
+
 ### OQ-22 — Is the (email, IP) login key the right one against a distributed attacker?
 
 **Affects**: `P1-07` — **not blocking**; implemented exactly as `docs/SECURITY/10` specifies.
@@ -270,6 +289,8 @@ All 17 gaps found while writing the plan were resolved on 2026-09-09, and `docs/
 | PG-14 | Refund sent the invitation to `draft` per `PLAN/02` and to `paid` per `BACKEND/05` — the difference being whether a refunded customer keeps the product | **`draft`.** A refund reverses the entitlement, not only the payment | ADR-019 | `BACKEND/05`, `BACKEND/09`, `PLAN/02`, `PLAN/06` |
 | PG-15 | The slug blocklist had no storage despite needing to be admin-editable without a deploy | `slug_blocklist` added, with `exact` versus `substring` match types | ADR-020 | `DATABASE/12` (new), `SECURITY/10` |
 | PG-16 | BR-3.2 promises an explicit template version upgrade with no endpoint to perform it | `POST /invitations/:id/upgrade-template-version`, separate from `change-template` because the two carry different warnings | ADR-021 | `API/04` |
+
+> **PG-16 has no owning task card.** `P1-15` built `change-template` and deliberately did not build `upgrade-template-version` beside it, even though the mechanism is nearly identical: they are different user intentions carrying different warnings (`docs/API/04` line 16), and folding one into the other would hide the planning gap rather than close it. `P1-10`'s card says it "belongs with the template tasks in Phase 2", but no Phase 2 card lists it — `P2-01` is the catalogue API and the closest fit. **Raised, not decided**: BR-3.2 is a promise to users that nothing currently keeps.
 | PG-17 | `ARCHITECTURE/04` listed `invitation_locations`, `invitation_sections` and `template_sections`, none of which exist | Summary corrected to match `DATABASE/00`, with a note on where those concepts actually live | ADR-022 | `ARCHITECTURE/04` |
 
 Two of these were genuine contradictions rather than omissions — `PG-01` and `PG-14` — and both would have become bugs decided endpoint-by-endpoint by whoever wrote each one first.

@@ -714,6 +714,87 @@ export class InvitationRepository {
   }
 
   /**
+   * Swap the template of an owned invitation. `P1-15`, BR-3.1 and BR-4.1.
+   *
+   * ## What this method deliberately cannot do
+   *
+   * It writes two columns on `invitations` and two columns on `invitation_settings`. There
+   * is **no `DELETE` anywhere in it**, and that absence is the feature: BR-4.1 says data for
+   * a section the new template does not support "remains stored in the database", so a
+   * template change is allowed to change what renders and nothing else. A `delete` here
+   * would look like tidying up and would destroy a couple's gallery.
+   *
+   * ## Why the two writes are one transaction
+   *
+   * A committed `template_version_id` with a stale `enabled_sections` is an invitation
+   * rendering against a definition that does not describe it — enabled keys the new template
+   * never heard of, and a settings screen that 422s on a value the server itself wrote. The
+   * audit row joins the same transaction for the reason `AuditLogService` exists: a trail
+   * that can commit without its change, or a change without its trail, is worse than none.
+   *
+   * ## Ownership
+   *
+   * The `UPDATE` carries the owner predicate in its own `WHERE`, and the settings upsert
+   * runs only if that update matched a row — so an attempt aimed at another tenant writes
+   * nothing at all, not even the settings half. Returns `false` when nothing matched, which
+   * the caller turns into a 404 (`docs/SECURITY/05`: a non-owner must not be able to tell
+   * "not yours" from "does not exist").
+   */
+  async changeTemplate(
+    invitationId: string,
+    scope: TenantScope,
+    next: {
+      readonly templateId: string;
+      readonly templateVersionId: string;
+      readonly enabledSections: readonly string[];
+      readonly themeOverride: Record<string, unknown>;
+    },
+    audit: (tx: Transaction) => Promise<void>,
+  ): Promise<boolean> {
+    return this.db.transaction(async (tx) => {
+      const moved = await tx
+        .update(invitations)
+        .set({
+          templateId: next.templateId,
+          templateVersionId: next.templateVersionId,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(invitations.id, invitationId),
+            eq(invitations.ownerId, scope),
+            isNull(invitations.deletedAt),
+          ),
+        )
+        .returning({ id: invitations.id });
+
+      if (moved.length === 0) return false;
+
+      // An upsert, like `updateSettings`: `P1-09` creates the row, and an invitation
+      // predating that would otherwise keep a section selection belonging to the old
+      // template forever.
+      await tx
+        .insert(invitationSettings)
+        .values({
+          invitationId,
+          enabledSections: [...next.enabledSections],
+          themeOverride: next.themeOverride,
+        })
+        .onConflictDoUpdate({
+          target: invitationSettings.invitationId,
+          set: {
+            enabledSections: [...next.enabledSections],
+            themeOverride: next.themeOverride,
+            updatedAt: new Date(),
+          },
+        });
+
+      await audit(tx);
+      return true;
+    });
+  }
+
+  /**
    * The next `display_order` for a new event. `P1-12` step 5.
    *
    * Appended rather than prepended: a new event must not silently jump to the front of a

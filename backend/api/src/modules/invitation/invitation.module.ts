@@ -9,6 +9,7 @@ import { CoupleService } from "./couple.service";
 import { EventsService } from "./events.service";
 import { GiftService, QuoteService } from "./gift.service";
 import { SettingsService } from "./settings.service";
+import { ChangeTemplateService } from "./change-template.service";
 import { AuditModule } from "../../shared/audit/audit.module";
 import { SlugService } from "./slug.service";
 import { InvitationStatusService } from "../../shared/invitation-status/invitation-status.service";
@@ -25,6 +26,7 @@ import { InvitationStatusService } from "../../shared/invitation-status/invitati
     GiftService,
     QuoteService,
     SettingsService,
+    ChangeTemplateService,
     SlugService,
     InvitationStatusService,
   ],
@@ -36,6 +38,7 @@ import { InvitationStatusService } from "../../shared/invitation-status/invitati
     GiftService,
     QuoteService,
     SettingsService,
+    ChangeTemplateService,
     SlugService,
   ],
 })

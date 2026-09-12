@@ -13,6 +13,7 @@ import { logger } from "../../shared/logging/logger";
 import type { TenantScope } from "../../shared/tenancy/tenant-scope";
 import { InvitationRepository } from "../../shared/tenancy/invitation-repository";
 import { InvitationStatusService } from "../../shared/invitation-status/invitation-status.service";
+import { parseSections } from "./settings.service";
 import { SlugService } from "./slug.service";
 
 /**
@@ -57,19 +58,6 @@ export interface CreatedInvitation {
   readonly status: string;
   readonly templateId: string;
   readonly templateVersionId: string;
-}
-
-/**
- * The section keys a template marks `enabled_by_default`. `docs/PLAN/07`.
- *
- * The field is `section_key`, not `key` — the name `P0-20`'s schema uses. The first
- * version of this read `key`, which produced an empty `enabled_sections` array on every
- * new invitation: a silent, total failure that renders as a blank invitation rather than
- * an error. Caught by the test that compares against the template's own sections.
- */
-interface TemplateSection {
-  readonly section_key?: unknown;
-  readonly enabled_by_default?: unknown;
 }
 
 @Injectable()
@@ -219,21 +207,21 @@ export class InvitationCreateService {
 }
 
 /**
- * The section keys a template enables by default.
+ * The section keys a template marks `enabled_by_default`. `docs/PLAN/07`.
  *
- * Defensive about the shape because `template_versions.sections` is `jsonb`: the `P0-20`
- * validator guarantees it on write, and this reads rows that may predate any given version
- * of that validator.
+ * The field is `section_key`, not `key` — the name `P0-20`'s schema uses. The first
+ * version of this read `key`, which produced an empty `enabled_sections` array on every new
+ * invitation: a silent, total failure that renders as a blank invitation rather than an
+ * error. Caught by the test that compares against the template's own sections.
+ *
+ * `P1-15` moved the actual parsing into `parseSections`, which needs the same three fields
+ * to recompute a selection across a template change. Two readers of one `jsonb` column
+ * would eventually disagree about a default, and the disagreement would appear as a section
+ * that is on for a new invitation and off after a template change — the kind of difference
+ * nobody attributes to a parser.
  */
 export function defaultSections(sections: unknown): string[] {
-  if (!Array.isArray(sections)) return [];
-
-  return sections
-    .filter(
-      (section): section is TemplateSection =>
-        typeof section === "object" && section !== null,
-    )
-    .filter((section) => section.enabled_by_default === true)
-    .map((section) => section.section_key)
-    .filter((key): key is string => typeof key === "string");
+  return parseSections(sections)
+    .filter((section) => section.enabledByDefault)
+    .map((section) => section.key);
 }

@@ -15,6 +15,7 @@ import {
   QuoteService,
 } from "../src/modules/invitation/gift.service";
 import { SettingsService } from "../src/modules/invitation/settings.service";
+import { ChangeTemplateService } from "../src/modules/invitation/change-template.service";
 import { NotFoundError } from "../src/http/errors";
 import { SessionService } from "../src/modules/auth/session.service";
 import { UnauthenticatedError } from "../src/http/errors";
@@ -56,6 +57,7 @@ const seen: {
   bankId?: string | undefined;
   quoteInput?: unknown;
   settingsPatch?: unknown;
+  changeTemplateId?: string | undefined;
 } = {};
 
 const createStub = {
@@ -149,6 +151,22 @@ const giftStub = {
   },
   remove: async (_scope: unknown, id: string) => {
     mineOr404(id);
+  },
+};
+
+const NEW_TEMPLATE_ID = "66666666-6666-4666-8666-666666666666";
+
+const changeTemplateStub = {
+  change: async (_scope: unknown, id: string, templateId: string) => {
+    mineOr404(id);
+    seen.changeTemplateId = templateId;
+    return {
+      template_id: templateId,
+      template_version_id: "88888888-8888-4888-8888-888888888888",
+      enabled_sections: ["hero", "quote"],
+      hidden_sections: ["gallery"],
+      dropped_theme_keys: ["colors.accent"],
+    };
   },
 };
 
@@ -300,6 +318,7 @@ describe("POST /invitations over HTTP", () => {
         { provide: GiftService, useValue: giftStub },
         { provide: QuoteService, useValue: quoteStub },
         { provide: SettingsService, useValue: settingsStub },
+        { provide: ChangeTemplateService, useValue: changeTemplateStub },
         { provide: SessionService, useValue: sessionStub },
         { provide: RATE_LIMITER, useValue: limiterStub },
         {
@@ -1124,6 +1143,93 @@ describe("POST /invitations over HTTP", () => {
       await request(app.getHttpServer())
         .get(`/api/v1/invitations/${INVITATION_ID}/settings`)
         .expect(401);
+    });
+  });
+
+  describe("change template (P1-15)", () => {
+    it("returns the new version and what stops displaying", async () => {
+      // docs/UI-UX/05 § Change Template Flow: the confirmation modal lists the affected
+      // fields, so the response has to carry them.
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/change-template`)
+        .set(...AUTH)
+        .send({ template_id: NEW_TEMPLATE_ID })
+        .expect(200);
+
+      expect(res.body.data).toEqual({
+        template_id: NEW_TEMPLATE_ID,
+        template_version_id: "88888888-8888-4888-8888-888888888888",
+        enabled_sections: ["hero", "quote"],
+        hidden_sections: ["gallery"],
+        dropped_theme_keys: ["colors.accent"],
+      });
+      expect(seen.changeTemplateId).toBe(NEW_TEMPLATE_ID);
+    });
+
+    it.each([
+      [
+        "template_version_id",
+        { template_version_id: created.templateVersionId },
+      ],
+      ["enabled_sections", { enabled_sections: ["hero"] }],
+      ["theme_override", { theme_override: { colors: { primary: "#fff" } } }],
+      ["status", { status: "published" }],
+      ["owner_id", { owner_id: OWNER_ID }],
+    ])("rejects a body carrying %s", async (_name, extra) => {
+      // Each of these is a way to make the server compute something other than the
+      // consequence of the change: a draft version (BR-3.3), a section the new template
+      // does not define (P1-14), or a lifecycle field (SECURITY/05 § 3).
+      await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/change-template`)
+        .set(...AUTH)
+        .send({ template_id: NEW_TEMPLATE_ID, ...extra })
+        .expect(400);
+    });
+
+    it.each([
+      ["a missing template_id", {}],
+      ["a non-uuid template_id", { template_id: "not-a-uuid" }],
+      ["a null template_id", { template_id: null }],
+    ])("rejects %s", async (_name, body) => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/change-template`)
+        .set(...AUTH)
+        .send(body)
+        .expect(400);
+    });
+
+    it("another user's invitation is 404 and leaks nothing", async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${OTHERS_INVITATION}/change-template`)
+        .set(...AUTH)
+        .send({ template_id: NEW_TEMPLATE_ID })
+        .expect(404);
+
+      expect(res.body.data).toBeUndefined();
+    });
+
+    it("is 401 without a token", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/change-template`)
+        .send({ template_id: NEW_TEMPLATE_ID })
+        .expect(401);
+    });
+
+    it("is rate limited", async () => {
+      limiterStub.check = async () => ({
+        allowed: false,
+        limit: 300,
+        remaining: 0,
+        resetAt: 1789200000,
+      });
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/change-template`)
+        .set(...AUTH)
+        .send({ template_id: NEW_TEMPLATE_ID })
+        .expect(429);
+
+      expect(res.body.error.code).toBe("TOO_MANY_ATTEMPTS");
     });
   });
 });

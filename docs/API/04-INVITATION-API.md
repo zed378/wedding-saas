@@ -15,6 +15,27 @@ POST   /api/v1/invitations/:id/upgrade-template-version   Move to the latest pub
 
 `change-template` and `upgrade-template-version` are separate endpoints because they are separate user intentions and carry different warnings. Changing templates may hide sections the new template does not support (BR-4.1); upgrading a version keeps the same design and is the conscious action BR-3.2 promises. Neither is ever automatic — an invitation stays on the `template_version_id` it locked at creation until the user acts (BR-3.1).
 
+### `change-template` response
+
+The response is the source for the confirmation modal in UI-UX/05 § Change Template Flow, which lists the fields that will stop being displayed before the user commits:
+
+```json
+{
+  "data": {
+    "template_id": "uuid",
+    "template_version_id": "uuid",
+    "enabled_sections": ["hero", "quote"],
+    "hidden_sections": ["gallery"],
+    "dropped_theme_keys": ["colors.accent"]
+  }
+}
+```
+
+- `enabled_sections` is recomputed by the server from `section_key` equality (PLAN/07 § Template Compatibility): what was enabled and the new template still defines, plus the new template's `enabled_by_default` sections the old template did not have, plus any section the new template marks non-configurable. The client does not send it — a client that could would be able to enable a section the template does not define.
+- `hidden_sections` is what was enabled and the new template does not define. The data behind those sections **is not deleted** (BR-4.1); switching back restores the display.
+- `dropped_theme_keys` is what was removed from `theme_override` because the new template does not list it in `customizable_theme_keys`. Unlike section data these are not retained: a theme key's meaning belongs to the template that defines it.
+- 422 `TEMPLATE_NOT_AVAILABLE` when the target template has no published version (BR-3.3); 422 `TEMPLATE_UNCHANGED` when the invitation is already on it; 404 when the template id is unknown, indistinguishable from an invitation that is not the caller's.
+
 ## Sub-resource: Couple/Person
 ```
 PATCH  /api/v1/invitations/:id/couple/groom      { full_name, nickname, photo_media_id, instagram, father_name, mother_name, child_order }
