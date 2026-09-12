@@ -25,6 +25,7 @@ import { requireVerifiedEmail } from "../auth/require-verified-email";
 import { InvitationCreateService } from "./invitation-create.service";
 import { InvitationService } from "./invitation.service";
 import { CoupleService, type PersonRole } from "./couple.service";
+import { EventsService } from "./events.service";
 import { SLUG_MAX_LENGTH, SLUG_MIN_LENGTH } from "./slug.service";
 import { sanitizeFields } from "../../shared/sanitizer/sanitize";
 import { TEXT_FIELDS } from "../../shared/sanitizer/registry";
@@ -85,6 +86,80 @@ const personSchema = z
   })
   .strict();
 
+/**
+ * `docs/BACKEND/03` § Example Structural Schema, transcribed — it is the one place in the
+ * documents that writes a request schema out in full, so this follows it field for field
+ * rather than paraphrasing.
+ *
+ * Two additions it does not name, both bounded by `docs/DATABASE/05`'s column widths:
+ * `maps_url` (so a user can supply their own link instead of the generated one) and
+ * `display_order`.
+ *
+ * The coordinate range checks are the card's third DoD item. A latitude of 200 is not a
+ * place, and it would render as a map pin somewhere undefined rather than as an error.
+ */
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+const eventBase = {
+  type: z.enum(["akad", "reception", "custom"]),
+  title: z.string().trim().min(1).max(150),
+  event_date: z.string().date(),
+  start_time: z.string().regex(TIME, "Gunakan format HH:MM."),
+  end_time: z
+    .union([z.string().regex(TIME, "Gunakan format HH:MM."), z.null()])
+    .optional(),
+  venue_name: z.string().trim().min(1).max(200),
+  address: z.string().trim().min(1).max(2000),
+  latitude: z.union([z.coerce.number().min(-90).max(90), z.null()]).optional(),
+  longitude: z
+    .union([z.coerce.number().min(-180).max(180), z.null()])
+    .optional(),
+  // `z.url()` is NOT enough here, and this is measured rather than assumed: it accepts
+  // `javascript:alert(1)`, `JaVaScRiPt:...` and `data:text/html,...` -- all of which parse
+  // as valid URLs. `maps_url` becomes an `href` on the public page, so accepting any of
+  // them would be stored XSS with a link the guest chooses to click.
+  //
+  // A scheme allowlist, applied before `z.url()` so a malformed https URL still fails the
+  // parser. `docs/SECURITY/08` requires allowlist over blacklist, and "http or https" is
+  // the whole allowlist a maps link needs.
+  maps_url: z
+    .union([
+      z
+        .string()
+        .trim()
+        .regex(
+          /^https?:\/\//i,
+          "Tautan peta harus dimulai dengan http:// atau https://",
+        )
+        .url()
+        .max(500),
+      z.null(),
+    ])
+    .optional(),
+  description: z.union([z.string().trim().max(2000), z.null()]).optional(),
+  display_order: z.coerce.number().int().min(0).max(9999).optional(),
+};
+
+const createEventSchema = z.object(eventBase).strict();
+
+/** Every field optional, and `.strict()` still refuses anything not listed. */
+const updateEventSchema = z
+  .object({
+    type: eventBase.type.optional(),
+    title: eventBase.title.optional(),
+    event_date: eventBase.event_date.optional(),
+    start_time: eventBase.start_time.optional(),
+    end_time: eventBase.end_time,
+    venue_name: eventBase.venue_name.optional(),
+    address: eventBase.address.optional(),
+    latitude: eventBase.latitude,
+    longitude: eventBase.longitude,
+    maps_url: eventBase.maps_url,
+    description: eventBase.description,
+    display_order: eventBase.display_order,
+  })
+  .strict();
+
 const listQuerySchema = z
   .object({
     page: z.coerce.number().int().min(1).optional(),
@@ -132,6 +207,21 @@ function parse<T>(schema: z.ZodType<T>, body: unknown): T {
   );
 }
 
+/**
+ * A coordinate for storage.
+ *
+ * The schema coerces to a number so the range check is arithmetic rather than lexical
+ * (`"200"` must fail, and `"200" > "90"` is false as a string). `DECIMAL(9,6)` comes back
+ * from Drizzle as a string, so it goes in as one — and `String(number)` is exact here
+ * because six decimal places is well inside a double's precision.
+ */
+function coordinate(
+  value: number | null | undefined,
+): string | null | undefined {
+  if (value === undefined) return undefined;
+  return value === null ? null : String(value);
+}
+
 @Controller("api/v1/invitations")
 @UseGuards(requireAuth())
 export class InvitationController {
@@ -139,6 +229,7 @@ export class InvitationController {
     private readonly create: InvitationCreateService,
     private readonly invitations: InvitationService,
     private readonly couple: CoupleService,
+    private readonly events: EventsService,
   ) {}
 
   /**
@@ -295,5 +386,106 @@ export class InvitationController {
     );
 
     return ok(person);
+  }
+
+  /** `docs/API/04` § Events. */
+  @Get(":id/events")
+  async listEvents(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+  ) {
+    return ok(await this.events.list(user.scope, id));
+  }
+
+  @Post(":id/events")
+  @HttpCode(201)
+  async createEvent(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const input = parse(createEventSchema, body);
+
+    return ok(
+      await this.events.create(user.scope, id, {
+        type: input.type,
+        title: input.title,
+        eventDate: input.event_date,
+        startTime: input.start_time,
+        ...(input.end_time !== undefined ? { endTime: input.end_time } : {}),
+        venueName: input.venue_name,
+        address: input.address,
+        ...(input.latitude !== undefined
+          ? { latitude: coordinate(input.latitude) }
+          : {}),
+        ...(input.longitude !== undefined
+          ? { longitude: coordinate(input.longitude) }
+          : {}),
+        ...(input.maps_url !== undefined ? { mapsUrl: input.maps_url } : {}),
+        ...(input.description !== undefined
+          ? { description: input.description }
+          : {}),
+        ...(input.display_order !== undefined
+          ? { displayOrder: input.display_order }
+          : {}),
+      }),
+    );
+  }
+
+  /**
+   * `:event_id` is scoped by `:id` in the query, not checked afterwards.
+   * `docs/SECURITY/05` § 7 — see `EventsService`.
+   */
+  @Patch(":id/events/:eventId")
+  async updateEvent(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Param("eventId") eventId: string,
+    @Body() body: unknown,
+  ) {
+    const input = parse(updateEventSchema, body);
+
+    return ok(
+      await this.events.update(user.scope, id, eventId, {
+        ...(input.type !== undefined ? { type: input.type } : {}),
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.event_date !== undefined
+          ? { eventDate: input.event_date }
+          : {}),
+        ...(input.start_time !== undefined
+          ? { startTime: input.start_time }
+          : {}),
+        ...(input.end_time !== undefined ? { endTime: input.end_time } : {}),
+        ...(input.venue_name !== undefined
+          ? { venueName: input.venue_name }
+          : {}),
+        ...(input.address !== undefined ? { address: input.address } : {}),
+        ...(input.latitude !== undefined
+          ? { latitude: coordinate(input.latitude) }
+          : {}),
+        ...(input.longitude !== undefined
+          ? { longitude: coordinate(input.longitude) }
+          : {}),
+        ...(input.maps_url !== undefined ? { mapsUrl: input.maps_url } : {}),
+        ...(input.description !== undefined
+          ? { description: input.description }
+          : {}),
+        ...(input.display_order !== undefined
+          ? { displayOrder: input.display_order }
+          : {}),
+      }),
+    );
+  }
+
+  @Delete(":id/events/:eventId")
+  @HttpCode(200)
+  async deleteEvent(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Param("eventId") eventId: string,
+  ) {
+    await this.events.remove(user.scope, id, eventId);
+
+    return ok({ status: "deleted" });
   }
 }

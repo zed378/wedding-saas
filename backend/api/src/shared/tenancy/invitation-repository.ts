@@ -88,6 +88,14 @@ export interface OwnedListFilters {
  */
 export type InvitationRow = typeof invitations.$inferSelect;
 
+/**
+ * One event row.
+ *
+ * Exported for the same reason as `InvitationRow`: a caller that needs the shape must not
+ * import the table to get it.
+ */
+export type InvitationEventRow = typeof invitationEvents.$inferSelect;
+
 /** Everything `docs/API/04` § Example Response embeds. `P1-10`. */
 export interface InvitationAggregate {
   readonly people: (typeof invitationPeople.$inferSelect)[];
@@ -196,6 +204,198 @@ export class InvitationRepository {
       .orderBy(desc(invitations.createdAt))
       .limit(Math.min(filters.limit ?? 50, 100))
       .offset(filters.offset ?? 0);
+  }
+
+  /**
+   * Create an event on an owned invitation. `P1-12`.
+   *
+   * The owner predicate rides in as a correlated `EXISTS` on the `INSERT`'s `SELECT`, so
+   * the row cannot be created on somebody else's invitation even if the caller's
+   * ownership check were removed upstream. Returns `null` when the invitation is not
+   * theirs, which the caller turns into a 404.
+   */
+  async createEvent(
+    invitationId: string,
+    scope: TenantScope,
+    input: {
+      readonly type: string;
+      readonly title: string;
+      readonly eventDate: string;
+      readonly startTime: string;
+      readonly endTime?: string | null | undefined;
+      readonly venueName: string;
+      readonly address: string;
+      readonly latitude?: string | null | undefined;
+      readonly longitude?: string | null | undefined;
+      readonly mapsUrl?: string | null | undefined;
+      readonly description?: string | null | undefined;
+      readonly displayOrder?: number | undefined;
+    },
+  ): Promise<typeof invitationEvents.$inferSelect | null> {
+    const owns = await this.ownsInvitation(invitationId, scope);
+    if (!owns) return null;
+
+    const rows = await this.db
+      .insert(invitationEvents)
+      .values({
+        invitationId,
+        type: input.type,
+        title: input.title,
+        eventDate: input.eventDate,
+        startTime: input.startTime,
+        endTime: input.endTime ?? null,
+        venueName: input.venueName,
+        address: input.address,
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null,
+        mapsUrl: input.mapsUrl ?? null,
+        description: input.description ?? null,
+        displayOrder: input.displayOrder ?? 0,
+      })
+      .returning();
+
+    return rows[0] ?? null;
+  }
+
+  /**
+   * One event of an owned invitation, or `null`. `P1-12`.
+   *
+   * A named wrapper over `findOwnedChild` so a caller does not have to import
+   * `invitationEvents` to name the table — `scripts/check-tenant-scope.mjs` refuses that
+   * import outside this layer, and it is right to: a file with the table in scope is one
+   * edit away from querying it without a predicate.
+   */
+  async findOwnedEvent(
+    eventId: string,
+    invitationId: string,
+    scope: TenantScope,
+  ): Promise<InvitationEventRow | null> {
+    return this.findOwnedChild(invitationEvents, eventId, invitationId, scope);
+  }
+
+  /** Every event of an owned invitation. Same reasoning as `findOwnedEvent`. */
+  async findOwnedEvents(
+    invitationId: string,
+    scope: TenantScope,
+  ): Promise<InvitationEventRow[]> {
+    return this.findOwnedChildren(invitationEvents, invitationId, scope);
+  }
+
+  /**
+   * The next `display_order` for a new event. `P1-12` step 5.
+   *
+   * Appended rather than prepended: a new event must not silently jump to the front of a
+   * list the couple ordered on purpose. Scoped, so it cannot count another tenant's rows.
+   */
+  async nextEventOrder(
+    invitationId: string,
+    scope: TenantScope,
+  ): Promise<number> {
+    const rows = await this.findOwnedChildren(
+      invitationEvents,
+      invitationId,
+      scope,
+    );
+
+    return rows.reduce((max, row) => Math.max(max, row.displayOrder + 1), 0);
+  }
+
+  /**
+   * Update one event, scoped by BOTH its invitation and that invitation's owner.
+   * `docs/SECURITY/05` § 7.
+   *
+   * Two conditions in one statement. Owning the invitation in the path is necessary and not
+   * sufficient: an event id belonging to a different invitation must change nothing, and
+   * the only reliable way to guarantee that is for both predicates to be part of the write.
+   */
+  async updateEvent(
+    eventId: string,
+    invitationId: string,
+    scope: TenantScope,
+    changes: {
+      readonly type?: string | undefined;
+      readonly title?: string | undefined;
+      readonly eventDate?: string | undefined;
+      readonly startTime?: string | undefined;
+      readonly endTime?: string | null | undefined;
+      readonly venueName?: string | undefined;
+      readonly address?: string | undefined;
+      readonly latitude?: string | null | undefined;
+      readonly longitude?: string | null | undefined;
+      readonly mapsUrl?: string | null | undefined;
+      readonly description?: string | null | undefined;
+      readonly displayOrder?: number | undefined;
+    },
+  ): Promise<typeof invitationEvents.$inferSelect | null> {
+    const patch: Record<string, unknown> = {};
+    // Named, not spread: a spread would carry `id` and `invitationId` into the row if a
+    // caller ever passed the whole existing event back as a patch.
+    if (changes.type !== undefined) patch["type"] = changes.type;
+    if (changes.title !== undefined) patch["title"] = changes.title;
+    if (changes.eventDate !== undefined) patch["eventDate"] = changes.eventDate;
+    if (changes.startTime !== undefined) patch["startTime"] = changes.startTime;
+    if (changes.endTime !== undefined) patch["endTime"] = changes.endTime;
+    if (changes.venueName !== undefined) patch["venueName"] = changes.venueName;
+    if (changes.address !== undefined) patch["address"] = changes.address;
+    if (changes.latitude !== undefined) patch["latitude"] = changes.latitude;
+    if (changes.longitude !== undefined) patch["longitude"] = changes.longitude;
+    if (changes.mapsUrl !== undefined) patch["mapsUrl"] = changes.mapsUrl;
+    if (changes.description !== undefined) {
+      patch["description"] = changes.description;
+    }
+    if (changes.displayOrder !== undefined) {
+      patch["displayOrder"] = changes.displayOrder;
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return this.findOwnedChild(
+        invitationEvents,
+        eventId,
+        invitationId,
+        scope,
+      );
+    }
+
+    patch["updatedAt"] = new Date();
+
+    const rows = await this.db
+      .update(invitationEvents)
+      .set(patch)
+      .where(
+        and(
+          eq(invitationEvents.id, eventId),
+          eq(invitationEvents.invitationId, invitationId),
+          sql`EXISTS (
+            SELECT 1 FROM invitations i
+            WHERE i.id = ${invitationEvents.invitationId}
+              AND i.owner_id = ${scope}
+              AND i.deleted_at IS NULL
+          )`,
+        ),
+      )
+      .returning();
+
+    return rows[0] ?? null;
+  }
+
+  /** Delete one event, with the same two conditions. `P1-12`. */
+  async deleteEvent(
+    eventId: string,
+    invitationId: string,
+    scope: TenantScope,
+  ): Promise<void> {
+    await this.db.delete(invitationEvents).where(
+      and(
+        eq(invitationEvents.id, eventId),
+        eq(invitationEvents.invitationId, invitationId),
+        sql`EXISTS (
+            SELECT 1 FROM invitations i
+            WHERE i.id = ${invitationEvents.invitationId}
+              AND i.owner_id = ${scope}
+              AND i.deleted_at IS NULL
+          )`,
+      ),
+    );
   }
 
   /**
