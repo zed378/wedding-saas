@@ -19,6 +19,7 @@ import { ok } from "../../http/envelope";
 import { RegistrationService } from "./registration.service";
 import { LoginService, type Session } from "./login.service";
 import { GoogleOAuthService } from "./oauth/google-oauth.service";
+import { PasswordResetService } from "./password-reset.service";
 import { SessionService, type AuthenticatedUser } from "./session.service";
 import {
   clearRefreshCookie,
@@ -67,6 +68,15 @@ const googleSchema = z.object({ id_token: z.string().min(1).max(8192) });
 const verifySchema = z.object({ token: z.string().min(1).max(512) });
 const resendSchema = z.object({ email: z.email().max(255) });
 
+const forgotSchema = z.object({ email: z.email().max(255) });
+
+const resetSchema = z.object({
+  token: z.string().min(1).max(512),
+  // Unbounded here, as on register: P1-01's policy owns length, and a second limit in a
+  // second place is a second thing to keep in step.
+  new_password: z.string(),
+});
+
 function parse<T>(schema: z.ZodType<T>, body: unknown): T {
   const result = schema.safeParse(body);
   if (result.success) return result.data;
@@ -85,6 +95,7 @@ export class AuthController {
     private readonly registration: RegistrationService,
     private readonly logins: LoginService,
     private readonly google: GoogleOAuthService,
+    private readonly resets: PasswordResetService,
     private readonly sessions: SessionService,
     @Inject(ENV) private readonly env: Env,
   ) {}
@@ -222,6 +233,63 @@ export class AuthController {
     clearRefreshCookie(res, this.env);
 
     return ok({ message: "Anda telah keluar." });
+  }
+
+  /**
+   * `docs/API/01`: ask for a reset link.
+   *
+   * One response for a known address, an unknown one, a suspended account and an
+   * OAuth-only account with no password at all.
+   */
+  @Post("forgot-password")
+  @HttpCode(200)
+  async forgotPassword(@Body() body: unknown) {
+    const { email } = parse(forgotSchema, body);
+    await this.resets.request(email);
+
+    return ok({
+      message:
+        "Jika alamat email tersebut terdaftar, kami telah mengirim tautan untuk mengatur ulang kata sandi.",
+    });
+  }
+
+  /**
+   * Redeem the link and set a new password.
+   *
+   * Every session ends here, including whoever prompted the reset (`docs/SECURITY/03`).
+   */
+  @Post("reset-password")
+  @HttpCode(200)
+  async resetPassword(@Body() body: unknown) {
+    const input = parse(resetSchema, body);
+    const result = await this.resets.reset(input.token, input.new_password);
+
+    if (result.status === "expired") {
+      throw new ValidationError(
+        [
+          {
+            field: "token",
+            message: "Tautan ini telah kedaluwarsa. Silakan minta tautan baru.",
+          },
+        ],
+        "Tautan telah kedaluwarsa.",
+      );
+    }
+
+    if (result.status === "invalid") {
+      // Same answer for a token that never existed and one already spent. Telling them
+      // apart would confirm a token had once been real, which is information about
+      // somebody else's account.
+      throw new ValidationError(
+        [{ field: "token", message: "Tautan ini tidak valid." }],
+        "Tautan tidak valid.",
+      );
+    }
+
+    return ok({
+      message:
+        "Kata sandi berhasil diperbarui. Semua sesi lain telah diakhiri.",
+    });
   }
 
   /**

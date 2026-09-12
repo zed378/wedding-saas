@@ -5,6 +5,7 @@ import { RegistrationService } from "./registration.service";
 import { LoginService } from "./login.service";
 import { SessionService } from "./session.service";
 import { GoogleOAuthService } from "./oauth/google-oauth.service";
+import { PasswordResetService } from "./password-reset.service";
 import {
   createGoogleTokenVerifier,
   GOOGLE_TOKEN_VERIFIER,
@@ -13,7 +14,7 @@ import { ENV } from "../../config/config.module";
 import type { Env } from "../../config/env.schema";
 
 /**
- * P1-02, P1-03 and P1-04. `P1-05` adds password reset.
+ * P1-02 through P1-05. `P1-06` turns `SessionService` into middleware.
  *
  * `SessionService` is exported because it is how every other module will answer "who is
  * this request from" once `P1-06` turns it into middleware.
@@ -25,6 +26,7 @@ import type { Env } from "../../config/env.schema";
     LoginService,
     SessionService,
     GoogleOAuthService,
+    PasswordResetService,
     {
       // A factory, so a test can replace the verifier with one that never reaches the
       // network -- and so the client id is read from validated configuration rather than
@@ -40,6 +42,7 @@ import type { Env } from "../../config/env.schema";
     LoginService,
     SessionService,
     GoogleOAuthService,
+    PasswordResetService,
   ],
 })
 export class AuthModule {}

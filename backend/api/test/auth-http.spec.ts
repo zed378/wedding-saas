@@ -16,6 +16,7 @@ import {
 } from "../src/modules/auth/login.service";
 import { SessionService } from "../src/modules/auth/session.service";
 import { GoogleOAuthService } from "../src/modules/auth/oauth/google-oauth.service";
+import { PasswordResetService } from "../src/modules/auth/password-reset.service";
 import { RegistrationService } from "../src/modules/auth/registration.service";
 import { REFRESH_COOKIE_NAME } from "../src/modules/auth/tokens/refresh-token.service";
 import { UnauthenticatedError } from "../src/http/errors";
@@ -53,7 +54,20 @@ const seen: {
   refreshArg?: string | undefined;
   logoutArg?: string | undefined;
   googleBody?: unknown;
+  forgotEmail?: string;
 } = {};
+
+const resetStub = {
+  request: async (email: string) => {
+    seen.forgotEmail = email;
+  },
+  reset: async (token: string) =>
+    token === "good-token"
+      ? ({ status: "ok" } as const)
+      : token === "expired-token"
+        ? ({ status: "expired" } as const)
+        : ({ status: "invalid" } as const),
+};
 
 const googleStub = {
   authenticate: async (idToken: string) => {
@@ -98,6 +112,7 @@ describe("auth endpoints over HTTP", () => {
         { provide: LoginService, useValue: loginStub },
         { provide: SessionService, useValue: sessionStub },
         { provide: GoogleOAuthService, useValue: googleStub },
+        { provide: PasswordResetService, useValue: resetStub },
         { provide: RegistrationService, useValue: {} },
         { provide: ENV, useValue: env },
       ],
@@ -331,6 +346,65 @@ describe("auth endpoints over HTTP", () => {
       await request(app.getHttpServer())
         .post("/api/v1/auth/logout")
         .expect(200);
+    });
+  });
+
+  describe("password reset endpoints", () => {
+    it("forgot-password lowercases nothing at the edge and always answers 200", async () => {
+      // Uniform: the same body for a known address, an unknown one, a suspended account
+      // and an OAuth-only one. The service decides; the controller cannot leak.
+      for (const email of ["budi@example.test", "nobody@example.test"]) {
+        const res = await request(app.getHttpServer())
+          .post("/api/v1/auth/forgot-password")
+          .send({ email })
+          .expect(200);
+
+        expect(res.body.success).toBe(true);
+        expect(res.body.data).toHaveProperty("message");
+      }
+    });
+
+    it("forgot-password rejects a malformed address", async () => {
+      await request(app.getHttpServer())
+        .post("/api/v1/auth/forgot-password")
+        .send({ email: "not-an-address" })
+        .expect(400);
+    });
+
+    it("reset-password succeeds with a good token", async () => {
+      const res = await request(app.getHttpServer())
+        .post("/api/v1/auth/reset-password")
+        .send({ token: "good-token", new_password: "a-fine-new-password-99" })
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+    });
+
+    it.each([
+      ["an expired token", "expired-token"],
+      ["an unknown token", "nonsense"],
+    ])("reset-password refuses %s with 400", async (_name, token) => {
+      const res = await request(app.getHttpServer())
+        .post("/api/v1/auth/reset-password")
+        .send({ token, new_password: "a-fine-new-password-99" })
+        .expect(400);
+
+      expect(res.body.error.code).toBe("VALIDATION_ERROR");
+    });
+
+    it("reset-password takes no user id", async () => {
+      // Structural: the schema is { token, new_password }. A user_id sent alongside does
+      // not survive parsing, so one person cannot reset another's password.
+      const res = await request(app.getHttpServer())
+        .post("/api/v1/auth/reset-password")
+        .send({
+          token: "good-token",
+          new_password: "a-fine-new-password-99",
+          user_id: "11111111-1111-4111-8111-111111111111",
+        })
+        .expect(200);
+
+      expect(JSON.stringify(res.body)).not.toContain("11111111");
     });
   });
 
