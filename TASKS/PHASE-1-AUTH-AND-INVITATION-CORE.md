@@ -750,7 +750,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-21-dashboard-and-wizard.md) |
 | **Depends on** | P1-20, P1-09 |
 | **Spec refs** | `docs/UI-UX/10-COMPONENT-SPECIFICATION.md` § InvitationCard, `docs/PLAN/04` § F2, `docs/UI-UX/04-USER-JOURNEYS.md` (Budi), `docs/UI-UX/15-RESPONSIVE-DESIGN.md` |
 | **Spec required** | No |
@@ -767,10 +767,16 @@
 6. Stack the list as cards on mobile rather than a scrolling table (`docs/UI-UX/15`).
 
 **Definition of Done**
-- [ ] Status badge colours come from the design system map, not local conditionals.
-- [ ] Slug availability is checked before submission and the server result still wins on conflict.
-- [ ] The wizard runs once and does not reappear on subsequent edits.
-- [ ] The dashboard is usable at 360px width.
+- [x] Status badge colours come from the design system map, not local conditionals. The test asserts the **label** and reads it back out of `INVITATION_STATUS_PRESENTATION` rather than restating it — so a card rendering its own badge would have to duplicate the label too, and the assertion fails the moment the two diverge.
+- [x] Slug availability is checked before submission and the server result still wins on conflict. Both halves have a test, and the second asserts the user's work survives the 409.
+- [x] The wizard runs once and does not reappear on subsequent edits. It redirects with `replace`, and nothing links back into it from an existing invitation.
+- [x] The dashboard is usable at 360px width. Measured in a browser as "the document does not scroll sideways" — a layout claim that jsdom structurally cannot check — plus a tap-target floor of 44px (WCAG 2.5.5).
+
+**This card's surface label is wrong.** It says `web-app`, and its DoD cannot be met from the frontend alone: availability had to be *checkable*, and `docs/API/04` specified no way to check — creation and settings both discover a collision by **failing**, which is right for them and poor for somebody typing into a wizard. `GET /invitations/slug-available` was added, `docs/API/04` amended, and the gap recorded as `PG-18` / ADR-057.
+
+**The endpoint is advisory and the create call stays authoritative.** It cannot reserve anything: between its answer and the `POST` another user can claim the address. A reservation would need a lock held across somebody's typing, an expiry, and a release for a wizard abandoned halfway — a great deal of machinery for a rare collision that is already handled.
+
+**Two empty states, not one.** Somebody with no invitations needs to create one; somebody whose *filter* matched nothing needs the filter cleared. The single-message version tells a user with twelve invitations to create their first.
 
 ---
 

@@ -10,6 +10,23 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — the dashboard, and a card whose surface label was wrong
+
+**Added** — `/dashboard`, `/dashboard/new`, and `GET /invitations/slug-available` ([P1-21](./records/2026-09-12-P1-21-dashboard-and-wizard.md))
+
+- **The badge comes from the design system map**, and the test reads the label back out of `@wi/ui` rather than restating it — so a card that rendered its own badge would fail the assertion the moment the two diverged.
+- **Two empty states.** Somebody with no invitations needs to create one; somebody whose *filter* matched nothing needs the filter cleared. The single-message version tells a user with twelve invitations to create their first.
+- **The address is shown only once published.** A slug exists earlier — the wizard sets one — but the page does not, and showing the address would invite the couple to share a link that 404s.
+- The local slug rules mirror the server's **format** and deliberately not its **blocklist**: that lives in a table an admin edits without a deploy, so a copy would be wrong the first time somebody added a word.
+
+**Worth knowing** — the card says `Surface: web-app` and its definition of done could not be met from the frontend alone.
+
+"Slug availability is checked before submission" needs something to check with, and `docs/API/04` specified nothing: creation and settings both discover a collision by **failing**, which is correct for them and poor for somebody typing into a wizard. `P1-09`'s service already answered the question; only the route was missing.
+
+So `GET /invitations/slug-available` exists, and it is **advisory** (ADR-057). It cannot reserve anything — between its answer and the `POST` another user can claim the address — and a reservation would need a lock held across somebody's typing, an expiry, and a release for a wizard abandoned halfway. The wizard shows the check *and* handles the 409, and that second path has its own test.
+
+**Also** — the endpoint answered 404 at first, because `@Get(":id")` was declared above it and Nest matches routes in declaration order. It read as a missing endpoint rather than a routing mistake, and the fix is positional: a test now asserts the response *shape*, not only the status, because moving a method would undo it silently.
+
 ### 2026-09-12 — the first real screens, and an open redirect that was never built
 
 **Added** — login, register, forgot password, reset password and verify email ([P1-20](./records/2026-09-12-P1-20-auth-screens.md))

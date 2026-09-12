@@ -17,6 +17,7 @@ import {
 import { SettingsService } from "../src/modules/invitation/settings.service";
 import { ChangeTemplateService } from "../src/modules/invitation/change-template.service";
 import { GalleryService } from "../src/modules/invitation/gallery.service";
+import { SlugService } from "../src/modules/invitation/slug.service";
 import { NotFoundError } from "../src/http/errors";
 import { SessionService } from "../src/modules/auth/session.service";
 import { UnauthenticatedError } from "../src/http/errors";
@@ -204,6 +205,22 @@ const galleryStub = {
   },
 };
 
+/**
+ * The slug checker, as `P1-09`'s service answers: `undefined` for a usable address, and one
+ * of three rejection kinds otherwise.
+ */
+const slugStub = {
+  check: async (slug: string) => {
+    if (slug === "taken-address") {
+      return { kind: "taken", message: "Alamat sudah digunakan." };
+    }
+    if (slug === "admin") {
+      return { kind: "blocked", message: "Alamat ini dicadangkan." };
+    }
+    return undefined;
+  },
+};
+
 const NEW_TEMPLATE_ID = "66666666-6666-4666-8666-666666666666";
 
 const changeTemplateStub = {
@@ -370,6 +387,7 @@ describe("POST /invitations over HTTP", () => {
         { provide: SettingsService, useValue: settingsStub },
         { provide: ChangeTemplateService, useValue: changeTemplateStub },
         { provide: GalleryService, useValue: galleryStub },
+        { provide: SlugService, useValue: slugStub },
         { provide: SessionService, useValue: sessionStub },
         { provide: RATE_LIMITER, useValue: limiterStub },
         {
@@ -1421,6 +1439,93 @@ describe("POST /invitations over HTTP", () => {
       await request(app.getHttpServer())
         .get(`/api/v1/invitations/${INVITATION_ID}/gallery`)
         .expect(401);
+    });
+  });
+
+  describe("slug availability (P1-21, ADR-057)", () => {
+    it("says a free address is available", async () => {
+      const res = await request(app.getHttpServer())
+        .get("/api/v1/invitations/slug-available")
+        .query({ slug: "budi-dan-ani" })
+        .set(...AUTH)
+        .expect(200);
+
+      expect(res.body.data).toEqual({
+        available: true,
+        slug: "budi-dan-ani",
+      });
+    });
+
+    it.each([
+      ["taken-address", "taken"],
+      ["admin", "blocked"],
+    ])("reports %s with its reason", async (slug, reason) => {
+      // The three kinds stay distinct: "not a valid address", "reserved" and "somebody got
+      // there first" are different problems for the person typing, and collapsing them into
+      // "unavailable" makes the inline hint useless at the moment it is meant to help.
+      const res = await request(app.getHttpServer())
+        .get("/api/v1/invitations/slug-available")
+        .query({ slug })
+        .set(...AUTH)
+        .expect(200);
+
+      expect(res.body.data).toMatchObject({ available: false, reason });
+      expect(res.body.data.message).toEqual(expect.any(String));
+    });
+
+    it.each([
+      ["a missing slug", {}],
+      ["a two-character slug", { slug: "ab" }],
+      ["a 51-character slug", { slug: "a".repeat(51) }],
+      ["an unexpected field", { slug: "budi-dan-ani", reserve: "true" }],
+    ])("rejects %s", async (_name, query) => {
+      await request(app.getHttpServer())
+        .get("/api/v1/invitations/slug-available")
+        .query(query)
+        .set(...AUTH)
+        .expect(400);
+    });
+
+    it("is 401 without a token", async () => {
+      // A slug is a public address; this endpoint is a yes/no oracle over every published
+      // invitation's URL, and harvesting the platform's live address space should not be a
+      // convenience. ADR-057.
+      await request(app.getHttpServer())
+        .get("/api/v1/invitations/slug-available")
+        .query({ slug: "budi-dan-ani" })
+        .expect(401);
+    });
+
+    it("is rate limited", async () => {
+      limiterStub.check = async () => ({
+        allowed: false,
+        limit: 300,
+        remaining: 0,
+        resetAt: 1789200000,
+      });
+
+      await request(app.getHttpServer())
+        .get("/api/v1/invitations/slug-available")
+        .query({ slug: "budi-dan-ani" })
+        .set(...AUTH)
+        .expect(429);
+    });
+
+    it("is not swallowed by the :id route", async () => {
+      // It was, at first. Nest matches routes in DECLARATION order, so `@Get(":id")`
+      // declared above this one turns `/invitations/slug-available` into a lookup for the
+      // invitation whose id is "slug-available" — a 404 that looks like a missing endpoint
+      // rather than a routing mistake. The fix is positional and therefore easy to undo by
+      // moving a method, which is why this assertion names it.
+      const res = await request(app.getHttpServer())
+        .get("/api/v1/invitations/slug-available")
+        .query({ slug: "budi-dan-ani" })
+        .set(...AUTH)
+        .expect(200);
+
+      // An invitation detail would have an `id`; this has `available`.
+      expect(res.body.data).toHaveProperty("available");
+      expect(res.body.data).not.toHaveProperty("internal_name");
     });
   });
 });
