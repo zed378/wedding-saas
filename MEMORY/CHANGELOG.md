@@ -10,6 +10,22 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — rate limiting, and a decision about Redis being down
+
+**Added** — the policy table from `docs/SECURITY/10`, enforced ([P1-07](./records/2026-09-12-P1-07-rate-limiting.md))
+- A **sliding** window in Redis, not a fixed one. A fixed window resets on a clock boundary, so an attacker spends the whole allowance at the end of one window and again at the start of the next — ten attempts in two seconds against a limit of "5 per 15 minutes".
+- Trim, count and add are one Lua script, so two concurrent requests cannot both take the last slot.
+- Login counts **failed** attempts only, as the document specifies. Counting successes would lock out a household sharing an address, and would let an attacker exhaust a victim's budget by logging in correctly.
+- Limits are tunable **without a deploy**: `HSET rl:config login '{"limit":20}'` is in force within thirty seconds. A malformed override is logged and ignored rather than applied — a typo during a tuning change must not remove a control at the moment somebody is distracted by traffic.
+- `X-RateLimit-Limit`, `-Remaining` and `-Reset` on **every** response, not only refusals: a client can only back off before hitting a wall if it can see the wall coming.
+- The payment webhook is exempt (`docs/SECURITY/02` boundary 5) — a provider retry storm is legitimate traffic, and throttling it into failure loses the notification that `docs/SECURITY/07` makes the only source of truth for payment status.
+
+**Decided** — **ADR-050**: when Redis is unreachable, credential endpoints **fail closed** (`503`) and everything else **fails open**. Unlimited credential attempts against a live user table is a credential-stuffing window that opens exactly when the operator is distracted; a login outage is merely an outage. `503` rather than `429`, because "slow down" would be false and a backoff client would wait for the wrong thing. The cost, stated plainly: a Redis outage takes login, registration and password reset down completely.
+
+**Worth knowing** — **the first version did not limit anything.** The decision was derived in TypeScript from the count the Lua script returned, and at the limit a count is ambiguous: it means both "this one just filled the last slot" and "this one was turned away". `count > limit` was therefore never true. The headers were correct and `remaining` counted down, so a manual test would have shown a limiter working right up until the moment it was supposed to refuse. Six tests caught it on the first run.
+
+**Raised** — `OQ-22`: the (email, IP) key that `docs/SECURITY/10` specifies gives a distributed attacker a fresh budget per IP. The obvious tightening — a per-email limit — would let a stranger lock a victim out of their own account by failing five logins.
+
 ### 2026-09-12 — the authorization trio, and the test that makes the rest cheap
 
 **Added** — `requireAuth`, `requireRole`, `requireOwnership` ([P1-06](./records/2026-09-12-P1-06-auth-role-and-ownership-middleware.md))

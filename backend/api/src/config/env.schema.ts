@@ -139,6 +139,28 @@ export const envSchema = z
      */
     GOOGLE_OAUTH_CLIENT_ID: z.string().min(1).optional(),
 
+    /**
+     * Rate limit overrides (P1-07), as JSON: `{"login":{"limit":20}}`.
+     *
+     * The middle of three layers. Defaults live in `shared/rate-limit/policies.ts`; the
+     * layer that needs no restart is the `rl:config` Redis hash. A malformed value here
+     * is logged and ignored rather than applied -- a typo during a tuning change must not
+     * remove a limit.
+     */
+    RATE_LIMIT_OVERRIDES: z.string().optional(),
+
+    /**
+     * How many reverse proxies sit in front of the API (P1-07).
+     *
+     * A COUNT, deliberately, not a boolean. Express's `trust proxy: true` trusts the
+     * leftmost `X-Forwarded-For` entry, which the client wrote -- so anyone could pick
+     * their own rate-limit bucket, and per-IP limiting would become decorative. A count
+     * makes Express take the n-th entry from the right, which only a real proxy can set.
+     *
+     * 1 locally (Caddy). 2 in production (Cloudflare -> Caddy).
+     */
+    TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(1),
+
     /** Email (P4-06), CAPTCHA (P4-05), maps (P1-14). */
     RESEND_API_KEY: z.string().min(1).optional(),
     TURNSTILE_SECRET_KEY: z.string().min(1).optional(),

@@ -22,7 +22,7 @@
 | P1-04 | Google OAuth | backend | M | P1-03 | ✅
 | P1-05 | Forgot and reset password | backend | M | P1-03, P0-15 | ✅
 | P1-06 | Auth, role and ownership middleware | backend | L | P1-03, P0-11 | ✅
-| P1-07 | Rate limiting for auth and general API | backend | M | P1-03 |
+| P1-07 | Rate limiting for auth and general API | backend | M | P1-03 | ✅
 | P1-08 | User profile, preferences, account deletion | backend | M | P1-06 |
 | P1-09 | Create an invitation | backend | M | P1-06, P0-20 |
 | P1-10 | Invitation list, detail, update, soft delete | backend | L | P1-09 |
@@ -257,7 +257,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-07-rate-limiting.md) |
 | **Depends on** | P1-03 |
 | **Spec refs** | `docs/SECURITY/10-ABUSE-PREVENTION.md` § Rate Limiting, `docs/API/00-API-STANDARDS.md` § Rate Limiting, `docs/ARCHITECTURE/06` |
 | **Spec required** | Yes — abuse prevention |
@@ -277,10 +277,16 @@
 **Inherited obligation from `P1-05`** — `POST /auth/forgot-password` must be limited to **3 per hour per (email, IP)** (`docs/SECURITY/10`), with a test. `P1-05` implemented everything else on its card and deferred this one step here rather than building a second limiter.
 
 **Definition of Done**
-- [ ] Every policy in `docs/SECURITY/10`'s table is implemented with its documented key and window.
-- [ ] Limits are configurable without a deploy.
-- [ ] The webhook path is exempt from public rate limiting.
-- [ ] The Redis-down behaviour is decided, recorded, and covered by a test that simulates the outage.
+- [x] Every policy in `docs/SECURITY/10`'s table is implemented with its documented key and window. `"matches docs/SECURITY/10's table by default"` asserts all nine row for row. `reset-password` added as a documented addition — it consumes the link `forgot-password` sends.
+- [x] Limits are configurable without a deploy. Three layers; the `rl:config` Redis hash re-reads every 30 s. `"a Redis override applies with no restart"`. Five malformed-override cases prove a typo cannot remove a limit.
+- [x] The webhook path is exempt from public rate limiting. Three tests, including a crafted path that merely contains `webhooks`.
+- [x] The Redis-down behaviour is decided, recorded, and covered by a test that simulates the outage. **ADR-050**: fail closed on credential endpoints (`503`, not `429`), open elsewhere. The outage is simulated against a closed port.
+
+**Inherited obligation from `P1-05` — met.** `forgot-password` is limited to 3/hour per (email, IP), with a test.
+
+**Raised**: `OQ-22` — the (email, IP) key gives a distributed attacker a fresh budget per IP; the obvious fix lets a stranger lock a victim out of their own account.
+
+**Left for later tasks**: five policies have no route yet — `P1-09` must apply `invitation-create`, `P1-17` `media-upload`, Phase 2 the public pair, and the two general policies want a global guard rather than a per-route one. Step 7's Prometheus metric is Phase 7; the security event on a block is emitted.
 
 ---
 

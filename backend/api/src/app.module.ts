@@ -12,6 +12,7 @@ import { AuditModule } from "./shared/audit/audit.module";
 import { StorageModule } from "./infra/storage/storage.module";
 import { QueueModule } from "./infra/queue/queue.module";
 import { AuthModule } from "./modules/auth/auth.module";
+import { RateLimitModule } from "./shared/rate-limit/rate-limit.module";
 
 /**
  * The middleware chain, in order. Positions later tasks fill are reserved here rather
@@ -25,7 +26,7 @@ import { AuthModule } from "./modules/auth/auth.module";
  *   4. security headers           helmet                        (main.ts)
  *   5. body parsing + size limit  express.json({ limit })       (main.ts)
  *  5b. cookie parsing            cookie-parser, unsigned        (main.ts)
- *   6. rate limiting              Redis sliding window          P1-07
+ *   6. rate limiting              Redis sliding window          shared/rate-limit (P1-07)
  *   7. authentication             requireAuth(), injects user   shared/auth-middleware (P1-06)
  *   -- route handler --
  *   8. error mapper               envelope per docs/API/00      P0-13
@@ -47,6 +48,7 @@ import { AuthModule } from "./modules/auth/auth.module";
     AuditModule,
     StorageModule,
     QueueModule,
+    RateLimitModule,
     AuthModule,
     // Scaffolding, not a feature. Removed once a real module exists on each surface.
     ...(process.env["NODE_ENV"] === "production" ? [] : [ReferenceModule]),
