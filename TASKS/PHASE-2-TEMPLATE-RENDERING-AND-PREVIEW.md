@@ -98,7 +98,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** — 2026-09-12, [record](../MEMORY/records/2026-09-12-P2-03-section-components.md) |
 | **Depends on** | P2-02 |
 | **Spec refs** | `docs/UI-UX/14-PUBLIC-INVITATION-UX.md`, `docs/PLAN/07` § Section System, `docs/UI-UX/17-ACCESSIBILITY.md` |
 | **Spec required** | No |
@@ -117,11 +117,11 @@
 7. Add a visual regression snapshot per component, per `docs/FRONTEND/10` § Visual Regression — these components are shared across every template, so an unintended change has wide blast radius.
 
 **Definition of Done**
-- [ ] All ten components render from theme tokens with no hard-coded colour or font.
-- [ ] Empty optional fields leave no visual artifact.
-- [ ] Each component passes an automated accessibility check, including contrast over an image background.
-- [ ] `prefers-reduced-motion` disables non-essential animation.
-- [ ] Visual snapshots exist for each component in both layout variants where applicable.
+- [x] All ten components render from theme tokens with no hard-coded colour or font — and `check-renderer-is-generic.mjs` now fails the build for one, mutation-verified. The single exemption is the hero's achromatic scrim, which is a contrast mechanism rather than a palette: a cover photo can be any brightness, so darkening it is the only way to guarantee the ratio, and making that themeable would let a template author break `docs/UI-UX/17`.
+- [x] Empty optional fields leave no visual artifact — five tests, including the dangling-conjunction case (`"Putra dari Bapak X dan "`) that is the specific artifact `docs/PLAN/07` warns about.
+- [x] Each component passes an automated accessibility check — axe over all eleven, mutation-verified by removing a form label. **Partly met** on "including contrast over an image background": jsdom has no layout engine so `color-contrast` cannot run, the scrim is asserted structurally here, and the pixel measurement belongs to `P2-13`'s browser pass.
+- [x] `prefers-reduced-motion` disables non-essential animation.
+- [–] Visual snapshots exist for each component in both layout variants — **not done**. They need a browser that renders pixels; a jsdom snapshot compares empty boxes and passes forever. Moved onto `P2-13`, which already opens these pages for Core Web Vitals.
 
 ---
 
@@ -411,6 +411,7 @@
 - [ ] The bundle budget is enforced in CI.
 - [ ] RUM is wired and reporting.
 - [ ] Cover photo is the LCP element and loads eagerly; everything else is lazy.
+- [ ] **Inherited from `P2-03`**: a visual regression snapshot per section component, in both gallery layout variants (`docs/FRONTEND/10` § Visual Regression). jsdom cannot take a meaningful one — every element has zero size — so it belongs wherever a real browser is already open, which is here. The same pass should measure text contrast over a photo background, which is the half of `P2-03`'s accessibility DoD that jsdom structurally cannot check.
 
 ---
 

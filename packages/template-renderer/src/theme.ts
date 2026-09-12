@@ -64,6 +64,8 @@ export function themeToCustomProperties(
 ): Record<string, string> {
   const properties: Record<string, string> = {};
 
+  Object.assign(properties, derivedProperties(theme));
+
   for (const [group, value] of Object.entries(theme)) {
     if (value !== null && typeof value === "object" && !Array.isArray(value)) {
       for (const [name, inner] of Object.entries(
@@ -82,6 +84,63 @@ export function themeToCustomProperties(
   }
 
   return properties;
+}
+
+/**
+ * The scales `docs/PLAN/07`'s theme expresses as words rather than measurements.
+ *
+ * `spacing` is `compact | comfortable | spacious` and `border_radius` is
+ * `none | subtle | rounded | full` — a template author picks a feel, not a pixel count.
+ * Something has to turn those into CSS, and it belongs here rather than in a component:
+ * a component that knew `"comfortable"` meant `1.25rem` would be a component that had to
+ * be edited to change the scale, for every template at once.
+ *
+ * These numbers are the **renderer's** design decisions and apply to every template
+ * equally, which is what keeps them out of the per-template data.
+ */
+const SPACING_SCALE: Readonly<Record<string, string>> = {
+  compact: "0.75rem",
+  comfortable: "1.25rem",
+  spacious: "2rem",
+};
+
+const RADIUS_SCALE: Readonly<Record<string, string>> = {
+  none: "0",
+  subtle: "4px",
+  rounded: "12px",
+  full: "999px",
+};
+
+const FONT_SCALE: Readonly<Record<string, string>> = {
+  compact: "0.9",
+  default: "1",
+  large: "1.15",
+};
+
+/**
+ * Turn the word-valued tokens into usable CSS, alongside the literal ones.
+ *
+ * An unrecognised word falls back to the middle of its scale rather than to nothing: a
+ * theme that somehow carried `spacing: "roomy"` should render slightly wrong, not
+ * collapse to zero-width. `P0-20` validates the enum before storage, so this is the
+ * second layer.
+ */
+function derivedProperties(theme: ThemeObject): Record<string, string> {
+  const typography = theme["typography"];
+  const scale =
+    typography !== null &&
+    typeof typography === "object" &&
+    typeof (typography as Record<string, unknown>)["scale"] === "string"
+      ? ((typography as Record<string, unknown>)["scale"] as string)
+      : "default";
+
+  return {
+    "--space":
+      SPACING_SCALE[String(theme["spacing"])] ?? SPACING_SCALE["comfortable"]!,
+    "--radius":
+      RADIUS_SCALE[String(theme["border_radius"])] ?? RADIUS_SCALE["rounded"]!,
+    "--font-scale": FONT_SCALE[scale] ?? FONT_SCALE["default"]!,
+  };
 }
 
 /**

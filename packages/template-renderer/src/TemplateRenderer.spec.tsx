@@ -232,74 +232,29 @@ describe("step 3 — the component name resolves through the registry", () => {
 
 describe("step 4 — the data subset", () => {
   it("gives a section only the fields it declared", () => {
+    // The resolver's own properties are asserted in `resolve-data.spec.ts`, where they
+    // cannot be made vacuous by a component change. What belongs HERE is that the
+    // renderer actually applies it: a section rendered with the whole invitation would
+    // pass every resolver test and still leak.
     render(
       <TemplateRenderer
         mode="public"
-        invitationData={DATA}
+        invitationData={{
+          couple: { groom: { nickname: "Budi" }, bride: { nickname: "Siti" } },
+          gift: { accounts: [{ account_number: "SECRET-9999" }] },
+        }}
         templateVersion={version([
           section({
-            section_key: "hero",
-            required_fields: ["couple.groom.nickname"],
+            section_key: "couple",
+            component: "CoupleProfile",
+            required_fields: ["couple.groom.nickname", "couple.bride.nickname"],
           }),
         ])}
       />,
     );
 
-    const html = document.body.innerHTML;
-    expect(html).toContain("Budi");
-    // The bride's name was not declared by this section, so it is not in its props --
-    // `required_fields` describes what a component uses, and a component handed the whole
-    // invitation makes that description drift.
-    expect(html).not.toContain("Nurhaliza");
-  });
-
-  it("groups a collection by element rather than flattening it", () => {
-    render(
-      <TemplateRenderer
-        mode="public"
-        invitationData={DATA}
-        templateVersion={version([
-          section({
-            section_key: "event",
-            component: "EventCardDouble",
-            required_fields: ["events.*.title", "events.*.venue_name"],
-          }),
-        ])}
-      />,
-    );
-
-    const text = document.body.textContent ?? "";
-    // Each event keeps its own title and venue together. A flat list of titles and a flat
-    // list of venues could not be rendered as cards.
-    expect(text).toContain(
-      JSON.stringify({
-        events: [
-          { title: "Akad Nikah", venue_name: "Masjid Agung" },
-          { title: "Resepsi", venue_name: "Gedung Merdeka" },
-        ],
-      }),
-    );
-  });
-
-  it("omits a field that is absent rather than passing undefined", () => {
-    // `docs/PLAN/07` § Required vs Optional: an absent optional field must leave no empty
-    // box. The cheapest way to keep that promise is for the key never to arrive.
-    render(
-      <TemplateRenderer
-        mode="public"
-        invitationData={{ couple: { groom: { nickname: "Budi" } } }}
-        templateVersion={version([
-          section({
-            required_fields: ["couple.groom.nickname"],
-            optional_fields: ["couple.groom.instagram"],
-          }),
-        ])}
-      />,
-    );
-
-    expect(document.body.textContent).toContain(
-      JSON.stringify({ couple: { groom: { nickname: "Budi" } } }),
-    );
+    expect(document.body.textContent).toContain("Budi");
+    expect(document.body.innerHTML).not.toContain("SECRET-9999");
   });
 });
 
@@ -327,25 +282,82 @@ describe("step 5 — the props a component receives", () => {
     );
   });
 
-  it("passes layout_variant and max_items down", () => {
+  it("turns the word-valued theme tokens into usable CSS", () => {
+    // `spacing` and `border_radius` are words in the schema -- a template author picks a
+    // feel, not a pixel count. Something has to translate, and a component that knew
+    // "comfortable" meant 1.25rem would have to be edited to change the scale.
     render(
       <TemplateRenderer
         mode="public"
         invitationData={DATA}
+        templateVersion={version([section()], {
+          theme: {
+            colors: { primary: "#b76e79" },
+            spacing: "spacious",
+            border_radius: "none",
+          },
+        })}
+      />,
+    );
+
+    const root = document.querySelector<HTMLElement>(
+      "[data-template-renderer]",
+    );
+    expect(root?.style.getPropertyValue("--space")).toBe("2rem");
+    expect(root?.style.getPropertyValue("--radius")).toBe("0");
+  });
+
+  it("passes layout_variant down, so a definition can override the component's default", () => {
+    render(
+      <TemplateRenderer
+        mode="public"
+        invitationData={{
+          gallery: {
+            photos: [{ url: "https://cdn.test/a.jpg", media_id: "a" }],
+          },
+        }}
         templateVersion={version([
           section({
             section_key: "gallery",
+            // Named Grid, asked for a carousel. The definition wins.
             component: "GalleryGrid",
-            layout_variant: "grid",
-            max_items: 20,
+            layout_variant: "carousel",
+            required_fields: ["gallery.photos"],
           }),
         ])}
       />,
     );
 
-    const placeholder = document.querySelector("[data-placeholder]");
-    expect(placeholder?.getAttribute("data-layout-variant")).toBe("grid");
-    expect(placeholder?.getAttribute("data-max-items")).toBe("20");
+    expect(
+      document.querySelector("[data-variant]")?.getAttribute("data-variant"),
+    ).toBe("carousel");
+  });
+
+  it("passes max_items down, so a template's cap is honoured", () => {
+    render(
+      <TemplateRenderer
+        mode="public"
+        invitationData={{
+          gallery: {
+            photos: Array.from({ length: 10 }, (_, i) => ({
+              url: `https://cdn.test/${String(i)}.jpg`,
+              media_id: String(i),
+            })),
+          },
+        }}
+        templateVersion={version([
+          section({
+            section_key: "gallery",
+            component: "GalleryGrid",
+            max_items: 3,
+            required_fields: ["gallery.photos"],
+          }),
+        ])}
+      />,
+    );
+
+    // A couple with 200 photos must not break a layout designed for 20.
+    expect(document.querySelectorAll(".wi-photo")).toHaveLength(3);
   });
 
   it.each(["live", "public", "demo"] as const)(
@@ -354,18 +366,37 @@ describe("step 5 — the props a component receives", () => {
       render(
         <TemplateRenderer
           mode={mode}
-          invitationData={DATA}
+          invitationData={{
+            gift: {
+              accounts: [
+                { account_number: "1234567890", provider_name: "BCA" },
+              ],
+            },
+          }}
           templateVersion={version([
-            section(),
-            section({ section_key: "quote", component: "QuoteBanner" }),
+            section({
+              section_key: "gift",
+              component: "GiftAccountList",
+              required_fields: [
+                "gift.accounts.*.account_number",
+                "gift.accounts.*.provider_name",
+              ],
+            }),
           ])}
         />,
       );
 
-      const modes = [...document.querySelectorAll("[data-placeholder]")].map(
-        (el) => el.getAttribute("data-mode"),
-      );
-      expect(modes).toEqual([mode, mode]);
+      // The copy button is the mode made visible: `docs/FRONTEND/04` § Mode Differences
+      // makes interaction live only in `public`, and a button that appears to work and
+      // does not is worse than one plainly disabled.
+      const copy =
+        document.querySelector<HTMLButtonElement>(".wi-button-quiet");
+      expect(copy?.disabled).toBe(mode !== "public");
+      expect(
+        document
+          .querySelector("[data-template-renderer]")
+          ?.getAttribute("data-mode"),
+      ).toBe(mode);
     },
   );
 });

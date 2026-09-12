@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 import { resolveComponent } from "./registry.js";
+import { SECTION_STYLES } from "./sections/styles.js";
 import { resolveSectionData } from "./resolve-data.js";
 import { mergeTheme, themeToCustomProperties } from "./theme.js";
 import type {
@@ -62,6 +63,15 @@ export function TemplateRenderer({
 
   return (
     <div data-template-renderer="true" data-mode={mode} style={style}>
+      {/*
+       * The section stylesheet, once, at the root.
+       *
+       * A string rather than a `.css` import because this package is consumed by two Next
+       * applications and, later, by whatever renders a share preview: a CSS import needs
+       * every consumer's build to be told about it, and a `<style>` element needs nothing
+       * and works identically under SSR and in jsdom. See `sections/styles.ts`.
+       */}
+      <style>{SECTION_STYLES}</style>
       {visible.map((section: SectionDefinition, index: number) => {
         const Component = resolveComponent(section.component);
 
