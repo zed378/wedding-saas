@@ -54,6 +54,41 @@ const PACKAGE = join(ROOT, "packages", "template-renderer", "src");
 /** `templateId` and friends. The renderer is not entitled to know which template it is. */
 const IDENTIFIER = /\btemplate[_-]?(id|slug)\b/i;
 
+/**
+ * P2-03 DoD item 1: "all ten components render from theme tokens with no hard-coded
+ * colour or font".
+ *
+ * A colour typed into a section is a colour that does not change when the template does,
+ * which is the whole difference between a template system and ten copies of a page. The
+ * theme sets every one of these as a custom property at the renderer root
+ * (`docs/FRONTEND/04` § Theme Application) and a component reads `var(--color-primary)`.
+ *
+ * ## The one allowed exception, and why it is not a hole
+ *
+ * An achromatic overlay -- `rgb(0 0 0 / 45%)` and white text on top of it -- is not a
+ * palette choice. It is the mechanism `docs/UI-UX/14` § Accessibility requires for
+ * contrast "even over a photo background": a cover photo is chosen by the couple and can
+ * be any brightness, so the only way to guarantee 4.5:1 is to darken the image rather
+ * than to pick a colour against it.
+ *
+ * Making it themeable would let a template author break a requirement `docs/UI-UX/17`
+ * does not make optional. So black-with-alpha and white are permitted, and every other
+ * colour literal is not.
+ */
+const OVERLAY_ALLOWED = /^(#fff|#ffffff|rgb\(\s*0\s+0\s+0\s*\/)/i;
+
+const COLOUR_LITERAL = /#[0-9a-f]{3,8}|rgba?\s*\(|hsla?\s*\(/gi;
+
+/**
+ * A font stack fallback is generic; a named family first is a design decision.
+ *
+ * Captured rather than matched with a lookahead. `/font-family:\s*(?!var\()/` looks
+ * right and is wrong: `\s*` can match zero characters, so the lookahead is evaluated
+ * immediately after the colon where the next character is a space rather than `var(` --
+ * and it flags every declaration including the correct ones. It did, on the first run.
+ */
+const NAMED_FONT = /font-family:\s*([^;]+)/i;
+
 const ALWAYS_FORBIDDEN = [
   {
     pattern: /dangerouslySetInnerHTML/,
@@ -129,6 +164,27 @@ for (const file of sources(PACKAGE)) {
       });
     }
 
+    // DoD item 1 -- no colour or font literal in the package's own styling.
+    for (const match of code.matchAll(COLOUR_LITERAL)) {
+      const literal = code.slice(match.index);
+      if (OVERLAY_ALLOWED.test(literal)) continue;
+      offenders.push({
+        ...at,
+        why: "a colour belongs in the template's theme, read as var(--color-...); only an achromatic contrast overlay is exempt",
+      });
+    }
+
+    const font = NAMED_FONT.exec(code);
+    // A generic family AFTER the variable is the fallback stack, which is correct and
+    // required -- `var(--typography-heading-font), Georgia, serif`. What is forbidden is
+    // a named family standing where the variable should be.
+    if (font !== null && !font[1].trim().startsWith("var(")) {
+      offenders.push({
+        ...at,
+        why: "a font family belongs in the template's theme, read as var(--typography-...)",
+      });
+    }
+
     for (const slug of slugs) {
       if (code.includes(`"${slug}"`) || code.includes(`'${slug}'`)) {
         offenders.push({
@@ -158,5 +214,5 @@ if (offenders.length > 0) {
 
 console.log(
   `check-renderer-is-generic: ${String(sources(PACKAGE).length)} file(s) checked, ` +
-    `no template identifier, no innerHTML, no network call.`,
+    `no template identifier, no innerHTML, no network call, no colour or font literal.`,
 );

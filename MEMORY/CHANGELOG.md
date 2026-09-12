@@ -12,6 +12,19 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ### 2026-09-12 — Phase 2 opens: the catalog, and the renderer everything else runs through
 
+**Added** — the ten sections every template is assembled from ([P2-03](./records/2026-09-12-P2-03-section-components.md))
+
+- **Not one colour and not one font name in them.** Every visual value is `var(--…)`, set from the template's theme, and the guard now fails the build for a literal — mutation-verified. The single exemption is the hero's achromatic scrim: a cover photo is chosen by the couple and can be any brightness, so darkening the image is the only way to guarantee contrast, and making that themeable would let a template author break `docs/UI-UX/17`.
+- **The countdown survives hydration.** A server-rendered second count is guaranteed to disagree with the client's by the time React hydrates, so the server emits labels and an em dash and the browser fills in the numbers. It counts toward the nearest event that has not started — a guest opening the link between the akad and the reception should not see a number counting up — and reads stored times as WIB, so a guest abroad is not shown a countdown seven hours out.
+- **No map SDK**, per ADR-014: a deep link built from the stored coordinates, with `javascript:` refused a second time in case `P1-12` ever stops refusing it first.
+- **RSVP and Guestbook are disabled and say so.** Their wiring is Phase 4; a live-looking form whose handler is missing is the failure where a guest types a message, presses send, sees nothing, and concludes the invitation is broken.
+
+**Worth knowing** — `.jsx` import specifiers built cleanly and broke the consumer.
+
+TypeScript accepts `./HeroClassic.jsx` as referring to a `.tsx` source and emits that specifier **verbatim** — but the emitted file is `.js`. The package's own tests passed throughout, because they resolve from source. Only the two tests `P2-02` insisted on — one per consuming application, importing the built package — caught it. Without them this surfaces during `P2-08`, a card away from the change that caused it.
+
+**Not done, and named**: the visual regression snapshots `docs/FRONTEND/10` asks for. They need a browser that renders pixels; a jsdom snapshot compares empty boxes and passes forever. Moved onto `P2-13`, which already opens these pages for Core Web Vitals — along with the contrast-over-a-photograph measurement, which is the half of the accessibility DoD jsdom structurally cannot check.
+
 **Added** — the generic renderer, and the guard that keeps it generic ([P2-02](./records/2026-09-12-P2-02-generic-renderer-core.md))
 
 - **`CLAUDE.md`'s first non-negotiable, made executable.** One `<TemplateRenderer>`, imported and rendered by both frontends, implementing `docs/FRONTEND/04`'s five render steps including the `configurable: false` exception. Nothing in the package knows the name of a single template.
