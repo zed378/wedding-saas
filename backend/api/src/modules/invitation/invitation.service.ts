@@ -83,9 +83,23 @@ export class InvitationService {
       { scope, resourceType: "invitation", resourceId: invitationId },
     );
 
-    const aggregate = await this.repository.loadAggregate(invitationId, scope);
+    const [aggregate, template] = await Promise.all([
+      this.repository.loadAggregate(invitationId, scope),
+      // `PG-19`, ADR-060: the slug and version a client needs to fetch the definition it
+      // is actually rendering. The ownership check above has already passed, and this
+      // query repeats the owner predicate anyway rather than trusting that.
+      this.repository.findTemplateIdentity(invitationId, scope),
+    ]);
 
-    return toInvitationDetail(invitation, aggregate);
+    if (template === null) {
+      // Every invitation has a `template_version_id` with a NOT NULL foreign key, so this
+      // is unreachable through the schema -- and answering 404 rather than throwing on a
+      // null means a row that somehow lost its version does not become a 500 on the one
+      // endpoint the editor loads first.
+      throw new NotFoundError();
+    }
+
+    return toInvitationDetail(invitation, aggregate, template);
   }
 
   /**

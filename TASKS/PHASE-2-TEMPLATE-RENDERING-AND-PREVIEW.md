@@ -158,7 +158,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** — 2026-09-12, [record](../MEMORY/records/2026-09-12-P2-05-live-preview.md) |
 | **Depends on** | P2-03, P1-22 |
 | **Spec refs** | `docs/FRONTEND/06-EDITOR-ARCHITECTURE.md`, `docs/UI-UX/12-EDITOR-UX.md`, `docs/PLAN/17` § Non-Functional Performance |
 | **Spec required** | No |
@@ -176,11 +176,13 @@
 7. Measure the update latency in a test and assert the budget rather than eyeballing it.
 
 **Definition of Done**
-- [ ] A keystroke reaches the preview in under 300ms with no network request, asserted by a test.
-- [ ] Device toggle and scroll-to-section work.
-- [ ] The preview is skippable by keyboard.
-- [ ] Preview and public page render through the same component code — a diff test asserts the same DOM for the same data.
-- [ ] **Inherited from `P1-22` via `P1-25` (DF-11)**: a Playwright check at a desktop viewport asserting the editor's three panels are simultaneously visible. jsdom evaluates no media queries, so every editor component test written so far asserts the **mobile** arrangement and the desktop layout has never been executed by anything. It could not be done in Phase 1 because the wizard renders `templates={[]}` until `P2-01`, so no user could reach an editor route at all.
+- [x] A keystroke reaches the preview in under 300ms with no network request, asserted by a test — **both halves in one test**, because a test measuring only elapsed time would pass against a fetch served by a fast local mock, which is the implementation `docs/FRONTEND/06` rules out.
+- [x] Device toggle and scroll-to-section work. Mobile is the default, because `docs/UI-UX/14` makes the public page "purely mobile-first" and defaulting to desktop previews the less common case.
+- [x] The preview is skippable by keyboard — and the link is **first in the tab order**, which is the part that makes it useful.
+- [x] Preview and public page render through the same component code — a diff test asserting identical markup for identical data.
+- [x] **Inherited from `P1-22` via `P1-25` (DF-11)**: done, at two viewports — and **it found a real bug**. `P1-22` restored hidden panels with `md:block`, and Tailwind v4's preflight sets `[hidden]{display:none!important}`, so the three-column desktop layout **never worked** and nothing caught it because jsdom evaluates no media queries. The card's note that "the desktop layout has never been executed by anything" was right in the strongest sense. Discharged against the shell's layout on the workbench rather than at `/editor/:id`, because reaching that route needs a session, an invitation and a published template, while DF-11's question is a CSS one about the shell — the distinction is recorded in the story file itself. A session-authenticated walk belongs with `P2-14`.
+
+**Also closed here**: `PG-19` / ADR-060. The editor had no way to reach the definition of the version its invitation is locked to — the detail response carried bare uuids while every catalogue endpoint takes a slug and a semver, and `GET /templates/:slug` serves the newest published version, which BR-3.1 makes the one answer certain to be wrong. The detail now carries `template: { slug, name, version }`.
 
 ---
 

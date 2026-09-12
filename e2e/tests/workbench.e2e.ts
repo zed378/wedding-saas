@@ -214,6 +214,66 @@ test.describe("the app shell", () => {
     await expect(focused).toHaveAttribute("href", "#main");
   });
 
+  /**
+   * DF-11 — the editor's three-column layout, executed for the first time.
+   *
+   * `P1-22` shipped the editor shell noting its desktop layout was untested, and said
+   * why: **jsdom evaluates no media queries**, so every editor component test asserts the
+   * mobile arrangement and the `md:` three-column layout had never been executed by
+   * anything. `P1-25` inherited the gap and could not discharge it, because the wizard
+   * rendered `templates={[]}` until `P2-01` and no user could reach an editor route.
+   *
+   * A real browser is the only thing that can answer this, and the workbench is the only
+   * page the browser suite already opens. What is asserted is the CSS question DF-11
+   * actually asks — are three panels visible at once above the breakpoint, and do they
+   * collapse below it.
+   */
+  test("shows the editor's three panels at once on a desktop viewport", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`${WEB_APP}/workbench`);
+
+    const layout = page.locator("[data-editor-layout]");
+    await expect(layout.locator("[data-panel='sections']")).toBeVisible();
+    await expect(layout.locator("[data-panel='preview']")).toBeVisible();
+    await expect(layout.locator("[data-panel='properties']")).toBeVisible();
+
+    // Side by side rather than merely all present: three stacked panels would also pass
+    // three visibility checks, and stacking is exactly the mobile arrangement this test
+    // exists to distinguish from.
+    const boxes = await Promise.all(
+      ["sections", "preview", "properties"].map((panel) =>
+        layout.locator(`[data-panel='${panel}']`).boundingBox(),
+      ),
+    );
+
+    expect(boxes.every((box) => box !== null)).toBe(true);
+    const lefts = boxes.map((box) => box!.x);
+    expect(lefts[0]!).toBeLessThan(lefts[1]!);
+    expect(lefts[1]!).toBeLessThan(lefts[2]!);
+  });
+
+  test("collapses those panels below the breakpoint", async ({ page }) => {
+    // The other half: the mobile arrangement every jsdom test has been asserting all
+    // along, confirmed in a browser that actually evaluates the media query.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${WEB_APP}/workbench`);
+
+    const layout = page.locator("[data-editor-layout]");
+
+    // Attached first, hidden second. `toBeHidden` also passes for an element that is not
+    // in the DOM at all -- so on its own it would keep passing if the story were deleted,
+    // renamed, or (as happened while writing this) if the test navigated to the wrong
+    // page. That is a vacuous pass, and this is the two lines that stop it.
+    await expect(layout).toBeAttached();
+    for (const panel of ["sections", "preview", "properties"]) {
+      const locator = layout.locator(`[data-panel='${panel}']`);
+      await expect(locator).toBeAttached();
+      await expect(locator).toBeHidden();
+    }
+  });
+
   test("declares the page language, so a screen reader pronounces it", async ({
     page,
   }) => {

@@ -17,6 +17,7 @@ import {
   auditLogs,
   media,
   templateVersions,
+  templates,
 } from "../../infra/db/schema/index";
 import type { AdminBypass, TenantScope } from "./tenant-scope";
 import type { Transaction } from "../db/transaction";
@@ -1625,6 +1626,45 @@ export class InvitationRepository {
    * settings and quote rows are keyed by `invitation_id` and have no child id, so they
    * are read here with the same join.
    */
+  /**
+   * The template identity behind an invitation's locked version. `PG-19`, ADR-060.
+   *
+   * The two values a client needs to call `GET /templates/:slug/versions/:version` for
+   * the definition it is actually rendering. Not the definition itself: that would put a
+   * large JSON blob on every invitation read and duplicate `P2-01`'s cache, which is
+   * where a template definition is supposed to be served from.
+   *
+   * Owner-scoped like every other read here, so this cannot become a way to learn which
+   * template somebody else's invitation uses.
+   */
+  async findTemplateIdentity(
+    invitationId: string,
+    scope: TenantScope,
+  ): Promise<{ slug: string; name: string; version: string } | null> {
+    const rows = await this.db
+      .select({
+        slug: templates.slug,
+        name: templates.name,
+        version: templateVersions.version,
+      })
+      .from(invitations)
+      .innerJoin(
+        templateVersions,
+        eq(invitations.templateVersionId, templateVersions.id),
+      )
+      .innerJoin(templates, eq(templateVersions.templateId, templates.id))
+      .where(
+        and(
+          eq(invitations.id, invitationId),
+          eq(invitations.ownerId, scope),
+          isNull(invitations.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    return rows[0] ?? null;
+  }
+
   async loadAggregate(
     invitationId: string,
     scope: TenantScope,

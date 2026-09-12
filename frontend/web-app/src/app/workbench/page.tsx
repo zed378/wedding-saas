@@ -13,6 +13,7 @@ import {
   TableStory,
   TabsStory,
 } from "./stories";
+import { EditorLayoutStory } from "./editor-layout-story";
 
 /**
  * P0-22 — the workbench route.
@@ -40,6 +41,7 @@ export default function WorkbenchPage() {
         </p>
       </header>
 
+      <EditorLayoutStory />
       <ButtonStory />
       <FieldStory />
       <DropzoneStory />

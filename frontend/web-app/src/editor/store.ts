@@ -74,9 +74,21 @@ export interface EditorState {
 
 export interface TemplateSectionDefinition {
   readonly section_key: string;
+  /**
+   * The component name. Required by `@wi/template-renderer` (`P2-02`), which resolves it
+   * through the registry — so the live preview cannot render a section without it.
+   *
+   * Optional here only because the store holds whatever the API returned and this type
+   * predates the preview; a definition missing it renders nothing for that section and
+   * the renderer reports it through `onSectionIssue`.
+   */
+  readonly component?: string;
   readonly configurable?: boolean;
   readonly enabled_by_default?: boolean;
   readonly required_fields?: readonly string[];
+  /** `docs/PLAN/07`: a template's cap on a collection, honoured by the gallery. */
+  readonly max_items?: number;
+  readonly layout_variant?: string;
   /**
    * `sectionSchema` defaults it to `[]`, so a validated definition always has one — but the
    * store holds whatever the API returned, and a row written before the default existed
@@ -88,6 +100,16 @@ export interface TemplateSectionDefinition {
 export interface TemplateDefinition {
   readonly sections: readonly TemplateSectionDefinition[];
   readonly enabledSections: readonly string[];
+  /**
+   * The template's theme, for the live preview. `docs/FRONTEND/04` § Theme Application
+   * applies it as CSS custom properties at the renderer root.
+   *
+   * Optional because `P1-22` created this type before there was anything to render with
+   * it, and a section list without a theme is still a usable properties panel.
+   */
+  readonly theme?: Readonly<Record<string, unknown>>;
+  /** Which theme paths a user may override. `P1-14` enforces it on write. */
+  readonly customizable_theme_keys?: readonly string[];
 }
 
 export interface EditorActions {

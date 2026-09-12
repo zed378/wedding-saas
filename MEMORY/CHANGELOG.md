@@ -12,6 +12,21 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ### 2026-09-12 — Phase 2 opens: the catalog, and the renderer everything else runs through
 
+**Added** — the live preview, and a backend gap closed to make it possible ([P2-05](./records/2026-09-12-P2-05-live-preview.md))
+
+- **The editor finally renders a real invitation**, through the same renderer the public page uses — proved by a diff test asserting identical markup. A keystroke reaches it in under 300ms **and makes no request**: both halves asserted, because a test measuring only time would pass against a fetch served by a fast local mock, which is the implementation `docs/FRONTEND/06` exists to rule out.
+- **`PG-19` / ADR-060**: the editor could not reach the definition of the version its invitation is locked to. The detail response carried `template_id` and `template_version_id` as bare uuids, every catalogue endpoint is addressed by slug and semver, and `GET /templates/:slug` serves the *newest* version — which BR-3.1 makes the one answer certain to be wrong for an existing invitation. The detail now carries `template: { slug, name, version }`, and not the definition itself: a definition changes a few times a year and an invitation on every keystroke, so they belong on different cache lifetimes.
+
+**Fixed** — the editor's three-column desktop layout, which had never worked
+
+DF-11 was raised because "the desktop layout has never been executed by anything", and it was right in the strongest sense. `P1-22` restored hidden panels with `md:block`, and Tailwind v4's preflight contains `[hidden]:where(:not([hidden=until-found])){display:none!important}` — so every inactive panel stayed hidden at every width. jsdom evaluates no media queries, so no unit test could see it.
+
+The obvious fix is also wrong: `md:block!` has equal specificity and later source order, but for **important** declarations the CSS cascade reverses layer order, so preflight's `base` layer beats anything in `utilities`. The fix is the `hidden` class, where both declarations are ordinary and the variant wins by ordinary rules. Three build-and-test cycles, and the answer only came from probing `getComputedStyle` in a real browser instead of reasoning about specificity.
+
+**Worth knowing** — `toBeHidden()` passes for an element that is not in the DOM at all.
+
+The paired mobile assertion was green throughout, including while its desktop twin could not find the element — because two of those cycles went on a test that navigated to `/` instead of `/workbench`. Every panel is now asserted attached before it is asserted hidden. Any Playwright assertion that something is *not* visible needs that pairing, or it silently stops testing anything the moment a selector drifts.
+
 **Added** — all three error boundary levels, and the editor protection ([P2-04](./records/2026-09-12-P2-04-error-boundaries.md))
 
 - **One broken section never takes down an invitation.** `docs/FRONTEND/08` states the stake plainly: RSVP and event details "must never disappear because another section broke". A guest who cannot find the venue because a gallery row is corrupt is the outcome this prevents, on a page hundreds of people open from a WhatsApp link at a time nobody is watching a dashboard.

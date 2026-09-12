@@ -126,7 +126,12 @@ describe("the preview boundary", () => {
     // `role="status"` and not `alert`: an assertive announcement would cut across
     // whatever the user is in the middle of typing, which is the thing this boundary
     // exists to protect.
-    expect(screen.getByRole("status")).toBeInTheDocument();
+    //
+    // Scoped to the preview panel. jsdom applies no CSS, so the `hidden` class the shell
+    // uses for its inactive panels does nothing here and the save-status indicator is in
+    // the tree too -- an unscoped query finds two.
+    const preview = document.querySelector("#panel-preview")!;
+    expect(preview.querySelector('[role="status"]')).not.toBeNull();
   });
 
   it("leaves unsaved local state intact", () => {

@@ -135,7 +135,18 @@ export function EditorShell({
           tab={tab}
           className="border-border md:w-80 md:shrink-0 md:border-l"
         >
-          <div className="h-full overflow-y-auto p-4">{properties}</div>
+          {/*
+           * `id` for the preview's skip link (`P2-05`, `docs/UI-UX/17`). On the panel's
+           * scroll container rather than the `Panel` itself, so focusing it also brings
+           * the top of the form into view.
+           */}
+          <div
+            id="editor-properties"
+            tabIndex={-1}
+            className="h-full overflow-y-auto p-4"
+          >
+            {properties}
+          </div>
         </Panel>
       </div>
     </div>
@@ -167,11 +178,35 @@ function Panel({
       id={`panel-${id}`}
       role="tabpanel"
       aria-labelledby={`tab-${id}`}
-      // `hidden` is the attribute, so it applies below the breakpoint; `md:block` puts it
-      // back above it. The attribute also removes it from the accessibility tree, which is
-      // what stops a screen reader reading three panels as one long page on a phone.
-      hidden={!active}
-      className={`min-h-0 md:block ${className}`}
+      /*
+       * The `hidden` CLASS, not the attribute. This is the whole of a bug the shell
+       * shipped with, and the fix took two attempts.
+       *
+       * `P1-22` wrote `hidden={!active}` with `md:block` to put the panel back above the
+       * breakpoint. Tailwind v4's preflight makes that impossible:
+       *
+       *   [hidden]:where(:not([hidden=until-found])) { display: none !important }
+       *
+       * so every inactive panel stayed hidden at EVERY width and the three-column desktop
+       * layout never worked. Nothing caught it because jsdom evaluates no media queries --
+       * exactly the gap `P1-22` recorded and DF-11 was raised to close.
+       *
+       * `md:block!` was the obvious fix and is also wrong: for **important** declarations
+       * the CSS cascade reverses layer order, so preflight's `base` layer beats anything
+       * in `utilities`. No utility can win against that rule while it carries
+       * `!important`.
+       *
+       * So: the class. `.hidden{display:none}` and the `md:block` variant are ordinary
+       * declarations in the same layer and the variant is emitted second, so it wins
+       * above the breakpoint. The class is still `display: none`, so a hidden panel stays
+       * out of the accessibility tree on a phone — the property the attribute was chosen
+       * for is kept.
+       *
+       * One consequence: jsdom applies no CSS, so all three panels are in the
+       * accessibility tree in unit tests. A query that must mean "the visible panel" has
+       * to scope itself to one.
+       */
+      className={`min-h-0 md:block ${active ? "" : "hidden"} ${className}`}
     >
       {children}
     </section>

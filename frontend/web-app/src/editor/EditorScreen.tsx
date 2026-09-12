@@ -6,6 +6,7 @@ import { useAuth } from "../lib/auth";
 import { toFriendlyError } from "../lib/error-messages";
 import { EditorProvider } from "./EditorProvider";
 import { EditorShell } from "./EditorShell";
+import { LivePreview } from "./LivePreview";
 import { PropertiesPanel } from "./PropertiesPanel";
 import type { TemplateDefinition } from "./store";
 
@@ -23,6 +24,12 @@ interface InvitationDetail {
   readonly internal_name: string | null;
   readonly updated_at: string;
   readonly template_version_id: string;
+  /** `PG-19`, ADR-060: the slug and version that address the catalogue. */
+  readonly template: {
+    readonly slug: string;
+    readonly name: string;
+    readonly version: string;
+  };
   readonly settings?: { readonly enabled_sections?: readonly string[] };
   readonly [key: string]: unknown;
 }
@@ -56,14 +63,33 @@ export function EditorScreen({
 
         if (controller.signal.aborted) return;
 
-        setState({
-          kind: "loaded",
-          detail: result.data,
-          // The template's section definitions come from `P2-01`'s catalogue API, which does
-          // not exist yet. Undefined rather than invented: a fabricated section list would
-          // render a plausible editor for a template nobody has seen.
-          definition: undefined,
-        });
+        /**
+         * The definition of the version this invitation is LOCKED to. `PG-19`, ADR-060.
+         *
+         * Addressed by slug and version rather than by `template_version_id`, because
+         * that is what `docs/API/03` offers — and deliberately not `GET /templates/:slug`,
+         * which serves the newest published version. BR-3.1 keeps an invitation on the
+         * version it locked until the user explicitly upgrades, so the newest is the one
+         * answer that is certain to be wrong here.
+         *
+         * A failure to load it is not a failure to load the invitation: the editor still
+         * works, the properties panel still saves, and only the preview and the section
+         * list are unavailable. So it is fetched separately and its error is swallowed
+         * rather than escalated — `definition: undefined` is a state the editor already
+         * handles from `P1-22`.
+         */
+        const definition = await api
+          .request<TemplateDetailResponse>(
+            `/templates/${encodeURIComponent(result.data.template.slug)}` +
+              `/versions/${encodeURIComponent(result.data.template.version)}`,
+            { signal: controller.signal },
+          )
+          .then((response) => toDefinition(response.data))
+          .catch(() => undefined);
+
+        if (controller.signal.aborted) return;
+
+        setState({ kind: "loaded", detail: result.data, definition });
       } catch (error) {
         if (!controller.signal.aborted) {
           setState({ kind: "failed", message: toFriendlyError(error).message });
@@ -121,7 +147,7 @@ export function EditorScreen({
       <EditorShell
         title={detail.internal_name ?? "Undangan tanpa nama"}
         dashboardHref="/dashboard"
-        preview={<PreviewPlaceholder />}
+        preview={<LivePreview />}
         properties={<PropertiesPanel />}
       />
     </EditorProvider>
@@ -140,4 +166,44 @@ function PreviewPlaceholder() {
       Pratinjau langsung akan tersedia setelah komponen template siap.
     </div>
   );
+}
+
+/** `docs/API/03`'s detail shape, narrowed to what the editor reads. */
+interface TemplateDetailResponse {
+  readonly current_version: {
+    readonly sections: unknown;
+    readonly theme: unknown;
+    readonly customizable_theme_keys: readonly string[];
+  };
+}
+
+/**
+ * The catalogue's version payload as the editor store wants it.
+ *
+ * `sections` arrives as `unknown` because it is a JSONB column the API does not narrow.
+ * `P0-20` validated it before it was ever stored, so this trusts the shape rather than
+ * re-validating -- and returns `undefined` when it is not an array, because a definition
+ * the editor cannot iterate is no better than none.
+ */
+function toDefinition(
+  payload: TemplateDetailResponse,
+): TemplateDefinition | undefined {
+  const version = payload.current_version;
+  if (!Array.isArray(version.sections)) return undefined;
+
+  return {
+    sections: version.sections as TemplateDefinition["sections"],
+    // The store derives this from the sections' own `enabled_by_default`; the
+    // invitation's actual settings reach the renderer as a separate prop, because
+    // `docs/PLAN/08` keeps them in a different table.
+    enabledSections: (version.sections as { section_key: string }[])
+      .filter(
+        (section) =>
+          (section as { enabled_by_default?: boolean }).enabled_by_default !==
+          false,
+      )
+      .map((section) => section.section_key),
+    theme: (version.theme ?? {}) as Record<string, unknown>,
+    customizable_theme_keys: version.customizable_theme_keys,
+  };
 }

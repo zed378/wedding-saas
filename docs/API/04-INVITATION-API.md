@@ -118,6 +118,14 @@ DELETE /api/v1/invitations/:id/preview-links/:token_id   Revoke a link
 
 The token is returned **once**, at creation, and stored only as a hash (DATABASE/04 § Share-Preview Tokens). It is consumed by the public route `GET /public/preview/:token` (API/08), which always renders `noindex` and watermarked, with submissions disabled.
 
+### Why the detail carries a `template` object
+
+`template_id` and `template_version_id` are uuids, and every endpoint in `API/03` is addressed by **slug** and **semver**. Without the object a client holding an invitation cannot fetch the definition it is rendering — and BR-3.1 makes that worse rather than better: the invitation stays on the version it locked, so `GET /templates/:slug`, which serves the newest published version, is the wrong answer for an existing invitation.
+
+`template.slug` and `template.version` are exactly the two identifiers `GET /templates/:slug/versions/:version` needs. `template.name` is there because `UI-UX/10`'s invitation card displays it and would otherwise need a second request per row.
+
+**Not the definition itself.** Inlining `sections` and `theme` would put a large JSON blob on every invitation read, including the list, and would duplicate the cache `API/03` is served from — a template definition changes a few times a year and an invitation changes constantly, so they belong on different cache lifetimes. Added by `P2-05` (`PG-19`, ADR-060).
+
 ## Example Response — GET /invitations/:id (summary)
 ```json
 {
@@ -128,6 +136,7 @@ The token is returned **once**, at creation, and stored only as a hash (DATABASE
     "status": "draft",
     "template_id": "uuid",
     "template_version_id": "uuid",
+    "template": { "slug": "elegant-rose", "name": "Elegant Rose", "version": "1.2.0" },
     "slug": "andi-sarah",
     "couple": { "groom": {...}, "bride": {...} },
     "events": [ {...}, {...} ],
