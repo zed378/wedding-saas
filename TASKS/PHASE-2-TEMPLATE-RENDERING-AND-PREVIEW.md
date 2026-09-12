@@ -67,10 +67,10 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** — 2026-09-12, [record](../MEMORY/records/2026-09-12-P2-02-generic-renderer-core.md) |
 | **Depends on** | P0-20, P0-21 |
 | **Spec refs** | `docs/FRONTEND/04-TEMPLATE-RENDERING.md`, `docs/PLAN/07-TEMPLATE-SYSTEM.md`, `docs/PLAN/08-INVITATION-DATA-MODEL.md` |
-| **Spec required** | Yes — core architecture |
+| **Spec required** | Yes — core architecture ([spec](../MEMORY/specs/P2-02-generic-renderer-core.md)) |
 | **Surface** | web-app, public-invite |
 
 **Goal** — `<TemplateRenderer templateVersion invitationData mode />` in `packages/template-renderer`, implementing the five-step render flow, shared by all three consumers.
@@ -84,13 +84,13 @@
 6. Never branch on a template id or slug anywhere in the renderer. A grep-based CI check enforces it.
 
 **Definition of Done**
-- [ ] The renderer is imported by both `frontend/web-app` and `frontend/public-invite` from one package.
-- [ ] A template version naming an unregistered component fails CI.
-- [ ] No template identifier appears in a conditional anywhere in the package.
-- [ ] Rendering the reference template with demo data produces every enabled section, in order, in a test.
-- [ ] Disabled sections are absent from the DOM, not merely hidden with CSS — a hidden section is still a data leak in the page source.
-- [ ] **The parity test `P0-20` is owed** (ADR-037): every name in `@wi/schema`'s `COMPONENT_REGISTRY` has a component here, and every component here is named there. Until this exists, nothing proves the eleven names the reference template uses correspond to anything at all — the API validates against a list of strings.
-- [ ] **`P0-21`'s handoff**: the reference template and its demo invitation are already seeded (`pnpm --filter @wi/api db:seed`) and already proven complete against each other. What is unproven is that they *render*, which is the DoD item above this one.
+- [x] The renderer is imported by both `frontend/web-app` and `frontend/public-invite` from one package — proved by **rendering** from each, not by the manifest: both already declared the dependency before the package had anything in it.
+- [x] A template version naming an unregistered component fails CI — the parity test below, plus the renderer skipping that section and reporting it at runtime rather than blanking the page.
+- [x] No template identifier appears in a conditional anywhere in the package — `scripts/check-renderer-is-generic.mjs`, in `verify.sh` and `pre-push`. It forbids the **identifier**, which is stricter than forbidding a branch: a value that cannot be named cannot be branched on.
+- [x] Rendering the reference template with demo data produces every enabled section, in order, in a test — read from the seed JSON itself, so a copy cannot drift from what the seeder writes.
+- [x] Disabled sections are absent from the DOM, not merely hidden with CSS — asserted by searching `innerHTML` for a gift account number, from `public-invite`, which is the surface it matters on.
+- [x] **The parity test `P0-20` owed** (ADR-037), in both directions. The second direction is not symmetry: a component with no name in the schema is code no stored template could ever reach, which is how a redesign ships unused while every invitation keeps rendering the old one.
+- [x] **`P0-21`'s handoff**: the fixtures render, in all three modes, with no section reporting an issue.
 
 ---
 
