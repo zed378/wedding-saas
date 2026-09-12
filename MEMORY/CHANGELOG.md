@@ -18,6 +18,12 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 - **No test could have caught it.** All 33 existing limiter tests build their client *without* `lazyConnect` and ping it in `beforeAll` — the harness had already done the thing production had not. The two new tests that matter boot the real `AppModule` and ask the container for the client the guard will actually use.
 - **`/readyz` did not notice.** It checks the database and nothing else, so the container reported healthy while half its dependencies were unreachable. Raised as a follow-up before Phase 3 puts payments on the same Redis.
 
+**Fixed** — readiness checks Redis, which the specification always asked for ([P0-13](./records/2026-09-12-P0-13-readyz-checks-redis.md))
+
+`docs/DEVOPS/05` § Health Check names both dependencies in one sentence — "connectivity to critical dependencies (DB, Redis)" — and only the database was ever checked. It probes the **limiter's own client** rather than opening a socket of its own, because the server being reachable was never the question: during `P1-07` a raw `PING` from inside the container worked while the application's client could not issue a command, and a private connection would have reported healthy right through it.
+
+Worth separating from the usual failure in this project: most defects here have been tests that verified less than their names claimed. This was a test that verified exactly what the code did, while the code did less than the document said. No mutation test finds that — the code and its tests agreed, and only the specification disagreed.
+
 **Changed** — staging can run Phase 1 at all ([P0-23](./records/2026-09-11-P0-23-staging-deploy.md))
 
 Three things the staging compose predated, none of them visible to any test: the API had no `JWT_SIGNING_KEY` or `REFRESH_TOKEN_PEPPER` and would have exited 78 forever; the web-app image had no build argument for `NEXT_PUBLIC_API_BASE_URL` and would have shipped a bundle calling `http://localhost:3000` — the visitor's own machine — while the page rendered perfectly; and the tunnel does not route `/api/*` at all, which is a Cloudflare-side rule and not in this repository. `deploy/STAGING-DEPLOY.md` is the runbook, with the reasons the order matters.
