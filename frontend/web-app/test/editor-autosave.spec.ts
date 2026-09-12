@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  AutosaveManager,
-  defaultGroupFor,
-  type SaveGroup,
-} from "../src/editor/autosave";
+import { AutosaveManager, type SaveGroup } from "../src/editor/autosave";
+import { defaultGroupFor } from "../src/editor/transport";
 import { createEditorStore, getAtPath, setAtPath } from "../src/editor/store";
 
 /**
@@ -197,6 +194,7 @@ describe("the autosave manager", () => {
         },
       },
       callbacks,
+      groupFor: defaultGroupFor,
       debounceMs,
     });
 
@@ -362,6 +360,7 @@ describe("the autosave manager", () => {
     const seen: (string | undefined)[] = [];
     const m = new AutosaveManager({
       transport: { save: async () => ({ updatedAt: "2026-09-02T00:00:00Z" }) },
+      groupFor: defaultGroupFor,
       callbacks: {
         onBeginSave: () => undefined,
         onSaved: (_fields, updatedAt) => {

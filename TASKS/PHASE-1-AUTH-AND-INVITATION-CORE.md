@@ -819,7 +819,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-23-properties-panel.md) |
 | **Depends on** | P1-22, P0-20 |
 | **Spec refs** | `docs/FRONTEND/03-FORM-ARCHITECTURE.md`, `docs/PLAN/07` § Required vs Optional Fields, `docs/FRONTEND/00` § Code Conventions |
 | **Spec required** | No |
@@ -836,10 +836,16 @@
 6. Add a CI guard: a grep failing the build if a section key or field path appears as a literal in a component file. `CLAUDE.md`'s "what not to do" list names per-template hard-coding as the thing that defeats the entire template system, and this is the check that keeps it true under deadline pressure.
 
 **Definition of Done**
-- [ ] Adding a field to a template's `required_fields` changes the rendered form with no frontend code change — demonstrated in a test using a modified fixture template.
-- [ ] No section key or field path is hard-coded in a component; the CI guard proves it.
-- [ ] Every registry field type has a component and a unit test.
-- [ ] Client validation mirrors the server rules for each field type.
+- [x] Adding a field to a template's `required_fields` changes the rendered form with no frontend code change — demonstrated by rendering twice with **one string different in a fixture** and nothing else.
+- [x] No section key or field path is hard-coded in a component; the CI guard proves it. `scripts/check-no-hardcoded-fields.mjs`, in `verify.sh` and the pre-push hook. **Two mutations confirm it**: a `section_key === "hero"` conditional in the panel, and a component naming `couple.groom.full_name`.
+- [x] Every registry field type has a component and a unit test. The dispatcher's switch is exhaustive over the union, and a test asserts every member is used by at least one field — so a type nothing renders cannot sit in the union unnoticed.
+- [x] Client validation mirrors the server rules for each field type, **including** the `^https?://` check `P1-12` added after measuring that Zod's `.url()` accepts `javascript:alert(1)`.
+
+**The guard found one of mine on its first run.** `defaultGroupFor` lived in `autosave.ts` and held `couple`, `events` and `bank_accounts` — a second home for the field vocabulary in a file whose job is timing and queuing. Moved to `transport.ts`, which already held the endpoint table, so exactly one file knows the mapping. The workbench's Tabs story used real section keys as demo ids; **renamed rather than exempted**, because an exemption would be a hole in the guard for the sake of a fixture.
+
+**It reads the vocabularies from `@wi/schema`'s source**, not from its build and not from a copy: the guard runs before the build step in `verify.sh`, and a copy would drift from the thing it guards — green while wrong.
+
+**The client deliberately does not sanitize.** `docs/SECURITY/08` puts stored-XSS prevention on the server and `P1-16` built it there; a frontend that stripped tags would make the server's sanitiser look unnecessary to whoever reads the code next, and the API accepts requests that never came from this form. There is a test asserting the client leaves a script tag alone.
 
 ---
 

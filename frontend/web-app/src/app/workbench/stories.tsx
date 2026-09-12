@@ -299,7 +299,10 @@ export function CardStory() {
 /* -------------------------------------------------------------------- Tabs */
 
 export function TabsStory() {
-  const [active, setActive] = useState("couple");
+  // Demo ids, deliberately NOT the product's section keys: a Tabs story does not need
+  // the template vocabulary, and using it would need an exemption in
+  // `scripts/check-no-hardcoded-fields.mjs` for the sake of a fixture.
+  const [active, setActive] = useState("tab-one");
 
   return (
     <Story
@@ -313,22 +316,22 @@ export function TabsStory() {
         onChange={setActive}
         items={[
           {
-            id: "couple",
+            id: "tab-one",
             label: "Mempelai",
             content: <p className="text-body">Data mempelai.</p>,
           },
           {
-            id: "event",
+            id: "tab-two",
             label: "Acara",
             content: <p className="text-body">Akad dan resepsi.</p>,
           },
           {
-            id: "gallery",
+            id: "tab-three",
             label: "Galeri",
             content: <p className="text-body">Foto prewedding.</p>,
           },
           {
-            id: "gift",
+            id: "tab-four",
             label: "Hadiah",
             content: <p className="text-body">Rekening.</p>,
             disabled: true,

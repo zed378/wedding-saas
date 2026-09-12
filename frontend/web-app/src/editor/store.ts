@@ -77,6 +77,12 @@ export interface TemplateSectionDefinition {
   readonly configurable?: boolean;
   readonly enabled_by_default?: boolean;
   readonly required_fields?: readonly string[];
+  /**
+   * `sectionSchema` defaults it to `[]`, so a validated definition always has one — but the
+   * store holds whatever the API returned, and a row written before the default existed
+   * would not. Optional here for that reason, and read defensively by the panel.
+   */
+  readonly optional_fields?: readonly string[];
 }
 
 export interface TemplateDefinition {

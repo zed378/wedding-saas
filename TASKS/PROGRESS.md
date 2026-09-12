@@ -6,7 +6,7 @@ Single source of truth for where the project stands. Updated in the same commit 
 **Current phase**: Phase 0 — Foundation (26 / 27 done). **Staging is live**: `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
 
 The only task left is `P0-17` (CI/CD), deferred by ADR-028. Its **deployment** half was waived by the project owner on 2026-09-11; deploying is `git pull` plus a compose command. Its **verification** half was not waived and is the one Phase 0 exit criterion still unmet — see below. **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
-**Overall**: 48 / 136 tasks done
+**Overall**: 49 / 136 tasks done
 
 **No automated pipeline**: `P0-17` is deferred (ADR-028). Before merging to `main`, run `scripts/verify.sh`. The `:id`-endpoint gate blocks in `.githooks/pre-push`; integration tests, the coverage floor, SAST and dependency scanning are **not** running anywhere until `P0-17` is picked up — revisit before Phase 3 payment code.
 
@@ -24,7 +24,7 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 | Phase | Tasks | Done | Status | Gate to enter |
 |---|---|---|---|---|
 | [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 27 | 26 | **ACTIVE** | — |
-| [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 22 | **ACTIVE** | Phase 0 exit criteria |
+| [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 23 | **ACTIVE** | Phase 0 exit criteria |
 | [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 14 | 0 | Not started | Phase 1 exit + `P1-25` |
 | [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 0 | Not started | Phase 2 exit |
 | [Phase 4 — Engagement](./PHASE-4-ENGAGEMENT.md) | 12 | 0 | Not started | Phase 3 exit |
@@ -106,7 +106,7 @@ Roadmap: Week 3-5.
 | P1-20 | Frontend — auth screens | web-app | M | **DONE** — the token is in memory only; `safeNext` is an allowlist, not a sanitiser; the query string travels with the path so a chosen template survives | P0-22, P1-03 |
 | P1-21 | Frontend — dashboard and wizard | web-app | L | **DONE** — and it needed a backend endpoint the card's surface label did not anticipate: `slug-available`, advisory, with the create call still authoritative (ADR-057) | P1-20, P1-09 |
 | P1-22 | Frontend — editor shell and autosave | web-app | L | **DONE** — a failed save keeps everything; `markSaved` clears only the fields that were in flight, so a keystroke typed mid-request is not marked saved and lost | P1-21, P1-10 |
-| P1-23 | Frontend — schema-driven properties panel | web-app | L | TODO | P1-22, P0-20 |
+| P1-23 | Frontend — schema-driven properties panel | web-app | L | **DONE** — a new build guard refuses a section key or field path in any component, and it found one of mine on its first run | P1-22, P0-20 |
 | P1-24 | Frontend — media manager and map picker | web-app | L | TODO | P1-23, P1-19 |
 | P1-25 | Phase 1 test suite and acceptance | all | L | TODO | all above |
 

@@ -60,35 +60,24 @@ export interface AutosaveCallbacks {
 
 export interface AutosaveOptions {
   readonly transport: AutosaveTransport;
+  /**
+   * Which sub-resource owns a path.
+   *
+   * **Required**, and it lives in `transport.ts` rather than here. This file is about timing
+   * and queuing; the moment it also knew that `couple.groom.*` is one endpoint, it would be a
+   * second place holding the field vocabulary — which is what
+   * `scripts/check-no-hardcoded-fields.mjs` exists to prevent.
+   */
+  readonly groupFor: (path: FieldPath) => SaveGroupKey;
   readonly callbacks: AutosaveCallbacks;
   /** `docs/FRONTEND/06`: "debounced 1-1.5s". */
   readonly debounceMs?: number;
   /** Injected so tests do not wait in real time. */
   readonly setTimeout?: typeof globalThis.setTimeout;
   readonly clearTimeout?: typeof globalThis.clearTimeout;
-  /** Maps a field path to the sub-resource that owns it. */
-  readonly groupFor?: (path: FieldPath) => SaveGroupKey;
 }
 
 const DEFAULT_DEBOUNCE_MS = 1_200;
-
-/**
- * Which sub-resource owns a path. `docs/API/04`.
- *
- * The first one or two segments, because that is exactly the shape of the endpoint tree:
- * `couple.groom.*` is one endpoint and `couple.bride.*` is another, while everything under
- * `settings.*` is one PATCH. An unknown prefix groups by its first segment rather than
- * throwing — a new sub-resource should produce its own requests, not break the editor.
- */
-export function defaultGroupFor(path: FieldPath): SaveGroupKey {
-  const [head, second] = path.split(".");
-  if (head === "couple" && second !== undefined) return `couple:${second}`;
-  if (head === "events" && second !== undefined) return `events:${second}`;
-  if (head === "bank_accounts" && second !== undefined) {
-    return `bank_accounts:${second}`;
-  }
-  return head ?? "invitation";
-}
 
 export class AutosaveManager {
   readonly #options: Required<
@@ -115,7 +104,7 @@ export class AutosaveManager {
       debounceMs: options.debounceMs ?? DEFAULT_DEBOUNCE_MS,
       setTimeout: options.setTimeout ?? globalThis.setTimeout,
       clearTimeout: options.clearTimeout ?? globalThis.clearTimeout,
-      groupFor: options.groupFor ?? defaultGroupFor,
+      groupFor: options.groupFor,
     };
   }
 
