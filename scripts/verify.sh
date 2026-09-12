@@ -64,6 +64,7 @@ step "no auth token in browser storage" node scripts/check-token-storage.mjs
 # docs/UI-UX/08's dark mode depends on it. One literal is one thing that will not change
 # when the theme does.
 step "design tokens, not literals" node scripts/check-design-tokens.mjs
+step "sources are plain text" node scripts/check-text-sources.mjs
 step "every request text field is sanitized or exempt" node scripts/check-sanitized-fields.mjs
 
 # docs/DATABASE/03: sections and theme are validated in application code before the
