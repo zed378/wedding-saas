@@ -85,21 +85,6 @@ The usual mitigation is a short grace window — for perhaps 10-30 seconds after
 
 **Who decides**: whoever owns the design system (`docs/UI-UX/06`–`09`). If the answer differs from ADR-038, the change is two `z.enum` calls plus a data fix, and `docs/PLAN/07` should gain the vocabularies so the next reader does not have to find the ADR.
 
-### OQ-19 — Which media variants are actually produced?
-
-**Affects**: `P1-17` — not blocking; the path builder accepts anything either document sanctions.
-
-Two documents disagree, and neither is a superset of the other:
-
-- `docs/ARCHITECTURE/05` § Path Structure: `variant: original | large | thumbnail`
-- `docs/BACKEND/04` step 6: "thumbnail (300px), medium (800px), large (1600px)"
-
-`medium` is missing from the first, `original` from the second. Storing the original is useful — variants can be regenerated without asking the user to re-upload — and costly, since it is a full-resolution photo per media row held for the life of the invitation.
-
-`P0-16` accepted all four rather than choosing. The cost of guessing wrong is unusually high here: the filename is the CDN cache key (`docs/ARCHITECTURE/05` § CDN, immutable filenames), so a later rename is a rewrite of every stored object rather than a constant change.
-
-Decide in `P1-17`, when the pipeline is written and the storage cost of keeping originals can be estimated against a real photo count. Whichever set is chosen, amend the document that disagrees.
-
 ### OQ-18 — Should "one pending order per invitation" be a database constraint?
 
 **Affects**: `P3-01` — not blocking; the schema ships exactly as documented.
@@ -194,6 +179,17 @@ The vendor is decided (ADR-011: Cloudflare Turnstile). What is not decided is th
 ---
 
 ## Open Questions — Answered
+
+### ~~OQ-19 — Which media variants are actually produced?~~ — ANSWERED 2026-09-12
+
+**Answer**: three — `thumbnail` (300), `medium` (800), `large` (1600), all WebP. The raw upload is not retained. ADR-055.
+
+The two documents were never in conflict, and the sentence that resolves them had been overlooked. `docs/PLAN/11` § Limits says *"the retained **original** is the **capped** original from the processing pipeline (BACKEND/04 step 6), not the raw upload"* — and the capped original from step 6 is `large`. So `original` in `docs/ARCHITECTURE/05` is the product's word for the file `docs/BACKEND/04` calls `large`, not a fourth object.
+
+Retaining the raw upload would also have contradicted BR-8.2 ("all files are reprocessed before being permanently stored") and would have kept un-stripped EXIF, GPS included, in a bucket served by a CDN — which `docs/SECURITY/06` layer 7 and `docs/SECURITY/09` both forbid. The storage estimate the question asked for turned out not to be the deciding factor; the privacy rule already answered it.
+
+`docs/ARCHITECTURE/05` § Path Structure is amended, with a note saying why. `mediaKey()` still accepts `original` as a variant and nothing produces one — `parseStoredKey` must keep accepting it, and narrowing the type would be a change to `@wi/storage` for no behavioural gain.
+
 
 ### ~~OQ-01 — Tech stack~~ — ANSWERED 2026-09-09
 

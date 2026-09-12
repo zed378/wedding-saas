@@ -1539,3 +1539,72 @@ So the behaviour the owner asked for is already the specified behaviour, and add
 **Consequence** — the round trip restores full *rendering* and full *data*, but not a theme override the intermediate template did not permit. That is a real loss and it is stated in the response, in `docs/API/04`, and in the confirmation modal `docs/UI-UX/05` already specifies. The alternative — keeping them invisibly — trades a loss the user is told about for one they are not.
 
 **What would change this** — if a future template system made theme keys global rather than per-template, the argument disappears and overrides should then be retained like section data.
+
+### ADR-055 — Three variants, and `original` is another name for `large`
+
+**Date** 2026-09-12 · **Status** Accepted · **Task** `P1-18` · **Closes** `OQ-19`
+
+**Context** — two documents appeared to disagree about which image variants exist.
+`docs/ARCHITECTURE/05` § Path Structure lists `original | large | thumbnail`;
+`docs/BACKEND/04` step 6 lists `thumbnail (300px) | medium (800px) | large (1600px)`. Neither
+is a superset: one is missing `medium`, the other `original`. `P0-16` accepted all four in
+`mediaKey()` rather than guessing, and raised `OQ-19`, because guessing wrong means migrating
+every stored object.
+
+**Decision** — **three files: `thumbnail` (300), `medium` (800), `large` (1600), all WebP.**
+There is no fourth object, and the raw upload is never retained.
+
+**Why this is a reading rather than a choice** — `docs/PLAN/11` § Limits answers it in its own
+words, and the sentence had been overlooked: *"Note that the retained **original** is the
+**capped** original from the processing pipeline (BACKEND/04 step 6), not the raw upload, so
+200 photos does not mean 200 × 10 MB on disk."* The capped original from step 6 **is**
+`large`. So `original` in `docs/ARCHITECTURE/05` is a name for the retained, capped image,
+and `docs/BACKEND/04` names the same thing `large`. The two documents were never in conflict;
+one used the product's word and the other used the pipeline's.
+
+Retaining the raw upload as a fourth object would also contradict BR-8.2 — "all files are
+reprocessed before being permanently stored" — and would keep un-stripped EXIF, including
+GPS, in permanent storage, which `docs/SECURITY/06` layer 7 and `docs/SECURITY/09` both forbid.
+
+**Consequence** — `mediaKey()` still accepts `original` as a variant, and nothing produces
+one. That is left alone deliberately: narrowing the type would be a change to `@wi/storage`
+for no behavioural gain, and `parseStoredKey` must keep accepting it in case a future task
+needs it. `VARIANT_PLAN` in `backend/worker/src/media/process-image.ts` is the list that
+decides, and a test asserts its contents.
+
+`docs/ARCHITECTURE/05` is amended to say so rather than left to be rediscovered.
+
+### ADR-056 — A job's queue is named after the job, not after the pool
+
+**Date** 2026-09-12 · **Status** Accepted · **Task** `P1-18`
+
+**Context** — `P0-15`'s `JobRunner.start()` creates one `new Worker(jobName)` per registered
+job, so it consumes a BullMQ queue named after the **job**. `P1-02`'s producer
+(`QueueModule.enqueue`) added jobs to a queue named after the **pool**, and passed the
+caller's data raw where the runner reads a `JobPayload` envelope. The cron scheduler had the
+same shape: it put every repeated job into one `cron-scheduler` queue.
+
+Every job the API had ever enqueued was therefore landing in a queue nobody consumed, in a
+shape nobody would have understood if they had. Nothing noticed for six tasks because no
+handler had ever been registered — an unconsumed queue and an unregistered handler look
+identical from outside.
+
+**Decision** — the **queue name is the job name**, everywhere: the API producer, the cron
+scheduler, and the runner. The pool stays a parameter because it is real
+(`docs/BACKEND/08` separates `worker-media` from `worker-general` so they scale and fail
+independently), but it describes the **process** that consumes a job, not the address of it.
+
+**Why not the other direction** — a queue per pool would mean one BullMQ worker dispatching
+by `job.name`, which loses per-job concurrency: a media transform and a thumbnail cleanup
+would share one concurrency budget, and `docs/ARCHITECTURE/07`'s per-job retry policies would
+have to be applied by hand inside the dispatcher rather than by the queue.
+
+**What keeps it true** — two tests that cannot see each other, because the API cannot import
+`@wi/worker` and the worker cannot import the API. `backend/api/test/queue.spec.ts` asserts
+the producer's half — queue named by job, payload enveloped — and
+`backend/worker/test/queue.itest.ts` asserts the consumer's, including a test named *"a job
+addressed to the POOL is never delivered"* which encodes the old bug as a bug.
+
+**Follow-up** — the envelope type is declared twice, once on each side. It wants to be a
+shared package. `P4-06` is the task that will care, because `notification.send` is the next
+job to get a handler.

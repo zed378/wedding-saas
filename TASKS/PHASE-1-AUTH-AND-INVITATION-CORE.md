@@ -33,7 +33,7 @@
 | P1-15 | Change template without data loss | backend | M | P1-10, P0-20 | ✅
 | P1-16 | Free-text sanitization pipeline | backend | M | P0-13 | ✅
 | P1-17 | Media upload — synchronous validation stage | backend | L | P1-10, P0-16 |
-| P1-18 | Media processing worker | worker | L | P1-17, P0-15 |
+| P1-18 | Media processing worker | worker | L | P1-17, P0-15 | ✅
 | P1-19 | Gallery sub-resource, reorder, cover, quota | backend | M | P1-18 |
 | P1-20 | Frontend — authentication screens | web-app | M | P0-22, P1-03 |
 | P1-21 | Frontend — dashboard and creation wizard | web-app | L | P1-20, P1-09 |
@@ -644,7 +644,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-18-media-processing-worker.md), [spec](../MEMORY/specs/P1-18-media-processing-worker.md) |
 | **Depends on** | P1-17, P0-15 |
 | **Spec refs** | `docs/BACKEND/04-FILE-PROCESSING.md` Stage 2, `docs/SECURITY/06` layers 6-11, `docs/ARCHITECTURE/05-STORAGE-ARCHITECTURE.md` |
 | **Spec required** | Yes — file upload |
@@ -664,11 +664,19 @@
 9. Test with a real EXIF-GPS photo and assert the stored variants contain no EXIF, and with a crafted decompression bomb asserting the worker fails safely without exhausting the host.
 
 **Definition of Done**
-- [ ] Stored variants contain no EXIF, verified by reading the output file.
-- [ ] A decompression bomb fails the job within the resource limit and never becomes `ready`.
-- [ ] A malware-flagged file is deleted and never becomes publicly reachable.
-- [ ] The job is idempotent under retry.
-- [ ] Stranded staging files older than an hour are cleaned up.
+- [x] Stored variants contain no EXIF, verified by reading the output file. Both by parsing the output with sharp **and** by searching its raw bytes for the tag text. The strip is an *absence* — `process-image.ts` never calls `withMetadata()` — which is exactly why it is asserted against output rather than trusted: a later "keep the orientation" change would republish a couple's home coordinates onto a public CDN.
+- [x] A decompression bomb fails the job within the resource limit and never becomes `ready`. **Two** tests, because the obvious one does not discriminate: asserting the row ends `failed` passes whether the refusal came from the header gate or from sharp's own `limitInputPixels` throwing mid-decode, and those differ by 4.8 GB of allocation inside the worker. A second test calls `inspect()` alone and asserts `reason === "dimensions"`.
+- [x] A malware-flagged file is deleted and never becomes publicly reachable. The **ordering** is asserted directly — which of `scan` and `put` ran first — rather than inferred from the source order. A mutation moving the scan after the publish fails four tests.
+- [x] The job is idempotent under retry. At the handler **and** at the repository — see below.
+- [x] Stranded staging files older than an hour are cleaned up, **and their rows settled**: deleting the file alone would leave the owner polling `processing` forever and `P1-17`'s quota holding a slot for a photo that no longer exists.
+
+**Beyond the card, and not optional — no job the API enqueued could ever have been consumed.** The producer added to a BullMQ queue named after the **pool**; `JobRunner` creates one `new Worker(jobName)` per job, so it consumes a queue named after the **job**. The payload disagreed too. `P1-02`'s eight `notification.send` calls had been going nowhere for six tasks, unnoticed because an unconsumed queue and an unregistered handler look identical from outside. ADR-056, with a test on each side including one named *"a job addressed to the POOL is never delivered"*.
+
+**The repository's conditional writes were untestable through the handler.** Removing `WHERE status = 'processing'` from `markReady` passed all twenty-one tests, because the handler returns early on a non-`processing` row. `P1-12`'s rule for the fifth time; four repository-level tests added, and the mutation now fails three.
+
+**`OQ-19` is closed** (ADR-055): three variants — `thumbnail`, `medium`, `large` — and `original` is `docs/ARCHITECTURE/05`'s word for the file `docs/BACKEND/04` calls `large`. `docs/PLAN/11` § Limits said so all along.
+
+**The media pool refuses to start without a scanner.** `MEDIA_SCAN_DISABLED=true` is the development escape hatch, refused outright in staging and production and logged loudly wherever it is used. The staging compose gained a `clamav` service, because the new validation would otherwise have made it unbootable.
 
 ---
 

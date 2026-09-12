@@ -178,7 +178,18 @@ export class MediaService {
     // for a reason that has nothing to do with the file. `P0-15`'s producer swallows enqueue
     // failures by design, so the hourly staging cleanup (`docs/BACKEND/04` § Cleanup, owed by
     // `P1-18`) is the backstop for a lost job rather than this call's return value.
-    await this.queue.enqueue("media", "media.process", { mediaId });
+    await this.queue.enqueue(
+      "media",
+      "media.process",
+      { mediaId },
+      {
+        // The job is idempotent by state check anyway (`docs/BACKEND/04` § Idempotency) —
+        // it returns early on a row that is already `ready`. The key is the cheaper guard
+        // in front of that: a duplicate enqueue never reaches the scanner or the decoder.
+        idempotencyKey: `media.process:${mediaId}`,
+        relatedId: invitationId,
+      },
+    );
 
     logger.info(
       {
