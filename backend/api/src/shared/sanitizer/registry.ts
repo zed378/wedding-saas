@@ -107,6 +107,26 @@ export const NOT_USER_TEXT: Readonly<Record<string, string>> = {
     "a pagination integer, coerced and bounded; never stored or rendered",
   page: "a pagination integer, coerced and bounded; never stored or rendered",
 
+  /*
+   * The catalog's read filters (`P2-01`). None of the three is ever written anywhere or
+   * rendered anywhere: they narrow a SELECT and form part of a cache key, and the
+   * response is a list of templates rather than an echo of the query.
+   *
+   * `search` is the one worth pausing on, because it IS free text a user typed. Two
+   * things make sanitizing it wrong rather than merely unnecessary. It never reaches
+   * storage, so there is no stored XSS to prevent — `docs/SECURITY/08`'s concern does not
+   * arise. And stripping characters from it would silently change what the user searched
+   * for: a search for `<3` would quietly become a search for nothing. Its real hazards
+   * are SQL injection and LIKE-wildcard abuse, and both are handled where they live —
+   * parameter binding by the driver, and `escapeLike` in the repository.
+   */
+  category:
+    "a catalog read filter, bounded to 40 characters; matched against a stored tag, never written or rendered (P2-01)",
+  search:
+    "a catalog read filter; bound as a parameter and LIKE-escaped, never written or rendered — sanitizing it would change what the user searched for (P2-01)",
+  is_premium:
+    "a closed `z.enum` of true|false from a query string; coerced to a boolean, never stored or rendered (P2-01)",
+
   /**
    * A list of section keys, each checked against the **template's own** `section_key` set.
    *

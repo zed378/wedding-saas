@@ -325,7 +325,16 @@ describe("the gallery", () => {
     it.each([
       [
         "a foreign id",
-        (ids: string[]) => [ids[0]!, ids[1]!, ids[2]!.replace(/.$/, "0")],
+        // A constant that no factory produces. It used to be `ids[2].replace(/.$/, "0")`
+        // -- the last character of a real uuid rewritten to "0" -- which is the SAME id
+        // whenever that uuid already ended in "0". One run in sixteen the "foreign" list
+        // was a valid complete permutation, the reorder correctly succeeded, and the test
+        // failed. Found when it fired during an unrelated full-suite run.
+        (ids: string[]) => [
+          ids[0]!,
+          ids[1]!,
+          "00000000-0000-4000-8000-0000000000ff",
+        ],
       ],
       ["a missing id", (ids: string[]) => [ids[0]!, ids[1]!]],
       ["a duplicate", (ids: string[]) => [ids[0]!, ids[0]!, ids[1]!]],

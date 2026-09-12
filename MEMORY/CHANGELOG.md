@@ -10,6 +10,20 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — Phase 2 opens: the template catalog, and a cache
+
+**Added** — the three catalog reads and the application cache they sit behind ([P2-01](./records/2026-09-12-P2-01-template-catalog.md))
+
+- **The card the rest of Phase 2 waits on**, and the one Phase 1's editor was already blocked by: the creation wizard renders `templates={[]}` with a comment saying so.
+- **Unreleased work stays invisible.** A template appears only if it has a published version — both levels checked, because a published template whose every version is a draft has nothing to render. A deprecated version stays renderable for invitations locked to it (BR-3.3) and is gone from the catalog. A draft is refused even when named explicitly: deprecated versions were released, drafts never were.
+- **Invalidation is a generation counter.** `SCAN` + `DEL` over `tpl:*` walks a keyspace shared with rate limiting and the queue, is not atomic, and misses keys written mid-sweep. Every key carries a generation instead, and a publish is one `INCR`.
+- **The cache fails open everywhere.** `CachePort` never throws, so an unreachable Redis makes the catalog slower and never unavailable — proved by running the whole service against a Redis on a dead port.
+- **Anonymous, deliberately** (ADR-059). `docs/UI-UX/11` has a visitor browsing the catalog before they register; a 401 would block exactly the people it exists for. `/api/v1` is a routing namespace whose default is authentication, not a guarantee of it.
+
+**Fixed** — a flaky test that had been in the suite since `P1-19`
+
+`gallery.itest.ts` built its "foreign id" by rewriting a real uuid's last character to `"0"`. Whenever that uuid already ended in `0` the "foreign" id was the same id, the list was a valid permutation, the reorder correctly succeeded and the test failed — one run in sixteen. A third distinct failure mode for this project's collection: not a test that verified less than its name, nor code that did less than the document, but a test whose **fixture** was occasionally not the thing the test was named after.
+
 ### 2026-09-12 — the first deploy of Phase 1, and what it found
 
 **Fixed** — the rate limiter's cold start ([P1-07](./records/2026-09-12-P1-07-rate-limiter-cold-start.md))

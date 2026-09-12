@@ -1682,3 +1682,51 @@ rather than an unexplained cell.
 those the rule is unchanged and the sweep asserts a literal 404. This exception exists
 because the body is a *set*, and it should be quoted only for another endpoint whose body
 is also a set.
+
+### ADR-059 — The template catalog is anonymous, and its detail response gains two fields
+
+**Date** 2026-09-12 · **Status** Accepted · **Task** `P2-01`
+
+**Context** — `docs/API/03` heads the three catalog reads "Public/Authenticated (read
+catalog)" and gives them `/api/v1` paths. `SURFACE.AUTHENTICATED`'s own comment in
+`http/surfaces.ts` says that prefix is for "owners and admins", so the two read as a
+contradiction and the card does not resolve it.
+
+`docs/UI-UX/11` § "Use This Template" does: *"If not logged in: save the template choice in
+temporary state, redirect to login/register, and automatically continue the flow after
+successful auth."* A visitor browses the catalog **before** they have an account. That is
+the whole top of the funnel.
+
+**Decision** — `GET /templates`, `GET /templates/:slug` and
+`GET /templates/:slug/versions/:version` carry no `requireAuth()`, stay on the `/api/v1`
+path the contract gives them, and are rate limited on the existing `general-public` policy
+(100/minute, keyed by IP hash) because there is no user to key on.
+
+The `api/v1` prefix is therefore a **routing namespace whose default is authentication**,
+not a guarantee of it. That is worth stating plainly, because the safer-sounding reading —
+"everything under this prefix is authenticated" — is the one a future reviewer will assume,
+and this is the exception.
+
+**What makes the exception safe here**: everything the catalog serves is marketing
+material. Names, categories, thumbnails, and the section structure of a template that
+anyone can see rendered on its public demo page. There is no tenant-owned data, no `:id`,
+and nothing to check ownership of — a template belongs to the platform, not to a user.
+`docs/SECURITY/05`'s object-level rule is about tenant resources and does not apply, which
+is why this file has no `requireOwnership` and should not grow one.
+
+**Two fields added to the documented response**, and `docs/API/03` is amended rather than
+quietly exceeded:
+
+- **`supported_sections`** — `docs/UI-UX/11` asks the detail page for a badge list of the
+  sections a template supports, and the card's step 6 requires it. **Derived** from
+  `current_version.sections` in the component registry's canonical order, not stored: a
+  second copy is one more thing to keep in step, and the two disagreeing shows a
+  "Guestbook" badge on a template with no guestbook. The canonical order rather than the
+  authored one so a user comparing two templates finds the same badge in the same place.
+- **`current_version.status`** — so a preview surface can say which version it is showing.
+  Always `published` on the detail read; may be `deprecated` on the explicit version read.
+
+**Draft versions stay invisible everywhere**, including to the explicit version endpoint.
+BR-3.3's licence is for *deprecated* versions, which were released and have invitations
+locked to them. A draft never was, and serving one would let anyone holding a URL preview
+unreleased work.

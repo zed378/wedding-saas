@@ -11,10 +11,12 @@ import { LoggingModule } from "./shared/logging/logging.module";
 import { AuditModule } from "./shared/audit/audit.module";
 import { StorageModule } from "./infra/storage/storage.module";
 import { QueueModule } from "./infra/queue/queue.module";
+import { CacheModule } from "./infra/cache/cache.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { UserModule } from "./modules/user/user.module";
 import { InvitationModule } from "./modules/invitation/invitation.module";
 import { MediaModule } from "./modules/media/media.module";
+import { TemplateModule } from "./modules/template/template.module";
 import { RateLimitModule } from "./shared/rate-limit/rate-limit.module";
 
 /**
@@ -51,11 +53,13 @@ import { RateLimitModule } from "./shared/rate-limit/rate-limit.module";
     AuditModule,
     StorageModule,
     QueueModule,
+    CacheModule,
     RateLimitModule,
     AuthModule,
     UserModule,
     InvitationModule,
     MediaModule,
+    TemplateModule,
     // Scaffolding, not a feature. Removed once a real module exists on each surface.
     ...(process.env["NODE_ENV"] === "production" ? [] : [ReferenceModule]),
   ],
