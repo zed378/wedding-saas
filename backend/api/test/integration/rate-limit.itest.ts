@@ -1,5 +1,10 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { Redis as IORedis } from "ioredis";
+import { Test } from "@nestjs/testing";
+import type { INestApplication } from "@nestjs/common";
+import request from "supertest";
+
+import { RATE_LIMIT_REDIS } from "../../src/shared/rate-limit/rate-limiter";
 
 import {
   RateLimiter,
@@ -416,6 +421,119 @@ describe("rate limiting", () => {
       expect(isExemptPath("/api/v1/invitations")).toBe(false);
       // Not a prefix match on a crafted path.
       expect(isExemptPath("/api/v1/invitations/webhooks/x")).toBe(false);
+    });
+  });
+
+  /**
+   * The cold start. Found on the first Phase 1 staging deploy, not by any test here.
+   *
+   * `POST /auth/register` answered 503 against a Redis that was healthy and reachable
+   * from the API container; the same call a minute later answered 201. The limiter had
+   * failed closed -- correctly, by ADR-050 -- on a client that had never connected.
+   *
+   * Every test above constructs its client WITHOUT `lazyConnect` and calls `ping()` in
+   * `beforeAll`, so the suite was structurally unable to see this. That is the lesson
+   * worth keeping: the harness had already done the thing production had not.
+   */
+  describe("the first command after a cold start", () => {
+    const productionOptions = {
+      // Exactly what `rate-limit.module.ts` builds.
+      maxRetriesPerRequest: 1,
+      connectTimeout: 1000,
+      commandTimeout: 1000,
+      lazyConnect: true,
+      enableOfflineQueue: false,
+    } as const;
+
+    it("is rejected outright when nothing connected first", async () => {
+      // The hazard itself, asserted rather than described. If a future change to the
+      // client options makes this pass, the guard below has stopped being necessary --
+      // and this test says so instead of silently protecting nothing.
+      const cold = new IORedis(REDIS_URL, productionOptions);
+
+      await expect(cold.get("rl:cold-start-probe")).rejects.toThrow();
+
+      await cold.quit().catch(() => cold.disconnect());
+    });
+
+    it("succeeds when the module connected at startup", async () => {
+      const warm = new IORedis(REDIS_URL, productionOptions);
+
+      // What RateLimitModule.onModuleInit does, and the whole of the fix.
+      expect(warm.status).toBe("wait");
+      await warm.connect();
+
+      await expect(warm.get("rl:cold-start-probe")).resolves.toBeNull();
+
+      await warm.quit().catch(() => warm.disconnect());
+    });
+
+    it("a limiter on a connected client answers its first check", async () => {
+      // The property the endpoint actually depends on: not "a command works" but "the
+      // first `check` after boot reaches a decision instead of raising unavailable".
+      const warm = new IORedis(REDIS_URL, productionOptions);
+      await warm.connect();
+
+      const cold = new RateLimiter(warm);
+      const verdict = await cold.check(
+        policy({ name: "cold-start" }),
+        "1.2.3.4",
+      );
+
+      expect(verdict.allowed).toBe(true);
+
+      await warm.quit().catch(() => warm.disconnect());
+    });
+  });
+
+  /**
+   * And that the module actually does it.
+   *
+   * The three tests above prove the hazard is real and that `connect()` removes it. None
+   * of them would fail if `RateLimitModule.onModuleInit` were deleted -- they build their
+   * own clients. This one boots the real application and asks the container for the very
+   * client the guard will use, which is the only version that catches a regression.
+   */
+  describe("the application connects its limiter before serving", () => {
+    let app: INestApplication;
+
+    beforeAll(async () => {
+      process.env["DATABASE_URL"] = (
+        process.env["MIGRATION_DATABASE_URL"] ??
+        "postgres://wedding_owner:wedding_owner_dev@localhost:55432/wedding"
+      ).replace(/\/\/[^@]+@/, "//wedding_app:wedding_app_dev@");
+      process.env["REDIS_URL"] = REDIS_URL;
+      process.env["JWT_SIGNING_KEY"] =
+        "cold-start-signing-key-0000000000000000";
+
+      const { AppModule } = await import("../../src/app.module.ts");
+      const moduleRef = await Test.createTestingModule({
+        imports: [AppModule],
+      }).compile();
+      app = moduleRef.createNestApplication();
+      await app.init();
+    }, 60_000);
+
+    afterAll(async () => {
+      await app?.close();
+    });
+
+    it("hands the guard a client that is already ready", () => {
+      const redis = app.get<IORedis>(RATE_LIMIT_REDIS);
+
+      // `wait` here is the bug: lazy, never connected, and the next command fails.
+      expect(redis.status).toBe("ready");
+    });
+
+    it("answers the FIRST request to a credential endpoint, rather than 503", async () => {
+      // The symptom exactly as staging produced it. A 400 is a fine outcome -- the body
+      // is deliberately incomplete -- and 503 is not: that is the limiter refusing
+      // because it could not reach a Redis that is right there.
+      const response = await request(app.getHttpServer())
+        .post("/api/v1/auth/register")
+        .send({ email: "cold-start@example.test" });
+
+      expect(response.status).not.toBe(503);
     });
   });
 });
