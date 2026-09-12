@@ -98,7 +98,15 @@ export class SlugService {
    * telling somebody it is both badly formatted and taken is noise, since fixing the
    * format changes whether it is taken.
    */
-  async check(rawSlug: string): Promise<SlugRejection | undefined> {
+  async check(
+    rawSlug: string,
+    /**
+     * The invitation being renamed, if any. `P1-14`: an invitation keeping its own slug
+     * must not be told the slug is taken by itself, which is what an unconditional
+     * uniqueness check would say on every settings save that did not change it.
+     */
+    excludeInvitationId?: string,
+  ): Promise<SlugRejection | undefined> {
     const slug = rawSlug.trim();
 
     // The format check sees the RAW value, so uppercase is rejected rather than
@@ -116,7 +124,7 @@ export class SlugService {
       };
     }
 
-    if (await this.isTaken(slug)) {
+    if (await this.isTaken(slug, excludeInvitationId)) {
       return {
         kind: "taken",
         message: "Alamat undangan ini sudah digunakan.",

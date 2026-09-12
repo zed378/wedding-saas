@@ -60,6 +60,14 @@ export {
   themeKeySchema,
   themeKeyResolves,
   type Theme,
+  /**
+   * Exported for `P1-14`, which validates a **user's** theme override against the same
+   * patterns a template definition is held to. Re-deriving them in the API would let the
+   * two disagree about what a legal theme value is -- and the override is the side that
+   * comes from an end user and reaches a CSS custom property on a public page.
+   */
+  HEX_COLOR,
+  CSS_TOKEN,
 } from "./template/theme.schema.js";
 
 export {
