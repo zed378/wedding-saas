@@ -190,6 +190,15 @@ services:
       STORAGE_ENDPOINT: http://minio:9000
       STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:?required}
       STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:?required}
+      # Required since `P1-03`, at 32 characters, in EVERY environment (ADR-047). The API
+      # validates its environment at startup and exits 78 naming what is missing, so a
+      # deploy without these does not half-work -- the container restarts forever.
+      #
+      # Generated ON THE HOST with `openssl rand -base64 48`, never typed anywhere else.
+      # Rotating them is not free: `deploy/SECRETS.md` records that a new JWT_SIGNING_KEY
+      # signs every user out, and a new REFRESH_TOKEN_PEPPER ends every session.
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:?required}
+      REFRESH_TOKEN_PEPPER: ${REFRESH_TOKEN_PEPPER:?required}
     ports: ["${STAGING_API_PORT:-18000}:3000"]
     depends_on:
       postgres: { condition: service_healthy }
@@ -275,7 +284,17 @@ services:
       minio: { condition: service_healthy }
 
   web-app:
-    build: { context: .., dockerfile: frontend/web-app/Dockerfile }
+    build:
+      context: ..
+      dockerfile: frontend/web-app/Dockerfile
+      args:
+        # A build argument because `NEXT_PUBLIC_*` is inlined into the browser bundle by
+        # `next build`. Putting it under `environment:` would look right and do nothing:
+        # the value the browser uses was fixed when the image was built.
+        #
+        # It must be the address a VISITOR's browser can reach, not a compose service
+        # name -- `http://api:3000` resolves only inside this network.
+        NEXT_PUBLIC_API_BASE_URL: ${API_PUBLIC_BASE_URL:?required}
     restart: unless-stopped
     environment:
       NODE_ENV: production

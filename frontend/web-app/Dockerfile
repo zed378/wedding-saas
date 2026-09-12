@@ -17,6 +17,19 @@ RUN pnpm fetch
 # ---------------------------------------------------------------- build
 FROM deps AS build
 COPY . .
+# Where the browser will find the API.
+#
+# A BUILD argument, not a runtime variable, and that is not a preference: `NEXT_PUBLIC_*`
+# is read in client components, so Next **inlines its value into the bundle** during
+# `next build`. Setting it on the container at run time changes nothing -- the string is
+# already baked into the JavaScript the browser downloads.
+#
+# The default is the local stack's API. Without it every deployed build would ship
+# `http://localhost:3000/api/v1`, which resolves to the VISITOR's own machine: the login
+# form would fail with a connection error on a server that is running perfectly.
+ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api/v1
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+
 RUN pnpm install --prefer-offline --frozen-lockfile \
  && pnpm --filter @wi/web-app... build
 
