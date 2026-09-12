@@ -1,0 +1,452 @@
+[
+  {
+    "term": "about",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "account",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "admin",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "api",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "app",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "assets",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "auth",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "billing",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "blog",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "cdn",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "checkout",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "contact",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "dashboard",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "demo",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "docs",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "favicon",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "ftp",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "graphql",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "health",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "healthz",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "help",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "internal",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "invitation",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "invitations",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "login",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "mail",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "media",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "null",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "order",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "orders",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "payment",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "payments",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "preview",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "privacy",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "public",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "readyz",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "register",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "rest",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "robots",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "root",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "settings",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "sitemap",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "static",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "status",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "support",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "system",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "template",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "templates",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "terms",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "test",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "undefined",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "upload",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "uploads",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "user",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "users",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "v1",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "v2",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "webhooks",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "www",
+    "match_type": "exact",
+    "category": "reserved",
+    "reason": "Reserved path segment on the public invitation host (docs/PLAN/10 § 2)."
+  },
+  {
+    "term": "anjing",
+    "match_type": "substring",
+    "category": "profanity",
+    "reason": "Starter profanity list; admins curate it from P5-13 (docs/SECURITY/10)."
+  },
+  {
+    "term": "bajingan",
+    "match_type": "substring",
+    "category": "profanity",
+    "reason": "Starter profanity list; admins curate it from P5-13 (docs/SECURITY/10)."
+  },
+  {
+    "term": "bangsat",
+    "match_type": "substring",
+    "category": "profanity",
+    "reason": "Starter profanity list; admins curate it from P5-13 (docs/SECURITY/10)."
+  },
+  {
+    "term": "bitch",
+    "match_type": "substring",
+    "category": "profanity",
+    "reason": "Starter profanity list; admins curate it from P5-13 (docs/SECURITY/10)."
+  },
+  {
+    "term": "brengsek",
+    "match_type": "substring",
+    "category": "profanity",
+    "reason": "Starter profanity list; admins curate it from P5-13 (docs/SECURITY/10)."
+  },
+  {
+    "term": "cunt",
+    "match_type": "substring",
+    "category": "profanity",
+    "reason": "Starter profanity list; admins curate it from P5-13 (docs/SECURITY/10)."
+  },
+  {
+    "term": "faggot",
+    "match_type": "substring",
+    "category": "profanity",
+    "reason": "Starter profanity list; admins curate it from P5-13 (docs/SECURITY/10)."
+  },
+  {
+    "term": "fuck",
+    "match_type": "substring",
+    "category": "profanity",
+    "reason": "Starter profanity list; admins curate it from P5-13 (docs/SECURITY/10)."
+  },
+  {
+    "term": "kontol",
+    "match_type": "substring",
+    "category": "profanity",
+    "reason": "Starter profanity list; admins curate it from P5-13 (docs/SECURITY/10)."
+  },
+  {
+    "term": "memek",
+    "match_type": "substring",
+    "category": "profanity",
+    "reason": "Starter profanity list; admins curate it from P5-13 (docs/SECURITY/10)."
+  },
+  {
+    "term": "nazi",
+    "match_type": "substring",
+    "category": "profanity",
+    "reason": "Starter profanity list; admins curate it from P5-13 (docs/SECURITY/10)."
+  },
+  {
+    "term": "ngentot",
+    "match_type": "substring",
+    "category": "profanity",
+    "reason": "Starter profanity list; admins curate it from P5-13 (docs/SECURITY/10)."
+  },
+  {
+    "term": "nigger",
+    "match_type": "substring",
+    "category": "profanity",
+    "reason": "Starter profanity list; admins curate it from P5-13 (docs/SECURITY/10)."
+  },
+  {
+    "term": "rape",
+    "match_type": "substring",
+    "category": "profanity",
+    "reason": "Starter profanity list; admins curate it from P5-13 (docs/SECURITY/10)."
+  },
+  {
+    "term": "retard",
+    "match_type": "substring",
+    "category": "profanity",
+    "reason": "Starter profanity list; admins curate it from P5-13 (docs/SECURITY/10)."
+  },
+  {
+    "term": "shit",
+    "match_type": "substring",
+    "category": "profanity",
+    "reason": "Starter profanity list; admins curate it from P5-13 (docs/SECURITY/10)."
+  }
+]

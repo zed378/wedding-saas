@@ -1,10 +1,12 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, count, eq, isNull, desc, inArray, sql } from "drizzle-orm";
+import { and, count, eq, isNull, desc, inArray, ne, sql } from "drizzle-orm";
 
 import { DB, type Database } from "../../infra/db/client";
 import {
   invitations,
   invitationPeople,
+  invitationSettings,
+  invitationQuote,
   invitationEvents,
   invitationGallery,
   invitationBankAccounts,
@@ -15,6 +17,7 @@ import {
   auditLogs,
 } from "../../infra/db/schema/index";
 import type { AdminBypass, TenantScope } from "./tenant-scope";
+import type { Transaction } from "../db/transaction";
 
 /**
  * Tenant-scoped data access for invitations and their children.
@@ -74,6 +77,9 @@ export interface OwnedListFilters {
 }
 
 type InvitationRow = typeof invitations.$inferSelect;
+
+/** The statuses an invitation only reaches by being paid for. BR-1.4. */
+const NEVER_PAID_STATUSES = ["paid", "published", "expired"] as const;
 
 @Injectable()
 export class InvitationRepository {
@@ -170,6 +176,148 @@ export class InvitationRepository {
       .orderBy(desc(invitations.createdAt))
       .limit(Math.min(filters.limit ?? 50, 100))
       .offset(filters.offset ?? 0);
+  }
+
+  /**
+   * Create an invitation and its whole aggregate, in one transaction.
+   *
+   * Here rather than in `P1-09`'s service because this is the **one place `owner_id` is
+   * ever written**, and `scripts/check-tenant-scope.mjs` refuses a direct import of these
+   * tables outside this layer. Adding the invitation module to that script's ALLOWED list
+   * would have been the cheaper change and the wrong one: its own comment says every
+   * addition "deserves the same scrutiny and a sentence here saying what it costs", and
+   * the cost of this one would have been that the tenancy layer no longer owns the column
+   * every other query filters on.
+   *
+   * The five rows are the card's step 4. Both people rows are created **empty** rather
+   * than on first edit, so every later `PATCH /couple/groom` is a simple `UPDATE` instead
+   * of an upsert racing another tab.
+   *
+   * The caller supplies `recordCreation`, which is `P0-14`'s status service -- it must run
+   * inside this transaction, and this layer must not depend on that module.
+   */
+  async createAggregate(
+    scope: TenantScope,
+    input: {
+      readonly internalName: string;
+      readonly templateId: string;
+      readonly templateVersionId: string;
+      readonly slug: string | null;
+      readonly enabledSections: readonly string[];
+    },
+    recordCreation: (tx: Transaction, invitationId: string) => Promise<void>,
+  ): Promise<InvitationRow> {
+    return this.db.transaction(async (tx) => {
+      const [invitation] = await tx
+        .insert(invitations)
+        .values({
+          // The scope, and nothing a caller could have supplied. `docs/SECURITY/05` § 3.
+          ownerId: scope,
+          internalName: input.internalName,
+          templateId: input.templateId,
+          templateVersionId: input.templateVersionId,
+          status: "draft",
+          slug: input.slug,
+        })
+        .returning();
+
+      const invitationId = invitation!.id;
+
+      await tx.insert(invitationSettings).values({
+        invitationId,
+        enabledSections: [...input.enabledSections],
+        // Explicit, though the column defaults to it. `docs/PLAN/15`: an invitation
+        // carries names, addresses, times and a guest list, so not entering a search
+        // index is the default -- and writing it here means a change to the column
+        // default cannot quietly flip it.
+        seoIndexable: false,
+      });
+
+      await tx.insert(invitationQuote).values({ invitationId });
+
+      await tx.insert(invitationPeople).values([
+        { invitationId, role: "groom" },
+        { invitationId, role: "bride" },
+      ]);
+
+      await recordCreation(tx, invitationId);
+
+      return invitation!;
+    });
+  }
+
+  /**
+   * This scope's one invitation that has **never been paid for**, if it has one. BR-1.4.
+   *
+   * Not "their drafts". ADR-023 is explicit that the quota "limits unpaid inventory, not
+   * customers", so a wedding organiser with five paid invitations can start a sixth. Two
+   * conditions, and both are load-bearing:
+   *
+   *   the current status is none of the paid ones, which covers the common case;
+   *   and `invitation_status_history` has never recorded one, which covers an invitation
+   *   that was paid and later unpublished -- it must not start counting again.
+   *
+   * Writing this as `status = 'draft'` looks equivalent and is not: a `pending_payment`
+   * invitation is neither paid nor a draft, and the short version would let a user park
+   * one there and start another. That mutation passed every test until `P1-09` added the
+   * case for it.
+   */
+  async findUnpaidInvitation(
+    scope: TenantScope,
+  ): Promise<{ id: string; internalName: string | null } | undefined> {
+    const rows = await this.db
+      .select({ id: invitations.id, internalName: invitations.internalName })
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.ownerId, scope),
+          isNull(invitations.deletedAt),
+          ...NEVER_PAID_STATUSES.map((status) =>
+            ne(invitations.status, status),
+          ),
+          sql`NOT EXISTS (
+            SELECT 1 FROM invitation_status_history h
+            WHERE h.invitation_id = ${invitations.id}
+              AND h.to_status IN ('paid', 'published', 'expired')
+          )`,
+        ),
+      )
+      .limit(1);
+
+    return rows[0];
+  }
+
+  /**
+   * Whether a LIVE invitation holds this slug. Deliberately not scoped.
+   *
+   * The slug is a global public namespace, so a conflict with somebody else's invitation
+   * is a real conflict and the answer has to cross tenants. That makes this the one read
+   * in this file that does not carry an owner predicate, which is exactly why it lives
+   * here with this paragraph attached rather than in a service where it would look
+   * unremarkable.
+   *
+   * It leaks one bit -- that some invitation holds this address -- which is unavoidable
+   * for a public namespace and is what the public URL already tells any visitor.
+   *
+   * `deleted_at IS NULL` matches the partial unique index (ADR-033): `docs/DATABASE/04`
+   * § Notes says "a slug can be reused after the old invitation is truly deleted".
+   */
+  async slugTaken(
+    slug: string,
+    excludeInvitationId?: string,
+  ): Promise<boolean> {
+    const rows = await this.db
+      .select({ id: invitations.id })
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.slug, slug.trim().toLowerCase()),
+          isNull(invitations.deletedAt),
+        ),
+      )
+      .limit(2);
+
+    return rows.some((row) => row.id !== excludeInvitationId);
   }
 
   /**
