@@ -118,6 +118,13 @@ function isUniqueViolation(error: unknown): boolean {
 /** One settings row. */
 export type InvitationSettingsRow = typeof invitationSettings.$inferSelect;
 
+/**
+ * One `media` row. Exported so a caller need not import the table — `P1-17` added `media` to
+ * `scripts/check-tenant-scope.mjs`'s guarded list, because a row with a non-null
+ * `invitation_id` is tenant-owned data in exactly the way `invitation_gallery` is.
+ */
+export type MediaRow = typeof media.$inferSelect;
+
 /** One quote row. */
 export type InvitationQuoteRow = typeof invitationQuote.$inferSelect;
 
@@ -711,6 +718,145 @@ export class InvitationRepository {
       .limit(1);
 
     return rows[0] ?? null;
+  }
+
+  /**
+   * Insert a `media` row for an owned invitation, refusing to exceed the quota. `P1-17`.
+   *
+   * ## The lock is the whole method
+   *
+   * BR-8.1 caps an invitation at 200 photos, and `docs/SECURITY/06`'s abuse list includes
+   * "quota bypass by parallel uploads". A `SELECT count(*)` followed by an `INSERT` cannot
+   * enforce a cap: under READ COMMITTED two concurrent uploads both read 199, both insert,
+   * and the invitation holds 201. The count is not wrong — it was true when each read it.
+   *
+   * So the invitation row is taken `FOR UPDATE` first. Two uploads to the *same* invitation
+   * serialise; uploads to different invitations do not contend at all, because the lock is
+   * on that invitation's row. The owner predicate is on the same statement, so a non-owner
+   * takes no lock, learns no count, and inserts nothing.
+   *
+   * Returns `null` for "not this scope's invitation" — the caller's 404 — and
+   * `"quota_exceeded"` for the cap, because those are different answers and the caller must
+   * not have to guess from a null which one happened.
+   *
+   * ## What is NOT set here
+   *
+   * `width`, `height` and `status` beyond `processing`. This stage never decodes an image;
+   * `docs/BACKEND/04` Stage 2 fills those in after the scan and the decode. A row that
+   * claimed dimensions before anything read the pixels would be a row nobody could trust.
+   */
+  async insertMediaWithinQuota(
+    invitationId: string,
+    scope: TenantScope,
+    input: {
+      readonly mediaId: string;
+      readonly purpose: string;
+      readonly storagePath: string;
+      readonly mimeType: string;
+      readonly sizeBytes: number;
+      readonly maxPhotos: number;
+    },
+  ): Promise<MediaRow | null | "quota_exceeded"> {
+    return this.db.transaction(async (tx) => {
+      const [owned] = await tx
+        .select({ id: invitations.id })
+        .from(invitations)
+        .where(
+          and(
+            eq(invitations.id, invitationId),
+            eq(invitations.ownerId, scope),
+            isNull(invitations.deletedAt),
+          ),
+        )
+        .for("update")
+        .limit(1);
+
+      if (owned === undefined) return null;
+
+      const [existing] = await tx
+        .select({ total: count() })
+        .from(media)
+        .where(
+          and(
+            eq(media.invitationId, invitationId),
+            isNull(media.deletedAt),
+            // A failed upload occupies no storage and must not occupy a slot either.
+            // `docs/BACKEND/04` Stage 2 step 9 deletes the file when it sets 'failed'.
+            ne(media.status, "failed"),
+          ),
+        );
+
+      if ((existing?.total ?? 0) >= input.maxPhotos) return "quota_exceeded";
+
+      const rows = await tx
+        .insert(media)
+        .values({
+          id: input.mediaId,
+          invitationId,
+          uploadedBy: scope,
+          purpose: input.purpose,
+          status: "processing",
+          storagePath: input.storagePath,
+          mimeType: input.mimeType,
+          sizeBytes: BigInt(input.sizeBytes),
+        })
+        .returning();
+
+      return rows[0]!;
+    });
+  }
+
+  /**
+   * One media row, if this scope owns the invitation it belongs to. `P1-17`.
+   *
+   * `docs/SECURITY/05` § 6's two-step rule in one statement: the media id is validated
+   * against its invitation **and** the invitation against its owner. Fetching the row and
+   * then comparing `invitation.ownerId` in the service would be the shape the document
+   * forbids, and it is the shape that survives a refactor as a fetch with the comparison
+   * quietly dropped.
+   *
+   * A template asset — `media.invitation_id IS NULL` — can never match, because the inner
+   * join has nothing to join to. That is correct rather than incidental: a template asset has
+   * no owner, so no owner may read it through an owner endpoint.
+   */
+  async findOwnedMedia(
+    mediaId: string,
+    scope: TenantScope,
+  ): Promise<MediaRow | null> {
+    const rows = await this.db
+      .select({ row: media })
+      .from(media)
+      .innerJoin(invitations, eq(media.invitationId, invitations.id))
+      .where(
+        and(
+          eq(media.id, mediaId),
+          eq(invitations.ownerId, scope),
+          isNull(invitations.deletedAt),
+          isNull(media.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    return rows[0]?.row ?? null;
+  }
+
+  /**
+   * Mark a media row `failed`. `P1-17`.
+   *
+   * Used when the bytes could not be written to staging after the row was committed. An
+   * honest `failed` beats a row that claims a file nobody can find: the owner sees a failed
+   * upload and retries, rather than polling `processing` until the end of time.
+   *
+   * Scoped through the invitation like every other media write.
+   */
+  async markMediaFailed(mediaId: string, scope: TenantScope): Promise<void> {
+    const owned = await this.findOwnedMedia(mediaId, scope);
+    if (owned === null) return;
+
+    await this.db
+      .update(media)
+      .set({ status: "failed" })
+      .where(eq(media.id, mediaId));
   }
 
   /**

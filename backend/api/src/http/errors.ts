@@ -27,16 +27,32 @@ export abstract class AppError extends Error {
   }
 }
 
-/** 400. Structural validation failed. `details` names the offending fields. */
+/**
+ * 400. Structural validation failed. `details` names the offending fields.
+ *
+ * The code is a **closed union**, not a free string, for the reason `UnauthenticatedError`
+ * gives above: the documents name a small set of 400 codes and every other 400 must stay
+ * `VALIDATION_ERROR` and indistinguishable. `P1-17` added the three from `docs/API/05`
+ * § Error Cases, which are 400s carrying a specific meaning a client acts on — retry with a
+ * different file, retry with a smaller one, or delete something first.
+ */
+export type ValidationErrorCode =
+  | "VALIDATION_ERROR"
+  | "INVALID_FILE_TYPE"
+  | "FILE_TOO_LARGE"
+  | "QUOTA_EXCEEDED";
+
 export class ValidationError extends AppError {
   readonly status = 400;
-  readonly code = "VALIDATION_ERROR";
+  readonly code: ValidationErrorCode;
 
   constructor(
     details: readonly ErrorDetail[],
     message = "The request could not be validated.",
+    code: ValidationErrorCode = "VALIDATION_ERROR",
   ) {
     super(message, details);
+    this.code = code;
   }
 }
 

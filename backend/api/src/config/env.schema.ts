@@ -108,6 +108,20 @@ export const envSchema = z
     STORAGE_BUCKET_STAGING: z.string().min(1).default("staging"),
 
     /**
+     * Where media is READ from. `docs/ARCHITECTURE/05` § Access Control: buckets are
+     * private and "files must never be accessible directly via the bucket URL", so a media
+     * URL is a CDN URL and never a storage endpoint. The two are deliberately separate
+     * variables for that reason — pointing this at `STORAGE_ENDPOINT` would publish the
+     * bucket.
+     *
+     * Optional, and with **no default**. A wrong CDN hostname produces broken images on
+     * every published invitation, and a default is how a placeholder domain reaches
+     * production. Where it is unset, `P1-17`'s media read simply omits `url` and
+     * `thumbnail_url` rather than emitting a link it cannot construct.
+     */
+    CDN_BASE_URL: z.url().optional(),
+
+    /**
      * Auth secrets. Required as of `P1-03`: without them nobody can log in, and "nobody
      * can log in" should be a refusal to boot rather than a 500 on the first attempt.
      *

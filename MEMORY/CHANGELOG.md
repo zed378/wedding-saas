@@ -10,6 +10,25 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — media upload, and a concurrency test that could not see the race
+
+**Added** — `POST /invitations/:id/media` and `GET /media/:media_id` ([P1-17](./records/2026-09-12-P1-17-media-upload.md))
+
+- **The bytes decide.** A filename is a string the client chose; a `Content-Type` is a header the client typed. The extension is checked because it is free, the header is logged when it disagrees, and the magic bytes refuse — `docs/SECURITY/06` layer 3, the check that catches a webshell renamed `.jpg`. Every content rejection carries the same code and message: which layer refused is useful only to somebody deciding which layer to work around next.
+- **The filename cannot reach a storage path**, rather than being cleaned out of one. The object is `uploads/{media_id}`, `stagingKey()` accepts nothing but a UUID, and `check-storage-paths.mjs` refuses a hand-assembled key anywhere in the repository.
+- **The 200-photo quota is held under a row lock** on the invitation, with the owner predicate on the same statement — so a non-owner takes no lock, learns no count and inserts nothing.
+- Nothing is written to the permanent bucket. BR-8.2: the worker publishes, after the scan, the decode and the EXIF strip.
+- `media` added to the tenant-scope guard. It was missing, and a `media` row with an `invitation_id` is a couple's photo.
+- `docs/API/05` amended: § Limits still named "Basic 5MB, Premium 10MB" packages that ADR-023 removed.
+
+**Worth knowing** — the concurrency test passed with the lock removed. Twice.
+
+Two parallel uploads at the quota boundary, asserting exactly one succeeds: passed with `FOR UPDATE` deleted. Eight parallel uploads: also passed. node-postgres and the foreign key's own `FOR KEY SHARE` happen to serialise the inserts often enough that the race never occurs on this machine, so the test proved nothing while reporting green.
+
+The replacement is a deterministic probe rather than more parallelism: a second connection holds `FOR NO KEY UPDATE` on the invitation row, and the test asserts the upload does not complete while it is held. The lock mode is the whole trick — `FOR NO KEY UPDATE` conflicts with `FOR UPDATE` and does **not** conflict with the `FOR KEY SHARE` that the media insert's foreign key takes on its own, so an upload that blocks can only be blocking on the quota lock. A `FOR UPDATE` probe would have passed either way.
+
+**Stated rather than implied** — a file that reaches `processing` has been checked for three things, and a polyglot with a valid JPEG header passes all of them. There is a test named for that, asserting it is accepted. The decode and the malware scan are `P1-18`'s.
+
 ### 2026-09-12 — changing a template, where the whole feature is what the code does not do
 
 **Added** — `POST /invitations/:id/change-template` ([P1-15](./records/2026-09-12-P1-15-change-template.md))

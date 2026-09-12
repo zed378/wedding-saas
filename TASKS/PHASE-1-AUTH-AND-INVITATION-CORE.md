@@ -597,7 +597,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-17-media-upload.md), [spec](../MEMORY/specs/P1-17-media-upload.md) |
 | **Depends on** | P1-10, P0-16 |
 | **Spec refs** | `docs/API/05-MEDIA-API.md`, `docs/SECURITY/06-FILE-UPLOAD-SECURITY.md` layers 1-5, `docs/BACKEND/04-FILE-PROCESSING.md` Stage 1 |
 | **Spec required** | Yes — file upload |
@@ -617,11 +617,17 @@
 9. Return 404, not 403, for another user's invitation or media — `docs/API/05` § Error Cases was corrected by ADR-018.
 
 **Definition of Done**
-- [ ] A file whose bytes do not match its extension is rejected before it reaches staging.
-- [ ] An oversized upload is rejected without the whole body being buffered.
-- [ ] Uploading to another user's invitation returns 404 and creates no row and no file.
-- [ ] The stored path contains no attacker-controlled string.
-- [ ] `GET /media/:media_id` exists, is ownership-scoped, and `docs/API/05` is amended.
+- [x] A file whose bytes do not match its extension is rejected before it reaches staging. Asserted against both the database **and** the object store — a test that checked only the row would pass while a refused upload left bytes in staging. Every content rejection carries the same code and the same message, because which layer refused is useful only to somebody deciding which layer to work around next.
+- [x] An oversized upload is rejected without the whole body being buffered. **Framework level only.** `docs/SECURITY/06` layer 4 wants it at the web server too, and there is no Caddy in this repository until `P3-11` — written there as step 4b rather than counted as done here.
+- [x] Uploading to another user's invitation returns 404 and creates no row and no file. The owner predicate rides on the same `FOR UPDATE` statement that takes the quota lock, so a non-owner takes no lock, learns no count, and inserts nothing.
+- [x] The stored path contains no attacker-controlled string. **Unrepresentable, not sanitized**: `stagingKey()` accepts only a UUID and `check-storage-paths.mjs` refuses a hand-assembled key. A mutation interpolating the filename is caught by the guard *and* by two tests.
+- [x] `GET /media/:media_id` exists, is ownership-scoped, and `docs/API/05` is amended. The amendment also corrected § Limits, which still named "Basic 5MB, Premium 10MB" packages that ADR-023 removed.
+
+**What this stage does NOT check, stated because the natural misreading is that it does.** A file that reaches `processing` has been checked for three things: a permitted extension, a permitted image signature in its first twelve bytes, and a size under 10 MB. A crafted PNG that decodes to 40,000 × 40,000 pixels passes all three, and so does a polyglot with a JPEG header and a script payload after it — there is a test named for the second case, asserting it is **accepted**. Layers 6, 7, 10 and 11 are `P1-18`'s, in the resource-capped worker.
+
+**The concurrency test passed with the lock removed, twice.** Two parallel uploads at the quota boundary, then eight: both versions passed with `FOR UPDATE` deleted, because node-postgres and the foreign key's own `FOR KEY SHARE` happened to serialise the inserts. Replaced with a deterministic probe holding `FOR NO KEY UPDATE` — a mode that conflicts with `FOR UPDATE` and **not** with the FK's lock, so an upload that blocks can only be blocking on the quota lock. Eighth time in this project a test verified less than its name claimed.
+
+**Beyond the card**: `media` was missing from `scripts/check-tenant-scope.mjs`'s guarded list, so any module could have read a photo by id without an owner filter. Added.
 
 **Abuse cases to test**
 | Abuse case | Source | Expectation |

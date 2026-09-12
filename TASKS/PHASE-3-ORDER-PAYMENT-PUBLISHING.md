@@ -364,6 +364,7 @@
 2. Confirm automatic renewal for each hostname's certificate, and add the 14-day expiry alert from `docs/DEVOPS/07`.
 3. Apply edge rate limiting per `docs/DEVOPS/03`, with the webhook path exempt.
 4. Set a longer upload timeout than the general API timeout, per `docs/DEVOPS/03` § Timeout & Buffering — a 10MB photo on a phone connection is not a stuck request.
+4b. **Owed by `P1-17`**: set the request-body cap (`request_body max_size` in Caddy) to just above 10 MB on the upload route. `docs/SECURITY/06` layer 4 asks for an oversized upload to be refused "at the request level BEFORE the file is fully received", and today only the framework half exists — multer stops reading at the limit, but the bytes have already reached the application. Until this is done the API is one layer thinner than the document specifies, which is why it is written here rather than counted as done there.
 5. Add the security headers not already set at the application layer, and keep the frame policy separate for the public invitation surface (`docs/SECURITY/08`).
 6. Verify with a real published invitation, not a placeholder.
 
