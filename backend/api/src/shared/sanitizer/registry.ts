@@ -83,6 +83,8 @@ export const NOT_USER_TEXT: Readonly<Record<string, string>> = {
   slug: "matched against `^[a-z0-9-]+$` before storage; no tag survives that character set",
   template_id: "a UUID, validated by `z.uuid()`; not rendered as text",
   media_id: "a UUID, validated by `z.uuid()`; not rendered as text",
+  ordered_photo_ids:
+    "a list of UUIDs, each validated by `z.uuid()` and then checked to be exactly this invitation's photos (P1-19)",
   invitation_id: "a UUID, validated by `z.uuid()`; not rendered as text",
   user_id: "a UUID, validated by `z.uuid()`; not rendered as text",
   event_id: "a UUID, validated by `z.uuid()`; not rendered as text",

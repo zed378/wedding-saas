@@ -29,6 +29,7 @@ import { EventsService } from "./events.service";
 import { GiftService, QuoteService } from "./gift.service";
 import { SettingsService } from "./settings.service";
 import { ChangeTemplateService } from "./change-template.service";
+import { GalleryService } from "./gallery.service";
 import { SLUG_MAX_LENGTH, SLUG_MIN_LENGTH } from "./slug.service";
 import { sanitizeFields } from "../../shared/sanitizer/sanitize";
 import { TEXT_FIELDS } from "../../shared/sanitizer/registry";
@@ -254,6 +255,40 @@ const settingsSchema = z
  */
 const changeTemplateSchema = z.object({ template_id: z.uuid() }).strict();
 
+/**
+ * `POST /invitations/:id/gallery`. `docs/API/04` § Gallery.
+ *
+ * `media_id` is the only way a photo enters a gallery, and it is validated in the service
+ * against **this** invitation — `docs/SECURITY/05` § 6. `display_order` is absent on purpose:
+ * a new photo is appended, and rearranging is what `/gallery/reorder` is for.
+ */
+const galleryAttachSchema = z
+  .object({
+    media_id: z.uuid(),
+    caption: z.union([z.string().trim().max(200), z.null()]).optional(),
+    is_cover: z.boolean().optional(),
+  })
+  .strict();
+
+const galleryUpdateSchema = z
+  .object({
+    caption: z.union([z.string().trim().max(200), z.null()]).optional(),
+    order: z.number().int().min(0).max(999).optional(),
+    is_cover: z.boolean().optional(),
+  })
+  .strict();
+
+/**
+ * `POST /invitations/:id/gallery/reorder`.
+ *
+ * The whole list, every time. The service refuses anything that is not exactly this
+ * invitation's photos, each once — a partial application would leave the user looking at an
+ * arrangement nobody chose.
+ */
+const galleryReorderSchema = z
+  .object({ ordered_photo_ids: z.array(z.uuid()).min(1).max(200) })
+  .strict();
+
 const listQuerySchema = z
   .object({
     page: z.coerce.number().int().min(1).optional(),
@@ -328,6 +363,7 @@ export class InvitationController {
     private readonly quote: QuoteService,
     private readonly settings: SettingsService,
     private readonly changeTemplate: ChangeTemplateService,
+    private readonly gallery: GalleryService,
   ) {}
 
   /**
@@ -767,6 +803,95 @@ export class InvitationController {
 
     return ok(
       await this.changeTemplate.change(user.scope, id, input.template_id),
+    );
+  }
+
+  // ------------------------------------------------------------------ gallery
+
+  @Get(":id/gallery")
+  async listGallery(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+  ) {
+    return ok(await this.gallery.list(user.scope, id));
+  }
+
+  /**
+   * Attach a ready photo. 201, because a gallery entry is created.
+   *
+   * Not rate limited beyond the global policy: the expensive operation was the upload, which
+   * `media-upload` already limits at 60/hour, and a photo cannot be attached that was not
+   * first uploaded.
+   */
+  @Post(":id/gallery")
+  @HttpCode(201)
+  async attachPhoto(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const input = parse(galleryAttachSchema, body);
+
+    return ok(
+      await this.gallery.attach(user.scope, id, {
+        mediaId: input.media_id,
+        ...(input.caption !== undefined ? { caption: input.caption } : {}),
+        ...(input.is_cover !== undefined ? { isCover: input.is_cover } : {}),
+      }),
+    );
+  }
+
+  @Patch(":id/gallery/:photoId")
+  async updatePhoto(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Param("photoId") photoId: string,
+    @Body() body: unknown,
+  ) {
+    const input = parse(galleryUpdateSchema, body);
+
+    return ok(
+      await this.gallery.update(user.scope, id, photoId, {
+        ...(input.caption !== undefined ? { caption: input.caption } : {}),
+        // `order` in the contract, `display_order` in the column. The API's word is the
+        // one `docs/API/04` § Gallery uses.
+        ...(input.order !== undefined ? { displayOrder: input.order } : {}),
+        ...(input.is_cover !== undefined ? { isCover: input.is_cover } : {}),
+      }),
+    );
+  }
+
+  @Delete(":id/gallery/:photoId")
+  @HttpCode(204)
+  async deletePhoto(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Param("photoId") photoId: string,
+  ) {
+    await this.gallery.remove(user.scope, id, photoId);
+  }
+
+  /**
+   * `POST /invitations/:id/gallery/reorder`.
+   *
+   * Declared BEFORE `:photoId` would matter if this were a PATCH; it is a POST to a fixed
+   * path, so there is no ambiguity — but the ordering is kept explicit because
+   * `gallery/reorder` and `gallery/:photoId` differ by one route type, and a future
+   * `GET /gallery/reorder` would resolve to the parameterised route.
+   */
+  @Post(":id/gallery/reorder")
+  // 200, not the 201 Nest gives a POST by default: nothing is created. POST rather than
+  // PATCH because the body replaces the whole order rather than amending part of it.
+  @HttpCode(200)
+  async reorderGallery(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const input = parse(galleryReorderSchema, body);
+
+    return ok(
+      await this.gallery.reorder(user.scope, id, input.ordered_photo_ids),
     );
   }
 }

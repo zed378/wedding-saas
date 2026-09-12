@@ -16,6 +16,7 @@ import {
 } from "../src/modules/invitation/gift.service";
 import { SettingsService } from "../src/modules/invitation/settings.service";
 import { ChangeTemplateService } from "../src/modules/invitation/change-template.service";
+import { GalleryService } from "../src/modules/invitation/gallery.service";
 import { NotFoundError } from "../src/http/errors";
 import { SessionService } from "../src/modules/auth/session.service";
 import { UnauthenticatedError } from "../src/http/errors";
@@ -58,6 +59,10 @@ const seen: {
   quoteInput?: unknown;
   settingsPatch?: unknown;
   changeTemplateId?: string | undefined;
+  galleryAttach?: unknown;
+  galleryUpdate?: unknown;
+  galleryOrder?: unknown;
+  galleryDeleted?: string | undefined;
 } = {};
 
 const createStub = {
@@ -151,6 +156,51 @@ const giftStub = {
   },
   remove: async (_scope: unknown, id: string) => {
     mineOr404(id);
+  },
+};
+
+const PHOTO_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const MEDIA_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+const galleryPhoto = {
+  id: PHOTO_ID,
+  media_id: MEDIA_ID,
+  caption: null,
+  display_order: 0,
+  is_cover: false,
+  status: "ready",
+  width: 1600,
+  height: 1200,
+};
+
+const galleryStub = {
+  list: async (_scope: unknown, id: string) => {
+    mineOr404(id);
+    return [galleryPhoto];
+  },
+  attach: async (_scope: unknown, id: string, input: unknown) => {
+    mineOr404(id);
+    seen.galleryAttach = input;
+    return galleryPhoto;
+  },
+  update: async (
+    _scope: unknown,
+    id: string,
+    photoId: string,
+    changes: unknown,
+  ) => {
+    mineOr404(id);
+    seen.galleryUpdate = { photoId, changes };
+    return galleryPhoto;
+  },
+  remove: async (_scope: unknown, id: string, photoId: string) => {
+    mineOr404(id);
+    seen.galleryDeleted = photoId;
+  },
+  reorder: async (_scope: unknown, id: string, ordered: unknown) => {
+    mineOr404(id);
+    seen.galleryOrder = ordered;
+    return [galleryPhoto];
   },
 };
 
@@ -319,6 +369,7 @@ describe("POST /invitations over HTTP", () => {
         { provide: QuoteService, useValue: quoteStub },
         { provide: SettingsService, useValue: settingsStub },
         { provide: ChangeTemplateService, useValue: changeTemplateStub },
+        { provide: GalleryService, useValue: galleryStub },
         { provide: SessionService, useValue: sessionStub },
         { provide: RATE_LIMITER, useValue: limiterStub },
         {
@@ -1230,6 +1281,146 @@ describe("POST /invitations over HTTP", () => {
         .expect(429);
 
       expect(res.body.error.code).toBe("TOO_MANY_ATTEMPTS");
+    });
+  });
+
+  describe("gallery (P1-19)", () => {
+    it("lists, attaches, updates, reorders and deletes", async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/invitations/${INVITATION_ID}/gallery`)
+        .set(...AUTH)
+        .expect(200);
+
+      const created = await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/gallery`)
+        .set(...AUTH)
+        .send({ media_id: MEDIA_ID, caption: "Di pantai", is_cover: true })
+        .expect(201);
+      expect(created.body.data.id).toBe(PHOTO_ID);
+      expect(seen.galleryAttach).toEqual({
+        mediaId: MEDIA_ID,
+        caption: "Di pantai",
+        isCover: true,
+      });
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}/gallery/${PHOTO_ID}`)
+        .set(...AUTH)
+        .send({ caption: "Baru", order: 3, is_cover: false })
+        .expect(200);
+      expect(seen.galleryUpdate).toEqual({
+        photoId: PHOTO_ID,
+        // `order` at the boundary, `displayOrder` inside. docs/API/04 § Gallery uses the
+        // first; the column is named the second.
+        changes: { caption: "Baru", displayOrder: 3, isCover: false },
+      });
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/gallery/reorder`)
+        .set(...AUTH)
+        .send({ ordered_photo_ids: [PHOTO_ID] })
+        .expect(200);
+      expect(seen.galleryOrder).toEqual([PHOTO_ID]);
+
+      await request(app.getHttpServer())
+        .delete(`/api/v1/invitations/${INVITATION_ID}/gallery/${PHOTO_ID}`)
+        .set(...AUTH)
+        .expect(204);
+      expect(seen.galleryDeleted).toBe(PHOTO_ID);
+    });
+
+    it("routes gallery/reorder to the reorder handler, not to :photoId", async () => {
+      // `POST :id/gallery/reorder` and `PATCH :id/gallery/:photoId` differ only by method.
+      // If the parameterised route ever won, `reorder` would arrive as a photo id and the
+      // failure would be a confusing 404 rather than an obvious one.
+      seen.galleryOrder = undefined;
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/gallery/reorder`)
+        .set(...AUTH)
+        .send({ ordered_photo_ids: [PHOTO_ID] })
+        .expect(200);
+
+      expect(seen.galleryOrder).toEqual([PHOTO_ID]);
+    });
+
+    it.each([
+      ["display_order", { display_order: 2 }],
+      ["invitation_id", { invitation_id: INVITATION_ID }],
+      ["status", { status: "ready" }],
+      ["url", { url: "https://evil.test/x.webp" }],
+    ])("rejects an attach body carrying %s", async (_name, extra) => {
+      // `display_order` in particular: a new photo is appended, and rearranging is what
+      // /reorder is for. A client that could set it on attach could interleave a photo into
+      // the middle of an order the couple chose.
+      await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/gallery`)
+        .set(...AUTH)
+        .send({ media_id: MEDIA_ID, ...extra })
+        .expect(400);
+    });
+
+    it.each([
+      ["a missing media_id", {}],
+      ["a non-uuid media_id", { media_id: "not-a-uuid" }],
+      [
+        "an over-long caption",
+        { media_id: MEDIA_ID, caption: "x".repeat(201) },
+      ],
+      ["a non-boolean is_cover", { media_id: MEDIA_ID, is_cover: "yes" }],
+    ])("rejects %s", async (_name, body) => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/gallery`)
+        .set(...AUTH)
+        .send(body)
+        .expect(400);
+    });
+
+    it.each([
+      ["an empty list", { ordered_photo_ids: [] }],
+      ["a non-array", { ordered_photo_ids: PHOTO_ID }],
+      ["a non-uuid entry", { ordered_photo_ids: ["nope"] }],
+      ["an extra field", { ordered_photo_ids: [PHOTO_ID], apply: "partial" }],
+    ])("rejects a reorder with %s", async (_name, body) => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/gallery/reorder`)
+        .set(...AUTH)
+        .send(body)
+        .expect(400);
+    });
+
+    it("another user's invitation is 404 on every gallery route", async () => {
+      const server = app.getHttpServer();
+
+      await request(server)
+        .get(`/api/v1/invitations/${OTHERS_INVITATION}/gallery`)
+        .set(...AUTH)
+        .expect(404);
+      await request(server)
+        .post(`/api/v1/invitations/${OTHERS_INVITATION}/gallery`)
+        .set(...AUTH)
+        .send({ media_id: MEDIA_ID })
+        .expect(404);
+      await request(server)
+        .patch(`/api/v1/invitations/${OTHERS_INVITATION}/gallery/${PHOTO_ID}`)
+        .set(...AUTH)
+        .send({ caption: "x" })
+        .expect(404);
+      await request(server)
+        .delete(`/api/v1/invitations/${OTHERS_INVITATION}/gallery/${PHOTO_ID}`)
+        .set(...AUTH)
+        .expect(404);
+      await request(server)
+        .post(`/api/v1/invitations/${OTHERS_INVITATION}/gallery/reorder`)
+        .set(...AUTH)
+        .send({ ordered_photo_ids: [PHOTO_ID] })
+        .expect(404);
+    });
+
+    it("is 401 without a token", async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/invitations/${INVITATION_ID}/gallery`)
+        .expect(401);
     });
   });
 });
