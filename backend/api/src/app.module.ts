@@ -26,7 +26,7 @@ import { AuthModule } from "./modules/auth/auth.module";
  *   5. body parsing + size limit  express.json({ limit })       (main.ts)
  *  5b. cookie parsing            cookie-parser, unsigned        (main.ts)
  *   6. rate limiting              Redis sliding window          P1-07
- *   7. authentication             requireAuth, injects user     P1-06
+ *   7. authentication             requireAuth(), injects user   shared/auth-middleware (P1-06)
  *   -- route handler --
  *   8. error mapper               envelope per docs/API/00      P0-13
  *

@@ -6,7 +6,7 @@ Single source of truth for where the project stands. Updated in the same commit 
 **Current phase**: Phase 0 — Foundation (26 / 27 done). **Staging is live**: `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
 
 The only task left is `P0-17` (CI/CD), deferred by ADR-028. Its **deployment** half was waived by the project owner on 2026-09-11; deploying is `git pull` plus a compose command. Its **verification** half was not waived and is the one Phase 0 exit criterion still unmet — see below. **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
-**Overall**: 31 / 136 tasks done
+**Overall**: 32 / 136 tasks done
 
 **No automated pipeline**: `P0-17` is deferred (ADR-028). Before merging to `main`, run `scripts/verify.sh`. The `:id`-endpoint gate blocks in `.githooks/pre-push`; integration tests, the coverage floor, SAST and dependency scanning are **not** running anywhere until `P0-17` is picked up — revisit before Phase 3 payment code.
 
@@ -24,7 +24,7 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 | Phase | Tasks | Done | Status | Gate to enter |
 |---|---|---|---|---|
 | [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 27 | 26 | **ACTIVE** | — |
-| [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 5 | **ACTIVE** | Phase 0 exit criteria |
+| [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 6 | **ACTIVE** | Phase 0 exit criteria |
 | [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 14 | 0 | Not started | Phase 1 exit + `P1-25` |
 | [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 0 | Not started | Phase 2 exit |
 | [Phase 4 — Engagement](./PHASE-4-ENGAGEMENT.md) | 12 | 0 | Not started | Phase 3 exit |
@@ -89,7 +89,7 @@ Roadmap: Week 3-5.
 | P1-03 | Login, access tokens, refresh rotation | backend | L | **DONE** — reuse of a spent refresh token revokes every session; role and status re-read from the database on every request | P1-01 |
 | P1-04 | Google OAuth | backend | M | **DONE** — the body has no email to trust; an unverified Google address cannot claim an account. Answers OQ-15 (migration 0005) | P1-03 |
 | P1-05 | Forgot and reset password | backend | M | **DONE** — every session dies in the same transaction as the password write; step 4 (rate limit) owed by P1-07 | P1-03, P0-15 |
-| P1-06 | Auth, role and ownership middleware | backend | L | TODO | P1-03, P0-11 |
+| P1-06 | Auth, role and ownership middleware | backend | L | **DONE** — `requireOwnership` is a service-layer function, not a guard; the reusable IDOR helper has three tests that pass only when an assertion fails | P1-03, P0-11 |
 | P1-07 | Rate limiting | backend | M | TODO | P1-03 |
 | P1-08 | User profile and account deletion | backend | M | TODO | P1-06 |
 | P1-09 | Create an invitation | backend | M | TODO | P1-06, P0-20 |
