@@ -37,7 +37,24 @@ export interface InvitationSummary {
   readonly updated_at: string;
 }
 
+/**
+ * The template identity behind the locked version. `PG-19`, ADR-060.
+ *
+ * `template_id` and `template_version_id` are uuids and every catalogue endpoint is
+ * addressed by slug and semver, so without these a client holding an invitation cannot
+ * fetch the definition it is rendering. BR-3.1 makes that worse rather than better: the
+ * invitation stays on the version it locked, so `GET /templates/:slug` — which serves the
+ * newest — is the wrong answer for an existing invitation.
+ */
+export interface InvitationTemplate {
+  readonly slug: string;
+  readonly name: string;
+  /** The locked version's number, for `GET /templates/:slug/versions/:version`. */
+  readonly version: string;
+}
+
 export interface InvitationDetail extends InvitationSummary {
+  readonly template: InvitationTemplate;
   readonly owner_id: string;
   readonly couple: {
     readonly groom: PersonDto | null;
@@ -127,6 +144,7 @@ export function toInvitationSummary(row: InvitationRow): InvitationSummary {
 export function toInvitationDetail(
   row: InvitationRow,
   aggregate: InvitationAggregate,
+  template: InvitationTemplate,
 ): InvitationDetail {
   const person = (role: string): PersonDto | null => {
     const found = aggregate.people.find((p) => p.role === role);
@@ -148,6 +166,7 @@ export function toInvitationDetail(
 
   return {
     ...toInvitationSummary(row),
+    template,
     // `owner_id` is in `docs/API/04`'s example response, and it is the caller's own id --
     // the query that produced this row filtered on it.
     owner_id: row.ownerId,

@@ -1730,3 +1730,53 @@ quietly exceeded:
 BR-3.3's licence is for *deprecated* versions, which were released and have invitations
 locked to them. A draft never was, and serving one would let anyone holding a URL preview
 unreleased work.
+
+### ADR-060 — The invitation detail carries its template's slug, name and version, not its definition
+
+**Date** 2026-09-12 · **Status** Accepted · **Task** `P2-05` · **Closes** `PG-19`
+
+**Context** — `P2-05` mounts the live preview against the editor store, and the store needs
+the **section definition** of the template version the invitation is locked to. There was
+no way to get it.
+
+`docs/API/04`'s detail response carries `template_id` and `template_version_id` as bare
+uuids. Every catalogue endpoint in `docs/API/03` is addressed by slug and semver:
+`GET /templates/:slug` serves the **newest published** version, and BR-3.1 says that is
+precisely the wrong one — an invitation stays on the version it locked until the user
+explicitly upgrades. `GET /templates/:slug/versions/:version` serves the right one and
+needs two identifiers the client does not have.
+
+So the editor could load an invitation and could not discover what to render it with.
+`P1-22` shipped with `templateDefinition: undefined` and a comment saying so; `P1-23`'s
+properties panel is a loop over a section list it had no source for.
+
+**Decision** — the detail response gains
+`template: { slug, name, version }`.
+
+Three fields, chosen for what a client actually needs:
+
+- **`slug` and `version`** are exactly the arguments of
+  `GET /templates/:slug/versions/:version`. The editor makes one extra request and gets
+  the definition from `P2-01`'s cache, which is where a template definition is supposed
+  to come from.
+- **`name`** because `docs/UI-UX/10`'s invitation card displays it, and without it every
+  dashboard row would need its own request to render a label.
+
+**Not the definition itself**, and that is the part worth defending. Inlining `sections`
+and `theme` would:
+
+- put several kilobytes of JSON on every invitation read, including the list;
+- duplicate the cache `docs/API/03` is served from, so a published template change would
+  have to invalidate two things instead of one;
+- and tie two objects with completely different lifetimes together — a definition changes
+  a few times a year, an invitation changes on every keystroke.
+
+**Owner-scoped, like every other read.** `findTemplateIdentity` repeats the
+`owner_id = :scope` predicate even though `detail` has already checked ownership, for the
+reason `docs/SECURITY/05` gives about query-level filters: a second code path that reached
+it without the check would otherwise be a way to learn which template somebody else's
+invitation uses.
+
+**Only on the detail, not the summary.** The list already carries `template_id`, and a
+join per row to serve a name nobody has asked for yet is a cost with no caller. `P2-11`'s
+catalogue UI is the first thing that might want it, and it can ask then.

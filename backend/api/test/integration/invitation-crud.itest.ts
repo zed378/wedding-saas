@@ -232,10 +232,31 @@ describe("invitation CRUD", () => {
         "settings",
         "slug",
         "status",
+        // `PG-19`, ADR-060: the slug and version a client needs to fetch the
+        // definition it is rendering. `template_id` and `template_version_id` are
+        // uuids and every catalogue endpoint is addressed by slug and semver. The
+        // LIST shape above deliberately does not gain it -- a join per row for a
+        // label nobody has asked for yet is a cost with no caller.
+        "template",
         "template_id",
         "template_version_id",
         "updated_at",
       ]);
+    });
+
+    it("names the template and the version the invitation is locked to", async () => {
+      // `PG-19`: BR-3.1 keeps an invitation on the version it locked, so the newest
+      // published version -- what `GET /templates/:slug` serves -- is the wrong answer for
+      // an existing invitation. These two fields are what makes the right one reachable.
+      const { user, invitationId } = await withInvitation();
+      const detail = await service.detail(user.scope, invitationId);
+
+      expect(Object.keys(detail.template).sort()).toEqual([
+        "name",
+        "slug",
+        "version",
+      ]);
+      expect(detail.template.version).toBe("1.0.0");
     });
 
     it("embeds the nested entities", async () => {

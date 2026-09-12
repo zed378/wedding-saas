@@ -173,6 +173,17 @@
 
   /* The 1280px max-width container from docs/UI-UX/09 § Grid System. */
   --container-page: 80rem; /* 1280px */
+
+  /*
+   * The editor's mobile preview frame. `docs/UI-UX/12` specifies 375px.
+   *
+   * A device width rather than a layout choice -- it is the size of the phone the
+   * invitation is mostly opened on (`docs/UI-UX/14` § Principles), so a preview at any
+   * other width would be previewing something nobody sees. It lives here because this
+   * file is where a measurement somebody might want to change belongs, and because
+   * `scripts/check-design-tokens.mjs` is right to refuse it inline.
+   */
+  --container-device-mobile: 23.4375rem; /* 375px */
 }
 
 /*
