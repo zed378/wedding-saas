@@ -60,7 +60,7 @@ const XSS_PAYLOADS: readonly [string, string][] = [
   ["an unclosed tag", "<script>alert(1)"],
   ["a malformed tag", "<<script>alert(1);//<</script>"],
   ["an uppercase tag", "<SCRIPT>alert(1)</SCRIPT>"],
-    // Written with escape sequences rather than the bytes themselves: a source file
+  // Written with escape sequences rather than the bytes themselves: a source file
   // containing a real NUL is one git classifies as BINARY and stops diffing
   // (`scripts/check-text-sources.mjs`). The value under test is identical.
   ["a null-byte separated tag", "<scri\u0000pt>alert(1)</scri\u0000pt>"],
