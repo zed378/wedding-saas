@@ -1,0 +1,458 @@
+import { describe, expect, it, vi } from "vitest";
+import { render } from "@testing-library/react";
+
+import { TemplateRenderer } from "./TemplateRenderer.js";
+import type { SectionDefinition, TemplateVersionDefinition } from "./types.js";
+
+/**
+ * P2-02 — the render flow. `docs/FRONTEND/04` § Render Flow, step by step.
+ */
+
+const section = (over: Partial<SectionDefinition> = {}): SectionDefinition => ({
+  section_key: "hero",
+  component: "HeroClassic",
+  enabled_by_default: true,
+  configurable: true,
+  required_fields: [],
+  optional_fields: [],
+  ...over,
+});
+
+const version = (
+  sections: SectionDefinition[],
+  over: Partial<TemplateVersionDefinition> = {},
+): TemplateVersionDefinition => ({
+  sections,
+  theme: { colors: { primary: "#b76e79" } },
+  customizable_theme_keys: ["colors.primary"],
+  ...over,
+});
+
+const DATA = {
+  couple: {
+    groom: { nickname: "Budi", full_name: "Budi Santoso" },
+    bride: { nickname: "Siti", full_name: "Siti Nurhaliza" },
+  },
+  events: [
+    { title: "Akad Nikah", venue_name: "Masjid Agung", type: "akad" },
+    { title: "Resepsi", venue_name: "Gedung Merdeka", type: "reception" },
+  ],
+  gift: { accounts: [{ account_number: "1234567890" }] },
+  quote: { text: "Sebuah kutipan" },
+};
+
+describe("step 1 — sections render in the template's order", () => {
+  it("renders them in the order the definition lists, not alphabetically", () => {
+    render(
+      <TemplateRenderer
+        mode="public"
+        invitationData={DATA}
+        templateVersion={version([
+          section({ section_key: "closing", component: "ClosingSimple" }),
+          section({ section_key: "hero", component: "HeroClassic" }),
+          section({ section_key: "gallery", component: "GalleryGrid" }),
+        ])}
+      />,
+    );
+
+    const rendered = [...document.querySelectorAll("[data-section]")].map(
+      (el) => el.getAttribute("data-section"),
+    );
+    expect(rendered).toEqual(["closing", "hero", "gallery"]);
+  });
+
+  it("renders two sections of the same key without a duplicate-key collapse", () => {
+    // `docs/PLAN/07` does not forbid a template having two galleries. A React key of just
+    // the section key would render one and warn.
+    render(
+      <TemplateRenderer
+        mode="public"
+        invitationData={DATA}
+        templateVersion={version([
+          section({ section_key: "gallery", component: "GalleryGrid" }),
+          section({ section_key: "gallery", component: "GalleryCarousel" }),
+        ])}
+      />,
+    );
+
+    expect(document.querySelectorAll('[data-section="gallery"]')).toHaveLength(
+      2,
+    );
+  });
+});
+
+describe("step 2 — enabled_sections decides, with one exception", () => {
+  it("omits a section the settings do not enable", () => {
+    render(
+      <TemplateRenderer
+        mode="public"
+        invitationData={DATA}
+        enabledSections={["hero"]}
+        templateVersion={version([
+          section({ section_key: "hero", component: "HeroClassic" }),
+          section({ section_key: "gallery", component: "GalleryGrid" }),
+        ])}
+      />,
+    );
+
+    expect(document.querySelector('[data-section="hero"]')).not.toBeNull();
+    expect(document.querySelector('[data-section="gallery"]')).toBeNull();
+  });
+
+  it("a disabled section is absent from the DOM, not hidden", () => {
+    // The card's own wording: "a hidden section is still a data leak in the page source".
+    // A `display:none` gallery still ships every caption to every guest.
+    render(
+      <TemplateRenderer
+        mode="public"
+        invitationData={{
+          ...DATA,
+          gift: { accounts: [{ account_number: "SECRET-ACCOUNT-9999" }] },
+        }}
+        enabledSections={["hero"]}
+        templateVersion={version([
+          section({ section_key: "hero", component: "HeroClassic" }),
+          section({
+            section_key: "gift",
+            component: "GiftAccountList",
+            required_fields: ["gift.accounts.*.account_number"],
+          }),
+        ])}
+      />,
+    );
+
+    expect(document.body.innerHTML).not.toContain("SECRET-ACCOUNT-9999");
+  });
+
+  it("shows a non-configurable section even when the settings omit it", () => {
+    // `docs/FRONTEND/04` step 2's explicit exception, and what `P1-15`'s recompute relies
+    // on: a section the user cannot turn off is not the user's to turn off.
+    render(
+      <TemplateRenderer
+        mode="public"
+        invitationData={DATA}
+        enabledSections={[]}
+        templateVersion={version([
+          section({
+            section_key: "hero",
+            component: "HeroClassic",
+            configurable: false,
+          }),
+        ])}
+      />,
+    );
+
+    expect(document.querySelector('[data-section="hero"]')).not.toBeNull();
+  });
+
+  it("falls back to enabled_by_default when no settings are supplied", () => {
+    // The demo and catalogue case: no invitation settings exist, so the template's own
+    // opinion is what a demo should show.
+    render(
+      <TemplateRenderer
+        mode="demo"
+        invitationData={DATA}
+        templateVersion={version([
+          section({ section_key: "hero", enabled_by_default: true }),
+          section({
+            section_key: "guestbook",
+            component: "GuestbookWall",
+            enabled_by_default: false,
+          }),
+        ])}
+      />,
+    );
+
+    expect(document.querySelector('[data-section="hero"]')).not.toBeNull();
+    expect(document.querySelector('[data-section="guestbook"]')).toBeNull();
+  });
+});
+
+describe("step 3 — the component name resolves through the registry", () => {
+  it("records which component rendered a section", () => {
+    render(
+      <TemplateRenderer
+        mode="public"
+        invitationData={DATA}
+        templateVersion={version([
+          section({ section_key: "gallery", component: "GalleryCarousel" }),
+        ])}
+      />,
+    );
+
+    expect(
+      document
+        .querySelector('[data-section="gallery"]')
+        ?.getAttribute("data-component"),
+    ).toBe("GalleryCarousel");
+  });
+
+  it("skips a section whose component is not registered, and renders the rest", () => {
+    // `docs/PLAN/18` R5. A blank invitation because one stored definition names a removed
+    // component is the outcome this avoids.
+    const onSectionIssue = vi.fn();
+
+    render(
+      <TemplateRenderer
+        mode="public"
+        invitationData={DATA}
+        onSectionIssue={onSectionIssue}
+        templateVersion={version([
+          section({ section_key: "hero", component: "HeroClassic" }),
+          section({ section_key: "gallery", component: "GalleryGridV99" }),
+          section({ section_key: "closing", component: "ClosingSimple" }),
+        ])}
+      />,
+    );
+
+    expect(document.querySelectorAll("[data-section]")).toHaveLength(2);
+    expect(onSectionIssue).toHaveBeenCalledWith({
+      sectionKey: "gallery",
+      component: "GalleryGridV99",
+      reason: "unregistered_component",
+    });
+  });
+
+  it("does not require the caller to supply a handler for that", () => {
+    // `public-invite` logs it server-side and the editor shows it; the demo does neither,
+    // and must not crash for the lack of a callback.
+    expect(() =>
+      render(
+        <TemplateRenderer
+          mode="demo"
+          invitationData={DATA}
+          templateVersion={version([
+            section({ component: "NotARealComponent" }),
+          ])}
+        />,
+      ),
+    ).not.toThrow();
+  });
+});
+
+describe("step 4 — the data subset", () => {
+  it("gives a section only the fields it declared", () => {
+    render(
+      <TemplateRenderer
+        mode="public"
+        invitationData={DATA}
+        templateVersion={version([
+          section({
+            section_key: "hero",
+            required_fields: ["couple.groom.nickname"],
+          }),
+        ])}
+      />,
+    );
+
+    const html = document.body.innerHTML;
+    expect(html).toContain("Budi");
+    // The bride's name was not declared by this section, so it is not in its props --
+    // `required_fields` describes what a component uses, and a component handed the whole
+    // invitation makes that description drift.
+    expect(html).not.toContain("Nurhaliza");
+  });
+
+  it("groups a collection by element rather than flattening it", () => {
+    render(
+      <TemplateRenderer
+        mode="public"
+        invitationData={DATA}
+        templateVersion={version([
+          section({
+            section_key: "event",
+            component: "EventCardDouble",
+            required_fields: ["events.*.title", "events.*.venue_name"],
+          }),
+        ])}
+      />,
+    );
+
+    const text = document.body.textContent ?? "";
+    // Each event keeps its own title and venue together. A flat list of titles and a flat
+    // list of venues could not be rendered as cards.
+    expect(text).toContain(
+      JSON.stringify({
+        events: [
+          { title: "Akad Nikah", venue_name: "Masjid Agung" },
+          { title: "Resepsi", venue_name: "Gedung Merdeka" },
+        ],
+      }),
+    );
+  });
+
+  it("omits a field that is absent rather than passing undefined", () => {
+    // `docs/PLAN/07` § Required vs Optional: an absent optional field must leave no empty
+    // box. The cheapest way to keep that promise is for the key never to arrive.
+    render(
+      <TemplateRenderer
+        mode="public"
+        invitationData={{ couple: { groom: { nickname: "Budi" } } }}
+        templateVersion={version([
+          section({
+            required_fields: ["couple.groom.nickname"],
+            optional_fields: ["couple.groom.instagram"],
+          }),
+        ])}
+      />,
+    );
+
+    expect(document.body.textContent).toContain(
+      JSON.stringify({ couple: { groom: { nickname: "Budi" } } }),
+    );
+  });
+});
+
+describe("step 5 — the props a component receives", () => {
+  it("applies the theme as custom properties at the root", () => {
+    render(
+      <TemplateRenderer
+        mode="public"
+        invitationData={DATA}
+        templateVersion={version([section()], {
+          theme: {
+            colors: { primary: "#b76e79", text: "#2b2b2b" },
+            typography: { heading_font: "Playfair Display" },
+          },
+        })}
+      />,
+    );
+
+    const root = document.querySelector<HTMLElement>(
+      "[data-template-renderer]",
+    );
+    expect(root?.style.getPropertyValue("--color-primary")).toBe("#b76e79");
+    expect(root?.style.getPropertyValue("--typography-heading-font")).toBe(
+      "Playfair Display",
+    );
+  });
+
+  it("passes layout_variant and max_items down", () => {
+    render(
+      <TemplateRenderer
+        mode="public"
+        invitationData={DATA}
+        templateVersion={version([
+          section({
+            section_key: "gallery",
+            component: "GalleryGrid",
+            layout_variant: "grid",
+            max_items: 20,
+          }),
+        ])}
+      />,
+    );
+
+    const placeholder = document.querySelector("[data-placeholder]");
+    expect(placeholder?.getAttribute("data-layout-variant")).toBe("grid");
+    expect(placeholder?.getAttribute("data-max-items")).toBe("20");
+  });
+
+  it.each(["live", "public", "demo"] as const)(
+    "passes mode=%s to every section",
+    (mode) => {
+      render(
+        <TemplateRenderer
+          mode={mode}
+          invitationData={DATA}
+          templateVersion={version([
+            section(),
+            section({ section_key: "quote", component: "QuoteBanner" }),
+          ])}
+        />,
+      );
+
+      const modes = [...document.querySelectorAll("[data-placeholder]")].map(
+        (el) => el.getAttribute("data-mode"),
+      );
+      expect(modes).toEqual([mode, mode]);
+    },
+  );
+});
+
+describe("what the renderer must never do", () => {
+  it("renders markup in a name as text, never as HTML", () => {
+    // `P1-16` sanitizes on the way in. This is the layer that makes a miss there visible
+    // rather than exploitable: React escapes, so the tag is characters on the page.
+    render(
+      <TemplateRenderer
+        mode="public"
+        invitationData={{
+          couple: { groom: { nickname: "<img src=x onerror=alert(1)>" } },
+        }}
+        templateVersion={version([
+          section({ required_fields: ["couple.groom.nickname"] }),
+        ])}
+      />,
+    );
+
+    expect(document.querySelector("img")).toBeNull();
+    expect(document.body.textContent).toContain("<img src=x onerror=alert(1)>");
+  });
+
+  it("ignores a theme override the template does not list as customizable", () => {
+    render(
+      <TemplateRenderer
+        mode="public"
+        invitationData={DATA}
+        themeOverride={{
+          "colors.primary": "#000000",
+          "typography.heading_font": "Comic Sans MS",
+        }}
+        templateVersion={version([section()], {
+          theme: {
+            colors: { primary: "#b76e79" },
+            typography: { heading_font: "Playfair Display" },
+          },
+          customizable_theme_keys: ["colors.primary"],
+        })}
+      />,
+    );
+
+    const root = document.querySelector<HTMLElement>(
+      "[data-template-renderer]",
+    );
+    expect(root?.style.getPropertyValue("--color-primary")).toBe("#000000");
+    // Not listed as customizable, so the stored override does not take effect -- the case
+    // that arises after a template change narrows the list (ADR-054).
+    expect(root?.style.getPropertyValue("--typography-heading-font")).toBe(
+      "Playfair Display",
+    );
+  });
+
+  it("does not mutate the template's own theme when applying an override", () => {
+    const templateVersion = version([section()], {
+      theme: { colors: { primary: "#b76e79" } },
+      customizable_theme_keys: ["colors.primary"],
+    });
+
+    render(
+      <TemplateRenderer
+        mode="public"
+        invitationData={DATA}
+        themeOverride={{ "colors.primary": "#000000" }}
+        templateVersion={templateVersion}
+      />,
+    );
+
+    // The definition came from a cache in `P2-01` and may be shared between requests.
+    // Mutating it would apply one invitation's colour to the next one rendered.
+    expect(templateVersion.theme).toEqual({ colors: { primary: "#b76e79" } });
+  });
+
+  it("renders nothing at all for a template with no sections", () => {
+    render(
+      <TemplateRenderer
+        mode="public"
+        invitationData={DATA}
+        templateVersion={version([])}
+      />,
+    );
+
+    // The root still exists, carrying the theme -- an empty template is a template with
+    // no sections, not an absent renderer. `P2-11`'s catalogue can render a template whose
+    // sections are all disabled and must get a themed empty page rather than nothing.
+    expect(document.querySelectorAll("[data-section]")).toHaveLength(0);
+    expect(document.querySelector("[data-template-renderer]")).not.toBeNull();
+  });
+});

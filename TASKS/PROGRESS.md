@@ -3,10 +3,10 @@
 Single source of truth for where the project stands. Updated in the same commit as the work it describes (`00-TASK-CONVENTIONS.md` global DoD item 11).
 
 **Last updated**: 2026-09-12
-**Current phase**: Phase 2 — Template Rendering and Preview (1 / 14 done). **Phase 1 is complete** (25 / 25, [summary](../MEMORY/records/2026-09-12-PHASE-1-SUMMARY.md)); Phase 0 is 26 / 27 done. **Staging is live**: `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
+**Current phase**: Phase 2 — Template Rendering and Preview (2 / 14 done). **Phase 1 is complete** (25 / 25, [summary](../MEMORY/records/2026-09-12-PHASE-1-SUMMARY.md)); Phase 0 is 26 / 27 done. **Staging is live**: `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
 
 The only task left is `P0-17` (CI/CD), deferred by ADR-028. Its **deployment** half was waived by the project owner on 2026-09-11; deploying is `git pull` plus a compose command. Its **verification** half was not waived and is the one Phase 0 exit criterion still unmet — see below. **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
-**Overall**: 52 / 136 tasks done
+**Overall**: 53 / 136 tasks done
 
 **No automated pipeline**: `P0-17` is deferred (ADR-028). Before merging to `main`, run `scripts/verify.sh`. The `:id`-endpoint gate blocks in `.githooks/pre-push`; integration tests, the coverage floor, SAST and dependency scanning are **not** running anywhere until `P0-17` is picked up — revisit before Phase 3 payment code.
 
@@ -25,7 +25,7 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 |---|---|---|---|---|
 | [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 27 | 26 | **ACTIVE** | — |
 | [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 25 | **COMPLETE** — 2026-09-12 | Phase 0 exit criteria |
-| [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 14 | 1 | **ACTIVE** | Phase 1 exit + `P1-25` — **met** |
+| [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 14 | 2 | **ACTIVE** | Phase 1 exit + `P1-25` — **met** |
 | [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 0 | Not started | Phase 2 exit |
 | [Phase 4 — Engagement](./PHASE-4-ENGAGEMENT.md) | 12 | 0 | Not started | Phase 3 exit |
 | [Phase 5 — Admin Panel](./PHASE-5-ADMIN-PANEL.md) | 14 | 0 | Not started | Phase 4 exit |
@@ -121,7 +121,7 @@ Roadmap: Week 6-7.
 | ID | Task | Surface | Size | Status | Depends on |
 |---|---|---|---|---|---|
 | P2-01 | Template catalog API | backend | M | **DONE** — published-only at both levels; cache invalidation is a generation counter rather than a key sweep, and every cache operation fails open. Anonymous by ADR-059 | P0-20, P1-06 |
-| P2-02 | Generic renderer core | frontend | L | TODO | P0-20, P0-21 |
+| P2-02 | Generic renderer core | frontend | L | **DONE** — a new guard forbids a template *identifier* anywhere in the package, not just a branch on one; closes the parity test ADR-037 owed since P0-20 | P0-20, P0-21 |
 | P2-03 | Section component library v1 | frontend | L | TODO | P2-02 |
 | P2-04 | Per-section error boundaries | frontend | M | TODO | P2-03 |
 | P2-05 | Live preview in the editor | web-app | M | TODO | P2-03, P1-22 |

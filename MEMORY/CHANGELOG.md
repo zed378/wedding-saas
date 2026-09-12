@@ -10,7 +10,19 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
-### 2026-09-12 — Phase 2 opens: the template catalog, and a cache
+### 2026-09-12 — Phase 2 opens: the catalog, and the renderer everything else runs through
+
+**Added** — the generic renderer, and the guard that keeps it generic ([P2-02](./records/2026-09-12-P2-02-generic-renderer-core.md))
+
+- **`CLAUDE.md`'s first non-negotiable, made executable.** One `<TemplateRenderer>`, imported and rendered by both frontends, implementing `docs/FRONTEND/04`'s five render steps including the `configurable: false` exception. Nothing in the package knows the name of a single template.
+- **And guarded.** `check-renderer-is-generic.mjs` forbids a template **identifier** anywhere in the package — not merely a branch on one, because a value that cannot be named cannot be branched on. It also forbids `dangerouslySetInnerHTML` and any network call, the two things that would end the "one renderer, three surfaces" claim. Mutation-verified by branching on a slug.
+- **A disabled section is not in the DOM.** A `display:none` gift section still ships the couple's account numbers to every guest who views source, so the test searches `innerHTML` for the number — from `public-invite`, which is the surface it matters on.
+- **The parity test ADR-037 has owed since `P0-20`.** The API validates a stored template's component name against a list of **strings**; until now nothing proved those strings corresponded to code. Both directions: a name with no component would render nothing, and a component with no name is code no stored template could ever reach.
+- **The reference template renders**, read from the seed JSON rather than a copy. `P0-21` proved the template and its demo invitation complete against each other; what was unproven was that they render at all.
+
+**Worth knowing** — I wrote an assertion that could not fail.
+
+`expect(screen.getByTestId ?? true).toBeTruthy()` — a function reference, always truthy, in a test named "renders nothing at all for a template with no sections". It passed, it looked like a test, and it asserted nothing. Replaced with the real property. Worth recording because it is the failure mode this project keeps finding in code written by others, and this one was written here while assembling a long file.
 
 **Added** — the three catalog reads and the application cache they sit behind ([P2-01](./records/2026-09-12-P2-01-template-catalog.md))
 

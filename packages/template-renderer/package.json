@@ -8,15 +8,37 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./src/*": "./src/*"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "lint": "echo \"[later] lint not wired yet\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "echo \"[P0-19] tests not wired yet\""
+    "test": "vitest run"
   },
   "files": [
-    "dist"
-  ]
+    "dist",
+    "src"
+  ],
+  "type": "module",
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "dependencies": {
+    "@wi/schema": "workspace:*"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^22.20.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
 }
