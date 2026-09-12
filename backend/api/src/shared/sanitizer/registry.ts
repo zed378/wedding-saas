@@ -92,6 +92,7 @@ export const NOT_USER_TEXT: Readonly<Record<string, string>> = {
   // Enumerations and structured scalars. Each is constrained to a shape no tag fits in.
   type: "a closed `z.enum`; an unlisted value is rejected before storage",
   status: "a closed `z.enum`; an unlisted value is rejected before storage",
+  purpose: "a closed `z.enum` of cover|gallery|profile (P1-17); never rendered",
   phone: "digits with an optional +62 prefix, format-validated (P1-08)",
   event_date: "an ISO date, parsed before storage; not free text",
   start_time: "`HH:MM`, matched by regex before storage",

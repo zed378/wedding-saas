@@ -14,6 +14,7 @@ import { QueueModule } from "./infra/queue/queue.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { UserModule } from "./modules/user/user.module";
 import { InvitationModule } from "./modules/invitation/invitation.module";
+import { MediaModule } from "./modules/media/media.module";
 import { RateLimitModule } from "./shared/rate-limit/rate-limit.module";
 
 /**
@@ -54,6 +55,7 @@ import { RateLimitModule } from "./shared/rate-limit/rate-limit.module";
     AuthModule,
     UserModule,
     InvitationModule,
+    MediaModule,
     // Scaffolding, not a feature. Removed once a real module exists on each surface.
     ...(process.env["NODE_ENV"] === "production" ? [] : [ReferenceModule]),
   ],

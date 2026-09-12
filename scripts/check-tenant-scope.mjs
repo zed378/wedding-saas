@@ -38,6 +38,15 @@ const GUARDED = [
   "invitationStatusHistory",
   "invitationCustomDomains",
   "invitationViewCounts",
+  /**
+   * Added by `P1-17`. A `media` row with a non-null `invitation_id` is a user's photo and
+   * is tenant-owned in exactly the way `invitation_gallery` is; the table was absent from
+   * this list only because it ALSO holds template assets, where `invitation_id` is null.
+   * That dual use is a reason to route access through the tenancy layer, not an exemption
+   * from it -- `findOwnedMedia` refuses a template asset precisely because the join has
+   * nothing to join to.
+   */
+  "media",
 ];
 
 /**
