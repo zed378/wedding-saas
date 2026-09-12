@@ -8,7 +8,7 @@
     "start": "next start --port 3100",
     "lint": "echo \"[P0-17] lint not wired yet\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "echo \"[P0-22] no unit tests here yet -- the components are tested in @wi/ui\""
+    "test": "vitest run"
   },
   "dependencies": {
     "@wi/api-client": "workspace:*",
@@ -20,11 +20,18 @@
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.20.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.1.1",
+    "axe-core": "^4.11.1",
+    "jsdom": "^30.0.1",
     "tailwindcss": "^4.3.3",
-    "@tailwindcss/postcss": "^4.3.3",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
   }
 }

@@ -283,6 +283,9 @@ export class ApiClient {
         ...(body.error.details === undefined
           ? {}
           : { details: body.error.details }),
+        ...(retryAfterSeconds(response) === undefined
+          ? {}
+          : { retryAfterSeconds: retryAfterSeconds(response) }),
         // docs/FRONTEND/08: 5xx gets a GENERIC message. The server's own 500 message is
         // generic too, but the client is the last place that can decide not to render
         // whatever a proxy put there.
@@ -369,4 +372,20 @@ function isAbort(cause: unknown): boolean {
     cause !== null &&
     (cause as { name?: unknown }).name === "AbortError"
   );
+}
+
+/**
+ * `Retry-After`, in seconds, when the server sent one. `P1-20`.
+ *
+ * The header is defined as either a delay in seconds or an HTTP date; this reads the delay
+ * form, which is what `docs/SECURITY/10`'s limiter sends. A date form returns `undefined`
+ * rather than being parsed hopefully — a clock-skewed client computing a negative wait would
+ * tell the user to try again immediately, which is worse than telling them nothing.
+ */
+function retryAfterSeconds(response: Response): number | undefined {
+  const raw = response.headers.get("retry-after");
+  if (raw === null) return undefined;
+
+  const seconds = Number(raw.trim());
+  return Number.isInteger(seconds) && seconds > 0 ? seconds : undefined;
 }
