@@ -14,7 +14,7 @@ import { z } from "zod";
 
 import { ok } from "../../http/envelope";
 import { pageMeta, parsePagination } from "../../http/pagination";
-import { ValidationError } from "../../http/errors";
+import { NotFoundError, ValidationError } from "../../http/errors";
 import {
   CurrentUserParam,
   requireAuth,
@@ -24,6 +24,7 @@ import { rateLimit } from "../../shared/rate-limit";
 import { requireVerifiedEmail } from "../auth/require-verified-email";
 import { InvitationCreateService } from "./invitation-create.service";
 import { InvitationService } from "./invitation.service";
+import { CoupleService, type PersonRole } from "./couple.service";
 import { SLUG_MAX_LENGTH, SLUG_MIN_LENGTH } from "./slug.service";
 import { sanitizeFields } from "../../shared/sanitizer/sanitize";
 import { TEXT_FIELDS } from "../../shared/sanitizer/registry";
@@ -60,6 +61,28 @@ import { TEXT_FIELDS } from "../../shared/sanitizer/registry";
  */
 const updateSchema = z
   .object({ internal_name: z.string().trim().min(1).max(150) })
+  .strict();
+
+/**
+ * `PATCH /invitations/:id/couple/{groom,bride}`. `docs/PLAN/08` § Person, field for field.
+ *
+ * `role` is NOT a body field -- it comes from the path, so a client cannot rename the
+ * groom into the bride by sending one. Every optional field accepts `null` to clear it,
+ * except the two the document marks required, which can be emptied to `""` but not
+ * removed: `P1-09` created them as `""` and the column is `NOT NULL`.
+ *
+ * Lengths are `docs/DATABASE/05`'s column widths.
+ */
+const personSchema = z
+  .object({
+    full_name: z.string().trim().max(150).optional(),
+    nickname: z.string().trim().max(60).optional(),
+    photo_media_id: z.union([z.uuid(), z.null()]).optional(),
+    instagram: z.union([z.string().trim().max(60), z.null()]).optional(),
+    father_name: z.union([z.string().trim().max(150), z.null()]).optional(),
+    mother_name: z.union([z.string().trim().max(150), z.null()]).optional(),
+    child_order: z.union([z.string().trim().max(60), z.null()]).optional(),
+  })
   .strict();
 
 const listQuerySchema = z
@@ -115,6 +138,7 @@ export class InvitationController {
   constructor(
     private readonly create: InvitationCreateService,
     private readonly invitations: InvitationService,
+    private readonly couple: CoupleService,
   ) {}
 
   /**
@@ -221,5 +245,55 @@ export class InvitationController {
       message:
         "Undangan telah dihapus. Alamat undangannya kini dapat digunakan kembali.",
     });
+  }
+
+  /**
+   * `docs/API/04` § Couple/Person.
+   *
+   * Two routes rather than one with a `role` body field, exactly as the document writes
+   * them. The role is in the path, so it cannot be tampered with independently of the
+   * resource being addressed.
+   */
+  @Patch(":id/couple/:role")
+  async updateCouple(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Param("role") role: string,
+    @Body() body: unknown,
+  ) {
+    if (role !== "groom" && role !== "bride") {
+      // A 404 rather than a 400: `/couple/spouse` is not a route that exists, and saying
+      // so as a validation error would imply it might.
+      throw new NotFoundError();
+    }
+
+    const input = parse(personSchema, body);
+
+    const person = await this.couple.update(
+      user.scope,
+      id,
+      role as PersonRole,
+      {
+        ...(input.full_name !== undefined ? { fullName: input.full_name } : {}),
+        ...(input.nickname !== undefined ? { nickname: input.nickname } : {}),
+        ...(input.photo_media_id !== undefined
+          ? { photoMediaId: input.photo_media_id }
+          : {}),
+        ...(input.instagram !== undefined
+          ? { instagram: input.instagram }
+          : {}),
+        ...(input.father_name !== undefined
+          ? { fatherName: input.father_name }
+          : {}),
+        ...(input.mother_name !== undefined
+          ? { motherName: input.mother_name }
+          : {}),
+        ...(input.child_order !== undefined
+          ? { childOrder: input.child_order }
+          : {}),
+      },
+    );
+
+    return ok(person);
   }
 }

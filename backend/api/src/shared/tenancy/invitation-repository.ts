@@ -15,6 +15,7 @@ import {
   invitationPreviewTokens,
   invitationStatusHistory,
   auditLogs,
+  media,
 } from "../../infra/db/schema/index";
 import type { AdminBypass, TenantScope } from "./tenant-scope";
 import type { Transaction } from "../db/transaction";
@@ -195,6 +196,130 @@ export class InvitationRepository {
       .orderBy(desc(invitations.createdAt))
       .limit(Math.min(filters.limit ?? 50, 100))
       .offset(filters.offset ?? 0);
+  }
+
+  /**
+   * Update one person row of an owned invitation. `P1-11`.
+   *
+   * An `UPDATE`, never an upsert. `P1-09` creates both rows empty with the invitation, so
+   * there is nothing to insert — and an upsert could produce a second `groom` row under
+   * concurrency, which `toInvitationDetail` would silently resolve by picking whichever
+   * came back first.
+   *
+   * The owner predicate is in the join, so an update aimed at somebody else's invitation
+   * matches nothing rather than being refused after a read.
+   */
+  async updatePerson(
+    invitationId: string,
+    scope: TenantScope,
+    role: "groom" | "bride",
+    changes: {
+      readonly fullName?: string;
+      readonly nickname?: string;
+      readonly photoMediaId?: string | null;
+      readonly instagram?: string | null;
+      readonly fatherName?: string | null;
+      readonly motherName?: string | null;
+      readonly childOrder?: string | null;
+    },
+  ): Promise<typeof invitationPeople.$inferSelect | null> {
+    const patch: Record<string, unknown> = {};
+    // Named, not spread. A spread would carry whatever the caller's object grew next
+    // straight into the row, and `role` is in that object's neighbourhood.
+    if (changes.fullName !== undefined) patch["fullName"] = changes.fullName;
+    if (changes.nickname !== undefined) patch["nickname"] = changes.nickname;
+    if (changes.photoMediaId !== undefined) {
+      patch["photoMediaId"] = changes.photoMediaId;
+    }
+    if (changes.instagram !== undefined) patch["instagram"] = changes.instagram;
+    if (changes.fatherName !== undefined) {
+      patch["fatherName"] = changes.fatherName;
+    }
+    if (changes.motherName !== undefined) {
+      patch["motherName"] = changes.motherName;
+    }
+    if (changes.childOrder !== undefined) {
+      patch["childOrder"] = changes.childOrder;
+    }
+
+    if (Object.keys(patch).length === 0) {
+      // An empty PATCH is a read. Going through the same scoped path rather than a
+      // separate query keeps "what can this caller see" in one place.
+      const rows = await this.db
+        .select({ person: invitationPeople })
+        .from(invitationPeople)
+        .innerJoin(
+          invitations,
+          eq(invitationPeople.invitationId, invitations.id),
+        )
+        .where(
+          and(
+            eq(invitationPeople.invitationId, invitationId),
+            eq(invitationPeople.role, role),
+            eq(invitations.ownerId, scope),
+            isNull(invitations.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      return rows[0]?.person ?? null;
+    }
+
+    patch["updatedAt"] = new Date();
+
+    // Drizzle cannot express a join in an UPDATE, so the ownership condition rides in as
+    // a correlated subquery. It is the same predicate, in the same statement -- what
+    // matters is that there is no window between checking and writing.
+    const rows = await this.db
+      .update(invitationPeople)
+      .set(patch)
+      .where(
+        and(
+          eq(invitationPeople.invitationId, invitationId),
+          eq(invitationPeople.role, role),
+          sql`EXISTS (
+            SELECT 1 FROM invitations i
+            WHERE i.id = ${invitationPeople.invitationId}
+              AND i.owner_id = ${scope}
+              AND i.deleted_at IS NULL
+          )`,
+        ),
+      )
+      .returning();
+
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Whether a media row exists, belongs to this invitation, and is ready to be referenced.
+   * `P1-11`, `docs/SECURITY/05` § 6.
+   *
+   * Scoped by **invitation**, not by owner, and that is deliberate: the caller has already
+   * proved they own the invitation, and `media.invitation_id` is the narrower question.
+   * A photo belonging to another invitation of the *same* user is still the wrong photo.
+   *
+   * `status = 'ready'` is the third condition and the least obvious. A file still in the
+   * pipeline has not been through `docs/SECURITY/06`'s magic-byte, EXIF and malware
+   * stages; referencing one would put an unvalidated file on a public page the moment it
+   * finished processing.
+   */
+  async mediaBelongsToInvitation(
+    mediaId: string,
+    invitationId: string,
+  ): Promise<boolean> {
+    const rows = await this.db
+      .select({ one: sql<number>`1` })
+      .from(media)
+      .where(
+        and(
+          eq(media.id, mediaId),
+          eq(media.invitationId, invitationId),
+          eq(media.status, "ready"),
+        ),
+      )
+      .limit(1);
+
+    return rows.length > 0;
   }
 
   /**

@@ -8,6 +8,7 @@ import { AppExceptionFilter } from "../src/http/exception.filter";
 import { InvitationController } from "../src/modules/invitation/invitation.controller";
 import { InvitationCreateService } from "../src/modules/invitation/invitation-create.service";
 import { InvitationService } from "../src/modules/invitation/invitation.service";
+import { CoupleService } from "../src/modules/invitation/couple.service";
 import { NotFoundError } from "../src/http/errors";
 import { SessionService } from "../src/modules/auth/session.service";
 import { UnauthenticatedError } from "../src/http/errors";
@@ -41,6 +42,8 @@ const seen: {
   listOptions?: unknown;
   update?: unknown;
   deleted?: string | undefined;
+  coupleRole?: string | undefined;
+  coupleChanges?: unknown;
 } = {};
 
 const createStub = {
@@ -85,6 +88,28 @@ const detail = {
 /** Anything but the owner's own invitation is a 404, as the real service would. */
 const mineOr404 = (id: string) => {
   if (id !== INVITATION_ID) throw new NotFoundError();
+};
+
+const coupleStub = {
+  update: async (
+    _scope: unknown,
+    id: string,
+    role: string,
+    changes: unknown,
+  ) => {
+    mineOr404(id);
+    seen.coupleRole = role;
+    seen.coupleChanges = changes;
+    return {
+      full_name: "Budi Santoso",
+      nickname: "Budi",
+      photo_media_id: null,
+      instagram: null,
+      father_name: null,
+      mother_name: null,
+      child_order: null,
+    };
+  },
 };
 
 const invitationStub = {
@@ -148,6 +173,7 @@ describe("POST /invitations over HTTP", () => {
         { provide: APP_FILTER, useClass: AppExceptionFilter },
         { provide: InvitationCreateService, useValue: createStub },
         { provide: InvitationService, useValue: invitationStub },
+        { provide: CoupleService, useValue: coupleStub },
         { provide: SessionService, useValue: sessionStub },
         { provide: RATE_LIMITER, useValue: limiterStub },
         {
@@ -407,6 +433,117 @@ describe("POST /invitations over HTTP", () => {
 
       expect(seen.deleted).toBe(INVITATION_ID);
       expect(res.body.data.message).toMatch(/dapat digunakan kembali/i);
+    });
+  });
+
+  describe("PATCH /invitations/:id/couple/:role (P1-11)", () => {
+    it.each(["groom", "bride"])("updates the %s", async (role) => {
+      seen.coupleRole = undefined;
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}/couple/${role}`)
+        .set(...AUTH)
+        .send({ full_name: "Budi Santoso", nickname: "Budi" })
+        .expect(200);
+
+      expect(seen.coupleRole).toBe(role);
+      expect(res.body.data.full_name).toBe("Budi Santoso");
+    });
+
+    it.each(["spouse", "GROOM", "witness", "../groom"])(
+      "an unknown role (%j) is 404, not 400",
+      async (role) => {
+        // `/couple/spouse` is not a route that exists. Answering 400 would imply it might.
+        await request(app.getHttpServer())
+          .patch(
+            `/api/v1/invitations/${INVITATION_ID}/couple/${encodeURIComponent(role)}`,
+          )
+          .set(...AUTH)
+          .send({ nickname: "X" })
+          .expect(404);
+      },
+    );
+
+    it("another user's invitation is 404", async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${OTHERS_INVITATION}/couple/groom`)
+        .set(...AUTH)
+        .send({ nickname: "Hijacked" })
+        .expect(404);
+
+      expect(res.body.data).toBeUndefined();
+    });
+
+    it("is 401 without a token", async () => {
+      await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}/couple/groom`)
+        .send({ nickname: "X" })
+        .expect(401);
+    });
+
+    it("sanitizes every name field (P1-16)", async () => {
+      // These render on a public page seen by hundreds of guests. docs/SECURITY/08 makes
+      // stored XSS the primary risk here.
+      seen.coupleChanges = undefined;
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}/couple/groom`)
+        .set(...AUTH)
+        .send({
+          full_name: "<img src=x onerror=alert(1)>Budi",
+          nickname: "<script>alert(1)</script>Bud",
+          father_name: "<b>Pak</b> Santoso",
+          mother_name: "<svg/onload=alert(1)>Ibu",
+          child_order: "<iframe></iframe>Anak pertama",
+        })
+        .expect(200);
+
+      expect(seen.coupleChanges).toEqual({
+        fullName: "Budi",
+        nickname: "Bud",
+        fatherName: "Pak Santoso",
+        motherName: "Ibu",
+        childOrder: "Anak pertama",
+      });
+    });
+
+    it.each([
+      ["role", { role: "bride" }],
+      ["invitation_id", { invitation_id: INVITATION_ID }],
+      ["photo_url", { photo_url: "https://evil.test/x.jpg" }],
+    ])("rejects a body carrying %s", async (_name, extra) => {
+      await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}/couple/groom`)
+        .set(...AUTH)
+        .send({ nickname: "Budi", ...extra })
+        .expect(400);
+    });
+
+    it.each([
+      ["a non-uuid photo_media_id", { photo_media_id: "not-a-uuid" }],
+      ["an over-long full_name", { full_name: "x".repeat(151) }],
+      ["an over-long nickname", { nickname: "x".repeat(61) }],
+    ])("rejects %s", async (_name, body) => {
+      await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}/couple/groom`)
+        .set(...AUTH)
+        .send(body)
+        .expect(400);
+    });
+
+    it("accepts null to clear an optional field", async () => {
+      seen.coupleChanges = undefined;
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}/couple/groom`)
+        .set(...AUTH)
+        .send({ instagram: null, photo_media_id: null })
+        .expect(200);
+
+      expect(seen.coupleChanges).toEqual({
+        instagram: null,
+        photoMediaId: null,
+      });
     });
   });
 });
