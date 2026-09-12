@@ -278,11 +278,18 @@ describe("settings and slug rules", () => {
         { section_key: "gift", configurable: false },
       ]);
 
+      // `enabledByDefault` was added by `P1-15`, which recomputes a selection across a
+      // template change and needs the same three fields. Absent means off, the same way
+      // round: a template that forgets the flag produces a quiet section rather than one
+      // nobody asked for.
       expect(parsed).toEqual([
-        { key: "hero", configurable: false },
-        { key: "gallery", configurable: true },
-        { key: "gift", configurable: false },
+        { key: "hero", configurable: false, enabledByDefault: false },
+        { key: "gallery", configurable: true, enabledByDefault: false },
+        { key: "gift", configurable: false, enabledByDefault: false },
       ]);
+      expect(
+        parseSections([{ section_key: "hero", enabled_by_default: true }]),
+      ).toEqual([{ key: "hero", configurable: false, enabledByDefault: true }]);
     });
 
     it("parseSections ignores malformed entries", () => {

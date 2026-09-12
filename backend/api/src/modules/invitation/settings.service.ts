@@ -43,6 +43,13 @@ interface TemplateSection {
   readonly enabled_by_default?: unknown;
 }
 
+/** One section of a template definition, as the rest of the codebase wants to read it. */
+export interface ParsedSection {
+  readonly key: string;
+  readonly configurable: boolean;
+  readonly enabledByDefault: boolean;
+}
+
 export interface SettingsPatch {
   readonly enabledSections?: readonly string[] | undefined;
   readonly themeOverride?: Record<string, unknown> | undefined;
@@ -297,10 +304,20 @@ export class SettingsService {
   }
 }
 
-/** `{ key, configurable }` for each section the template defines. */
-export function parseSections(
-  sections: unknown,
-): { key: string; configurable: boolean }[] {
+/**
+ * Every section a template version defines, in the template's own order.
+ *
+ * The single reader of `template_versions.sections` for application code. Defensive about
+ * the shape because the column is `jsonb`: `P0-20`'s validator guarantees it on write, and
+ * this reads rows that may predate any given version of that validator.
+ *
+ * `P1-15` widened it from `{ key, configurable }` to carry `enabledByDefault` as well, and
+ * `defaultSections` in `invitation-create.service.ts` now delegates here. Three
+ * independent readers of one JSON column would eventually disagree about a default, and the
+ * disagreement would show up as a section that is on for a new invitation and off after a
+ * template change.
+ */
+export function parseSections(sections: unknown): ParsedSection[] {
   if (!Array.isArray(sections)) return [];
 
   return sections
@@ -311,6 +328,9 @@ export function parseSections(
       // explicitly for a section the user may toggle, so defaulting the other way would
       // make every section in a template that omits the flag switchable off.
       configurable: s.configurable === true,
+      // Absent means off, the same way round: a template that forgets the flag produces a
+      // quiet section rather than one nobody asked for.
+      enabledByDefault: s.enabled_by_default === true,
     }))
     .filter((s) => s.key.length > 0);
 }

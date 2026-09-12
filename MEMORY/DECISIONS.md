@@ -1523,3 +1523,19 @@ So the behaviour the owner asked for is already the specified behaviour, and add
 **Why this matters more here than elsewhere** — `docs/PLAN/18` R16. A gift account number is data the couple publishes deliberately, so disclosure costs them little; **substitution** costs them everything their guests sent. The audit trail is the only thing that makes such a change answerable afterwards, and it is written inside the same transaction as the change so the two cannot come apart.
 
 **What it costs** — `admin_id` is now a slightly wrong name, and `idx_audit_admin` indexes a column that is not always an admin. A rename to `actor_id` under expand-contract would fix both and is not urgent; anything filtering for admin activity should filter on `action` or `resource_type`, which were always the meaningful discriminators.
+
+### ADR-054 — A template change keeps every section's data and drops its theme overrides
+
+**Date** 2026-09-12 · **Status** Accepted · **Task** `P1-15`
+
+**Context** — BR-4.1 says data for a section the active template does not support "remains stored in the database", and `docs/PLAN/17` line 8 makes "switch templates without losing data" an acceptance criterion for the product. `P1-15`'s own card, step 4, nonetheless requires theme overrides outside the new template's `customizable_theme_keys` to be **dropped**, "not silently kept and ignored". Read side by side, those two instructions look like a contradiction, and a later reader resolving it the other way would either delete a couple's gallery or reintroduce the stored-and-ignored failure `P1-14` spent a whole card removing.
+
+**Decision** — the line is drawn at **who owns the namespace**.
+
+*Section data belongs to the couple.* `gallery` photos, `gift` accounts, an `event` address: a template is only the thing that decides whether to display them. They survive every template change, and switching back displays them again. There is no `DELETE` in the code path, and `change-template.itest.ts` asserts that three ways — row counts across seven child tables, row-for-row equality after an A → B → A round trip, and a source-level check that neither the service nor `InvitationRepository.changeTemplate` contains a delete at all.
+
+*Theme overrides belong to the template.* `colors.accent` means whatever this template's `customizable_theme_keys` and theme schema say it means. Carried into a template that does not offer the key, it is not hidden data waiting to come back — it is a value with no referent, and keeping it would mean storing a customization that can never be shown and can never be edited, which is exactly the shape of failure `P1-14` refused. They are dropped, and `dropped_theme_keys` in the response names every one so the UI can say so before the user commits.
+
+**Consequence** — the round trip restores full *rendering* and full *data*, but not a theme override the intermediate template did not permit. That is a real loss and it is stated in the response, in `docs/API/04`, and in the confirmation modal `docs/UI-UX/05` already specifies. The alternative — keeping them invisibly — trades a loss the user is told about for one they are not.
+
+**What would change this** — if a future template system made theme keys global rather than per-template, the argument disappears and overrides should then be retained like section data.

@@ -10,6 +10,20 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — changing a template, where the whole feature is what the code does not do
+
+**Added** — `POST /invitations/:id/change-template` ([P1-15](./records/2026-09-12-P1-15-change-template.md))
+
+- **Nothing is deleted.** BR-4.1 makes "this template has no gallery" a rendering decision, never a storage one, and `docs/PLAN/17` makes it an acceptance criterion for the product. Proven three ways: row counts across all seven child tables, an A → B → A round trip comparing every row including the gallery photo ids, and a source-level test that reads the service and the repository method and fails on the word `delete`. The three protect each other — removing one because "the others cover it" removes the case the others do not.
+- **The section recompute keys on the old template's section list, not the old selection.** A section the old template offered and the user deliberately switched off stays off; only a section genuinely new to that user arrives in its default state. The two readings differ on exactly the case a user notices — turn the gallery off, change template, find it back on the page.
+- A section the **new** template marks non-configurable is forced on, because `P1-14` refuses to let anyone disable one: the alternative is a stored selection the API itself wrote and will then reject on every later save.
+- Theme overrides the new template does not permit are **dropped** and named in the response (ADR-054). The line between that and BR-4.1 is who owns the key namespace: a gallery photo is the couple's and a template only decides whether to show it, whereas `colors.accent` means whatever this template says it means.
+- `docs/API/04` amended with the response shape, which it had not specified.
+
+**Worth knowing** — the service-level IDOR test did **not** catch a deliberately removed owner filter. Only the repository-level one did, because `requireOwnership` had already refused the request before the repository was reached. That is `P1-12`'s finding confirmed for the fourth time: **defence in depth makes each layer untestable from outside**, and every remaining sub-resource task needs repository-level tests rather than only service-level ones.
+
+**Raised, not decided** — OQ-23: may a *published* invitation change template, and must the publish check re-run? Nothing in `docs/` forbids it, so it is allowed and logged at `warn`; but BR-4.2's required-field check does not re-run, so a live page can end up incomplete. Needs an answer before `P2-06`. Separately, PG-16 (`upgrade-template-version`, promised by BR-3.2) still has no owning task card — the mechanism is nearly identical to this endpoint's, which is exactly why folding it in would have hidden the gap.
+
 ### 2026-09-12 — settings, and a CSS injection that a build guard surfaced
 
 **Added** — `GET`/`PATCH /invitations/:id/settings` ([P1-14](./records/2026-09-12-P1-14-settings-and-slug-rules.md))
