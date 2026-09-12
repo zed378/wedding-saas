@@ -18,7 +18,7 @@
 |---|---|---|---|---|
 | P1-01 | Password hashing and password policy | backend | M | P0-07, P0-19 |
 | P1-02 | Registration and email verification tokens | backend | M | P1-01, P0-15 |
-| P1-03 | Login, access tokens, refresh rotation | backend | L | P1-01 |
+| P1-03 | Login, access tokens, refresh rotation | backend | L | P1-01 | ✅
 | P1-04 | Google OAuth | backend | M | P1-03 |
 | P1-05 | Forgot and reset password | backend | M | P1-03, P0-15 |
 | P1-06 | Auth, role and ownership middleware | backend | L | P1-03, P0-11 |
@@ -123,7 +123,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-03-login-tokens-and-refresh-rotation.md) |
 | **Depends on** | P1-01 |
 | **Spec refs** | `docs/API/01-AUTHENTICATION.md` § Token Strategy, `docs/SECURITY/03-AUTHENTICATION-SECURITY.md` § Tokens, `docs/DATABASE/02-USERS.md` |
 | **Spec required** | Yes — authentication |
@@ -142,10 +142,12 @@
 8. Logout revokes the refresh token server-side; discarding the cookie is not enough.
 
 **Definition of Done**
-- [ ] Refresh tokens are stored hashed and rotate on every use.
-- [ ] Reusing a revoked refresh token revokes the whole family and emits a security event, proven by a test.
-- [ ] A suspended user's next authenticated request fails without waiting for token expiry.
-- [ ] The access token never appears in a response body destined for persistent client storage, and never in a log.
+- [x] Refresh tokens are stored hashed and rotate on every use. HMAC-SHA256 with a pepper (ADR-048); `"is stored only as a peppered hash"`, `"invalidates the presented token and issues a working successor"`.
+- [x] Reusing a revoked refresh token revokes the whole family and emits a security event, proven by a test. `"a replayed refresh token revokes every session"` and `"emits auth.token_reuse_detected"`. **Mutation**: dropping `isNull(revokedAt)` from the rotation `UPDATE` fails 5 tests including both.
+- [x] A suspended user's next authenticated request fails without waiting for token expiry. `"a suspended user is refused before the token expires"` — the access token there is seconds old and valid.
+- [x] The access token never appears in a response body destined for persistent client storage, and never in a log. Body is `{ access_token, user }`; `@wi/api-client` holds it in a closure (`P0-22`) and `check-token-storage` fails the build on a write to browser storage.
+
+**Open after this task**: `OQ-21` — two legitimate concurrent refreshes are indistinguishable from theft. Implemented strictly as `docs/SECURITY/03` states; raised, not decided.
 
 **Abuse cases to test**
 | Abuse case | Source | Expectation |

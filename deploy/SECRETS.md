@@ -43,7 +43,7 @@ The values in `deploy/docker-compose.yml` and `.env.example` are local-developme
 
 - A **live** Midtrans key (no `SB-` prefix) outside production. A live key on staging charges real cards from a test run.
 - A **sandbox** key in production. Every payment would succeed against the provider's test environment and no money would arrive — nothing errors, the orders just look paid.
-- A `JWT_SIGNING_KEY` under 32 characters in production.
+- A `JWT_SIGNING_KEY` or `REFRESH_TOKEN_PEPPER` still set to the `.env.example` placeholder in production. (Length is enforced by the schema in every environment, so a short one never reaches these rules.)
 - A non-`https://` origin in production.
 - A `localhost` database in production.
 

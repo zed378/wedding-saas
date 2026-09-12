@@ -22,6 +22,22 @@ Nothing on the board is `BLOCKED`. The remaining questions shape work rather tha
 
 ## Open Questions — Remaining
 
+### OQ-21 — Should refresh-token rotation have a grace window?
+
+**Affects**: `P1-03` — **not blocking**; implemented strictly as `docs/SECURITY/03` describes.
+
+`docs/SECURITY/03` § Tokens: "the refresh token **rotates on every use** — the old token is immediately marked `revoked_at`, and reuse is detected (if a revoked token is used again -> indicates theft -> revoke ALL of that user's active sessions)."
+
+Implemented exactly that. The consequence the document does not mention: **two legitimate concurrent refreshes are indistinguishable from theft.** Two browser tabs whose access tokens expire in the same second, or one client retrying a request that timed out after the server had already committed the rotation, both present the same refresh token twice. The second presentation finds it revoked, and the user is logged out of every device.
+
+The integration test `"survives two simultaneous rotations of the same token"` documents this behaviour rather than working around it: one rotation succeeds, and the family is then revoked by the loser.
+
+The usual mitigation is a short grace window — for perhaps 10-30 seconds after a rotation, presenting the spent token returns its already-issued successor again instead of raising the alarm. It costs a `replaced_by` column on `refresh_tokens` and narrows the theft-detection window to that interval.
+
+**Why it matters that this gets a real answer**: the current behaviour is correct and is also a plausible source of "the app keeps logging me out" reports that would be very hard to diagnose from the outside — they would look random, because they depend on tab timing. If those reports appear, this is the cause.
+
+**Who decides**: whoever owns the security posture. A grace window is a deliberate weakening of a control `docs/SECURITY/03` states without qualification, so it should not be added because support tickets are annoying — it should be added, or not, on the evidence.
+
 ### OQ-20 — What are the allowed values of `border_radius` and `typography.scale`?
 
 **Affects**: `P0-20` — **not blocking**; decided provisionally in ADR-038 so the phase could continue.

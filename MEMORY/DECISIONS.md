@@ -1367,3 +1367,48 @@ If production ever runs on materially different hardware, re-measure. These numb
 **Specification impact** — None. `docs/SECURITY/03` names the algorithm and leaves the parameters to implementation.
 
 ---
+
+### ADR-046 — `jose` for JWT, statically imported from a CommonJS build
+
+**Date** 2026-09-12 · **Status** Accepted · **Task** `P1-03`
+
+**Context** — `docs/SECURITY/03` § Tokens requires an HS256/RS256 access token. The stack table names no JWT library, so this was open.
+
+The candidates were `jsonwebtoken`, `jose`, and roughly sixty lines of `node:crypto`.
+
+**Decision** — `jose@6`.
+
+**Why not `jsonwebtoken`** — the entire JWT vulnerability class is algorithm confusion, and `jsonwebtoken` is safe only when every call site passes `algorithms: ["HS256"]`. Omitting it is not a compile error, not a runtime error, and not visible in a passing test suite; it is visible only when someone presents an `alg: none` token. `jose` requires the algorithm list as an argument.
+
+**Why not hand-rolled** — the primitive would have come from `node:crypto` and the encoding is base64url, so nothing would have been invented. But a reviewer cannot tell a correct hand-rolled verifier from a subtly wrong one by reading it, and the value of "one call site, obviously pinned" is not worth the value of "a library thousands of people audit".
+
+**The awkward part, and why it is fine** — `jose@6` is ESM-only; `@wi/api` compiles to CommonJS under `module: NodeNext`. TypeScript 7 permits the static import, and Node 24 resolves it through `require(esm)`. **That was verified against the built `dist/` output, not just under Vitest**, because Vitest loads ESM natively and would have been green for a failure that only appears in production — which is exactly how `P0-19.1`'s `import.meta` bug reached a running container.
+
+The risk this carries: a future change that gives `jose` a top-level `await` in its entry point would break `require(esm)` and the failure would be at startup, in the image, not in CI. Pinned major, and `P0-19`'s E2E suite exercises the built image.
+
+### ADR-047 — `JWT_SIGNING_KEY` and `REFRESH_TOKEN_PEPPER` are required, at 32 characters, in every environment
+
+**Date** 2026-09-12 · **Status** Accepted · **Task** `P1-03`
+
+**Context** — both were optional in `env.schema.ts` because nothing used them, and `checkSecretRules` enforced a 32-character minimum **in production only**, on the reasoning that "a developer should not need a 32-character key to run the stack locally".
+
+**Decision** — required, `min(32)`, in the schema, in all four environments. The production-only length rule is deleted.
+
+**Why the development exemption was wrong** — a short HMAC key is brute-forceable offline from a single captured token wherever it runs. More practically: a development environment that tolerates a short key is where a short key comes from. The value gets copied to staging, and staging's is copied to production by someone in a hurry, and the one place it is checked is the one place nobody pastes by hand.
+
+**What replaces it** — a rule the schema genuinely cannot express, because it depends on `APP_ENV`: in production, neither value may still be the placeholder from `.env.example`. That value is long, valid, and published on the internet, so it passes every per-field check while being shared by every deployment that copied the file.
+
+**Cost** — staging has neither variable and will refuse to boot (exit 78, naming both) until they are generated on the host. That is the intended behaviour and is recorded as a deployment follow-up on `P1-03`, not as a surprise.
+
+### ADR-048 — The refresh token is hashed with a pepper; the single-use tokens are not
+
+**Date** 2026-09-12 · **Status** Accepted · **Task** `P1-03`
+
+**Context** — `P1-02` stores email-verification tokens as a plain SHA-256. `docs/SECURITY/03` says refresh tokens are "stored **hashed** (not plaintext)" and says nothing about a pepper — but `REFRESH_TOKEN_PEPPER` has been in the environment schema since `P0-18`, reserved for this.
+
+**Decision** — `refresh_tokens.token_hash` is `HMAC-SHA256(REFRESH_TOKEN_PEPPER, token)`. `user_tokens.token_hash` stays a bare SHA-256.
+
+**Why they differ** — a verification token lives 24 hours and its worst case is that somebody confirms an address that was already theirs. A refresh token *is* the session: thirty days, accepted without a password, and a leak of the table is simultaneous account takeover for every logged-in user. The pepper lives in the environment rather than the database, so a dump alone — a backup on the wrong bucket, a read replica, a SQL injection — does not yield working credentials. It costs one HMAC.
+
+**What it costs** — the pepper cannot be rotated without ending every session. That is recorded in `deploy/SECRETS.md`, and it is why the variable is required rather than defaulted: a missing pepper silently degrading to an unpeppered hash would be the worst of both.
+

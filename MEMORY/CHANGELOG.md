@@ -10,6 +10,19 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — you can log in, and be logged out everywhere
+
+**Added** — login, access tokens and rotating refresh tokens ([P1-03](./records/2026-09-12-P1-03-login-tokens-and-refresh-rotation.md))
+- **A stolen session ends the next time either party uses it.** Refresh tokens rotate on every use, and presenting one that has already been spent is treated as theft: every session that user has is revoked, including devices the attacker never touched, and `auth.token_reuse_detected` goes to the one-year retention stream. `docs/SECURITY/03` calls for exactly this and the task card calls it the highest-value behaviour in the task; it is proven by two named tests and by the mutation that makes them fail.
+- **A suspension takes effect immediately, not in fifteen minutes.** The access token proves *who* you are; `role`, `status` and `email_verified` are re-read from the database on every authenticated request, so a validly-signed token claiming `role: super_admin` resolves to whatever the row says. `docs/SECURITY/01` § Elevation of Privilege.
+- The refresh token leaves only as an `HttpOnly; Secure; SameSite=Lax` cookie scoped to `/api/v1/auth`, never in a response body, and a token supplied in the body is ignored. Three tests read the raw `Set-Cookie` header, because that is the only place those attributes exist.
+- An unknown email and a wrong password produce the same code, the same message **and** comparable timing. A suspended account with the correct password gets a distinct `403`, which is not an enumeration oracle: only someone who already has the password reaches it.
+- JWTs are signed and verified by `jose` with HS256 pinned (ADR-046) — `alg: none`, algorithm substitution, a wrong key and a tampered payload each have a test.
+
+**Changed** — `JWT_SIGNING_KEY` and `REFRESH_TOKEN_PEPPER` are now **required, at 32 characters, in every environment** (ADR-047). The old rule applied a length floor in production only; a short HMAC key is brute-forceable offline wherever it runs, and development is where short keys come from. **Staging will refuse to boot until both are generated on the host** — `openssl rand -base64 48`, twice, into the mode-600 `.env`.
+
+**Worth knowing** — two legitimate concurrent refreshes (two browser tabs, or a retried request) are indistinguishable from theft and will log the user out everywhere. That follows `docs/SECURITY/03` literally. Raised as `OQ-21` rather than quietly softened, because a grace window weakens a control the document states without qualification.
+
 ### 2026-09-11 — you can create an account
 
 **Added** — registration, email verification and resend ([P1-02](./records/2026-09-11-P1-02-registration-and-verification.md))
