@@ -198,6 +198,31 @@ describe("user endpoints over HTTP", () => {
       },
     );
 
+    it("sanitizes full_name before it reaches the service (P1-16)", async () => {
+      // The field renders on the dashboard and, once P2 ships the renderer, on a public
+      // page seen by hundreds of guests. docs/SECURITY/08 calls stored XSS the primary
+      // risk here, and the defence is BEFORE storage, not at render time.
+      seen.update = undefined;
+
+      await request(app.getHttpServer())
+        .patch("/api/v1/users/me")
+        .set(...AUTH)
+        .send({ full_name: "<img src=x onerror=alert(1)>Budi" })
+        .expect(200);
+
+      expect(seen.update).toEqual({ fullName: "Budi" });
+    });
+
+    it("validates length BEFORE sanitizing, not after", async () => {
+      // The ordering bug: sanitize first and a 3000-character payload that shrinks to 90
+      // passes a length check it should have failed.
+      await request(app.getHttpServer())
+        .patch("/api/v1/users/me")
+        .set(...AUTH)
+        .send({ full_name: `<b>${"x".repeat(200)}</b>` })
+        .expect(400);
+    });
+
     it("passes only the whitelisted fields to the service", async () => {
       seen.update = undefined;
 

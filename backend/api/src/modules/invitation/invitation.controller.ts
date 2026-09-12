@@ -25,6 +25,8 @@ import { requireVerifiedEmail } from "../auth/require-verified-email";
 import { InvitationCreateService } from "./invitation-create.service";
 import { InvitationService } from "./invitation.service";
 import { SLUG_MAX_LENGTH, SLUG_MIN_LENGTH } from "./slug.service";
+import { sanitizeFields } from "../../shared/sanitizer/sanitize";
+import { TEXT_FIELDS } from "../../shared/sanitizer/registry";
 
 /**
  * P1-09 — `POST /invitations`. `docs/API/04`.
@@ -84,9 +86,20 @@ const createSchema = z
   })
   .strict();
 
+/**
+ * Validate, then sanitize. `docs/BACKEND/03` puts them in that order, and it matters:
+ * sanitizing first would let a payload change a value's LENGTH after the length check.
+ */
 function parse<T>(schema: z.ZodType<T>, body: unknown): T {
   const result = schema.safeParse(body);
-  if (result.success) return result.data;
+  if (result.success) {
+    return typeof result.data === "object" && result.data !== null
+      ? (sanitizeFields(
+          result.data as Record<string, unknown>,
+          TEXT_FIELDS,
+        ) as T)
+      : result.data;
+  }
 
   throw new ValidationError(
     result.error.issues.map((issue) => ({
