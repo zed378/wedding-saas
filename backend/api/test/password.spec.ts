@@ -143,7 +143,13 @@ describe("timing equality (docs/SECURITY/03 § Login Rate Limiting)", () => {
       ratio,
       `wrong-password median ${a.toFixed(1)}ms vs unknown-user median ${b.toFixed(1)}ms`,
     ).toBeLessThan(1.5);
-  });
+    // 60s, against vitest's 5s default. This test performs fifteen argon2 operations at
+    // 64 MiB -- one hash, two warm-ups and twelve measured verifications -- and under the
+    // full suite running in parallel it exceeded five seconds twice, failing as a TIMEOUT
+    // rather than on its assertion. The budget does not weaken anything: the assertion is a
+    // RATIO between two paths measured in the same loop, so a slower machine moves both
+    // numbers and leaves the comparison intact.
+  }, 60_000);
 
   it("would fail if the null path short-circuited", async () => {
     // The mutation, made explicit. A `return false` with no work is what this guards
@@ -155,7 +161,9 @@ describe("timing equality (docs/SECURITY/03 § Login Rate Limiting)", () => {
     // An argon2 verification at 64 MiB cannot complete in under 10 ms on any hardware
     // this runs on; a short-circuit completes in well under one.
     expect(elapsed).toBeGreaterThan(10);
-  });
+    // Same reason as above, though this one does a single verification: it shares a worker
+    // with the test before it and inherits its scheduling.
+  }, 30_000);
 });
 
 describe("needsRehash", () => {
