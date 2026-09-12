@@ -96,6 +96,13 @@ export type InvitationRow = typeof invitations.$inferSelect;
  */
 export type InvitationEventRow = typeof invitationEvents.$inferSelect;
 
+/** One gift-account row. Exported so a caller need not import the table. */
+export type InvitationBankAccountRow =
+  typeof invitationBankAccounts.$inferSelect;
+
+/** One quote row. */
+export type InvitationQuoteRow = typeof invitationQuote.$inferSelect;
+
 /** Everything `docs/API/04` § Example Response embeds. `P1-10`. */
 export interface InvitationAggregate {
   readonly people: (typeof invitationPeople.$inferSelect)[];
@@ -279,6 +286,256 @@ export class InvitationRepository {
     scope: TenantScope,
   ): Promise<InvitationEventRow[]> {
     return this.findOwnedChildren(invitationEvents, invitationId, scope);
+  }
+
+  /**
+   * One bank account of an owned invitation, or `null`. `P1-13`.
+   *
+   * Named wrapper, like `findOwnedEvent` — the caller must not hold the table.
+   */
+  async findOwnedBankAccount(
+    bankAccountId: string,
+    invitationId: string,
+    scope: TenantScope,
+  ): Promise<InvitationBankAccountRow | null> {
+    return this.findOwnedChild(
+      invitationBankAccounts,
+      bankAccountId,
+      invitationId,
+      scope,
+    );
+  }
+
+  /** Every bank account of an owned invitation. */
+  async findOwnedBankAccounts(
+    invitationId: string,
+    scope: TenantScope,
+  ): Promise<InvitationBankAccountRow[]> {
+    return this.findOwnedChildren(invitationBankAccounts, invitationId, scope);
+  }
+
+  /**
+   * Create a gift account, and audit it in the same transaction. `P1-13` step 4b.
+   *
+   * The audit row is not optional and cannot be separated from the write, because the
+   * threat here is **tampering, not disclosure** (`docs/PLAN/18` R16). An attacker who
+   * swaps the account number on a live invitation collects every guest's gift, and the
+   * only thing that makes that recoverable afterwards is a trail saying who changed what
+   * and when. A write that could commit without its audit row would lose exactly the
+   * evidence an incident needs.
+   *
+   * `before_state`/`after_state` carry the **masked** number. `docs/DATABASE/10` § Policy
+   * asks to "avoid unnecessarily duplicating bank account data" in audit rows, and a
+   * two-year retention on a table of full account numbers is a worse liability than the
+   * one it documents.
+   */
+  async createBankAccount(
+    invitationId: string,
+    scope: TenantScope,
+    input: {
+      readonly type: string;
+      readonly providerName: string;
+      readonly accountNumber: string;
+      readonly accountHolder: string;
+      readonly displayOrder?: number | undefined;
+    },
+    audit: (tx: Transaction, row: InvitationBankAccountRow) => Promise<void>,
+  ): Promise<InvitationBankAccountRow | null> {
+    if (!(await this.ownsInvitation(invitationId, scope))) return null;
+
+    return this.db.transaction(async (tx) => {
+      const rows = await tx
+        .insert(invitationBankAccounts)
+        .values({
+          invitationId,
+          type: input.type,
+          providerName: input.providerName,
+          accountNumber: input.accountNumber,
+          accountHolder: input.accountHolder,
+          displayOrder: input.displayOrder ?? 0,
+        })
+        .returning();
+
+      const row = rows[0]!;
+      await audit(tx, row);
+      return row;
+    });
+  }
+
+  /**
+   * Update a gift account, audited in the same transaction, scoped by both conditions.
+   *
+   * Returns `null` when the account does not belong to this invitation **or** the
+   * invitation does not belong to this scope — the two-step rule from `docs/SECURITY/05`
+   * § 7, and on this table it is the control standing between a compromised account and
+   * the guests' money.
+   */
+  async updateBankAccount(
+    bankAccountId: string,
+    invitationId: string,
+    scope: TenantScope,
+    changes: {
+      readonly type?: string | undefined;
+      readonly providerName?: string | undefined;
+      readonly accountNumber?: string | undefined;
+      readonly accountHolder?: string | undefined;
+      readonly displayOrder?: number | undefined;
+    },
+    audit: (
+      tx: Transaction,
+      before: InvitationBankAccountRow,
+      after: InvitationBankAccountRow,
+    ) => Promise<void>,
+  ): Promise<InvitationBankAccountRow | null> {
+    const before = await this.findOwnedBankAccount(
+      bankAccountId,
+      invitationId,
+      scope,
+    );
+    if (before === null) return null;
+
+    const patch: Record<string, unknown> = {};
+    if (changes.type !== undefined) patch["type"] = changes.type;
+    if (changes.providerName !== undefined) {
+      patch["providerName"] = changes.providerName;
+    }
+    if (changes.accountNumber !== undefined) {
+      patch["accountNumber"] = changes.accountNumber;
+    }
+    if (changes.accountHolder !== undefined) {
+      patch["accountHolder"] = changes.accountHolder;
+    }
+    if (changes.displayOrder !== undefined) {
+      patch["displayOrder"] = changes.displayOrder;
+    }
+
+    if (Object.keys(patch).length === 0) return before;
+
+    patch["updatedAt"] = new Date();
+
+    return this.db.transaction(async (tx) => {
+      const rows = await tx
+        .update(invitationBankAccounts)
+        .set(patch)
+        .where(
+          and(
+            eq(invitationBankAccounts.id, bankAccountId),
+            eq(invitationBankAccounts.invitationId, invitationId),
+            sql`EXISTS (
+              SELECT 1 FROM invitations i
+              WHERE i.id = ${invitationBankAccounts.invitationId}
+                AND i.owner_id = ${scope}
+                AND i.deleted_at IS NULL
+            )`,
+          ),
+        )
+        .returning();
+
+      const after = rows[0];
+      if (after === undefined) return null;
+
+      await audit(tx, before, after);
+      return after;
+    });
+  }
+
+  /** Delete a gift account, audited in the same transaction. */
+  async deleteBankAccount(
+    bankAccountId: string,
+    invitationId: string,
+    scope: TenantScope,
+    audit: (tx: Transaction, before: InvitationBankAccountRow) => Promise<void>,
+  ): Promise<boolean> {
+    const before = await this.findOwnedBankAccount(
+      bankAccountId,
+      invitationId,
+      scope,
+    );
+    if (before === null) return false;
+
+    return this.db.transaction(async (tx) => {
+      const rows = await tx
+        .delete(invitationBankAccounts)
+        .where(
+          and(
+            eq(invitationBankAccounts.id, bankAccountId),
+            eq(invitationBankAccounts.invitationId, invitationId),
+            sql`EXISTS (
+              SELECT 1 FROM invitations i
+              WHERE i.id = ${invitationBankAccounts.invitationId}
+                AND i.owner_id = ${scope}
+                AND i.deleted_at IS NULL
+            )`,
+          ),
+        )
+        .returning({ id: invitationBankAccounts.id });
+
+      if (rows.length === 0) return false;
+
+      await audit(tx, before);
+      return true;
+    });
+  }
+
+  /** The next `display_order` for a new gift account. Scoped, like the event version. */
+  async nextBankAccountOrder(
+    invitationId: string,
+    scope: TenantScope,
+  ): Promise<number> {
+    const rows = await this.findOwnedBankAccounts(invitationId, scope);
+    return rows.reduce((max, row) => Math.max(max, row.displayOrder + 1), 0);
+  }
+
+  /** The quote row of an owned invitation, or `null`. `P1-13`. */
+  async findOwnedQuote(
+    invitationId: string,
+    scope: TenantScope,
+  ): Promise<InvitationQuoteRow | null> {
+    return this.findOwnedSingleton(invitationQuote, invitationId, scope);
+  }
+
+  /**
+   * Update the quote. `P1-13`.
+   *
+   * An upsert, unlike the people rows: `P1-09` creates this row with the invitation, but
+   * an invitation that predates it would otherwise have no quote to patch and the user
+   * would get a 404 for a field the UI shows. The primary key is `invitation_id`, so a
+   * concurrent double-write conflicts rather than duplicating.
+   */
+  async updateQuote(
+    invitationId: string,
+    scope: TenantScope,
+    changes: {
+      readonly text?: string | null | undefined;
+      readonly source?: string | null | undefined;
+    },
+  ): Promise<InvitationQuoteRow | null> {
+    if (!(await this.ownsInvitation(invitationId, scope))) return null;
+
+    const patch: Record<string, unknown> = {};
+    if (changes.text !== undefined) patch["text"] = changes.text;
+    if (changes.source !== undefined) patch["source"] = changes.source;
+
+    if (Object.keys(patch).length === 0) {
+      return this.findOwnedQuote(invitationId, scope);
+    }
+
+    patch["updatedAt"] = new Date();
+
+    const rows = await this.db
+      .insert(invitationQuote)
+      .values({
+        invitationId,
+        text: changes.text ?? null,
+        source: changes.source ?? null,
+      })
+      .onConflictDoUpdate({
+        target: invitationQuote.invitationId,
+        set: patch,
+      })
+      .returning();
+
+    return rows[0] ?? null;
   }
 
   /**

@@ -26,6 +26,7 @@ import { InvitationCreateService } from "./invitation-create.service";
 import { InvitationService } from "./invitation.service";
 import { CoupleService, type PersonRole } from "./couple.service";
 import { EventsService } from "./events.service";
+import { GiftService, QuoteService } from "./gift.service";
 import { SLUG_MAX_LENGTH, SLUG_MIN_LENGTH } from "./slug.service";
 import { sanitizeFields } from "../../shared/sanitizer/sanitize";
 import { TEXT_FIELDS } from "../../shared/sanitizer/registry";
@@ -160,6 +161,51 @@ const updateEventSchema = z
   })
   .strict();
 
+/**
+ * Gift accounts. `docs/DATABASE/06` column widths, `docs/API/04` § Bank Accounts.
+ *
+ * `account_number` is validated by **format**, not sanitized as prose — digits, spaces and
+ * hyphens only. `P1-16`'s registry exempts it with that reason, and this is the check that
+ * exemption promised: tag stripping would silently alter a value whose exact characters
+ * matter, while a character allowlist makes markup impossible in the first place.
+ */
+const ACCOUNT_NUMBER = /^[0-9][0-9 -]{3,58}[0-9]$/;
+
+const bankAccountBase = {
+  type: z.enum(["bank", "ewallet"]),
+  provider_name: z.string().trim().min(1).max(60),
+  account_number: z
+    .string()
+    .trim()
+    .regex(
+      ACCOUNT_NUMBER,
+      "Nomor rekening hanya boleh berisi angka, spasi dan tanda hubung.",
+    )
+    .max(60),
+  account_holder: z.string().trim().min(1).max(150),
+  display_order: z.coerce.number().int().min(0).max(9999).optional(),
+};
+
+const createBankAccountSchema = z.object(bankAccountBase).strict();
+
+const updateBankAccountSchema = z
+  .object({
+    type: bankAccountBase.type.optional(),
+    provider_name: bankAccountBase.provider_name.optional(),
+    account_number: bankAccountBase.account_number.optional(),
+    account_holder: bankAccountBase.account_holder.optional(),
+    display_order: bankAccountBase.display_order,
+  })
+  .strict();
+
+/** `docs/PLAN/08`: "Quote is a simple entity: `{ text, source|null }`." */
+const quoteSchema = z
+  .object({
+    text: z.union([z.string().trim().max(2000), z.null()]).optional(),
+    source: z.union([z.string().trim().max(200), z.null()]).optional(),
+  })
+  .strict();
+
 const listQuerySchema = z
   .object({
     page: z.coerce.number().int().min(1).optional(),
@@ -230,6 +276,8 @@ export class InvitationController {
     private readonly invitations: InvitationService,
     private readonly couple: CoupleService,
     private readonly events: EventsService,
+    private readonly gift: GiftService,
+    private readonly quote: QuoteService,
   ) {}
 
   /**
@@ -487,5 +535,103 @@ export class InvitationController {
     await this.events.remove(user.scope, id, eventId);
 
     return ok({ status: "deleted" });
+  }
+
+  // ------------------------------------------------------------ gift accounts
+
+  @Get(":id/bank-accounts")
+  async listBankAccounts(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+  ) {
+    return ok(await this.gift.list(user.scope, id));
+  }
+
+  @Post(":id/bank-accounts")
+  @HttpCode(201)
+  async createBankAccount(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const input = parse(createBankAccountSchema, body);
+
+    return ok(
+      await this.gift.create(user.scope, id, {
+        type: input.type,
+        providerName: input.provider_name,
+        accountNumber: input.account_number,
+        accountHolder: input.account_holder,
+        ...(input.display_order !== undefined
+          ? { displayOrder: input.display_order }
+          : {}),
+      }),
+    );
+  }
+
+  @Patch(":id/bank-accounts/:bankAccountId")
+  async updateBankAccount(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Param("bankAccountId") bankAccountId: string,
+    @Body() body: unknown,
+  ) {
+    const input = parse(updateBankAccountSchema, body);
+
+    return ok(
+      await this.gift.update(user.scope, id, bankAccountId, {
+        ...(input.type !== undefined ? { type: input.type } : {}),
+        ...(input.provider_name !== undefined
+          ? { providerName: input.provider_name }
+          : {}),
+        ...(input.account_number !== undefined
+          ? { accountNumber: input.account_number }
+          : {}),
+        ...(input.account_holder !== undefined
+          ? { accountHolder: input.account_holder }
+          : {}),
+        ...(input.display_order !== undefined
+          ? { displayOrder: input.display_order }
+          : {}),
+      }),
+    );
+  }
+
+  @Delete(":id/bank-accounts/:bankAccountId")
+  @HttpCode(200)
+  async deleteBankAccount(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Param("bankAccountId") bankAccountId: string,
+  ) {
+    await this.gift.remove(user.scope, id, bankAccountId);
+
+    return ok({ status: "deleted" });
+  }
+
+  // ------------------------------------------------------------------- quote
+
+  @Get(":id/quote")
+  async getQuote(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+  ) {
+    return ok(await this.quote.get(user.scope, id));
+  }
+
+  @Patch(":id/quote")
+  async updateQuote(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const input = parse(quoteSchema, body);
+
+    return ok(
+      await this.quote.update(user.scope, id, {
+        ...(input.text !== undefined ? { text: input.text } : {}),
+        ...(input.source !== undefined ? { source: input.source } : {}),
+      }),
+    );
   }
 }

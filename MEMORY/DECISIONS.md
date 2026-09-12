@@ -1507,3 +1507,19 @@ So the behaviour the owner asked for is already the specified behaviour, and add
 **What this costs** — a link three hundred guests may already hold goes dead after three days. That is the owner's deliberate choice, and it is what makes the three days a trial rather than a free product.
 
 **What it does not change** — BR-1.4's quota arithmetic. `P1-09` counts invitations that never reached `paid`, and a trial publish does not reach `paid`, so a user who trials and lets it lapse still holds their one free invitation. They can pay to revive it; they cannot start a second one for free. That is the intended reading and it needed no code change.
+
+### ADR-053 — `audit_logs` records owner actions too, not only admin ones
+
+**Date** 2026-09-12 · **Status** Accepted · **Task** `P1-13`
+
+**Context** — `docs/DATABASE/10` describes `audit_logs` as the trail for admin endpoints, and its `admin_id` is `NOT NULL REFERENCES users(id)`. `P1-13` step 4b requires every gift-account create, update and delete to be recorded "with actor and timestamp", and those are actions a **user** takes on their own invitation.
+
+**Decision** — write them to `audit_logs`, with `admin_id` holding the acting user. `docs/DATABASE/10` is amended to say the actor is an admin for admin endpoints and the resource's owner for owner-sensitive resources.
+
+**Why not a separate table** — an `invitation_bank_account_history` table would be cleaner on paper and worse in an incident. "Who changed this gift account, and when" is asked *without knowing in advance* whether an admin or the owner did it, and the answer would live in one of two places depending on the answer. One place to look beats a column name being literally accurate.
+
+`docs/DATABASE/10` § Policy already anticipates this table holding bank-account data — "avoid unnecessarily duplicating bank account data" — which is the strongest available hint that it is the intended home.
+
+**Why this matters more here than elsewhere** — `docs/PLAN/18` R16. A gift account number is data the couple publishes deliberately, so disclosure costs them little; **substitution** costs them everything their guests sent. The audit trail is the only thing that makes such a change answerable afterwards, and it is written inside the same transaction as the change so the two cannot come apart.
+
+**What it costs** — `admin_id` is now a slightly wrong name, and `idx_audit_admin` indexes a column that is not always an admin. A rename to `actor_id` under expand-contract would fix both and is not urgent; anything filtering for admin activity should filter on `action` or `resource_type`, which were always the meaningful discriminators.
