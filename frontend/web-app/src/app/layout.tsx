@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 
 import { ToastProvider } from "@wi/ui";
 
+import { AuthProvider } from "../lib/auth";
+
 import "./globals.css";
 
 /**
@@ -46,7 +48,13 @@ export default function RootLayout({
           Lewati ke konten utama
         </a>
 
-        <ToastProvider>{children}</ToastProvider>
+        {/*
+         * `AuthProvider` outside `ToastProvider` would leave a session-expiry toast with
+         * nowhere to go; inside it, the provider can report one. The order is deliberate.
+         */}
+        <ToastProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </ToastProvider>
       </body>
     </html>
   );

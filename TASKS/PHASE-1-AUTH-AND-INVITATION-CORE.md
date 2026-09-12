@@ -716,7 +716,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-20-auth-screens.md) |
 | **Depends on** | P0-22, P1-03 |
 | **Spec refs** | `docs/FRONTEND/01-ROUTING.md`, `docs/FRONTEND/02-STATE-MANAGEMENT.md` § Auth Token Storage, `docs/UI-UX/05-USER-FLOWS.md`, `docs/UI-UX/17-ACCESSIBILITY.md` |
 | **Spec required** | No |
@@ -733,10 +733,16 @@
 6. Meet the accessibility floor from `docs/UI-UX/17`: real labels, `aria-live` error announcements, full keyboard operability.
 
 **Definition of Done**
-- [ ] No token is ever written to `localStorage` or `sessionStorage`; a test asserts both are empty after login.
-- [ ] Login from a protected URL returns the user to that URL.
-- [ ] A template chosen before login survives registration.
-- [ ] Every screen passes the automated accessibility check.
+- [x] No token is ever written to `localStorage` or `sessionStorage`; a test asserts both are empty after login. **Two** tests: one asserting both stores are empty, one asserting the token's value appears nowhere in either — a token under an unexpected key is still a token in storage. Plus a browser check after a plain page load. The API is a stubbed `fetch` rather than a mocked `ApiClient`, because it is the client that holds the token and mocking it would mock the control.
+- [x] Login from a protected URL returns the user to that URL. `RequireAuth` writes the destination and the login page reads it; a test round-trips the pair, because a mismatch between the two would fail *silently* by sending everybody to the dashboard.
+- [x] A template chosen before login survives registration. The **query string** travels with the path — the template is a query parameter, and a guard that kept only the path would strand the user on `/dashboard/new` with nothing selected.
+- [x] Every screen passes the automated accessibility check. In jsdom for all five **and** in a real browser for seven routes.
+
+**Why the browser pass is not a duplicate**: axe in jsdom **cannot run `color-contrast`** — there is no layout engine, so every element has zero size and no computed colour. Five screens passing in jsdom therefore say nothing about `docs/UI-UX/08`'s 4.5:1 requirement. `e2e/tests/auth-screens.e2e.ts` covers it and contains a test named *"colour contrast is actually checked here"*, asserting the rule appears among those that ran: without it the browser pass could degrade to jsdom's subset while every test stayed green.
+
+**`safeNext` is an allowlist, not a sanitiser.** The post-login destination arrives in a query parameter, so anybody can choose it, and a login page is the worst place in a product for an open redirect. Twelve rejection cases — including the three that look like paths: `//evil.test`, `/` followed by a backslash, and a tab before a `javascript:` scheme.
+
+**`restoring` is a third auth state.** The access token is in memory only, so a reload always starts with none and one refresh in flight; treating that as "not signed in" would bounce every reload of every protected page to login and back a second later.
 
 ---
 

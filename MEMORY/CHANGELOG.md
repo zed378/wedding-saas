@@ -10,6 +10,18 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — the first real screens, and an open redirect that was never built
+
+**Added** — login, register, forgot password, reset password and verify email ([P1-20](./records/2026-09-12-P1-20-auth-screens.md))
+
+- **The access token is in memory and nowhere else**, so a reload starts with none and one refresh in flight. That makes `restoring` a **third** auth state rather than a slow `anonymous`: a guard that conflated them would bounce every reload of every protected page to login and back a second later.
+- **`safeNext` is an allowlist, not a sanitiser.** The post-login destination arrives in a query parameter, so anybody can choose it — and a login page is the worst place in a product for an open redirect. Twelve rejection cases, including the three that look like paths.
+- **The query string travels with the path**, because the template a user picked before signing in is in it. Keeping only the path would strand them on an empty creation screen, which is the exact complaint `docs/UI-UX/11` exists to prevent.
+- **The screens never distinguish what the server refuses to distinguish**: one message for wrong credentials and it is *not* attached to the email field, one confirmation for registration, "if that address is registered" for a password reset. The backend spent two tasks removing user enumeration and a helpful frontend is the easiest place to hand it back.
+- A 429 now says **how long**: `Retry-After` is read by `@wi/api-client` and rendered as "coba lagi dalam 2 menit". A user who does not know will retry immediately and spend the rest of their budget.
+
+**Worth knowing** — axe in jsdom **cannot run `color-contrast`**. There is no layout engine, so every element has zero size and no computed colour, and five screens passing the jsdom pass say nothing about `docs/UI-UX/08`'s 4.5:1 requirement. The browser suite covers it and contains a test asserting the rule *actually ran* — without that, the browser pass could quietly degrade to jsdom's subset while every test stayed green.
+
 ### 2026-09-12 — the gallery, where an entry is a placement rather than a photo
 
 **Added** — the five gallery endpoints ([P1-19](./records/2026-09-12-P1-19-gallery.md))

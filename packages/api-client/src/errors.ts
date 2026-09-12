@@ -31,6 +31,16 @@ export class ApiError extends Error {
   readonly code: string;
   readonly details: readonly ApiErrorDetail[];
   readonly requestId: string | undefined;
+  /**
+   * Seconds until a rate limit lifts, from the `Retry-After` header. `P1-20`.
+   *
+   * Present only when the server said so. `docs/SECURITY/10` asks the limiter to send it,
+   * and a screen that has it can tell the user *how long* rather than "try again later" —
+   * which is the difference between waiting and retrying uselessly. Absent rather than
+   * guessed where the header is missing: a made-up number that runs out too early trains
+   * people to ignore it.
+   */
+  readonly retryAfterSeconds: number | undefined;
 
   constructor(init: {
     status: number;
@@ -38,6 +48,7 @@ export class ApiError extends Error {
     message: string;
     details?: readonly ApiErrorDetail[];
     requestId?: string | undefined;
+    retryAfterSeconds?: number | undefined;
   }) {
     super(init.message);
     this.name = "ApiError";
@@ -45,6 +56,7 @@ export class ApiError extends Error {
     this.code = init.code;
     this.details = init.details ?? [];
     this.requestId = init.requestId;
+    this.retryAfterSeconds = init.retryAfterSeconds;
   }
 
   /** 4xx that the user can act on: fix a field, pick a different slug. */
