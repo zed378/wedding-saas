@@ -10,6 +10,21 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — ten photos, and the reorder that works without a mouse
+
+**Added** — the upload queue, the gallery manager and the map picker ([P1-24](./records/2026-09-12-P1-24-media-manager.md))
+
+- **Ten files selected at once all arrive.** Three upload concurrently — the cap is about the user's connection, not the server's capacity — and a rejected photo is removed from the running set without taking the batch with it. A retry re-enters the **same item**, so its place in the list and its local preview survive.
+- **Polling has two terminal cases and neither is a spinner.** `P1-18`'s `failed` verdict is permanent and becomes a failed item; a two-minute timeout covers a job that was never enqueued, because `P0-15`'s producer swallows that failure by design.
+- **Reordering is operable by keyboard because that is the only mechanism there is.** Move up and move down carry their position in the accessible name; a debounced sender makes one call per pause with the final arrangement, instead of eight calls each carrying a different complete order and landing out of sequence.
+- **The map is the convenience and the two coordinate inputs are the control.** MapLibre needs WebGL, which jsdom does not have and some browsers disable, so the fields are what the user actually fills in and the map writes into them. Coordinates are rounded to the six decimal places `DECIMAL(9,6)` stores, so the value shown is the value that comes back.
+
+**Worth knowing** — the hard-coding guard caught `"gallery"` a second time, and it was a different `"gallery"`.
+
+`form.append("purpose", "gallery")` names a **media purpose**; `P1-23`'s guard sees a section key. It cannot tell them apart in a string literal and should not try. `MEDIA_PURPOSES` moved into `@wi/schema` — the vocabulary the API already validates against — so the component imports the value, the guard stays strict, and there is one definition instead of two.
+
+**Not built, and said rather than faked**: drag-to-reorder (the keyboard path is the requirement and is delivered), and the undo toast `docs/FRONTEND/05` suggests on delete — the media is soft-deleted and recoverable in principle, but re-attaching it needs an endpoint accepting a soft-deleted media id, which `P1-19` deliberately refuses.
+
 ### 2026-09-12 — the schema-driven form, and a guard that caught its own author
 
 **Added** — the properties panel and `scripts/check-no-hardcoded-fields.mjs` ([P1-23](./records/2026-09-12-P1-23-properties-panel.md))
