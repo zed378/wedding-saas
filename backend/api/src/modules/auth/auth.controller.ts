@@ -18,6 +18,7 @@ import { ValidationError } from "../../http/errors";
 import { ok } from "../../http/envelope";
 import { RegistrationService } from "./registration.service";
 import { LoginService, type Session } from "./login.service";
+import { GoogleOAuthService } from "./oauth/google-oauth.service";
 import { SessionService, type AuthenticatedUser } from "./session.service";
 import {
   clearRefreshCookie,
@@ -51,6 +52,18 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+/**
+ * ONE field. `docs/SECURITY/03`: "NEVER trust the email from the request body."
+ *
+ * Zod strips unknown keys by default, so an `email` sent alongside is not merely ignored
+ * by the service -- it does not survive parsing. That is the version of the rule a future
+ * edit cannot weaken by forgetting to skip a field.
+ *
+ * 8192 is generous for a Google `id_token` (typically ~1 KB) and bounded, so an
+ * unauthenticated caller cannot make us hand a megabyte to a JWT parser.
+ */
+const googleSchema = z.object({ id_token: z.string().min(1).max(8192) });
+
 const verifySchema = z.object({ token: z.string().min(1).max(512) });
 const resendSchema = z.object({ email: z.email().max(255) });
 
@@ -71,6 +84,7 @@ export class AuthController {
   constructor(
     private readonly registration: RegistrationService,
     private readonly logins: LoginService,
+    private readonly google: GoogleOAuthService,
     private readonly sessions: SessionService,
     @Inject(ENV) private readonly env: Env,
   ) {}
@@ -156,6 +170,24 @@ export class AuthController {
   ) {
     const input = parse(loginSchema, body);
     const session = await this.logins.login(input.email, input.password);
+
+    return this.respondWithSession(res, session);
+  }
+
+  /**
+   * `docs/API/01` § Google OAuth.
+   *
+   * The response is byte-identical in shape to `POST /auth/login`, per the card's step 6:
+   * nothing downstream should be able to tell how a session began.
+   */
+  @Post("oauth/google")
+  @HttpCode(200)
+  async google_(
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const input = parse(googleSchema, body);
+    const { session } = await this.google.authenticate(input.id_token);
 
     return this.respondWithSession(res, session);
   }

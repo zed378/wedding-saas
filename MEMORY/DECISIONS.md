@@ -1412,3 +1412,22 @@ The risk this carries: a future change that gives `jose` a top-level `await` in 
 
 **What it costs** — the pepper cannot be rotated without ending every session. That is recorded in `deploy/SECRETS.md`, and it is why the variable is required rather than defaulted: a missing pepper silently degrading to an unpeppered hash would be the worst of both.
 
+### ADR-049 — A Google identity is unique across active accounts
+
+**Date** 2026-09-12 · **Status** Accepted · **Task** `P1-04` · **Answers** `OQ-15`
+
+**Context** — `docs/DATABASE/02` indexes `(oauth_provider, oauth_subject_id)` **non-uniquely**. `P0-07` shipped it exactly that way and raised `OQ-15` rather than inventing a constraint, with the note: "Decide it when the linking behaviour is actually designed."
+
+`P1-04`'s step 3 designs it: *"Match on `(oauth_provider, oauth_subject_id)` **first**, then on verified email."*
+
+**Decision** — `idx_users_oauth` becomes a UNIQUE partial index over active rows: `WHERE oauth_provider IS NOT NULL AND deleted_at IS NULL`. Migration `0005_unique_google_identity`.
+
+**Why the answer is now forced** — step 3 turns the subject id from a lookup key into a **login key**, and `OQ-15` anticipated exactly this: "if a user can attach a Google identity to an existing account, subject id becomes a login key and a duplicate makes login ambiguous." A login whose outcome depends on which row Postgres returns first is not a design anyone would choose deliberately.
+
+**Why partial over active rows** — the same reasoning as `idx_users_email` and ADR-031. A soft-deleted account must not hold a Google identity hostage until the hard delete runs days later, leaving the user unable to sign in again with the account they just deleted.
+
+**Why the database and not only the service** — the service already cannot create a duplicate through the documented flow. The index is for everything else: a backfill, an admin correction, a hand-run data fix during an incident. A constraint that lives only in application code is a constraint that does not apply to the paths taken when things are going badly.
+
+**Risk** — the migration fails if two active rows already share a subject id. Impossible through the documented flow (nothing has written these columns yet, and the email index prevents two active accounts on one address), and a failure would be the correct outcome rather than a silent choice between two accounts.
+
+**This deviates from `docs/DATABASE/02`**, which writes the index as non-unique. The document should gain the `UNIQUE` and the predicate; recorded here as the deviation protocol requires.

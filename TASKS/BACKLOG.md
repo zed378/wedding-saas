@@ -104,15 +104,23 @@ Options: leave it and enforce consistency in the repository layer; add a composi
 
 Decide in `P1-17`, when the upload pipeline actually writes the column and the full set of purposes is known.
 
-### OQ-15 — Should a Google identity be unique across accounts?
+### ~~OQ-15 — Should a Google identity be unique across accounts?~~ — ANSWERED 2026-09-12
 
-**Affects**: `P1-05` — not blocking; the schema ships exactly as documented.
+**Yes.** `P1-04` made `idx_users_oauth` a unique partial index over active rows (ADR-049, migration `0005`).
 
-`docs/DATABASE/02` indexes `(oauth_provider, oauth_subject_id)` **non-uniquely**, so nothing at the database level stops two accounts carrying the same Google subject id. `docs/API/01` says an OAuth login is matched or registered by the verified Google **email**, so it cannot arise through the documented flow today — the email index already prevents two active accounts on one address.
+The entry below deferred this until "the linking behaviour is actually designed". `P1-04`'s step 3 designs it — *"Match on `(oauth_provider, oauth_subject_id)` **first**"* — which makes the subject id a login key, and this entry's own reasoning then settles it: a duplicate makes login ambiguous.
 
-It becomes a real question the moment account linking is designed: if a user can attach a Google identity to an existing account, subject id becomes a login key and a duplicate makes login ambiguous.
+It also deviates from `docs/DATABASE/02`, which writes the index as non-unique; see ADR-049.
 
-`P0-07` left the index exactly as specified rather than adding a unique constraint the documents do not state — an invented constraint would have been discovered later as an unexplained migration failure. Decide it in `P1-05`, when the linking behaviour is actually designed.
+Original entry, for the reasoning:
+
+> **Affects**: `P1-05` — not blocking; the schema ships exactly as documented.
+>
+> `docs/DATABASE/02` indexes `(oauth_provider, oauth_subject_id)` **non-uniquely**, so nothing at the database level stops two accounts carrying the same Google subject id. `docs/API/01` says an OAuth login is matched or registered by the verified Google **email**, so it cannot arise through the documented flow today — the email index already prevents two active accounts on one address.
+>
+> It becomes a real question the moment account linking is designed: if a user can attach a Google identity to an existing account, subject id becomes a login key and a duplicate makes login ambiguous.
+>
+> `P0-07` left the index exactly as specified rather than adding a unique constraint the documents do not state — an invented constraint would have been discovered later as an unexplained migration failure. Decide it in `P1-05`, when the linking behaviour is actually designed.
 
 ### OQ-11 — Account deletion with live invitations
 

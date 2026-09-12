@@ -10,6 +10,19 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — sign in with Google
+
+**Added** — `POST /auth/oauth/google` ([P1-04](./records/2026-09-12-P1-04-google-oauth.md))
+- **The request body has one field, so there is no email to trust.** `docs/SECURITY/03`'s instruction — "NEVER trust the email from the request body" — is usually implemented as discipline. Here the schema is `{ id_token }`, Zod strips everything else, and the service takes a single opaque string: the attack has no way to be expressed. Two tests send a mismatched address and watch it have no effect.
+- **The audience is checked**, which is the check people skip: a token minted for a *different* Google application is validly signed and carries a real verified email, so without it any site using Google Sign-In could hand us its users' tokens.
+- **An unverified Google address can neither claim an existing account nor create one.** A Workspace administrator can mint an identity on an address they do not own; linking one would be account takeover without a password, and registering one would create an account whose password reset belongs to somebody else.
+- Google being unreachable is a `503`, not a `401`. A user whose sign-in failed because a key endpoint was slow has done nothing wrong and may have no password to fall back on.
+- A Google account links to an existing password account without removing the password, so both sign-in methods keep working.
+
+**Changed** — `idx_users_oauth` is now **unique** over active accounts (ADR-049, migration `0005`), which answers `OQ-15`. The task card makes `(oauth_provider, oauth_subject_id)` the first thing a sign-in matches on, turning it from a lookup key into a login key — and a login key that can match two rows is a login whose outcome depends on row order. `docs/DATABASE/02` was updated to match.
+
+**Worth knowing** — the first version of the verifier **leaked the `id_token` into the log stream**. `google-auth-library` throws `new Error('Invalid token signature: ' + jwt)`, with the whole token in the message, and three of its other messages embed the decoded payload including the user's email; that message was being stored as the error's `reason`, which is logged on every failed sign-in. `P0-12`'s redaction could not have caught it — redaction matches key names, and the credential would have arrived inside a string called `reason`. The classifier now maps each message to a fixed slug and discards the text.
+
 ### 2026-09-12 — you can log in, and be logged out everywhere
 
 **Added** — login, access tokens and rotating refresh tokens ([P1-03](./records/2026-09-12-P1-03-login-tokens-and-refresh-rotation.md))

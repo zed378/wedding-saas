@@ -144,3 +144,23 @@ export class RateLimitedError extends AppError {
     super(message);
   }
 }
+
+/**
+ * 503. A dependency this request needed could not be reached.
+ *
+ * Added by `P1-04` for the case that must not become a 401: Google's key endpoint being
+ * unreachable is not a bad credential. Telling a user their sign-in was rejected sends
+ * them to a password form for an account that may have no password, and turns an outage
+ * somewhere else into what looks like their mistake.
+ *
+ * The message names the service, never the failure -- `docs/SECURITY/08` § Error Handling
+ * forbids leaking the shape of an internal error to a client.
+ */
+export class ServiceUnavailableError extends AppError {
+  readonly status = 503;
+  readonly code = "SERVICE_UNAVAILABLE";
+
+  constructor(message = "A required service is temporarily unavailable.") {
+    super(message);
+  }
+}

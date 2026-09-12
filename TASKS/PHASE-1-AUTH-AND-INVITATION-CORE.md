@@ -19,7 +19,7 @@
 | P1-01 | Password hashing and password policy | backend | M | P0-07, P0-19 |
 | P1-02 | Registration and email verification tokens | backend | M | P1-01, P0-15 |
 | P1-03 | Login, access tokens, refresh rotation | backend | L | P1-01 | ✅
-| P1-04 | Google OAuth | backend | M | P1-03 |
+| P1-04 | Google OAuth | backend | M | P1-03 | ✅
 | P1-05 | Forgot and reset password | backend | M | P1-03, P0-15 |
 | P1-06 | Auth, role and ownership middleware | backend | L | P1-03, P0-11 |
 | P1-07 | Rate limiting for auth and general API | backend | M | P1-03 |
@@ -162,7 +162,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-04-google-oauth.md) |
 | **Depends on** | P1-03 |
 | **Spec refs** | `docs/API/01-AUTHENTICATION.md` § Google OAuth, `docs/SECURITY/03` § Google OAuth, `docs/DATABASE/02-USERS.md` |
 | **Spec required** | Yes — authentication |
@@ -179,9 +179,11 @@
 6. Issue the same token pair as password login, so downstream code has one session model.
 
 **Definition of Done**
-- [ ] An `id_token` with a wrong audience, bad signature, or past expiry is rejected.
-- [ ] An email in the request body has no influence on the resulting identity, proven by a test that sends a mismatched one.
-- [ ] An OAuth-only account cannot be used for password login and produces a clear, non-enumerating error.
+- [x] An `id_token` with a wrong audience, bad signature, or past expiry is rejected. Six classification tests plus `"passes our client id as the audience"`. **Mutation**: deleting the `audience` argument fails that test.
+- [x] An email in the request body has no influence on the resulting identity, proven by a test that sends a mismatched one. `"the email in the request body has no influence on the identity"` and `"an email in the body does not survive parsing"` — the schema has one field and Zod strips the rest.
+- [x] An OAuth-only account cannot be used for password login and produces a clear, non-enumerating error. `"gives the same error as a genuinely unknown address"` — same code, same message — and `"the null password hash does not crash the login path"`.
+
+**Answered here**: `OQ-15` — a Google identity is unique across active accounts (ADR-049, migration `0005`), because step 3 makes the subject id a login key. `docs/DATABASE/02` was updated to match.
 
 ---
 
