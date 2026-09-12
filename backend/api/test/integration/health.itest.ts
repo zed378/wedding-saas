@@ -32,18 +32,37 @@ const REDIS_URL =
  * `enableOfflineQueue: false` is what makes an unreachable Redis fail the probe FAST
  * rather than hanging until the 2s timeout -- and it is also the option that made
  * `P1-07`'s cold start possible, so the harness connects deliberately.
+ *
+ * `expectReachable` decides what a failed connect MEANS, and the distinction is not
+ * cosmetic. The first version swallowed every failure, which was right for the
+ * dead-port case and wrong for the live one: under a full-suite run the production
+ * timeouts (1s connect, 1s command) are occasionally not enough, the client came back
+ * disconnected, and readiness answered 503 with the database perfectly fine. The test
+ * then failed claiming the endpoint was broken. Where the client is supposed to work,
+ * this now fails loudly at setup with a message about Redis -- and uses the generous
+ * timeouts every other integration suite uses, because the tight ones are a production
+ * choice, not a test one.
  */
-async function redisClient(url: string): Promise<IORedis> {
+async function redisClient(
+  url: string,
+  expectReachable: boolean,
+): Promise<IORedis> {
   const client = new IORedis(url, {
     maxRetriesPerRequest: 1,
-    connectTimeout: 1000,
-    commandTimeout: 1000,
+    connectTimeout: expectReachable ? 5000 : 300,
+    commandTimeout: expectReachable ? 5000 : 300,
     lazyConnect: true,
     enableOfflineQueue: false,
   });
-  await client.connect().catch(() => {
+
+  if (!expectReachable) {
     // A deliberately unreachable URL is one of the cases under test.
-  });
+    await client.connect().catch(() => undefined);
+    return client;
+  }
+
+  await client.connect();
+  await client.ping();
   return client;
 }
 
@@ -56,7 +75,7 @@ async function appWith(
     connectionTimeoutMillis: 1_500,
     max: 1,
   });
-  const redis = await redisClient(redisUrl);
+  const redis = await redisClient(redisUrl, redisUrl === REDIS_URL);
   const moduleRef = await Test.createTestingModule({
     controllers: [HealthController],
     providers: [

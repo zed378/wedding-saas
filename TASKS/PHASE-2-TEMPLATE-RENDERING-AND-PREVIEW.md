@@ -37,7 +37,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** — 2026-09-12, [record](../MEMORY/records/2026-09-12-P2-01-template-catalog.md) |
 | **Depends on** | P0-20, P1-06 |
 | **Spec refs** | `docs/API/03-TEMPLATE-API.md`, `docs/PLAN/02` § BR-3.3, `docs/ARCHITECTURE/06` § What Is Cached |
 | **Spec required** | No |
@@ -54,10 +54,12 @@
 6. Include the section capability list the template detail UI displays (`docs/UI-UX/11`).
 
 **Definition of Done**
-- [ ] A draft or deprecated version never appears in the catalog list.
-- [ ] The detail response matches `docs/API/03`'s example shape exactly.
-- [ ] The version endpoint can serve a deprecated version by explicit request.
-- [ ] Cache invalidation on version publish is covered by a test.
+- [x] A draft or deprecated version never appears in the catalog list — four tests, and a mutation removing the rule fails three of them by name. Both levels are checked: a `published` template whose every version is a draft has nothing to render and is hidden too.
+- [x] The detail response matches `docs/API/03`'s example shape exactly, asserted as an exact key set. The document is **amended** for the two fields the card's own step 6 requires — `supported_sections` and `current_version.status` (ADR-059).
+- [x] The version endpoint can serve a deprecated version by explicit request, with `"still refuses a draft version"` as the boundary: deprecated versions were released and have invitations locked to them, a draft never was.
+- [x] Cache invalidation on version publish is covered by a test — three. The admin publish endpoint that calls `invalidate()` is `P5-02`'s; the seam exists and is tested rather than described.
+
+**Not in the steps, and worth knowing**: invalidation is a generation counter rather than `SCAN` + `DEL`, because this Redis is shared with rate limiting and the queue — see ADR-059's record. Every cache operation fails open, proved against a Redis on a dead port.
 
 ---
 
