@@ -10,6 +10,17 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — a reset that actually takes the account back
+
+**Added** — forgot and reset password ([P1-05](./records/2026-09-12-P1-05-forgot-and-reset-password.md))
+- **Every session on the account ends, in the same transaction as the password write.** `docs/SECURITY/03` asks for this with an explicit reason — "in case the account was already compromised previously" — and that reason is the whole design: the resets that matter are somebody taking their account back from a person holding a thirty-day refresh token. A crash between the two writes would leave a new password and the attacker's session both working, and the user would see nothing wrong.
+- One-hour, single-use, hashed token. Asking twice leaves only the newer link live, and a spent token is indistinguishable from one that never existed — "already used" would confirm it had once been real.
+- An unknown address is indistinguishable from a known one in body **and** in timing: the unknown path runs the same transaction against a nil UUID rather than returning early. That claim is bounded rather than absolute, and the code says so.
+- The account owner gets a "your password was changed" notification, because they are the only person who can say it was not them.
+- An account created through Google, which has no password, can set one through this flow.
+
+**Worth knowing** — step 4 of the card (rate limit 3/hour per email and IP) is **not** implemented here and is not one of this card's DoD items. `P1-07` owns rate limiting; a second implementation would be a second thing to keep in step. Recorded as an obligation on that card.
+
 ### 2026-09-12 — sign in with Google
 
 **Added** — `POST /auth/oauth/google` ([P1-04](./records/2026-09-12-P1-04-google-oauth.md))

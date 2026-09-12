@@ -20,7 +20,7 @@
 | P1-02 | Registration and email verification tokens | backend | M | P1-01, P0-15 |
 | P1-03 | Login, access tokens, refresh rotation | backend | L | P1-01 | ✅
 | P1-04 | Google OAuth | backend | M | P1-03 | ✅
-| P1-05 | Forgot and reset password | backend | M | P1-03, P0-15 |
+| P1-05 | Forgot and reset password | backend | M | P1-03, P0-15 | ✅
 | P1-06 | Auth, role and ownership middleware | backend | L | P1-03, P0-11 |
 | P1-07 | Rate limiting for auth and general API | backend | M | P1-03 |
 | P1-08 | User profile, preferences, account deletion | backend | M | P1-06 |
@@ -191,7 +191,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-05-forgot-and-reset-password.md) |
 | **Depends on** | P1-03, P0-15 |
 | **Spec refs** | `docs/API/01-AUTHENTICATION.md`, `docs/SECURITY/03` § Password Reset, `docs/SECURITY/10` |
 | **Spec required** | Yes — authentication |
@@ -207,9 +207,11 @@
 5. Send a notification to the account email that the password changed, so an unauthorized reset is visible to the real owner.
 
 **Definition of Done**
-- [ ] Reset tokens are hashed, expire in an hour, and are single-use.
-- [ ] All sessions are revoked on reset, proven by a test that a pre-reset refresh token stops working.
-- [ ] Requesting a reset for an unknown email is indistinguishable from a known one, in both body and timing.
+- [x] Reset tokens are hashed, expire in an hour, and are single-use. `"is stored only as a hash"`, `"a reset token expires in an hour"`, `"a used reset token cannot be redeemed twice"`.
+- [x] All sessions are revoked on reset, proven by a test that a pre-reset refresh token stops working. `"a pre-reset refresh token stops working"` and `"every device, not just the one that asked"`. **Mutation**: deleting the revocation `UPDATE` fails both. The revocation is in the **same transaction** as the password write.
+- [x] Requesting a reset for an unknown email is indistinguishable from a known one, in both body and timing. `"an unknown address is indistinguishable from a known one"` and `"an unknown address costs about as much as a known one"`. The timing claim is bounded, not absolute — there is no expensive operation here to mirror, unlike `P1-01`'s dummy hash.
+
+**Step 4 is deferred, not done.** Rate limiting to 3/hour per (email, IP) belongs to `P1-07`, which owns the mechanism; a bespoke limiter here would be a second implementation to keep in step. It is not a DoD item on this card. Recorded as an obligation on `P1-07`.
 
 ---
 
@@ -269,6 +271,8 @@
 5. Decide and record the Redis-unavailable behaviour: fail open (no limiting, alert loudly) or fail closed (no logins). Recommendation on the card: fail open for general API traffic and fail **closed** for login and password reset, since the cost of unlimited credential attempts exceeds the cost of a login outage. Record as an ADR either way.
 6. Implement escalating temporary blocks for repeat violators, per `docs/SECURITY/10` § Monitoring & Auto-block.
 7. Add a metric for rate-limit hits per policy, for the `docs/DEVOPS/07` alert on brute-force patterns.
+
+**Inherited obligation from `P1-05`** — `POST /auth/forgot-password` must be limited to **3 per hour per (email, IP)** (`docs/SECURITY/10`), with a test. `P1-05` implemented everything else on its card and deferred this one step here rather than building a second limiter.
 
 **Definition of Done**
 - [ ] Every policy in `docs/SECURITY/10`'s table is implemented with its documented key and window.
