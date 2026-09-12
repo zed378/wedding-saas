@@ -27,6 +27,7 @@ import { InvitationService } from "./invitation.service";
 import { CoupleService, type PersonRole } from "./couple.service";
 import { EventsService } from "./events.service";
 import { GiftService, QuoteService } from "./gift.service";
+import { SettingsService } from "./settings.service";
 import { SLUG_MAX_LENGTH, SLUG_MIN_LENGTH } from "./slug.service";
 import { sanitizeFields } from "../../shared/sanitizer/sanitize";
 import { TEXT_FIELDS } from "../../shared/sanitizer/registry";
@@ -206,6 +207,38 @@ const quoteSchema = z
   })
   .strict();
 
+/**
+ * `PATCH /invitations/:id/settings`. `docs/API/04` § Settings.
+ *
+ * One domain object over two tables (`docs/PLAN/08` § Where Settings Fields Physically
+ * Live, ADR-022): `slug` is a column on `invitations`, the toggles are on
+ * `invitation_settings`, and the service writes to whichever owns the column. A user should
+ * not have to know the schema to change a setting.
+ *
+ * `theme_override` is `z.record(z.unknown())` here because its *keys* are what matter and
+ * they are validated against the template's `customizable_theme_keys` in the service —
+ * which is the only place that knows them. A schema cannot express "whatever this
+ * particular template permits".
+ */
+const settingsSchema = z
+  .object({
+    enabled_sections: z.array(z.string().min(1).max(40)).max(50).optional(),
+    theme_override: z.record(z.string(), z.unknown()).optional(),
+    rsvp_enabled: z.boolean().optional(),
+    guestbook_enabled: z.boolean().optional(),
+    guestbook_moderation: z.boolean().optional(),
+    seo_indexable: z.boolean().optional(),
+    slug: z
+      .string()
+      .trim()
+      .min(SLUG_MIN_LENGTH)
+      .max(SLUG_MAX_LENGTH)
+      .optional(),
+    /** BR-6.2. A field rather than a header, so it survives a proxy and shows in a log. */
+    confirm_slug_change: z.boolean().optional(),
+  })
+  .strict();
+
 const listQuerySchema = z
   .object({
     page: z.coerce.number().int().min(1).optional(),
@@ -278,6 +311,7 @@ export class InvitationController {
     private readonly events: EventsService,
     private readonly gift: GiftService,
     private readonly quote: QuoteService,
+    private readonly settings: SettingsService,
   ) {}
 
   /**
@@ -631,6 +665,62 @@ export class InvitationController {
       await this.quote.update(user.scope, id, {
         ...(input.text !== undefined ? { text: input.text } : {}),
         ...(input.source !== undefined ? { source: input.source } : {}),
+      }),
+    );
+  }
+
+  // ----------------------------------------------------------------- settings
+
+  @Get(":id/settings")
+  async getSettings(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+  ) {
+    return ok(await this.settings.get(user.scope, id));
+  }
+
+  /**
+   * `docs/API/04` § Settings.
+   *
+   * Rate limited on the **slug-change** policy rather than a general one, because that is
+   * the part BR-6.2 asks to limit: changing an address breaks links people already hold.
+   * The limiter runs for every settings save, which is slightly generous in the other
+   * direction — a guard cannot see the body's contents before the handler parses it — and
+   * three a day is chosen with that in mind.
+   */
+  @Patch(":id/settings")
+  @UseGuards(rateLimit("slug-change"))
+  async updateSettings(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    const input = parse(settingsSchema, body);
+
+    return ok(
+      await this.settings.update(user.scope, id, {
+        ...(input.enabled_sections !== undefined
+          ? { enabledSections: input.enabled_sections }
+          : {}),
+        ...(input.theme_override !== undefined
+          ? { themeOverride: input.theme_override }
+          : {}),
+        ...(input.rsvp_enabled !== undefined
+          ? { rsvpEnabled: input.rsvp_enabled }
+          : {}),
+        ...(input.guestbook_enabled !== undefined
+          ? { guestbookEnabled: input.guestbook_enabled }
+          : {}),
+        ...(input.guestbook_moderation !== undefined
+          ? { guestbookModeration: input.guestbook_moderation }
+          : {}),
+        ...(input.seo_indexable !== undefined
+          ? { seoIndexable: input.seo_indexable }
+          : {}),
+        ...(input.slug !== undefined ? { slug: input.slug } : {}),
+        ...(input.confirm_slug_change !== undefined
+          ? { confirmSlugChange: input.confirm_slug_change }
+          : {}),
       }),
     );
   }

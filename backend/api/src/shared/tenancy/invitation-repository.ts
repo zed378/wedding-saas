@@ -16,6 +16,7 @@ import {
   invitationStatusHistory,
   auditLogs,
   media,
+  templateVersions,
 } from "../../infra/db/schema/index";
 import type { AdminBypass, TenantScope } from "./tenant-scope";
 import type { Transaction } from "../db/transaction";
@@ -99,6 +100,23 @@ export type InvitationEventRow = typeof invitationEvents.$inferSelect;
 /** One gift-account row. Exported so a caller need not import the table. */
 export type InvitationBankAccountRow =
   typeof invitationBankAccounts.$inferSelect;
+
+/**
+ * Whether a driver error is a unique-constraint violation.
+ *
+ * `23505` is Postgres's code. Checked rather than matched on a message, because a message
+ * is localised and a code is not — and because flattening any error into "somebody took
+ * the slug" would turn a real fault into a confusing 409.
+ */
+function isUniqueViolation(error: unknown): boolean {
+  const code =
+    (error as { code?: unknown; cause?: { code?: unknown } }).code ??
+    (error as { cause?: { code?: unknown } }).cause?.code;
+  return code === "23505";
+}
+
+/** One settings row. */
+export type InvitationSettingsRow = typeof invitationSettings.$inferSelect;
 
 /** One quote row. */
 export type InvitationQuoteRow = typeof invitationQuote.$inferSelect;
@@ -534,6 +552,163 @@ export class InvitationRepository {
         set: patch,
       })
       .returning();
+
+    return rows[0] ?? null;
+  }
+
+  /** The settings row of an owned invitation, or `null`. `P1-14`. */
+  async findOwnedSettings(
+    invitationId: string,
+    scope: TenantScope,
+  ): Promise<InvitationSettingsRow | null> {
+    return this.findOwnedSingleton(invitationSettings, invitationId, scope);
+  }
+
+  /**
+   * Update the toggles on `invitation_settings`. `P1-14`.
+   *
+   * An upsert for the same reason as the quote: `P1-09` creates the row, and an invitation
+   * predating that would otherwise 404 on a screen the editor shows.
+   */
+  async updateSettings(
+    invitationId: string,
+    scope: TenantScope,
+    changes: {
+      readonly enabledSections?: readonly string[] | undefined;
+      readonly themeOverride?: Record<string, unknown> | undefined;
+      readonly rsvpEnabled?: boolean | undefined;
+      readonly guestbookEnabled?: boolean | undefined;
+      readonly guestbookModeration?: boolean | undefined;
+      readonly seoIndexable?: boolean | undefined;
+    },
+  ): Promise<InvitationSettingsRow | null> {
+    if (!(await this.ownsInvitation(invitationId, scope))) return null;
+
+    const patch: Record<string, unknown> = {};
+    if (changes.enabledSections !== undefined) {
+      patch["enabledSections"] = [...changes.enabledSections];
+    }
+    if (changes.themeOverride !== undefined) {
+      patch["themeOverride"] = changes.themeOverride;
+    }
+    if (changes.rsvpEnabled !== undefined) {
+      patch["rsvpEnabled"] = changes.rsvpEnabled;
+    }
+    if (changes.guestbookEnabled !== undefined) {
+      patch["guestbookEnabled"] = changes.guestbookEnabled;
+    }
+    if (changes.guestbookModeration !== undefined) {
+      patch["guestbookModeration"] = changes.guestbookModeration;
+    }
+    if (changes.seoIndexable !== undefined) {
+      patch["seoIndexable"] = changes.seoIndexable;
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return this.findOwnedSettings(invitationId, scope);
+    }
+
+    patch["updatedAt"] = new Date();
+
+    const rows = await this.db
+      .insert(invitationSettings)
+      .values({
+        invitationId,
+        enabledSections: [...(changes.enabledSections ?? [])],
+        ...(changes.themeOverride !== undefined
+          ? { themeOverride: changes.themeOverride }
+          : {}),
+        ...(changes.rsvpEnabled !== undefined
+          ? { rsvpEnabled: changes.rsvpEnabled }
+          : {}),
+        ...(changes.guestbookEnabled !== undefined
+          ? { guestbookEnabled: changes.guestbookEnabled }
+          : {}),
+        ...(changes.guestbookModeration !== undefined
+          ? { guestbookModeration: changes.guestbookModeration }
+          : {}),
+        ...(changes.seoIndexable !== undefined
+          ? { seoIndexable: changes.seoIndexable }
+          : {}),
+      })
+      .onConflictDoUpdate({
+        target: invitationSettings.invitationId,
+        set: patch,
+      })
+      .returning();
+
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Change the slug of an owned invitation. `P1-14`, BR-6.
+   *
+   * Returns `false` when nothing was written — either the invitation is not this scope's,
+   * or the partial unique index rejected the value because another invitation claimed it
+   * between the caller's availability check and this write. `docs/BACKEND/06` § Slug
+   * Validation asks for that race to surface as a 409, so the unique violation is caught
+   * here rather than escaping as a 500.
+   */
+  async updateSlug(
+    invitationId: string,
+    scope: TenantScope,
+    slug: string,
+  ): Promise<boolean> {
+    try {
+      const rows = await this.db
+        .update(invitations)
+        .set({ slug, updatedAt: new Date() })
+        .where(
+          and(
+            eq(invitations.id, invitationId),
+            eq(invitations.ownerId, scope),
+            isNull(invitations.deletedAt),
+          ),
+        )
+        .returning({ id: invitations.id });
+
+      return rows.length > 0;
+    } catch (error) {
+      // 23505 is a unique violation. Anything else is a real fault and must not be
+      // flattened into "somebody took the slug".
+      if (isUniqueViolation(error)) return false;
+      throw error;
+    }
+  }
+
+  /**
+   * The template version an invitation is locked to, with the two fields settings
+   * validation needs. `P1-14`.
+   *
+   * Scoped through the invitation, so a caller cannot read another tenant's template
+   * configuration by guessing an invitation id — even though a template version is not
+   * itself tenant data.
+   */
+  async findTemplateVersionFor(
+    invitationId: string,
+    scope: TenantScope,
+  ): Promise<{
+    sections: unknown;
+    customizableThemeKeys: string[];
+  } | null> {
+    const rows = await this.db
+      .select({
+        sections: templateVersions.sections,
+        customizableThemeKeys: templateVersions.customizableThemeKeys,
+      })
+      .from(invitations)
+      .innerJoin(
+        templateVersions,
+        eq(invitations.templateVersionId, templateVersions.id),
+      )
+      .where(
+        and(
+          eq(invitations.id, invitationId),
+          eq(invitations.ownerId, scope),
+          isNull(invitations.deletedAt),
+        ),
+      )
+      .limit(1);
 
     return rows[0] ?? null;
   }

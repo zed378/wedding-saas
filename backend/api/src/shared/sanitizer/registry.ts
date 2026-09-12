@@ -103,6 +103,31 @@ export const NOT_USER_TEXT: Readonly<Record<string, string>> = {
   page: "a pagination integer, coerced and bounded; never stored or rendered",
 
   /**
+   * A list of section keys, each checked against the **template's own** `section_key` set.
+   *
+   * Not prose and not free text: a key the active template does not define is rejected
+   * (`P1-14`), so nothing a user invents can be stored, let alone rendered. Sanitizing
+   * would be the wrong defence — it would leave an unknown-but-clean key in the array and
+   * the settings object would disagree with the page forever.
+   */
+  enabled_sections:
+    "section keys, validated against the template's own set (P1-14)",
+
+  /**
+   * Theme overrides. **Keys and values are both validated**, and neither is prose.
+   *
+   * Keys must appear in the template's `customizable_theme_keys`; values must match
+   * `HEX_COLOR` or `CSS_TOKEN` from `@wi/schema` — the same patterns a template definition
+   * is held to, imported rather than re-derived so the two cannot disagree.
+   *
+   * The value check is the one that matters and the one that is easy to miss: a theme value
+   * becomes a **CSS custom property** on the public page, so `red; background: url(...)`
+   * would be a CSS injection reaching every guest. Tag stripping would not have caught it.
+   */
+  theme_override:
+    "theme keys and values, both validated against the template (P1-14); values become CSS custom properties",
+
+  /**
    * A URL that becomes an `href`, so it needs a **scheme allowlist**, not tag stripping.
    *
    * Sanitizing it as prose would be the wrong defence twice over: `sanitizePlainText`

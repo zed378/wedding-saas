@@ -6,7 +6,7 @@ Single source of truth for where the project stands. Updated in the same commit 
 **Current phase**: Phase 0 — Foundation (26 / 27 done). **Staging is live**: `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
 
 The only task left is `P0-17` (CI/CD), deferred by ADR-028. Its **deployment** half was waived by the project owner on 2026-09-11; deploying is `git pull` plus a compose command. Its **verification** half was not waived and is the one Phase 0 exit criterion still unmet — see below. **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
-**Overall**: 40 / 136 tasks done
+**Overall**: 41 / 136 tasks done
 
 **No automated pipeline**: `P0-17` is deferred (ADR-028). Before merging to `main`, run `scripts/verify.sh`. The `:id`-endpoint gate blocks in `.githooks/pre-push`; integration tests, the coverage floor, SAST and dependency scanning are **not** running anywhere until `P0-17` is picked up — revisit before Phase 3 payment code.
 
@@ -24,7 +24,7 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 | Phase | Tasks | Done | Status | Gate to enter |
 |---|---|---|---|---|
 | [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 27 | 26 | **ACTIVE** | — |
-| [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 14 | **ACTIVE** | Phase 0 exit criteria |
+| [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 15 | **ACTIVE** | Phase 0 exit criteria |
 | [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 14 | 0 | Not started | Phase 1 exit + `P1-25` |
 | [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 0 | Not started | Phase 2 exit |
 | [Phase 4 — Engagement](./PHASE-4-ENGAGEMENT.md) | 12 | 0 | Not started | Phase 3 exit |
@@ -97,7 +97,7 @@ Roadmap: Week 3-5.
 | P1-11 | Couple sub-resource | backend | M | **DONE** — `photo_media_id` is a second tenancy boundary; a photo from another invitation of the *same* user is also refused | P1-10 |
 | P1-12 | Events sub-resource | backend | M | **DONE** — `:event_id` scoped by `:id` in one query; five repository-level tests added because a mutation showed the two layers were masking each other | P1-10 |
 | P1-13 | Bank accounts and quote | backend | M | **DONE** — the threat is substitution, not disclosure (R16): every change is audited inside its own transaction, and a change to a published invitation notifies the owner | P1-10 |
-| P1-14 | Settings and slug rules | backend | M | TODO | P1-10 |
+| P1-14 | Settings and slug rules | backend | M | **DONE** — the boundary rejects rather than silently ignoring; theme override **values** are validated too, because they become CSS custom properties on a public page | P1-10 |
 | P1-15 | Change template without data loss | backend | M | TODO | P1-10, P0-20 |
 | P1-16 | Free-text sanitization pipeline | backend | M | **DONE** — built early: `P1-11`–`P1-15` all have it as a DoD item. A build guard refuses an unregistered text field | P0-13 |
 | P1-17 | Media upload — sync validation | backend | L | TODO | P1-10, P0-16 |

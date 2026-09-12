@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Test } from "@nestjs/testing";
 import type { INestApplication } from "@nestjs/common";
 import { APP_FILTER } from "@nestjs/core";
@@ -14,6 +14,7 @@ import {
   GiftService,
   QuoteService,
 } from "../src/modules/invitation/gift.service";
+import { SettingsService } from "../src/modules/invitation/settings.service";
 import { NotFoundError } from "../src/http/errors";
 import { SessionService } from "../src/modules/auth/session.service";
 import { UnauthenticatedError } from "../src/http/errors";
@@ -54,6 +55,7 @@ const seen: {
   giftInput?: unknown;
   bankId?: string | undefined;
   quoteInput?: unknown;
+  settingsPatch?: unknown;
 } = {};
 
 const createStub = {
@@ -150,6 +152,18 @@ const giftStub = {
   },
 };
 
+const settingsStub = {
+  get: async (_scope: unknown, id: string) => {
+    mineOr404(id);
+    return { ...detail.settings, slug: "budi-dan-ani" };
+  },
+  update: async (_scope: unknown, id: string, patch: unknown) => {
+    mineOr404(id);
+    seen.settingsPatch = patch;
+    return { ...detail.settings, slug: "budi-dan-ani" };
+  },
+};
+
 const quoteStub = {
   get: async (_scope: unknown, id: string) => {
     mineOr404(id);
@@ -243,13 +257,23 @@ const sessionStub = {
   },
 };
 
+/** Permissive by default; a test that refuses restores it through `beforeEach`. */
+const ALLOW = {
+  allowed: true as boolean,
+  limit: 10,
+  remaining: 9,
+  resetAt: 1789200000,
+};
+
 const limiterStub = {
-  check: async () => ({
-    allowed: true,
-    limit: 10,
-    remaining: 9,
-    resetAt: 1789200000,
-  }),
+  check: async () =>
+    ALLOW as {
+      allowed: boolean;
+      limit: number;
+      remaining: number;
+      resetAt: number;
+      retryAfterSeconds?: number;
+    },
   recordFailure: async () => {},
   block: async () => 900,
 };
@@ -275,6 +299,7 @@ describe("POST /invitations over HTTP", () => {
         { provide: EventsService, useValue: eventsStub },
         { provide: GiftService, useValue: giftStub },
         { provide: QuoteService, useValue: quoteStub },
+        { provide: SettingsService, useValue: settingsStub },
         { provide: SessionService, useValue: sessionStub },
         { provide: RATE_LIMITER, useValue: limiterStub },
         {
@@ -290,6 +315,14 @@ describe("POST /invitations over HTTP", () => {
 
   afterAll(async () => {
     await app.close();
+  });
+
+  beforeEach(() => {
+    // The limiter stub is shared, and a test that makes it refuse used to leave it that
+    // way -- which broke every later test in the file with a 429 that had nothing to do
+    // with what it was checking. Resetting here rather than in each test means the next
+    // person to add a refusing case cannot reintroduce it.
+    limiterStub.check = async () => ALLOW;
   });
 
   it("creates and returns 201 with the documented fields", async () => {
@@ -969,6 +1002,128 @@ describe("POST /invitations over HTTP", () => {
         .set(...AUTH)
         .send({ text: "Hijacked" })
         .expect(404);
+    });
+  });
+
+  describe("settings (P1-14)", () => {
+    it("reads and writes", async () => {
+      const read = await request(app.getHttpServer())
+        .get(`/api/v1/invitations/${INVITATION_ID}/settings`)
+        .set(...AUTH)
+        .expect(200);
+      expect(read.body.data.slug).toBe("budi-dan-ani");
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}/settings`)
+        .set(...AUTH)
+        .send({ rsvp_enabled: false })
+        .expect(200);
+    });
+
+    it("maps snake_case to the service's camelCase", async () => {
+      seen.settingsPatch = undefined;
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}/settings`)
+        .set(...AUTH)
+        .send({
+          enabled_sections: ["hero"],
+          theme_override: { colors: { primary: "#fff" } },
+          rsvp_enabled: false,
+          guestbook_enabled: false,
+          guestbook_moderation: true,
+          seo_indexable: true,
+          slug: "new-address",
+          confirm_slug_change: true,
+        })
+        .expect(200);
+
+      expect(seen.settingsPatch).toEqual({
+        enabledSections: ["hero"],
+        themeOverride: { colors: { primary: "#fff" } },
+        rsvpEnabled: false,
+        guestbookEnabled: false,
+        guestbookModeration: true,
+        seoIndexable: true,
+        slug: "new-address",
+        confirmSlugChange: true,
+      });
+    });
+
+    it.each([
+      ["status", { status: "published" }],
+      ["owner_id", { owner_id: OWNER_ID }],
+      [
+        "template_version_id",
+        { template_version_id: created.templateVersionId },
+      ],
+      ["expiry_date", { expiry_date: "2030-01-01" }],
+      ["published_at", { published_at: "2026-01-01T00:00:00Z" }],
+    ])("rejects a body carrying %s", async (_name, extra) => {
+      // The settings screen is the most tempting place to smuggle a lifecycle field,
+      // because it already writes to `invitations`.
+      await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}/settings`)
+        .set(...AUTH)
+        .send({ rsvp_enabled: true, ...extra })
+        .expect(400);
+    });
+
+    it.each([
+      ["a non-boolean toggle", { rsvp_enabled: "yes" }],
+      ["a non-array enabled_sections", { enabled_sections: "hero" }],
+      ["too many sections", { enabled_sections: Array(51).fill("hero") }],
+      ["an over-long section key", { enabled_sections: ["x".repeat(41)] }],
+      ["a two-character slug", { slug: "ab" }],
+      ["a 51-character slug", { slug: "a".repeat(51) }],
+    ])("rejects %s", async (_name, body) => {
+      await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}/settings`)
+        .set(...AUTH)
+        .send(body)
+        .expect(400);
+    });
+
+    it("is rate limited on the slug-change policy", async () => {
+      // BR-6.2 asks for a rate limit; docs/SECURITY/10's table predates the rule needing a
+      // number, so `slug-change` was added there rather than invented at the call site.
+      limiterStub.check = async () => ({
+        allowed: false,
+        limit: 3,
+        remaining: 0,
+        resetAt: 1789200000,
+      });
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}/settings`)
+        .set(...AUTH)
+        .send({ slug: "new-address" })
+        .expect(429);
+
+      expect(res.body.error.code).toBe("TOO_MANY_ATTEMPTS");
+
+      limiterStub.check = async () => ({
+        allowed: true,
+        limit: 10,
+        remaining: 9,
+        resetAt: 1789200000,
+      });
+    });
+
+    it("another user's invitation is 404", async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${OTHERS_INVITATION}/settings`)
+        .set(...AUTH)
+        .send({ seo_indexable: true })
+        .expect(404);
+
+      expect(res.body.data).toBeUndefined();
+    });
+
+    it("is 401 without a token", async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/invitations/${INVITATION_ID}/settings`)
+        .expect(401);
     });
   });
 });

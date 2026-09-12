@@ -93,6 +93,21 @@ export const DEFAULT_POLICIES: readonly RateLimitPolicy[] = [
     key: "ip",
     failClosed: true,
   },
+  {
+    /**
+     * BR-6.2 — a slug change after publishing is "rate-limited", and the document does not
+     * say at what. Three a day per user: enough to fix a typo and then reconsider once,
+     * few enough that nobody churns through addresses squatting names or leaving a trail
+     * of dead links behind them.
+     *
+     * Not in `docs/SECURITY/10`'s table, which predates the rule needing a number. Added
+     * here rather than invented at the call site, so it is tunable with everything else.
+     */
+    name: "slug-change",
+    limit: 3,
+    windowSeconds: 24 * 60 * 60,
+    key: "user",
+  },
   { name: "rsvp", limit: 10, windowSeconds: 60 * 60, key: "iphash+slug" },
   { name: "guestbook", limit: 10, windowSeconds: 60 * 60, key: "iphash+slug" },
   {

