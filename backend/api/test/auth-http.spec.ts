@@ -15,6 +15,7 @@ import {
   type Session,
 } from "../src/modules/auth/login.service";
 import { SessionService } from "../src/modules/auth/session.service";
+import { GoogleOAuthService } from "../src/modules/auth/oauth/google-oauth.service";
 import { RegistrationService } from "../src/modules/auth/registration.service";
 import { REFRESH_COOKIE_NAME } from "../src/modules/auth/tokens/refresh-token.service";
 import { UnauthenticatedError } from "../src/http/errors";
@@ -51,7 +52,15 @@ const session: Session = {
 const seen: {
   refreshArg?: string | undefined;
   logoutArg?: string | undefined;
+  googleBody?: unknown;
 } = {};
+
+const googleStub = {
+  authenticate: async (idToken: string) => {
+    seen.googleBody = idToken;
+    return { session, outcome: "registered" as const };
+  },
+};
 
 const loginStub = {
   login: async (email: string) => {
@@ -88,6 +97,7 @@ describe("auth endpoints over HTTP", () => {
         { provide: APP_FILTER, useClass: AppExceptionFilter },
         { provide: LoginService, useValue: loginStub },
         { provide: SessionService, useValue: sessionStub },
+        { provide: GoogleOAuthService, useValue: googleStub },
         { provide: RegistrationService, useValue: {} },
         { provide: ENV, useValue: env },
       ],
@@ -186,6 +196,73 @@ describe("auth endpoints over HTTP", () => {
         .post("/api/v1/auth/login")
         .send({ email: "not-an-email", password: "" })
         .expect(400);
+    });
+  });
+
+  describe("POST /auth/oauth/google", () => {
+    it("passes the id_token down and returns the login shape", async () => {
+      // Step 6: nothing downstream should be able to tell how a session began.
+      const res = await request(app.getHttpServer())
+        .post("/api/v1/auth/oauth/google")
+        .send({ id_token: "an-opaque-google-token" })
+        .expect(200);
+
+      expect(seen.googleBody).toBe("an-opaque-google-token");
+      expect(res.body.data).toHaveProperty("access_token");
+      expect(res.body.data).toHaveProperty("user");
+    });
+
+    it("an email in the body does not survive parsing", async () => {
+      // docs/SECURITY/03: "NEVER trust the email from the request body." The schema has
+      // one field and Zod strips the rest, so there is nothing for a later edit to
+      // accidentally start reading.
+      const res = await request(app.getHttpServer())
+        .post("/api/v1/auth/oauth/google")
+        .send({
+          id_token: "an-opaque-google-token",
+          email: "attacker@example.test",
+        })
+        .expect(200);
+
+      expect(JSON.stringify(res.body)).not.toContain("attacker@example.test");
+      expect(seen.googleBody).toBe("an-opaque-google-token");
+    });
+
+    it("sets the refresh cookie, with the same attributes", async () => {
+      const res = await request(app.getHttpServer())
+        .post("/api/v1/auth/oauth/google")
+        .send({ id_token: "an-opaque-google-token" });
+
+      expect(cookieHeader(res)).toMatch(/HttpOnly/i);
+      expect(cookieHeader(res)).toMatch(/SameSite=Lax/i);
+    });
+
+    it("rejects a missing or oversized id_token", async () => {
+      await request(app.getHttpServer())
+        .post("/api/v1/auth/oauth/google")
+        .send({})
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .post("/api/v1/auth/oauth/google")
+        .send({ id_token: "x".repeat(9000) })
+        .expect(400);
+    });
+
+    it("maps an unavailable provider to 503, not 401", async () => {
+      const { ServiceUnavailableError } = await import("../src/http/errors.js");
+      const original = googleStub.authenticate;
+      googleStub.authenticate = async () => {
+        throw new ServiceUnavailableError();
+      };
+
+      const res = await request(app.getHttpServer())
+        .post("/api/v1/auth/oauth/google")
+        .send({ id_token: "a-fine-token" })
+        .expect(503);
+
+      expect(res.body.error.code).toBe("SERVICE_UNAVAILABLE");
+      googleStub.authenticate = original;
     });
   });
 

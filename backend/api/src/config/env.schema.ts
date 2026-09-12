@@ -131,6 +131,14 @@ export const envSchema = z
     MIDTRANS_CLIENT_KEY: z.string().min(1).optional(),
     MIDTRANS_WEBHOOK_SECRET: z.string().min(1).optional(),
 
+    /**
+     * Google Sign-In (P1-04). Optional, and checked at the point of use rather than at
+     * boot: making it required would stop every developer not working on OAuth from
+     * starting the API, and the failure it prevents -- a sign-in attempt with no client
+     * id -- reports a 503 naming this variable rather than a confusing 401.
+     */
+    GOOGLE_OAUTH_CLIENT_ID: z.string().min(1).optional(),
+
     /** Email (P4-06), CAPTCHA (P4-05), maps (P1-14). */
     RESEND_API_KEY: z.string().min(1).optional(),
     TURNSTILE_SECRET_KEY: z.string().min(1).optional(),

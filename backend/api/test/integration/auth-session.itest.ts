@@ -24,6 +24,7 @@ import type { Env } from "../../src/config/env.schema";
 import type { JobQueue } from "../../src/infra/queue/queue.module";
 import { securityLogger } from "../../src/shared/logging/logger";
 import { startHarness, type Harness } from "../support/harness";
+import { rejection } from "../support/rejection";
 import { resetTenantData } from "./helpers.ts";
 
 /**
@@ -45,22 +46,6 @@ const env = {
 } as unknown as Env;
 
 const PASSWORD = "kembang-sepatu-ungu-2026";
-
-/** The shape the exception filter maps. `catch` alone widens to a union with the result. */
-interface ThrownAppError extends Error {
-  readonly status: number;
-  readonly code: string;
-}
-
-/** Run something that must reject, and hand back the error it rejected with. */
-async function rejection(fn: () => Promise<unknown>): Promise<ThrownAppError> {
-  try {
-    await fn();
-  } catch (error) {
-    return error as ThrownAppError;
-  }
-  throw new Error("expected the call to reject, and it resolved");
-}
 
 describe("login, refresh and logout", () => {
   let harness: Harness;

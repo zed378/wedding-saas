@@ -18,7 +18,10 @@ CREATE TABLE users (
 );
 
 CREATE UNIQUE INDEX idx_users_email ON users(email) WHERE deleted_at IS NULL;
-CREATE INDEX idx_users_oauth ON users(oauth_provider, oauth_subject_id) WHERE oauth_provider IS NOT NULL;
+-- UNIQUE since P1-04 (ADR-049): API/01 matches an OAuth login on (provider, subject_id)
+-- first, which makes it a login key -- and a login key that matches two rows is a login
+-- whose outcome depends on row order. Partial over active rows, like idx_users_email.
+CREATE UNIQUE INDEX idx_users_oauth ON users(oauth_provider, oauth_subject_id) WHERE oauth_provider IS NOT NULL AND deleted_at IS NULL;
 ```
 
 > **Email uniqueness is enforced only by `idx_users_email`** — deliberately not by a

@@ -69,14 +69,23 @@ export const users = pgTable(
       .where(sql`deleted_at IS NULL`),
 
     /**
-     * Not unique, exactly as documented. `docs/API/01` matches an OAuth login by
-     * verified Google email rather than by subject id, so this index exists for
-     * lookup speed and not as a constraint. Making it unique would be inventing a
-     * rule the specification does not state -- raised as OQ-15 instead.
+     * UNIQUE as of `P1-04` (ADR-049), which answers OQ-15.
+     *
+     * It was a plain index through `P0-07`, because `docs/API/01` matched an OAuth login
+     * by verified Google email and subject id was only a lookup key -- making it unique
+     * then would have invented a rule the documents do not state.
+     *
+     * `P1-04`'s step 3 changed that: "Match on (oauth_provider, oauth_subject_id)
+     * **first**". A login key that can match two rows is a login whose outcome depends on
+     * row order, and OQ-15 said so itself -- "a duplicate makes login ambiguous".
+     *
+     * Partial over active rows, like `idx_users_email` and for the same reason: a
+     * soft-deleted account must not hold a Google identity hostage until the hard delete
+     * runs.
      */
-    index("idx_users_oauth")
+    uniqueIndex("idx_users_oauth")
       .on(t.oauthProvider, t.oauthSubjectId)
-      .where(sql`oauth_provider IS NOT NULL`),
+      .where(sql`oauth_provider IS NOT NULL AND deleted_at IS NULL`),
 
     /**
      * A role outside this set must be impossible, not merely unexpected. This is the
