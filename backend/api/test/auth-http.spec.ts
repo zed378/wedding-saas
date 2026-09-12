@@ -17,6 +17,13 @@ import {
 import { SessionService } from "../src/modules/auth/session.service";
 import { GoogleOAuthService } from "../src/modules/auth/oauth/google-oauth.service";
 import { PasswordResetService } from "../src/modules/auth/password-reset.service";
+import {
+  POLICY_REGISTRY,
+  RATE_LIMITER,
+} from "../src/shared/rate-limit/rate-limit.guard";
+import { PolicyRegistry } from "../src/shared/rate-limit/config";
+import type { RateLimitDecision } from "../src/shared/rate-limit/rate-limiter";
+import { RateLimiterUnavailableError } from "../src/shared/rate-limit/rate-limiter";
 import { RegistrationService } from "../src/modules/auth/registration.service";
 import { REFRESH_COOKIE_NAME } from "../src/modules/auth/tokens/refresh-token.service";
 import { UnauthenticatedError } from "../src/http/errors";
@@ -55,6 +62,7 @@ const seen: {
   logoutArg?: string | undefined;
   googleBody?: unknown;
   forgotEmail?: string;
+  recordedFailure?: boolean;
 } = {};
 
 const resetStub = {
@@ -67,6 +75,31 @@ const resetStub = {
       : token === "expired-token"
         ? ({ status: "expired" } as const)
         : ({ status: "invalid" } as const),
+};
+
+/**
+ * The limiter, faked. What is under test here is the GUARD -- the headers it sets, the
+ * 429 it raises and the 503 it raises instead when a fail-closed policy cannot reach
+ * Redis. The window arithmetic has its own suite against a real Redis.
+ */
+let nextDecision: RateLimitDecision | "unavailable" = {
+  allowed: true,
+  limit: 5,
+  remaining: 4,
+  resetAt: 1789200000,
+};
+
+const limiterStub = {
+  check: async (policy: { name: string }) => {
+    if (nextDecision === "unavailable") {
+      throw new RateLimiterUnavailableError(policy.name);
+    }
+    return nextDecision;
+  },
+  recordFailure: async () => {
+    seen.recordedFailure = true;
+  },
+  block: async () => 900,
 };
 
 const googleStub = {
@@ -115,6 +148,11 @@ describe("auth endpoints over HTTP", () => {
         { provide: PasswordResetService, useValue: resetStub },
         { provide: RegistrationService, useValue: {} },
         { provide: ENV, useValue: env },
+        { provide: RATE_LIMITER, useValue: limiterStub },
+        {
+          provide: POLICY_REGISTRY,
+          useValue: new PolicyRegistry(undefined, undefined),
+        },
       ],
     }).compile();
 
@@ -405,6 +443,142 @@ describe("auth endpoints over HTTP", () => {
         .expect(200);
 
       expect(JSON.stringify(res.body)).not.toContain("11111111");
+    });
+  });
+
+  describe("rate limiting (P1-07)", () => {
+    it("sets the three headers docs/API/00 names, on a SUCCESSFUL response", async () => {
+      // Not only on refusals. A client can only back off before hitting a wall if it can
+      // see the wall coming, and a Remaining that appears in the 429 arrives exactly one
+      // request too late.
+      nextDecision = {
+        allowed: true,
+        limit: 5,
+        remaining: 3,
+        resetAt: 1789200000,
+      };
+
+      const res = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: "budi@example.test", password: "whatever" })
+        .expect(200);
+
+      expect(res.headers["x-ratelimit-limit"]).toBe("5");
+      expect(res.headers["x-ratelimit-remaining"]).toBe("3");
+      expect(res.headers["x-ratelimit-reset"]).toBe("1789200000");
+    });
+
+    it("refuses with 429 and the standard envelope", async () => {
+      nextDecision = {
+        allowed: false,
+        limit: 5,
+        remaining: 0,
+        resetAt: 1789200000,
+        retryAfterSeconds: 300,
+      };
+
+      const res = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: "budi@example.test", password: "whatever" })
+        .expect(429);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe("TOO_MANY_ATTEMPTS");
+      expect(res.headers["retry-after"]).toBe("300");
+    });
+
+    it("a refused request never reaches the service", async () => {
+      // The point of limiting a credential endpoint: the expensive argon2 verify must
+      // not run for an attacker who is already over budget.
+      nextDecision = {
+        allowed: false,
+        limit: 5,
+        remaining: 0,
+        resetAt: 1789200000,
+      };
+      seen.recordedFailure = false;
+
+      await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: "nobody@example.test", password: "whatever" })
+        .expect(429);
+
+      expect(seen.recordedFailure).toBe(false);
+    });
+
+    it("a Redis outage on a credential endpoint is 503, not 429", async () => {
+      // ADR-050. A 429 would tell the client to slow down, which is false, and a client
+      // with backoff would wait for a limit that is not the problem.
+      nextDecision = "unavailable";
+
+      const res = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: "budi@example.test", password: "whatever" })
+        .expect(503);
+
+      expect(res.body.error.code).toBe("SERVICE_UNAVAILABLE");
+
+      nextDecision = { allowed: true, limit: 5, remaining: 4, resetAt: 1 };
+    });
+
+    it("a failed login is recorded against the budget; a successful one is not", async () => {
+      // docs/SECURITY/10 counts FAILED attempts. The guard runs before the attempt and
+      // cannot know, so the controller records after.
+      nextDecision = { allowed: true, limit: 5, remaining: 4, resetAt: 1 };
+
+      seen.recordedFailure = false;
+      await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: "budi@example.test", password: "whatever" })
+        .expect(200);
+      expect(seen.recordedFailure).toBe(false);
+
+      seen.recordedFailure = false;
+      await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: "nobody@example.test", password: "whatever" })
+        .expect(401);
+      expect(seen.recordedFailure).toBe(true);
+    });
+
+    it("forgot-password is limited (the obligation inherited from P1-05)", async () => {
+      nextDecision = {
+        allowed: false,
+        limit: 3,
+        remaining: 0,
+        resetAt: 1789200000,
+      };
+
+      await request(app.getHttpServer())
+        .post("/api/v1/auth/forgot-password")
+        .send({ email: "budi@example.test" })
+        .expect(429);
+
+      nextDecision = { allowed: true, limit: 5, remaining: 4, resetAt: 1 };
+    });
+
+    it.each([
+      [
+        "register",
+        "/api/v1/auth/register",
+        { email: "a@b.test", password: "x", full_name: "A" },
+      ],
+      [
+        "reset-password",
+        "/api/v1/auth/reset-password",
+        { token: "t", new_password: "x" },
+      ],
+    ])("%s is limited too", async (_name, path, body) => {
+      nextDecision = {
+        allowed: false,
+        limit: 5,
+        remaining: 0,
+        resetAt: 1789200000,
+      };
+
+      await request(app.getHttpServer()).post(path).send(body).expect(429);
+
+      nextDecision = { allowed: true, limit: 5, remaining: 4, resetAt: 1 };
     });
   });
 

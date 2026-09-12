@@ -22,6 +22,22 @@ Nothing on the board is `BLOCKED`. The remaining questions shape work rather tha
 
 ## Open Questions — Remaining
 
+### OQ-22 — Is the (email, IP) login key the right one against a distributed attacker?
+
+**Affects**: `P1-07` — **not blocking**; implemented exactly as `docs/SECURITY/10` specifies.
+
+`docs/SECURITY/10` § Rate Limiting keys `POST /auth/login` on **(email, IP)**: 5 failed attempts per 15 minutes. That is implemented.
+
+The weakness is structural rather than a bug. An attacker rotating IPs against one account gets a **fresh budget per IP**, because the IP is part of the key. Against a botnet or a proxy pool, a per-(email, IP) limit is close to no limit on the email at all.
+
+The obvious tightening — a per-email limit regardless of IP — has its own failure mode, and it is nastier than it sounds: **anyone could lock a victim out of their own account** by failing five logins against their address. A login endpoint that a stranger can use to deny you service is a worse product than one that is slow to stop a botnet.
+
+The usual answers are all partial: a much higher per-email ceiling on top of the per-(email, IP) one, so a distributed attack is bounded but a single actor cannot lock anybody out; CAPTCHA after a per-email threshold (`P4-05` brings Turnstile); or device/ASN reputation, which is a different project.
+
+**Why it matters that this gets a real answer**: the limit reads as protection against credential stuffing, and against the form credential stuffing actually takes — distributed, one attempt per address per account — it is weak. Anyone reasoning about the auth posture from the document's table would overestimate it.
+
+**Who decides**: whoever owns the security posture, ideally with `P4-05` (adaptive CAPTCHA) on the table, since that is the mitigation that does not create a lockout vector.
+
 ### OQ-21 — Should refresh-token rotation have a grace window?
 
 **Affects**: `P1-03` — **not blocking**; implemented strictly as `docs/SECURITY/03` describes.

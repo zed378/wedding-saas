@@ -1431,3 +1431,26 @@ The risk this carries: a future change that gives `jose` a top-level `await` in 
 **Risk** — the migration fails if two active rows already share a subject id. Impossible through the documented flow (nothing has written these columns yet, and the email index prevents two active accounts on one address), and a failure would be the correct outcome rather than a silent choice between two accounts.
 
 **This deviates from `docs/DATABASE/02`**, which writes the index as non-unique. The document should gain the `UNIQUE` and the predicate; recorded here as the deviation protocol requires.
+
+### ADR-050 — The rate limiter fails closed on credential endpoints and open everywhere else
+
+**Date** 2026-09-12 · **Status** Accepted · **Task** `P1-07`
+
+**Context** — `P1-07` step 5 asks for the Redis-unavailable behaviour to be decided and recorded either way, and recommends this split. `docs/SECURITY/10` does not address it.
+
+**Decision** —
+
+| Policy | Redis down | Response |
+|---|---|---|
+| `login`, `register`, `forgot-password`, `reset-password` | **fail closed** | `503` |
+| every other policy | **fail open**, logged at `error` | the request proceeds |
+
+**Why credential endpoints fail closed** — with the limiter off, `POST /auth/login` accepts unlimited attempts against a live user table. That is a credential-stuffing window that opens exactly when the operator is distracted by a Redis incident, and it leaves no trace beyond `auth.login_failed` lines nobody is reading during an outage. A login outage is an outage: users are inconvenienced, nothing is lost, and it ends when Redis comes back.
+
+**Why everything else fails open** — throttling protects capacity. Refusing every authenticated request because the *limiter* is unreachable converts a degraded dependency into a total outage. The traffic being defended against is hypothetical; the outage would be real and immediate.
+
+**Why `503` and not `429`** — a `429` tells the client "slow down", which is false. A client implementing backoff would wait for a limit that is not the problem, and a human would read "too many attempts" and try a password reset. `503` says the service cannot answer, which is what is true.
+
+**The cost, stated plainly** — a Redis outage takes login, registration and password reset down completely. That is the trade, deliberately made. `"every credential policy is fail-closed and nothing else is"` asserts the split so a new credential endpoint added without `failClosed` is caught by a test rather than discovered later.
+
+**Revisit if** — Redis becomes a frequent source of incidents, or a second Redis is provisioned for rate limiting alone. A local in-process fallback counter was considered and rejected: per-instance counters multiply the effective limit by the instance count, which is a silently weaker control rather than an honest outage.

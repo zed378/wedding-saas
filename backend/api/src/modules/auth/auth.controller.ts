@@ -8,6 +8,7 @@ import {
   Post,
   Req,
   Res,
+  UseGuards,
 } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { z } from "zod";
@@ -20,6 +21,14 @@ import { RegistrationService } from "./registration.service";
 import { LoginService, type Session } from "./login.service";
 import { GoogleOAuthService } from "./oauth/google-oauth.service";
 import { PasswordResetService } from "./password-reset.service";
+import {
+  deriveKey,
+  rateLimit,
+  POLICY_REGISTRY,
+  RATE_LIMITER,
+  type PolicyRegistry,
+  type RateLimiter,
+} from "../../shared/rate-limit";
 import { SessionService, type AuthenticatedUser } from "./session.service";
 import {
   clearRefreshCookie,
@@ -28,7 +37,7 @@ import {
 } from "./refresh-cookie";
 
 /**
- * P1-02 and P1-03 — `docs/API/01`.
+ * P1-02 through P1-07 — `docs/API/01`.
  *
  * Thin, per `docs/ARCHITECTURE/01`: parse, delegate, shape the envelope. Every decision
  * lives in `RegistrationService`, which is also what the publish and order services will
@@ -98,10 +107,13 @@ export class AuthController {
     private readonly resets: PasswordResetService,
     private readonly sessions: SessionService,
     @Inject(ENV) private readonly env: Env,
+    @Inject(RATE_LIMITER) private readonly limiter: RateLimiter,
+    @Inject(POLICY_REGISTRY) private readonly policies: PolicyRegistry,
   ) {}
 
   @Post("register")
   @HttpCode(201)
+  @UseGuards(rateLimit("register"))
   async register(@Body() body: unknown) {
     const input = parse(registerSchema, body);
 
@@ -175,14 +187,34 @@ export class AuthController {
    */
   @Post("login")
   @HttpCode(200)
+  @UseGuards(rateLimit("login"))
   async login(
     @Body() body: unknown,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const input = parse(loginSchema, body);
-    const session = await this.logins.login(input.email, input.password);
 
-    return this.respondWithSession(res, session);
+    try {
+      const session = await this.logins.login(input.email, input.password);
+      // Deliberately nothing on success. `docs/SECURITY/10` limits "5 FAILED attempts",
+      // and counting successes would lock out a household sharing an address -- and would
+      // let an attacker exhaust a victim's budget by logging in correctly.
+      return this.respondWithSession(res, session);
+    } catch (error) {
+      // The guard checked the budget before the attempt and could not know the outcome.
+      // This is where the outcome is known, so this is where a failure is counted.
+      await this.recordLoginFailure(req);
+      throw error;
+    }
+  }
+
+  private async recordLoginFailure(req: Request): Promise<void> {
+    const policy = this.policies.get("login");
+    const key = deriveKey(policy, req);
+    if (key === undefined) return;
+
+    await this.limiter.recordFailure(policy, key);
   }
 
   /**
@@ -243,6 +275,7 @@ export class AuthController {
    */
   @Post("forgot-password")
   @HttpCode(200)
+  @UseGuards(rateLimit("forgot-password"))
   async forgotPassword(@Body() body: unknown) {
     const { email } = parse(forgotSchema, body);
     await this.resets.request(email);
@@ -260,6 +293,7 @@ export class AuthController {
    */
   @Post("reset-password")
   @HttpCode(200)
+  @UseGuards(rateLimit("reset-password"))
   async resetPassword(@Body() body: unknown) {
     const input = parse(resetSchema, body);
     const result = await this.resets.reset(input.token, input.new_password);

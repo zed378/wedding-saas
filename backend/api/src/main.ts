@@ -78,6 +78,16 @@ async function bootstrap(): Promise<void> {
   //     integrity is already established by the lookup that uses it.
   app.use(cookieParser());
 
+  // Required before the rate limiter can see a real client address. Behind Caddy and
+  // Cloudflare (docs/ARCHITECTURE/04) every request arrives from the proxy, so without
+  // this `req.ip` is the proxy for the entire internet -- one bucket for everyone, which
+  // is both useless as a limit and a denial of service against every legitimate user.
+  //
+  // The value is the number of proxies to trust, NOT `true`. `true` trusts the leftmost
+  // X-Forwarded-For entry, which the client controls, letting anyone pick their own
+  // rate-limit bucket by sending a header.
+  app.set("trust proxy", env.TRUSTED_PROXY_HOPS);
+
   await app.listen(env.PORT);
   const server = app.getHttpServer() as Server;
 
