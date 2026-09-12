@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq, isNull, desc, inArray, sql } from "drizzle-orm";
+import { and, count, eq, isNull, desc, inArray, sql } from "drizzle-orm";
 
 import { DB, type Database } from "../../infra/db/client";
 import {
@@ -170,6 +170,36 @@ export class InvitationRepository {
       .orderBy(desc(invitations.createdAt))
       .limit(Math.min(filters.limit ?? 50, 100))
       .offset(filters.offset ?? 0);
+  }
+
+  /**
+   * How many of this scope's invitations are in one of the given statuses.
+   *
+   * Added by `P1-08` so account deletion can tell the user how many published invitations
+   * will keep serving (ADR-051) without importing `invitations` -- which
+   * `scripts/check-tenant-scope.mjs` correctly refuses. A count is a read like any other,
+   * and "which rows am I counting" is exactly the question the owner predicate answers.
+   */
+  async countOwnedByStatus(
+    scope: TenantScope,
+    statuses: readonly string[],
+  ): Promise<number> {
+    // An empty list must count nothing, not everything -- the same trap `findOwnedList`
+    // guards against with `inArray`.
+    if (statuses.length === 0) return 0;
+
+    const [row] = await this.db
+      .select({ n: count() })
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.ownerId, scope),
+          isNull(invitations.deletedAt),
+          inArray(invitations.status, [...statuses]),
+        ),
+      );
+
+    return row?.n ?? 0;
   }
 
   /**
