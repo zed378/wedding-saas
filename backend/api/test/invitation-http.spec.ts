@@ -10,6 +10,10 @@ import { InvitationCreateService } from "../src/modules/invitation/invitation-cr
 import { InvitationService } from "../src/modules/invitation/invitation.service";
 import { CoupleService } from "../src/modules/invitation/couple.service";
 import { EventsService } from "../src/modules/invitation/events.service";
+import {
+  GiftService,
+  QuoteService,
+} from "../src/modules/invitation/gift.service";
 import { NotFoundError } from "../src/http/errors";
 import { SessionService } from "../src/modules/auth/session.service";
 import { UnauthenticatedError } from "../src/http/errors";
@@ -47,6 +51,9 @@ const seen: {
   coupleChanges?: unknown;
   eventInput?: unknown;
   eventId?: string | undefined;
+  giftInput?: unknown;
+  bankId?: string | undefined;
+  quoteInput?: unknown;
 } = {};
 
 const createStub = {
@@ -106,6 +113,53 @@ const eventDto = {
   longitude: null,
   description: null,
   display_order: 0,
+};
+
+const bankDto = {
+  id: "88888888-8888-4888-8888-888888888888",
+  type: "bank",
+  provider_name: "BCA",
+  account_number: "1234567890",
+  account_holder: "Budi Santoso",
+  display_order: 0,
+};
+
+const giftStub = {
+  list: async (_scope: unknown, id: string) => {
+    mineOr404(id);
+    return [bankDto];
+  },
+  create: async (_scope: unknown, id: string, input: unknown) => {
+    mineOr404(id);
+    seen.giftInput = input;
+    return bankDto;
+  },
+  update: async (
+    _scope: unknown,
+    id: string,
+    bankId: string,
+    changes: unknown,
+  ) => {
+    mineOr404(id);
+    seen.giftInput = changes;
+    seen.bankId = bankId;
+    return bankDto;
+  },
+  remove: async (_scope: unknown, id: string) => {
+    mineOr404(id);
+  },
+};
+
+const quoteStub = {
+  get: async (_scope: unknown, id: string) => {
+    mineOr404(id);
+    return { text: null, source: null };
+  },
+  update: async (_scope: unknown, id: string, changes: unknown) => {
+    mineOr404(id);
+    seen.quoteInput = changes;
+    return { text: "A quote", source: null };
+  },
 };
 
 const eventsStub = {
@@ -219,6 +273,8 @@ describe("POST /invitations over HTTP", () => {
         { provide: InvitationService, useValue: invitationStub },
         { provide: CoupleService, useValue: coupleStub },
         { provide: EventsService, useValue: eventsStub },
+        { provide: GiftService, useValue: giftStub },
+        { provide: QuoteService, useValue: quoteStub },
         { provide: SessionService, useValue: sessionStub },
         { provide: RATE_LIMITER, useValue: limiterStub },
         {
@@ -723,6 +779,196 @@ describe("POST /invitations over HTTP", () => {
       await request(app.getHttpServer())
         .get(`/api/v1/invitations/${INVITATION_ID}/events`)
         .expect(401);
+    });
+  });
+
+  describe("gift accounts (P1-13)", () => {
+    const BANK_BODY = {
+      type: "bank",
+      provider_name: "BCA",
+      account_number: "1234567890",
+      account_holder: "Budi Santoso",
+    };
+
+    it("lists, creates, updates and deletes", async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/invitations/${INVITATION_ID}/bank-accounts`)
+        .set(...AUTH)
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/bank-accounts`)
+        .set(...AUTH)
+        .send(BANK_BODY)
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(
+          `/api/v1/invitations/${INVITATION_ID}/bank-accounts/${bankDto.id}`,
+        )
+        .set(...AUTH)
+        .send({ account_holder: "Budi S." })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .delete(
+          `/api/v1/invitations/${INVITATION_ID}/bank-accounts/${bankDto.id}`,
+        )
+        .set(...AUTH)
+        .expect(200);
+    });
+
+    it.each([
+      ["get", `/api/v1/invitations/${OTHERS_INVITATION}/bank-accounts`],
+      ["post", `/api/v1/invitations/${OTHERS_INVITATION}/bank-accounts`],
+    ])("%s on another user's invitation is 404", async (method, path) => {
+      const res = await request(app.getHttpServer())
+        [method as "get"](path)
+        .set(...AUTH)
+        .send(BANK_BODY)
+        .expect(404);
+
+      expect(res.body.data).toBeUndefined();
+    });
+
+    it.each([
+      ["letters", "12ab567890"],
+      ["a script tag", "<script>alert(1)</script>"],
+      ["a trailing dash", "123456789-"],
+      ["too short", "12"],
+      ["an empty string", ""],
+      ["a plus sign", "+6281234567890"],
+    ])(
+      "rejects an account_number containing %s",
+      async (_name, account_number) => {
+        // The format check P1-16's exemption promised. `account_number` is NOT sanitized as
+        // prose -- tag stripping would silently alter a value whose exact characters matter
+        // -- so a character allowlist is what makes markup impossible here.
+        await request(app.getHttpServer())
+          .post(`/api/v1/invitations/${INVITATION_ID}/bank-accounts`)
+          .set(...AUTH)
+          .send({ ...BANK_BODY, account_number })
+          .expect(400);
+      },
+    );
+
+    it.each([
+      "1234567890",
+      "1234 5678 90",
+      "1234-5678-90",
+      // Trimmed, not rejected. Somebody pasting from their banking app brings whitespace
+      // with them, and refusing that would be a worse product for no security gain -- the
+      // character allowlist still applies to what is left.
+      " 1234567890 ",
+    ])("accepts an account_number of %j", async (account_number) => {
+      // Real Indonesian account numbers are written with spaces and hyphens.
+      await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/bank-accounts`)
+        .set(...AUTH)
+        .send({ ...BANK_BODY, account_number })
+        .expect(201);
+    });
+
+    it("rejects an unknown type", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/bank-accounts`)
+        .set(...AUTH)
+        .send({ ...BANK_BODY, type: "crypto" })
+        .expect(400);
+    });
+
+    it("sanitizes provider_name and account_holder but NOT the number", async () => {
+      seen.giftInput = undefined;
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/bank-accounts`)
+        .set(...AUTH)
+        .send({
+          ...BANK_BODY,
+          provider_name: "<b>BCA</b>",
+          account_holder: "<script>alert(1)</script>Budi",
+        })
+        .expect(201);
+
+      expect(seen.giftInput).toMatchObject({
+        providerName: "BCA",
+        accountHolder: "Budi",
+        // Untouched: the exact characters matter, and the format check is the defence.
+        accountNumber: "1234567890",
+      });
+    });
+
+    it("is 401 without a token", async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/invitations/${INVITATION_ID}/bank-accounts`)
+        .expect(401);
+    });
+  });
+
+  describe("quote (P1-13)", () => {
+    it("reads and writes", async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/invitations/${INVITATION_ID}/quote`)
+        .set(...AUTH)
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}/quote`)
+        .set(...AUTH)
+        .send({ text: "A quote", source: "Somebody" })
+        .expect(200);
+
+      expect(res.body.data.text).toBe("A quote");
+    });
+
+    it("sanitizes both fields", async () => {
+      seen.quoteInput = undefined;
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}/quote`)
+        .set(...AUTH)
+        .send({
+          text: "<img src=x onerror=alert(1)>Cinta",
+          source: "<b>Ar-Rum</b>: 21",
+        })
+        .expect(200);
+
+      expect(seen.quoteInput).toEqual({
+        text: "Cinta",
+        source: "Ar-Rum: 21",
+      });
+    });
+
+    it("accepts null to clear", async () => {
+      seen.quoteInput = undefined;
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}/quote`)
+        .set(...AUTH)
+        .send({ source: null })
+        .expect(200);
+
+      expect(seen.quoteInput).toEqual({ source: null });
+    });
+
+    it.each([
+      ["an over-long text", { text: "x".repeat(2001) }],
+      ["an over-long source", { source: "x".repeat(201) }],
+      ["an unknown field", { author: "Somebody" }],
+    ])("rejects %s", async (_name, body) => {
+      await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}/quote`)
+        .set(...AUTH)
+        .send(body)
+        .expect(400);
+    });
+
+    it("another user's invitation is 404", async () => {
+      await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${OTHERS_INVITATION}/quote`)
+        .set(...AUTH)
+        .send({ text: "Hijacked" })
+        .expect(404);
     });
   });
 });

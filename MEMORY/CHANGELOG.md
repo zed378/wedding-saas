@@ -10,6 +10,22 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — gift accounts, where the threat is substitution rather than disclosure
+
+**Added** — gift account CRUD and the quote endpoint ([P1-13](./records/2026-09-12-P1-13-gift-accounts-and-quote.md))
+
+The threat model here is inverted from the rest of the product, and the controls follow from that. A gift account number is **data the couple enters in order to publish it** — on a live invitation with the gift section on, it is already served to every guest who opens the link. Disclosure costs them almost nothing. **Substitution costs them everything their guests sent** (`docs/PLAN/18` R16): an attacker who swaps the number on a published invitation collects the lot, and the couple may not find out until after the wedding.
+
+So:
+
+- **Every create, update and delete writes an audit row inside its own transaction**, and the audit callback is a *required argument* of each write — a caller cannot obtain the change without supplying the trail. A test proves a failing audit rolls the change back, because "in the same transaction" is a claim and a test is what makes it a fact.
+- Audit rows carry a **masked** number. `docs/DATABASE/10` § Policy asks to avoid duplicating this data, and two years of retention over a table of full account numbers would be a larger liability than the one it warns about.
+- **A change to a published invitation notifies the owner**, the way a bank confirms a payee change. Silent on a draft, deliberately: an email per keystroke trains somebody to ignore the one that matters.
+- `account_number` is **format-checked, not sanitized** — the promise `P1-16` made when it exempted the field. A character allowlist makes markup unrepresentable, where tag stripping would silently alter a value whose exact characters matter. Whitespace is trimmed rather than rejected, because somebody pasting from their banking app brings it with them.
+- Still **not column-encrypted** (ADR-025): encryption would protect only drafts, inside a database holding names, home addresses, venue coordinates and complete guest lists in plaintext beside it.
+
+**Changed** — **ADR-053**: `audit_logs` now records owner actions, not only admin ones, and `docs/DATABASE/10` says so. A separate history table would have been cleaner on paper and worse in an incident — "who changed this gift account, and when" is asked *without knowing in advance* whether an admin or the owner did it, and the answer would have lived in one of two places depending on the answer. The cost is that `admin_id` is now a slightly wrong name.
+
 ### 2026-09-12 — events, and a lesson about defence in depth
 
 **Added** — full CRUD over N events per invitation ([P1-12](./records/2026-09-12-P1-12-events-subresource.md))

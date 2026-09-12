@@ -7,18 +7,22 @@ import { InvitationCreateService } from "./invitation-create.service";
 import { InvitationService } from "./invitation.service";
 import { CoupleService } from "./couple.service";
 import { EventsService } from "./events.service";
+import { GiftService, QuoteService } from "./gift.service";
+import { AuditModule } from "../../shared/audit/audit.module";
 import { SlugService } from "./slug.service";
 import { InvitationStatusService } from "../../shared/invitation-status/invitation-status.service";
 
 /** P1-09 and P1-10. The sub-resources are `P1-11` onwards. */
 @Module({
-  imports: [AuthModule, TenancyModule],
+  imports: [AuthModule, TenancyModule, AuditModule],
   controllers: [InvitationController],
   providers: [
     InvitationCreateService,
     InvitationService,
     CoupleService,
     EventsService,
+    GiftService,
+    QuoteService,
     SlugService,
     InvitationStatusService,
   ],
@@ -27,6 +31,8 @@ import { InvitationStatusService } from "../../shared/invitation-status/invitati
     InvitationService,
     CoupleService,
     EventsService,
+    GiftService,
+    QuoteService,
     SlugService,
   ],
 })

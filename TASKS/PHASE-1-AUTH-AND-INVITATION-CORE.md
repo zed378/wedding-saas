@@ -28,7 +28,7 @@
 | P1-10 | Invitation list, detail, update, soft delete | backend | L | P1-09 | ✅
 | P1-11 | Couple sub-resource | backend | M | P1-10 | ✅
 | P1-12 | Events sub-resource | backend | M | P1-10 | ✅
-| P1-13 | Bank accounts and quote sub-resources | backend | M | P1-10 |
+| P1-13 | Bank accounts and quote sub-resources | backend | M | P1-10 | ✅
 | P1-14 | Settings sub-resource and slug rules | backend | M | P1-10 |
 | P1-15 | Change template without data loss | backend | M | P1-10, P0-20 |
 | P1-16 | Free-text sanitization pipeline | backend | M | P0-13 | ✅
@@ -456,7 +456,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-13-gift-accounts-and-quote.md) |
 | **Depends on** | P1-10 |
 | **Spec refs** | `docs/API/04-INVITATION-API.md`, `docs/DATABASE/06-MEDIA.md` § Data Security Note, `docs/SECURITY/09` § Encryption |
 | **Spec required** | Yes — sensitive data |
@@ -477,11 +477,17 @@
 6. Maintain `display_order`.
 
 **Definition of Done**
-- [ ] Account numbers never appear unmasked in any log.
-- [ ] Changing a bank account on a published invitation writes an audit record and emits the owner-notification event, proven by a test.
-- [ ] No log line anywhere contains a full account number.
-- [ ] Cross-invitation `:bank_id` returns 404.
-- [ ] The quote endpoint stores `{text, source}` and sanitizes both.
+- [x] Account numbers never appear unmasked in any log. Two tests against a real logger with a captured destination — three key spellings including a nested object, plus an assertion that the service's own line contains no digit run of six or more.
+- [x] Changing a bank account on a published invitation writes an audit record and emits the owner-notification event, proven by a test. **Mutation**: removing the `status !== "published"` guard fails `"stays quiet on a draft"`, so the guard is doing work rather than the test passing by accident.
+- [x] No log line anywhere contains a full account number. As above.
+- [x] Cross-invitation `:bank_id` returns 404. Three service tests, each also asserting nothing changed, plus three repository-level tests per the `P1-12` lesson.
+- [x] The quote endpoint stores `{text, source}` and sanitizes both.
+
+**The control the card is really about**: the audit callback is a **required argument** of every gift-account write, invoked inside that write's own transaction. `"a FAILING audit rolls the write back"` is what makes "in the same transaction" a fact rather than a claim. Audit rows carry a **masked** number — `docs/DATABASE/10` § Policy asks to avoid duplicating this data, and two years of full account numbers is a worse liability than the one it warns about.
+
+**Deviation**: `audit_logs.admin_id` now holds the acting *user* for owner-sensitive resources (**ADR-053**, `docs/DATABASE/10` amended). A separate history table was rejected — it would split "who changed this gift account" across two places depending on who did it, and an incident asks that question without knowing the answer.
+
+**Delivered on `P1-16`'s promise**: `account_number` is exempt from sanitization and gets a character allowlist instead (`^[0-9][0-9 -]{3,58}[0-9]$`), so markup is unrepresentable. Whitespace is trimmed, not rejected.
 
 ---
 
