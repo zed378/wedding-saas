@@ -138,13 +138,19 @@ Original entry, for the reasoning:
 >
 > `P0-07` left the index exactly as specified rather than adding a unique constraint the documents do not state — an invented constraint would have been discovered later as an unexplained migration failure. Decide it in `P1-05`, when the linking behaviour is actually designed.
 
-### OQ-11 — Account deletion with live invitations
+### ~~OQ-11 — Account deletion with live invitations~~ — ANSWERED 2026-09-12
 
-**Affects**: `P1-08` — implementable under the recommendation below, but the recommendation needs confirming before launch, not after.
+**The recommendation below was adopted** (ADR-051, `P1-08`): soft-delete the account and revoke every session immediately; published invitations keep serving until their own expiry; everything is hard-deleted together under BR-9.
 
-`docs/API/02` offers account deletion and `docs/SECURITY/09` frames it as a data subject right. `docs/DATABASE/01` sets `invitations.owner_id` to `ON DELETE RESTRICT`. What happens when someone requests deletion while their invitation is published and their wedding is next week is not specified. Immediate takedown may destroy something guests are actively using; refusing outright may not satisfy the right.
+**Still a legal question.** Adopting the recommendation does not confirm it. If counsel disagrees, the change is in `UserService.requestDeletion`, and the test `"published invitations keep serving, and are counted"` is the one to invert.
 
-**Recommendation**: soft-delete the account, keep published invitations serving until their existing expiry, hard-delete everything at the end of the retention window under BR-9. Needs confirmation — it is a legal question as much as a product one.
+Original entry:
+
+> **Affects**: `P1-08` — implementable under the recommendation below, but the recommendation needs confirming before launch, not after.
+>
+> `docs/API/02` offers account deletion and `docs/SECURITY/09` frames it as a data subject right. `docs/DATABASE/01` sets `invitations.owner_id` to `ON DELETE RESTRICT`. What happens when someone requests deletion while their invitation is published and their wedding is next week is not specified. Immediate takedown may destroy something guests are actively using; refusing outright may not satisfy the right.
+>
+> **Recommendation**: soft-delete the account, keep published invitations serving until their existing expiry, hard-delete everything at the end of the retention window under BR-9. Needs confirmation — it is a legal question as much as a product one.
 
 ### OQ-12 — Team size and expected timeline
 

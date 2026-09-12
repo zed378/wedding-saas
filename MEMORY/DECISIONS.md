@@ -1454,3 +1454,21 @@ The risk this carries: a future change that gives `jose` a top-level `await` in 
 **The cost, stated plainly** — a Redis outage takes login, registration and password reset down completely. That is the trade, deliberately made. `"every credential policy is fail-closed and nothing else is"` asserts the split so a new credential endpoint added without `failClosed` is caught by a test rather than discovered later.
 
 **Revisit if** — Redis becomes a frequent source of incidents, or a second Redis is provisioned for rate limiting alone. A local in-process fallback counter was considered and rejected: per-instance counters multiply the effective limit by the instance count, which is a silently weaker control rather than an honest outage.
+
+### ADR-051 — Deleting an account does not take its published invitations down
+
+**Date** 2026-09-12 · **Status** Accepted · **Task** `P1-08` · **Answers** `OQ-11`
+
+**Context** — `docs/API/02` offers `DELETE /users/me` and `docs/SECURITY/09` § Data Subject Rights frames it as a right. `docs/DATABASE/01` sets `invitations.owner_id` to `ON DELETE RESTRICT`. What happens when somebody requests deletion while their invitation is published and their wedding is next week was not specified, and `P1-08` step 5 asks for it to be decided rather than implemented by accident.
+
+**Decision** — the account is soft-deleted and made unusable immediately; **published invitations keep serving until their own expiry**, and everything is hard-deleted together at the end of the retention window under BR-9. This is `OQ-11`'s recommendation, adopted.
+
+**Why not an immediate takedown** — the case is concrete rather than theoretical. A couple has sent the link to three hundred guests who use it for the address, the time and the RSVP. Honouring a deletion request by breaking that removes data **the requester published on purpose, about themselves**, and lands the harm on people who did not ask for anything. A privacy control whose main effect is to strand third parties is the wrong control.
+
+**Why the account still dies immediately** — `deleted_at` is set, every refresh token is revoked in the same transaction, and `SessionService` already filters on `deleted_at IS NULL`. The *invitation* outlives the login; the login does not outlive the request. Someone who deletes their account because they fear it is compromised gets what they need at once.
+
+**Why the email is not scrambled** — ADR-031's partial unique index already frees the address for a new account, and keeping it readable is what lets support answer "did I delete this?" during the retention window. The hard delete under BR-9 removes it.
+
+**The response says so.** `DELETE /users/me` returns `live_invitations` and a message naming the behaviour, because a user who deletes their account and then finds their wedding page still up should have been told that was the intent rather than discovering it.
+
+**This is a legal question as much as a product one**, which `OQ-11` said and which adopting the recommendation does not change. If counsel disagrees, the change is to take published invitations down in `requestDeletion`; the test `"published invitations keep serving, and are counted"` is what would need inverting, and it is named so it can be found.
