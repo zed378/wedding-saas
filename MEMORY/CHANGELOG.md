@@ -10,6 +10,20 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — the free tier can publish, once, for three days
+
+**Changed** — a business rule, at the project owner's decision (**ADR-052**, amends BR-1.4, adds BR-2.8).
+
+ADR-023 set the free tier at one unpaid draft and said nothing about whether that draft could be published. It can: **once, for three days.** After that it expires and stops being served, and paying republishes it for the full twelve months.
+
+Three options were put forward — no publishing without payment, a three-day trial that keeps serving with an upgrade banner, and a three-day trial after which the page goes dead. The owner chose the last, which is the hardest on free users and the clearest about the product's value: a guest never sees a half-paid invitation.
+
+**No new status and no new column**, and that is the part worth knowing. The obvious implementation is a `needs_upgrade` boolean beside `status = 'published'`, which is what "give it a flag" suggests. It was rejected because the public renderer would then have to consult **two** fields before deciding a page is visible, and forgetting the second leaves a wedding invitation live forever after its trial ended. A trial publish simply sets `expiry_date` three days out and the existing BR-2.6 expiry sweep does the rest.
+
+**Nothing built so far needed changing.** `P1-09`'s free-draft quota already counts invitations that never reached `paid`, and a trial publish does not reach `paid` — so a user who trials and lets it lapse still holds their one free invitation, can pay to revive it, and cannot start a second one for nothing.
+
+**Worth knowing** — my first draft of BR-2.8 was wrong, and `docs/` caught it. I wrote that a lapsed trial should 404 while a lapsed *paid* invitation showed an "invitation has ended" page. `docs/API/08` already forbids exactly that distinction: the public endpoint answers 404 for anything whose status is not `published`, "WITHOUT leaking the specific reason". The behaviour the owner asked for was already the specified behaviour, and the distinction would have contradicted an explicit instruction to build something nobody needed. The difference is owner-facing only — an upgrade prompt instead of a renewal prompt in the dashboard.
+
 ### 2026-09-12 — the couple, and a reference field that is its own tenancy boundary
 
 **Added** — `PATCH /invitations/:id/couple/{groom,bride}` ([P1-11](./records/2026-09-12-P1-11-couple-subresource.md))

@@ -296,17 +296,19 @@
 **Goal** — `POST /invitations/:id/publish` performs every check in order and makes the invitation live.
 
 **Steps**
-1. Implement the sequence in `docs/BACKEND/02`'s worked example, which is the reference implementation for this endpoint: ownership-scoped load → status must be `paid` → required-field validation against the active template → slug availability → transactional status update with history.
+1. Implement the sequence in `docs/BACKEND/02`'s worked example, which is the reference implementation for this endpoint: ownership-scoped load → **payment OR trial eligibility** → required-field validation against the active template → slug availability → transactional status update with history.
+1a. **BR-2.8 / ADR-052 — the free trial publish.** An unpaid invitation may be published **once**, with `expiry_date = today + 3 days`. Eligibility is "this invitation has never reached `paid` **and** has never been published before" — the second half is what makes it once rather than an endless three-day cycle, and `invitation_status_history` answers both without a new column. A paid invitation takes the ordinary path and gets its package's duration.
 2. Require `email_verified` (`docs/API/01`).
 3. Return 422 with `details[]` listing missing field paths when validation fails (BR-4.2), reusing `P2-06`'s resolver so the checklist and the gate can never disagree.
 4. Validate the slug again at publish time — format, blocklist, uniqueness — and catch a unique-violation race as 409 `SLUG_TAKEN` (`docs/BACKEND/06`).
-5. Set `published_at = now()` and `expiry_date = now() + package duration` from `P3-01`'s entitlements.
+5. Set `published_at = now()` and `expiry_date` — from `P3-01`'s entitlements for a paid invitation, or `today + 3 days` for a trial (BR-2.8).
 6. Determine watermark display from the paid package and return it as `display.watermark` in the public payload (`docs/API/08`, added by ADR-021). It is derived server-side from `packages.has_watermark` and never influenced by a client hint. What the watermark actually looks like is still open as `OQ-13`.
 7. After commit, warm the cache and emit `invitation.published` (`docs/BACKEND/06`).
 8. Meet the acceptance criterion from `docs/PLAN/17`: the public page is reachable within five seconds of publishing.
 
 **Definition of Done**
-- [ ] Publishing an unpaid invitation is refused with a business-rule error.
+- [ ] Publishing an unpaid invitation that has **already used its trial** is refused with a business-rule error naming the upgrade path (BR-2.8).
+- [ ] A first publish of an unpaid invitation succeeds with `expiry_date = today + 3 days`, and a test proves the second attempt after that trial lapses is refused.
 - [ ] Missing required fields produce 422 with the exact field list, matching `publish-check`.
 - [ ] A slug taken concurrently produces 409, not a 500 or a duplicate.
 - [ ] `expiry_date` derives from the purchased package.
@@ -314,6 +316,8 @@
 - [ ] The watermark flag reaches the renderer and `docs/API/08` is amended.
 
 ---
+
+**Inherited from ADR-052 (BR-2.8)** — nothing in the public renderer changes for a lapsed trial: `docs/API/08` already answers 404 for any status other than `published` and forbids revealing why. What is owed is **owner-facing**: the dashboard must show an upgrade prompt rather than a renewal prompt for an invitation that expired without ever reaching `paid`. The predicate is `InvitationRepository.findUnpaidInvitation`'s, already written.
 
 ## P3-10 — Unpublish, Republish, Slug Change After Publish
 

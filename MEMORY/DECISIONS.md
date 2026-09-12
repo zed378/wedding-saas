@@ -1472,3 +1472,38 @@ The risk this carries: a future change that gives `jose` a top-level `await` in 
 **The response says so.** `DELETE /users/me` returns `live_invitations` and a message naming the behaviour, because a user who deletes their account and then finds their wedding page still up should have been told that was the intent rather than discovering it.
 
 **This is a legal question as much as a product one**, which `OQ-11` said and which adopting the recommendation does not change. If counsel disagrees, the change is to take published invitations down in `requestDeletion`; the test `"published invitations keep serving, and are counted"` is what would need inverting, and it is named so it can be found.
+
+### ADR-052 — The free tier publishes once, for three days, and then the page stops being served
+
+**Date** 2026-09-12 · **Status** Accepted · **Task** Amends BR-1.4, adds BR-2.8 · **Supersedes part of** ADR-023
+
+**Context** — ADR-023 set the free tier at one unpaid draft. It did not say whether that draft could be published. The project owner settled it on 2026-09-12, choosing the strictest of three options: the free invitation **may** be published, for **three days**, after which guests get a **404** and the owner is prompted to upgrade.
+
+The alternatives were "cannot publish at all without payment" (simplest) and "trial publish, then keep serving with an upgrade banner" (gentlest). The owner picked the version that is hardest on free users and clearest about the product's value: a guest never sees a half-paid invitation.
+
+**Decision** — a trial publish behaves exactly like a paid publish except for its expiry and what happens afterwards:
+
+| | Paid publish | Trial publish |
+|---|---|---|
+| `status` | `published` | `published` |
+| `expiry_date` | from the purchased package | `today + 3 days` |
+| At expiry | `expired`, stops being served | `expired`, stops being served |
+| Owner sees | renewal prompt | **upgrade prompt** |
+
+**No new status and no new column**, and that is the load-bearing part of this ADR.
+
+The obvious implementation is a `needs_upgrade` boolean beside `status = 'published'`, which is what "give it a flag" suggests. It was rejected: the public renderer would then have to consult **two** fields to decide whether a page is visible, and forgetting the second leaves a wedding invitation live forever after its trial ended. One source of truth for "is this public" is `status`, and `scripts/check-status-writes.mjs` already guarantees that only `InvitationStatusService` can change it.
+
+So a trial publish sets `expiry_date` three days out and the **existing** BR-2.6 sweep moves it to `expired` on its own. Nothing new is built for the expiry itself.
+
+**The guest-facing 404 needed no work, and my first draft of BR-2.8 was wrong about it.**
+
+I wrote that a lapsed trial should 404 while a lapsed *paid* invitation showed an "invitation has ended" page — a distinction the owner's chosen option implied. `docs/API/08` line 37 already forbids exactly that: the public endpoint answers 404 for anything whose status is not `published`, "WITHOUT leaking the specific reason (e.g., not explicitly distinguishing 'never published' vs 'intentionally unpublished' vs 'expired')".
+
+So the behaviour the owner asked for is already the specified behaviour, and adding the distinction would have contradicted an explicit instruction in order to build something nobody needed. BR-2.8 was corrected before any code was written.
+
+**Where the difference does live**: the owner's dashboard, which shows an upgrade prompt rather than a renewal prompt. That is derived from whether the invitation ever reached `paid` — read from `invitation_status_history`, the same predicate `InvitationRepository.findUnpaidInvitation` already uses for BR-1.4, so the two rules cannot disagree about what "paid" means.
+
+**What this costs** — a link three hundred guests may already hold goes dead after three days. That is the owner's deliberate choice, and it is what makes the three days a trial rather than a free product.
+
+**What it does not change** — BR-1.4's quota arithmetic. `P1-09` counts invitations that never reached `paid`, and a trial publish does not reach `paid`, so a user who trials and lets it lapse still holds their one free invitation. They can pay to revive it; they cannot start a second one for free. That is the intended reading and it needed no code change.

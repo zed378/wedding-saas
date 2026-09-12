@@ -41,6 +41,7 @@ One package, one price. See MEMORY ADR-023 for the reasoning, which is worth kno
 |---|---|---|---|---|---|
 | `standard` | **Rp 139,000** | 200 | 10 MB | No | **12 months** |
 
+- **Free tier: one invitation, published once for three days** (BR-1.4, BR-2.8, ADR-052). An account may hold one invitation that has never been paid for, and may publish it as a three-day trial. After three days it expires and stops being served; paying republishes it for the full 12 months. The trial exists so a couple can see their own finished invitation on a real link before deciding — three days is long enough to check it and to show one or two people, and short enough that it is not the product.
 - **One-time payment, not a recurring subscription.** The invitation is live for 12 months; extending it is a renewal order the user makes deliberately (see Renewal below and PLAN/06-INVITATION-LIFECYCLE.md). PLAN/00 § Business Model keeps recurring billing out of the MVP.
 - **Renewal** costs the same Rp 139,000 for another 12 months.
 - **Free tier: one draft.** An account may hold at most one invitation that has never reached `paid` — draft only, watermarked preview, cannot publish (BR-1.4). Once an invitation is paid for it no longer counts against that quota, so a wedding organizer with five paid invitations can still start a sixth draft.

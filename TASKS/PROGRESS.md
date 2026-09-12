@@ -288,6 +288,16 @@ Answered during Phase 1, each needing confirmation rather than further work:
 
 ---
 
+## Business Rule Changes — After the Plan Was Written
+
+| Date | Rule | Change | Recorded |
+|---|---|---|---|
+| 2026-09-12 | BR-1.4, **new** BR-2.8 | **The free tier may publish, once, for three days.** ADR-023 set the free tier at one unpaid draft and said nothing about publishing; the project owner settled it, choosing the strictest of three options. After three days the invitation expires and stops being served. No new status and no new column: a `needs_upgrade` flag beside `published` would give the renderer two fields to consult before deciding a page is visible. | ADR-052, `docs/PLAN/02`, `docs/PLAN/09`, `P3-09`, `P3-10` |
+
+Nothing built so far needed changing. `P1-09`'s quota already counts invitations that never reached `paid`, and a trial publish does not reach `paid` — so a user who trials and lets it lapse still holds their one free invitation and cannot start a second.
+
+---
+
 ## Specification Amendments — Completed
 
 All 17 gaps are resolved and every owed amendment has been made (2026-09-09, ADR-018 through ADR-022). `docs/` now describes the system the plan builds, so no task starts by having to decide something two documents disagreed about.

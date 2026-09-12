@@ -4,13 +4,17 @@
 - BR-1.1 Each invitation is owned by exactly one user (`owner_id`). No shared ownership in the MVP.
 - BR-1.2 Users can only view/modify/delete their own invitations. Violation = a security incident (see SECURITY/05).
 - BR-1.3 Admins can view all invitations for moderation/support purposes, logged in the audit log.
-- BR-1.4 **Free draft quota**: an account may hold at most **one** invitation that has never reached `paid`. Attempting to create a second returns 422 `FREE_DRAFT_LIMIT_REACHED` naming the existing draft. An invitation that has been paid for stops counting against this quota, so a wedding organizer with many paid invitations can always start one more draft — the quota limits unpaid inventory, not customers. (PLAN/09, ADR-023; the per-day creation rate limit in SECURITY/10 remains as a separate abuse control.)
+- BR-1.4 **Free tier**: an account may hold at most **one** invitation that has never reached `paid`, and that invitation may be published **once, as a three-day trial** (BR-2.8). Attempting to create a second returns 422 `FREE_DRAFT_LIMIT_REACHED` naming the existing draft. An invitation that has been paid for stops counting against this quota, so a wedding organizer with many paid invitations can always start one more draft — the quota limits unpaid inventory, not customers. (PLAN/09, ADR-023; the per-day creation rate limit in SECURITY/10 remains as a separate abuse control.)
 
 ## BR-2 Invitation Lifecycle
 - BR-2.1 A new invitation starts as `draft`. Drafts can be edited freely and are not public.
 - BR-2.2 The invitation becomes `pending_payment` when the user checks out.
 - BR-2.3 The invitation becomes `paid` after a validated payment callback is received.
 - BR-2.4 A `paid` invitation can be `published` (becomes publicly accessible).
+- BR-2.8 **Free trial publish** (ADR-052). An unpaid invitation may be published **once**, with `expiry_date = today + 3 days`. It then becomes `expired` by the ordinary BR-2.6 sweep and stops being served, exactly as any expired invitation does — API/08 already answers 404 for anything whose status is not `published`, deliberately without revealing why. The owner may publish again by paying, which sets `expiry_date` from the purchased package (BR-5).
+  - **Guests see no difference between a lapsed trial and a lapsed paid invitation**, and that is API/08's existing instruction, not an omission: it forbids distinguishing "never published" from "unpublished" from "expired" in the public response.
+  - The difference is **owner-facing only** — the dashboard shows an upgrade prompt rather than a renewal prompt. It is derived from whether the invitation ever reached `paid`, which `invitation_status_history` records and which `InvitationRepository.findUnpaidInvitation` already reads for BR-1.4.
+  - **No new status and no new column.** A `needs_upgrade` flag beside `status = 'published'` would give the renderer two fields to consult before deciding a page is visible, and forgetting the second leaves an invitation live after its trial ended.
 - BR-2.5 A `published` invitation can be `unpublished` (returns to private, data is not lost, remains `paid`).
 - BR-2.6 A `published` invitation that passes its `expiry_date` automatically becomes `expired` (not publicly accessible, shows an "invitation has ended" page).
 - BR-2.7 Status transitions MUST NOT move backward automatically except by an admin (e.g., refund).
