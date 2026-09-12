@@ -7,6 +7,8 @@ import request from "supertest";
 import { AppExceptionFilter } from "../src/http/exception.filter";
 import { InvitationController } from "../src/modules/invitation/invitation.controller";
 import { InvitationCreateService } from "../src/modules/invitation/invitation-create.service";
+import { InvitationService } from "../src/modules/invitation/invitation.service";
+import { NotFoundError } from "../src/http/errors";
 import { SessionService } from "../src/modules/auth/session.service";
 import { UnauthenticatedError } from "../src/http/errors";
 import {
@@ -33,7 +35,13 @@ const created = {
   templateVersionId: "55555555-5555-4555-8555-555555555555",
 };
 
-const seen: { input?: unknown; scope?: unknown } = {};
+const seen: {
+  input?: unknown;
+  scope?: unknown;
+  listOptions?: unknown;
+  update?: unknown;
+  deleted?: string | undefined;
+} = {};
 
 const createStub = {
   create: async (scope: unknown, input: unknown) => {
@@ -44,6 +52,60 @@ const createStub = {
 };
 
 const OWNER_ID = "11111111-1111-4111-8111-111111111111";
+const INVITATION_ID = "33333333-3333-4333-8333-333333333333";
+const OTHERS_INVITATION = "99999999-9999-4999-8999-999999999999";
+
+const detail = {
+  id: INVITATION_ID,
+  owner_id: OWNER_ID,
+  internal_name: "Budi & Ani",
+  status: "draft",
+  slug: "budi-dan-ani",
+  template_id: created.templateId,
+  template_version_id: created.templateVersionId,
+  published_at: null,
+  expiry_date: null,
+  created_at: "2026-01-05T02:00:00.000Z",
+  updated_at: "2026-01-05T02:00:00.000Z",
+  couple: { groom: null, bride: null },
+  events: [],
+  gallery: [],
+  bank_accounts: [],
+  quote: { text: null, source: null },
+  settings: {
+    enabled_sections: ["hero"],
+    theme_override: {},
+    rsvp_enabled: true,
+    guestbook_enabled: true,
+    guestbook_moderation: false,
+    seo_indexable: false,
+  },
+};
+
+/** Anything but the owner's own invitation is a 404, as the real service would. */
+const mineOr404 = (id: string) => {
+  if (id !== INVITATION_ID) throw new NotFoundError();
+};
+
+const invitationStub = {
+  list: async (_scope: unknown, options: unknown) => {
+    seen.listOptions = options;
+    return { items: [detail], total: 1 };
+  },
+  detail: async (_scope: unknown, id: string) => {
+    mineOr404(id);
+    return detail;
+  },
+  update: async (_scope: unknown, id: string, changes: unknown) => {
+    mineOr404(id);
+    seen.update = changes;
+    return detail;
+  },
+  softDelete: async (_scope: unknown, id: string) => {
+    mineOr404(id);
+    seen.deleted = id;
+  },
+};
 
 const sessionStub = {
   authenticate: async (header: string | undefined) => {
@@ -85,6 +147,7 @@ describe("POST /invitations over HTTP", () => {
       providers: [
         { provide: APP_FILTER, useClass: AppExceptionFilter },
         { provide: InvitationCreateService, useValue: createStub },
+        { provide: InvitationService, useValue: invitationStub },
         { provide: SessionService, useValue: sessionStub },
         { provide: RATE_LIMITER, useValue: limiterStub },
         {
@@ -242,5 +305,108 @@ describe("POST /invitations over HTTP", () => {
       .expect(429);
 
     expect(res.body.error.code).toBe("TOO_MANY_ATTEMPTS");
+  });
+
+  describe("the other four endpoints (P1-10)", () => {
+    it.each([
+      ["get", `/api/v1/invitations/${INVITATION_ID}`],
+      ["patch", `/api/v1/invitations/${INVITATION_ID}`],
+      ["delete", `/api/v1/invitations/${INVITATION_ID}`],
+      ["get", "/api/v1/invitations"],
+    ])("%s %s is 401 without a token", async (method, path) => {
+      await request(app.getHttpServer())
+        [method as "get"](path)
+        .send({ internal_name: "X" })
+        .expect(401);
+    });
+
+    it.each([
+      ["get", `/api/v1/invitations/${OTHERS_INVITATION}`],
+      ["patch", `/api/v1/invitations/${OTHERS_INVITATION}`],
+      ["delete", `/api/v1/invitations/${OTHERS_INVITATION}`],
+    ])(
+      "%s another user's invitation is 404 with no data",
+      async (method, path) => {
+        // docs/SECURITY/04 § Note: 404, never 403. A 403 would confirm the resource
+        // exists and turn every :id endpoint into an enumeration oracle.
+        const res = await request(app.getHttpServer())
+          [method as "get"](path)
+          .set(...AUTH)
+          .send({ internal_name: "Hijacked" })
+          .expect(404);
+
+        expect(res.body.data).toBeUndefined();
+        expect(JSON.stringify(res.body)).not.toContain("Budi & Ani");
+      },
+    );
+
+    it("GET /invitations returns a paginated envelope", async () => {
+      const res = await request(app.getHttpServer())
+        .get("/api/v1/invitations?page=2&per_page=5")
+        .set(...AUTH)
+        .expect(200);
+
+      expect(res.body.meta).toEqual({ page: 2, per_page: 5, total: 1 });
+      expect(seen.listOptions).toMatchObject({ limit: 5, offset: 5 });
+    });
+
+    it("GET /invitations rejects an unknown status filter", async () => {
+      await request(app.getHttpServer())
+        .get("/api/v1/invitations?status=nonsense")
+        .set(...AUTH)
+        .expect(400);
+    });
+
+    it("GET /invitations/:id returns the full aggregate", async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/invitations/${INVITATION_ID}`)
+        .set(...AUTH)
+        .expect(200);
+
+      expect(res.body.data.couple).toBeDefined();
+      expect(res.body.data.settings.enabled_sections).toEqual(["hero"]);
+    });
+
+    it.each([
+      ["status", { status: "published" }],
+      ["owner_id", { owner_id: OWNER_ID }],
+      ["slug", { slug: "hijacked" }],
+      [
+        "template_version_id",
+        { template_version_id: created.templateVersionId },
+      ],
+      ["published_at", { published_at: "2026-01-01T00:00:00Z" }],
+      ["expiry_date", { expiry_date: "2030-01-01" }],
+    ])("PATCH rejects a body carrying %s", async (_name, extra) => {
+      await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}`)
+        .set(...AUTH)
+        .send({ internal_name: "X", ...extra })
+        .expect(400);
+    });
+
+    it("PATCH passes only internal_name down", async () => {
+      seen.update = undefined;
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}`)
+        .set(...AUTH)
+        .send({ internal_name: "Budi & Ani — revisi" })
+        .expect(200);
+
+      expect(seen.update).toEqual({ internalName: "Budi & Ani — revisi" });
+    });
+
+    it("DELETE says the slug is released", async () => {
+      seen.deleted = undefined;
+
+      const res = await request(app.getHttpServer())
+        .delete(`/api/v1/invitations/${INVITATION_ID}`)
+        .set(...AUTH)
+        .expect(200);
+
+      expect(seen.deleted).toBe(INVITATION_ID);
+      expect(res.body.data.message).toMatch(/dapat digunakan kembali/i);
+    });
   });
 });
