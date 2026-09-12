@@ -395,3 +395,71 @@ describe("cron leader election", () => {
     await scheduler.close();
   });
 });
+
+describe("the producer/consumer contract (P1-18)", () => {
+  /**
+   * The seam this suite exists to pin.
+   *
+   * Until `P1-18` the API added jobs to a queue named after the **pool** while `JobRunner`
+   * created one `new Worker(jobName)` per job — so every job the API ever enqueued landed
+   * in a queue nobody consumed, and nothing noticed because no handler had been registered.
+   * `P1-02`'s eight `notification.send` calls had been going nowhere for six tasks.
+   *
+   * Two facts hold the two halves together, and each half has a test:
+   *
+   *   **the queue name is the job name** — asserted here and in `queue.spec.ts` on the API;
+   *   **the payload is the `JobPayload` envelope** — likewise.
+   *
+   * This is the consumer's half. It enqueues the way `QueueModule.enqueue` does, by hand,
+   * because the worker cannot import the API. That is the weakness of the arrangement and
+   * the reason the shape wants to live in a package (`P4-06`).
+   */
+  it("a job enqueued the way the API enqueues it reaches the handler", async () => {
+    const seen: unknown[] = [];
+    const runner = new JobRunner({ pool: "media", connection, redis });
+
+    runner.register("media.process", async (data: unknown) => {
+      seen.push(data);
+    });
+    runner.start();
+
+    // Exactly what `QueueModule.enqueue("media", "media.process", { mediaId })` produces:
+    // a queue named after the JOB, and the data wrapped in the envelope.
+    const queue = new Queue("media.process", { connection });
+    await queue.add("media.process", {
+      data: { mediaId: "abc" },
+      idempotencyKey: `media.process:abc-${uniq()}`,
+      relatedId: "invitation-1",
+      trace: { enqueued_at: new Date().toISOString() },
+    } satisfies JobPayload);
+
+    await until(() => seen.length === 1, "the handler to receive the job");
+
+    // The handler gets `data`, unwrapped. A handler reading `job.data` directly would see
+    // the envelope and quietly do nothing useful with it.
+    expect(seen[0]).toEqual({ mediaId: "abc" });
+
+    await queue.close();
+    await runner.stop();
+  });
+
+  it("a job addressed to the POOL is never delivered", async () => {
+    // The old bug, asserted as a bug. If this ever starts passing, the two halves have
+    // drifted back apart and the symptom will be jobs that vanish rather than fail.
+    const seen: unknown[] = [];
+    const runner = new JobRunner({ pool: "media", connection, redis });
+    runner.register("media.process", async (data: unknown) => {
+      seen.push(data);
+    });
+    runner.start();
+
+    const wrong = new Queue("media", { connection });
+    await wrong.add("media.process", { data: { mediaId: "abc" } });
+
+    await new Promise((r) => setTimeout(r, 1_000));
+    expect(seen).toEqual([]);
+
+    await wrong.close();
+    await runner.stop();
+  });
+});

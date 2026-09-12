@@ -196,6 +196,22 @@ services:
       redis: { condition: service_healthy }
       minio-init: { condition: service_completed_successfully }
 
+  # docs/SECURITY/06 layer 10, and a dependency of worker-media rather than an optional
+  # extra: that worker refuses to start without it (P1-18). `start_period` is long because
+  # the first boot downloads the full signature database, and a shorter one would mark a
+  # healthy container unhealthy every time the volume is recreated.
+  clamav:
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    volumes:
+      - clamav-data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+
   worker-general:
     build: { context: .., dockerfile: backend/worker/Dockerfile }
     restart: unless-stopped
@@ -218,6 +234,13 @@ services:
       SERVICE_NAME: worker-media
       REDIS_URL: redis://redis:6379
       DATABASE_URL: ${DATABASE_URL:?required}
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:?required}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:?required}
+      # docs/SECURITY/06 layer 10. The worker REFUSES TO START without this (P1-18), and
+      # MEDIA_SCAN_DISABLED is rejected outright when NODE_ENV is production or staging --
+      # an unscanned upload that reached `ready` is the outcome the layer exists to prevent.
+      CLAMAV_HOST: clamav
     # Hard caps, per docs/BACKEND/04 § Resource Isolation. This pool decodes untrusted
     # images: one crafted file must not starve the other eight projects on this host.
     deploy:
@@ -227,6 +250,8 @@ services:
     depends_on:
       redis: { condition: service_healthy }
       postgres: { condition: service_healthy }
+      minio: { condition: service_healthy }
+      clamav: { condition: service_healthy }
 
   worker-cron:
     build: { context: .., dockerfile: backend/worker/Dockerfile }
@@ -237,6 +262,9 @@ services:
       SERVICE_NAME: worker-cron
       REDIS_URL: redis://redis:6379
       DATABASE_URL: ${DATABASE_URL:?required}
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:?required}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:?required}
       # The documented cron times are WIB. The schedules carry an explicit timezone, so
       # this only affects log timestamps -- but a container in UTC read against a WIB
       # schedule is confusing enough to be worth setting.
@@ -244,6 +272,7 @@ services:
     depends_on:
       redis: { condition: service_healthy }
       postgres: { condition: service_healthy }
+      minio: { condition: service_healthy }
 
   web-app:
     build: { context: .., dockerfile: frontend/web-app/Dockerfile }
@@ -327,6 +356,7 @@ services:
       api: { condition: service_healthy }
 
 volumes:
+  clamav-data:
   postgres-data:
   redis-data:
   minio-data:

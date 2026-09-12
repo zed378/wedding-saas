@@ -30,11 +30,37 @@ export const JOB_QUEUE = Symbol("JOB_QUEUE");
 /** The pools `backend/worker/src/jobs.ts` defines. */
 export type PoolName = "general" | "media" | "cron";
 
+/**
+ * The envelope every job travels in. **This shape is the contract with the worker**, and
+ * `JobPayload` in `backend/worker/src/runner.ts` is the other half of it.
+ *
+ * Duplicated rather than shared, for now: the API cannot import `@wi/worker` and the worker
+ * cannot import the API. Each side has a test pinning its half — `queue.spec.ts` here and
+ * `media-process.itest.ts` there — which is what stops the two drifting until the shape
+ * moves into a package (`P4-06`, when `notification.send` gets its handler).
+ */
+export interface JobEnvelope {
+  readonly trace?: {
+    request_id?: string;
+    user_id?: string;
+    enqueued_at?: string;
+  };
+  /** Absent means the job is inherently safe to repeat. */
+  readonly idempotencyKey?: string;
+  /** An invitation or order id, for the worker's `related_id` log field. */
+  readonly relatedId?: string;
+  readonly data: Record<string, unknown>;
+}
+
 export interface JobQueue {
   readonly enqueue: (
     pool: PoolName,
     name: string,
     data: Record<string, unknown>,
+    options?: {
+      readonly idempotencyKey?: string;
+      readonly relatedId?: string;
+    },
   ) => Promise<void>;
   readonly close: () => Promise<void>;
 }
@@ -55,22 +81,44 @@ export interface JobQueue {
           enableOfflineQueue: false,
         });
 
-        // A Queue per pool. BullMQ addresses a queue by name, and the worker listens on
-        // one name per pool.
-        const queues = new Map<PoolName, Queue>();
-        const queueFor = (pool: PoolName): Queue => {
-          let queue = queues.get(pool);
+        /**
+         * A Queue per **job name**, not per pool.
+         *
+         * This was a queue per pool until `P1-18`, and it was a real defect rather than a
+         * style choice: `JobRunner.start()` creates one `new Worker(jobName)` per registered
+         * job, so a job added to a queue called `general` is a job no worker is listening
+         * for. Nothing noticed because no handler had ever been registered — `P1-02`'s eight
+         * `notification.send` calls were all landing in a queue nobody consumed.
+         *
+         * The pool is still a parameter because it is real — `docs/BACKEND/08` separates
+         * `worker-media` from `worker-general` so they scale and fail independently — but it
+         * is a property of the *worker process*, decided by `jobs.ts`, not an address.
+         */
+        const queues = new Map<string, Queue>();
+        const queueFor = (jobName: string): Queue => {
+          let queue = queues.get(jobName);
           if (queue === undefined) {
-            queue = new Queue(pool, { connection });
-            queues.set(pool, queue);
+            queue = new Queue(jobName, { connection });
+            queues.set(jobName, queue);
           }
           return queue;
         };
 
         return {
-          enqueue: async (pool, name, data) => {
+          enqueue: async (pool, name, data, options) => {
             try {
-              await queueFor(pool).add(name, data, {
+              const envelope: JobEnvelope = {
+                data,
+                ...(options?.idempotencyKey !== undefined
+                  ? { idempotencyKey: options.idempotencyKey }
+                  : {}),
+                ...(options?.relatedId !== undefined
+                  ? { relatedId: options.relatedId }
+                  : {}),
+                trace: { enqueued_at: new Date().toISOString() },
+              };
+
+              await queueFor(name).add(name, envelope, {
                 removeOnComplete: { count: 100 },
                 removeOnFail: { count: 1000 },
               });

@@ -10,6 +10,24 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — the media worker, and six tasks of jobs that went nowhere
+
+**Added** — `media.process` and `media_cleanup_staging` ([P1-18](./records/2026-09-12-P1-18-media-processing-worker.md))
+
+- **A file becomes `ready` only after it has been scanned, decoded and stripped**, and every other decision protects that sentence. A scanner that cannot answer raises rather than returning `clean`; a scan failure is retried rather than resolved into a verdict; the permanent bucket is written only after both pass. The ordering is asserted directly — which of `scan` and `put` ran first — rather than inferred from the order of the source.
+- **The dimension check runs on the header.** `metadata()` parses a few hundred bytes where `resize()` allocates width × height × channels: a 40000 × 40000 PNG is a 200 KB file and a 4.8 GB buffer.
+- **The EXIF strip is an absence** — sharp drops metadata unless asked to keep it — so the test reads the output bytes back rather than trusting the default, and greps them for the tag text as well. `docs/SECURITY/09` treats a couple's GPS coordinates on a public page as a privacy incident.
+- **The media pool refuses to start without a malware scanner.** `MEDIA_SCAN_DISABLED=true` exists for a laptop with no container, is refused outright in staging and production, and is logged loudly on every boot where it is used.
+- `OQ-19` closed (ADR-055): three variants, and `original` was always another name for `large` — `docs/PLAN/11` said so and the sentence had been overlooked.
+
+**Worth knowing** — **no job the API had ever enqueued could be consumed.**
+
+The producer added jobs to a BullMQ queue named after the **pool**; `JobRunner` creates one `new Worker(jobName)` per registered job, so it consumes a queue named after the **job**. The payloads disagreed too: raw data where the runner reads an envelope. The cron scheduler had the same shape.
+
+`P1-02`'s eight `notification.send` calls had been going nowhere for six tasks. Nothing noticed because an unconsumed queue and an unregistered handler are indistinguishable from outside, and no handler had ever been registered. `P1-18` is the first task where a job had to actually run, so it is the task that found it. ADR-056, with a test on each side — including one named *"a job addressed to the POOL is never delivered"*, which encodes the old bug as a bug.
+
+**Also** — the repository's conditional writes passed a mutation until repository-level tests were added, which is `P1-12`'s finding for the fifth time. And the first EICAR test was wrong rather than the code: it padded the test string past 128 bytes, where the specification stops defining it, and ClamAV was right to call the result clean.
+
 ### 2026-09-12 — media upload, and a concurrency test that could not see the race
 
 **Added** — `POST /invitations/:id/media` and `GET /media/:media_id` ([P1-17](./records/2026-09-12-P1-17-media-upload.md))

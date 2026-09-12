@@ -5,7 +5,8 @@ import { CRON_JOBS, CRON_TIMEZONE, jobsForPool, type Pool } from "./jobs.js";
 import { JobRunner } from "./runner.js";
 import { LeaderElection } from "./leader-election.js";
 import { logger } from "./logger.js";
-import { registerHandlers } from "./handlers/index.js";
+import { createHandlerDeps, registerHandlers } from "./handlers/index.js";
+import { loadWorkerEnv, WorkerConfigError, type WorkerEnv } from "./env.js";
 
 /**
  * The worker entry point. One process per pool.
@@ -39,42 +40,68 @@ function parsePool(): Pool {
   process.exit(78); // EX_CONFIG, the same code the API uses for a bad environment.
 }
 
-function redisUrl(): string {
-  const url = process.env["REDIS_URL"];
-  if (url === undefined || url.length === 0) {
-    console.error("REDIS_URL is required. See .env.example.");
-    process.exit(78);
-  }
-  return url;
-}
-
 async function main(): Promise<void> {
   const pool = parsePool();
-  const url = redisUrl();
+
+  // Validated before anything is constructed, and it exits 78 naming every offending
+  // variable -- the same contract the API's `loadEnv` keeps. A media worker missing its
+  // scanner should refuse to start, not discover it on the first hostile file.
+  let env: WorkerEnv;
+  try {
+    env = loadWorkerEnv(pool);
+  } catch (error) {
+    console.error(
+      error instanceof WorkerConfigError ? error.message : String(error),
+    );
+    return process.exit(78);
+  }
+
+  if (pool === "media" && env.clamav === undefined) {
+    // Loud, at startup, every time. `loadWorkerEnv` has already refused this combination
+    // in staging and production; in development it is allowed and must never be quiet.
+    logger.warn(
+      { context: { pool, event: "media.scan_disabled" } },
+      "MALWARE SCANNING IS DISABLED. Uploads will be published without being scanned (docs/SECURITY/06 layer 10)",
+    );
+  }
 
   // BullMQ requires this; without it a blocking command that fails is retried forever
   // instead of surfacing.
-  const redis = new IORedis(url, { maxRetriesPerRequest: null });
-  const connection = { url } as const;
+  const redis = new IORedis(env.redisUrl, { maxRetriesPerRequest: null });
+  const connection = { url: env.redisUrl } as const;
+
+  // `general` needs no database or bucket today, and building them would demand credentials
+  // an email worker has no use for.
+  const deps = pool === "general" ? undefined : createHandlerDeps(env);
 
   const runner = new JobRunner({ pool, connection, redis });
-  registerHandlers(pool, runner);
+  registerHandlers(pool, runner, deps);
   runner.start();
 
   let election: LeaderElection | undefined;
-  let scheduler: Queue | undefined;
+  let schedulers: Map<string, Queue> | undefined;
 
   if (pool === "cron") {
     // Scheduled jobs are registered only while this instance holds leadership, and
     // removed when it loses it. A follower therefore holds no schedules at all --
     // rather than holding them and declining to act, which is one forgotten check away
     // from every couple receiving two reminder emails.
-    scheduler = new Queue("cron-scheduler", { connection });
+    // One scheduler queue per cron job NAME, for the reason `queue.module.ts` in the API
+    // now documents: `JobRunner` creates one `new Worker(jobName)` per registered job, so a
+    // schedule that puts its jobs in a queue called `cron-scheduler` puts them where no
+    // worker is listening. This was true from `P0-15` until `P1-18` registered the first
+    // cron handler and nothing consumed it.
+    schedulers = new Map(
+      Object.values(CRON_JOBS).map((job) => [
+        job.name,
+        new Queue(job.name, { connection }),
+      ]),
+    );
     election = new LeaderElection(redis);
 
     await election.start({
-      onGain: () => void registerSchedules(scheduler!),
-      onLose: () => void removeSchedules(scheduler!),
+      onGain: () => void registerSchedules(schedulers!),
+      onLose: () => void removeSchedules(schedulers!),
     });
   }
 
@@ -95,7 +122,10 @@ async function main(): Promise<void> {
     // schedule, then drain in-flight jobs, then close the connection.
     await election?.stop();
     await runner.stop();
-    await scheduler?.close();
+    for (const scheduler of schedulers?.values() ?? []) await scheduler.close();
+    // A `pg.Pool` that is never ended keeps the process alive past SIGTERM, which turns a
+    // rolling deploy into a stuck one.
+    await deps?.pg.end();
     await redis.quit();
     process.exit(0);
   };
@@ -111,8 +141,11 @@ async function main(): Promise<void> {
  * would otherwise fire "daily at 00:05 WIB" at 07:05 WIB — seven hours late, every day,
  * with nothing about it looking wrong.
  */
-async function registerSchedules(scheduler: Queue): Promise<void> {
+async function registerSchedules(
+  schedulers: Map<string, Queue>,
+): Promise<void> {
   for (const job of Object.values(CRON_JOBS)) {
+    const scheduler = schedulers.get(job.name)!;
     // upsertJobScheduler, not the `repeat` option: BullMQ 6 replaced repeatable jobs
     // with job schedulers. The scheduler id is stable, so re-registering after a
     // leadership change REPLACES the schedule rather than adding a second copy -- which
@@ -139,17 +172,18 @@ async function registerSchedules(scheduler: Queue): Promise<void> {
   );
 }
 
-async function removeSchedules(scheduler: Queue): Promise<void> {
-  const schedulers = await scheduler.getJobSchedulers();
-  await Promise.all(
-    schedulers.map((s) =>
-      s.key !== undefined ? scheduler.removeJobScheduler(s.key) : undefined,
-    ),
-  );
-  logger.warn(
-    { context: { count: schedulers.length } },
-    "cron schedules removed",
-  );
+async function removeSchedules(schedulers: Map<string, Queue>): Promise<void> {
+  let removed = 0;
+  for (const scheduler of schedulers.values()) {
+    const existing = await scheduler.getJobSchedulers();
+    await Promise.all(
+      existing.map((s) =>
+        s.key !== undefined ? scheduler.removeJobScheduler(s.key) : undefined,
+      ),
+    );
+    removed += existing.length;
+  }
+  logger.warn({ context: { count: removed } }, "cron schedules removed");
 }
 
 main().catch((error: unknown) => {

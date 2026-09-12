@@ -8,7 +8,7 @@
 ```
 user-media/
   invitations/{invitation_id}/media/{media_id}/{variant}.webp
-    variant: original | large | thumbnail
+    variant: thumbnail | medium | large
 
 template-assets/
   templates/{template_id}/versions/{version}/assets/{asset_name}
@@ -18,6 +18,8 @@ The path includes `invitation_id` for isolation & audit purposes, and `media_id`
 ## Access Control
 - Buckets are **private** by default; public access is only through a CDN with cache-friendly signed URLs OR through a CDN restricted via Origin Access Control — files must never be accessible directly via the bucket URL.
 - Uploads occur through the backend (validated first) or via presigned URLs with strict constraints (content-type, size limit, short expiry) — see SECURITY/06-FILE-UPLOAD-SECURITY.md.
+
+**Three variants, and `original` is another name for `large`** (ADR-055, P1-18). This line previously read `original | large | thumbnail`, while BACKEND/04 step 6 generated `thumbnail (300px) | medium (800px) | large (1600px)`. The two were never in conflict: PLAN/11 § Limits says "the retained *original* is the **capped** original from the processing pipeline", and the capped original from step 6 is `large`. One document used the product's word and the other the pipeline's. The raw upload is never retained — BR-8.2 requires reprocessing before permanent storage, and keeping it would keep un-stripped EXIF (including GPS) in a public bucket, which SECURITY/06 layer 7 forbids.
 
 ## CDN
 - All media & static asset GETs are served via CDN with long cache-control (immutable filenames based on hash/UUID+variant).
