@@ -5,6 +5,7 @@ import { TenancyModule } from "../../shared/tenancy/tenancy.module";
 import { InvitationController } from "./invitation.controller";
 import { InvitationCreateService } from "./invitation-create.service";
 import { InvitationService } from "./invitation.service";
+import { CoupleService } from "./couple.service";
 import { SlugService } from "./slug.service";
 import { InvitationStatusService } from "../../shared/invitation-status/invitation-status.service";
 
@@ -15,9 +16,15 @@ import { InvitationStatusService } from "../../shared/invitation-status/invitati
   providers: [
     InvitationCreateService,
     InvitationService,
+    CoupleService,
     SlugService,
     InvitationStatusService,
   ],
-  exports: [InvitationCreateService, InvitationService, SlugService],
+  exports: [
+    InvitationCreateService,
+    InvitationService,
+    CoupleService,
+    SlugService,
+  ],
 })
 export class InvitationModule {}

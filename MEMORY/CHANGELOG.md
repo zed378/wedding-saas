@@ -10,6 +10,17 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — the couple, and a reference field that is its own tenancy boundary
+
+**Added** — `PATCH /invitations/:id/couple/{groom,bride}` ([P1-11](./records/2026-09-12-P1-11-couple-subresource.md))
+
+- **`photo_media_id` is where this endpoint could leak, and the path parameter does not protect it.** The route's `:id` is checked, so the caller demonstrably owns the invitation — and they can still name **somebody else's** photo, which would then render on their public page. `docs/SECURITY/05` § 6 is about exactly this: a reference field is a second tenancy boundary.
+- The check is scoped by **invitation**, not by owner, which is narrower and correct: a photo belonging to a *different invitation of the same user* is still the wrong photo. There is a test for that case on its own.
+- It also requires `status = 'ready'`. A file still in the pipeline has not been through `docs/SECURITY/06`'s magic-byte, EXIF and malware stages, so referencing one would put an unvalidated file on a public page the moment processing finished.
+- All three rejections return an **identical** error. Distinguishing "not yours" from "does not exist" would let a caller probe which media ids exist, which is the enumeration the 404 rule closes everywhere else; the test compares the serialised errors, not just the status.
+- An `UPDATE`, never an upsert — `P1-09` creates both people rows empty, and an upsert could produce a second `groom` under concurrency, which the detail projection would resolve by silently picking whichever row came back first. Three concurrent updates leave one row.
+- The role is in the path, as `docs/API/04` writes it, so it cannot be tampered with independently of the resource. An unknown role is a **404**: `/couple/spouse` is not a route, and a 400 would imply it might be.
+
 ### 2026-09-12 — one sanitization step, and a guard that refuses to let anyone skip it
 
 **Added** — the free-text sanitization pipeline ([P1-16](./records/2026-09-12-P1-16-sanitization-pipeline.md)), **built out of order** because every sub-resource task from `P1-11` to `P1-15` has it as a definition-of-done item.

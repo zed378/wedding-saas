@@ -26,7 +26,7 @@
 | P1-08 | User profile, preferences, account deletion | backend | M | P1-06 |
 | P1-09 | Create an invitation | backend | M | P1-06, P0-20 | ✅
 | P1-10 | Invitation list, detail, update, soft delete | backend | L | P1-09 | ✅
-| P1-11 | Couple sub-resource | backend | M | P1-10 |
+| P1-11 | Couple sub-resource | backend | M | P1-10 | ✅
 | P1-12 | Events sub-resource | backend | M | P1-10 |
 | P1-13 | Bank accounts and quote sub-resources | backend | M | P1-10 |
 | P1-14 | Settings sub-resource and slug rules | backend | M | P1-10 |
@@ -396,7 +396,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-11-couple-subresource.md) |
 | **Depends on** | P1-10 |
 | **Spec refs** | `docs/API/04-INVITATION-API.md` § Couple/Person, `docs/DATABASE/05-EVENTS.md`, `docs/PLAN/08` § Entity: Person |
 | **Spec required** | No |
@@ -411,10 +411,12 @@
 4. Enforce length limits from `docs/DATABASE/05`.
 
 **Definition of Done**
-- [ ] Both endpoints update the existing row; no duplicate person row can be created.
-- [ ] A `photo_media_id` from another invitation is rejected, with a test.
-- [ ] Script payloads in names do not survive storage.
-- [ ] IDOR tests pass for both endpoints.
+- [x] Both endpoints update the existing row; no duplicate person row can be created. Three concurrent updates leave exactly one row.
+- [x] A `photo_media_id` from another invitation is rejected, with a test. **Two** — a different tenant's, and a different invitation of the *same* user's, which is the narrower and more easily missed case. **Mutation**: removing `eq(media.invitationId, invitationId)` fails 3 tests; removing `eq(media.status, "ready")` fails 2 more.
+- [x] Script payloads in names do not survive storage. `P1-16`'s pipeline, asserted at the HTTP boundary over all five name fields.
+- [x] IDOR tests pass for both endpoints. Each also asserts the target row is unchanged, not only that the call was refused.
+
+**Worth knowing**: all three photo rejections return an identical error, because distinguishing them would be a media-id enumeration oracle. There is no `quarantined` media status — `media_status_check` permits `processing`, `ready`, `failed`, and a test asserting otherwise failed on the constraint.
 
 ---
 
