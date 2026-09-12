@@ -1646,3 +1646,39 @@ costs a legitimate user nothing.
 problems for the person typing — "that is not a valid address", "that word is reserved",
 "somebody got there first" — and collapsing them into "unavailable" would make the inline
 hint useless at exactly the moment it is supposed to help.
+
+### ADR-058 — A foreign child id in a whole-list body answers 422, not 404, and must be indistinguishable from an absent one
+
+**Date** 2026-09-12 · **Status** Accepted · **Task** `P1-25`
+
+**Context** — `docs/SECURITY/04` § Note states the rule without qualification: a resource the
+caller does not own answers **404**, never 403, because 403 confirms the resource exists.
+`P1-25`'s sweep asserts that for every `:id` endpoint in the phase, and one of them refused
+to comply.
+
+`POST /invitations/:id/gallery/reorder` does not take a resource id. It takes the **whole
+arrangement** — every photo of that invitation, each exactly once — and `P1-19` made it
+all-or-nothing on purpose: applying most of a reorder leaves the user looking at an order
+nobody chose. A list containing another tenant's photo id is not "a resource you may not
+have"; it is a list that is not this invitation's photos, and the service answers 422
+`VALIDATION_ERROR` with a message about the list.
+
+**Decision** — The 422 stands, and the property that has to hold instead is
+**indistinguishability**: the answer to a list containing a real photo id belonging to
+somebody else must be byte-identical to the answer for a uuid that names nothing.
+
+That is what the 404 rule is actually protecting. 404-versus-403 matters because the pair
+leaks existence; a single 422 that is the same for every wrong id leaks nothing. Changing
+the endpoint to answer 404 would be worse on its own terms — the owner sending a genuinely
+malformed list would get "not found" for an invitation that is plainly theirs.
+
+**How it is enforced** — `idor-sweep.itest.ts` carries a `crossChildControl` for this case
+and asserts `{status, body}` equality against the absent-id request, in both the
+cross-tenant and the same-owner direction. The generated matrix prints `400 — same as an
+absent id` rather than a bare number, so a reader sees the exception and its justification
+rather than an unexplained cell.
+
+**What this does not license** — any endpoint that addresses a single resource by id. For
+those the rule is unchanged and the sweep asserts a literal 404. This exception exists
+because the body is a *set*, and it should be quoted only for another endpoint whose body
+is also a set.

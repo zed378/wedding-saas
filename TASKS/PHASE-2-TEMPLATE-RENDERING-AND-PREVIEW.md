@@ -176,6 +176,7 @@
 - [ ] Device toggle and scroll-to-section work.
 - [ ] The preview is skippable by keyboard.
 - [ ] Preview and public page render through the same component code — a diff test asserts the same DOM for the same data.
+- [ ] **Inherited from `P1-22` via `P1-25` (DF-11)**: a Playwright check at a desktop viewport asserting the editor's three panels are simultaneously visible. jsdom evaluates no media queries, so every editor component test written so far asserts the **mobile** arrangement and the desktop layout has never been executed by anything. It could not be done in Phase 1 because the wizard renders `templates={[]}` until `P2-01`, so no user could reach an editor route at all.
 
 ---
 
