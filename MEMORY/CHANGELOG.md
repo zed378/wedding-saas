@@ -10,6 +10,24 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — the editor, where the whole guarantee is that nothing is lost
+
+**Added** — the three-column editor, its store and its autosave ([P1-22](./records/2026-09-12-P1-22-editor-shell.md))
+
+- **A failed save keeps everything.** `markFailed` does not touch the data or the dirty set: the work is still unsaved, so it is still dirty, and the retry has something to resend.
+- **`markSaved` clears only the fields that were in flight**, and this is the subtle one. A `dirtyFields.clear()` passes every happy-path test and silently drops every keystroke typed while a request was out — the field is marked saved and never sent.
+- **One request at a time, one per pause, one per sub-resource.** Two overlapping PATCHes to one endpoint can land in either order and the loser silently wins, so a flush during a save asks the running cycle to go round again rather than starting a second.
+- **The indicator's states are exhaustive**, with no `else` rendering "Saved" because nothing else matched. The window between an edit and its save is exactly where work exists only in the browser, and it reads "unsaved".
+- The conflict check carries a two-second tolerance, because the client's own save moves `updated_at` forward and a plain "newer than known" comparison would warn on every second save.
+
+**Worth knowing** — two of the tests were passing for the wrong reason, and one of the harnesses was testing nothing.
+
+The React harness injected a whole `AutosaveManager`. The provider builds its own, so the injected one was never used — and had it been, it carried the test's no-op callbacks rather than the provider's, which are what connect a save to the store. Either way the suite would have been green while the indicator never moved. The provider now takes a **transport**, which is the seam that actually exists.
+
+Separately, with a 10ms debounce the save completes before the assertion runs, so "says unsaved between an edit and the save" was asserting a state it never observed.
+
+**And one real bug the tests found**: the conflict warning sat inside the preview panel, and on mobile the panels are tabs — so somebody editing in the properties tab could never see a warning about the thing they were doing.
+
 ### 2026-09-12 — the dashboard, and a card whose surface label was wrong
 
 **Added** — `/dashboard`, `/dashboard/new`, and `GET /invitations/slug-available` ([P1-21](./records/2026-09-12-P1-21-dashboard-and-wizard.md))

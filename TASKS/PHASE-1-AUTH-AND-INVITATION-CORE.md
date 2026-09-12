@@ -784,7 +784,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-22-editor-shell.md) |
 | **Depends on** | P1-21, P1-10 |
 | **Spec refs** | `docs/FRONTEND/06-EDITOR-ARCHITECTURE.md`, `docs/UI-UX/12-EDITOR-UX.md`, `docs/FRONTEND/02-STATE-MANAGEMENT.md`, `docs/UI-UX/09` § Editor Layout |
 | **Spec required** | No |
@@ -802,10 +802,16 @@
 7. Build the section list with per-section completeness indicators and toggles for configurable sections (`docs/UI-UX/10` § SectionListItem).
 
 **Definition of Done**
-- [ ] Editing 100 fields in sequence loses nothing, matching the acceptance criterion in `docs/PLAN/17`.
-- [ ] A failed save preserves local state and offers a retry; a test simulates an API failure mid-edit.
-- [ ] Save status is visible at all times and never shows "Saved" when a request is in flight or failed.
-- [ ] A concurrent edit from a second tab produces a warning, not a silent overwrite.
+- [x] Editing 100 fields in sequence loses nothing. The test drives 100 distinct paths with a 200ms gap — which is also the case where a naive debounce sends **nothing** until the very end — and asserts all 100 were sent with nothing left pending.
+- [x] A failed save preserves local state and offers a retry; a test simulates an API failure mid-edit. Three tests: the store keeps the data and the dirty flag, the manager requeues the fields, and the button reaches the manager and succeeds on the second attempt.
+- [x] Save status is visible at all times and never shows "Saved" when a request is in flight or failed. The states are **exhaustive rather than defaulted** — there is no `else` branch rendering "Saved" because nothing else matched — and a test watches the window between an edit and its save with a deliberately long debounce, because with a short one the save completes before the assertion and the test would pass without observing the state it is named after.
+- [x] A concurrent edit from a second tab produces a warning, not a silent overwrite. Plus the negative case: an ordinary save does **not** warn. The comparison carries a two-second tolerance, because the client's own save moves `updated_at` forward and a plain "newer than known" check would flag every second save.
+
+**The subtle, load-bearing part**: `markSaved` clears only the fields that were **in flight**. A `dirtyFields.clear()` passes every happy-path test and silently drops every keystroke typed while a request was out — the field is marked saved and never sent. The test named `"keeps a field dirty when it changed again during the save"` is the only thing standing there.
+
+**Found while testing**: the conflict warning was unreachable on a phone. It sat inside the preview panel, and on mobile the panels are tabs — so somebody editing in the properties tab could not see a warning about the thing they were doing. Moved above the tab bar.
+
+**Not covered**: the desktop three-column layout. jsdom evaluates no media queries, so every component test here is exercising the **mobile** arrangement. A Playwright check at a desktop viewport belongs with `P1-25`.
 
 ---
 
