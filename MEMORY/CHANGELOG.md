@@ -10,6 +10,18 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — the first deploy of Phase 1, and what it found
+
+**Fixed** — the rate limiter's cold start ([P1-07](./records/2026-09-12-P1-07-rate-limiter-cold-start.md))
+
+- **The first credential request after any API restart answered 503.** Redis was healthy and reachable from inside the same container; `lazyConnect` plus `enableOfflineQueue: false` rejects the first command outright rather than holding it for the handshake, so the limiter concluded Redis was unavailable and failed closed — which is ADR-050 working correctly on a false premise. One `await redis.connect()` at module init.
+- **No test could have caught it.** All 33 existing limiter tests build their client *without* `lazyConnect` and ping it in `beforeAll` — the harness had already done the thing production had not. The two new tests that matter boot the real `AppModule` and ask the container for the client the guard will actually use.
+- **`/readyz` did not notice.** It checks the database and nothing else, so the container reported healthy while half its dependencies were unreachable. Raised as a follow-up before Phase 3 puts payments on the same Redis.
+
+**Changed** — staging can run Phase 1 at all ([P0-23](./records/2026-09-11-P0-23-staging-deploy.md))
+
+Three things the staging compose predated, none of them visible to any test: the API had no `JWT_SIGNING_KEY` or `REFRESH_TOKEN_PEPPER` and would have exited 78 forever; the web-app image had no build argument for `NEXT_PUBLIC_API_BASE_URL` and would have shipped a bundle calling `http://localhost:3000` — the visitor's own machine — while the page rendered perfectly; and the tunnel does not route `/api/*` at all, which is a Cloudflare-side rule and not in this repository. `deploy/STAGING-DEPLOY.md` is the runbook, with the reasons the order matters.
+
 ### 2026-09-12 — Phase 1 closes against evidence
 
 **Added** — the IDOR sweep, the mass-assignment sweep, the acceptance suite and a coverage command ([P1-25](./records/2026-09-12-P1-25-phase-1-acceptance.md)), plus the [phase summary](./records/2026-09-12-PHASE-1-SUMMARY.md)
