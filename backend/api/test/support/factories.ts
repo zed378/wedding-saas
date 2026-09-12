@@ -98,6 +98,15 @@ export async function createTestTemplateVersion(
     sections?: unknown;
     theme?: unknown;
     customizableThemeKeys?: readonly string[];
+    /**
+     * Add a version to an EXISTING template rather than creating a new one.
+     *
+     * Added by `P1-09`, which needs two published versions of one template to prove BR-3.1
+     * -- that a later version does not move an invitation that already locked an earlier
+     * one. Without this the factory can only ever produce unrelated templates, and the
+     * rule would be untestable through it.
+     */
+    templateId?: string;
   } = {},
 ): Promise<TestTemplateVersion> {
   // docs/DATABASE/03 § Schema Validation: validated before being saved. A factory that
@@ -111,22 +120,27 @@ export async function createTestTemplateVersion(
     ],
   });
 
-  const { rows: t } = await pool.query<{ id: string }>(
-    "INSERT INTO templates (slug, name, status) VALUES ($1, 'Test Template', 'published') RETURNING id",
-    [`tpl-${uniq()}`],
-  );
+  const templateId =
+    overrides.templateId ??
+    (
+      await pool.query<{ id: string }>(
+        "INSERT INTO templates (slug, name, status) VALUES ($1, 'Test Template', 'published') RETURNING id",
+        [`tpl-${uniq()}`],
+      )
+    ).rows[0]!.id;
+
   const { rows: v } = await pool.query<{ id: string }>(
     `INSERT INTO template_versions (template_id, version, sections, theme, customizable_theme_keys, status)
      VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, 'published') RETURNING id`,
     [
-      t[0]!.id,
+      templateId,
       overrides.version ?? "1.0.0",
       JSON.stringify(definition.sections),
       JSON.stringify(definition.theme),
       definition.customizable_theme_keys,
     ],
   );
-  return { templateId: t[0]!.id, versionId: v[0]!.id };
+  return { templateId, versionId: v[0]!.id };
 }
 
 export async function createTestInvitation(

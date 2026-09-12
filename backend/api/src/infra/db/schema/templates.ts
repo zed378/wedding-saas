@@ -195,3 +195,51 @@ export const templateAssets = pgTable("template_assets", {
     .notNull()
     .defaultNow(),
 });
+
+/**
+ * The reserved-word and profanity blocklist. `docs/DATABASE/12-PLATFORM-CONFIG.md`.
+ *
+ * Data rather than a constant because `docs/SECURITY/10` § Slug Blocklist requires it to be
+ * "managed by admins, updatable without a deploy". `P1-09` reads it on every slug
+ * validation; `P5-13` gives admins the write path.
+ *
+ * It lives in this file rather than `invitations.ts` because it is platform configuration,
+ * not tenant data -- nothing here belongs to a user, which is also why
+ * `scripts/check-tenant-scope.mjs` has no opinion about importing it.
+ */
+export const slugBlocklist = pgTable(
+  "slug_blocklist",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    term: varchar("term", { length: 60 }).notNull(),
+    /** `exact` for reserved words, `substring` for profanity. See the document. */
+    matchType: varchar("match_type", { length: 20 }).notNull().default("exact"),
+    category: varchar("category", { length: 30 }).notNull().default("reserved"),
+    reason: text("reason"),
+    /** NULL for seeded system entries. Nobody typed them. */
+    createdBy: uuid("created_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    /**
+     * On `lower(term)`, so `Admin` and `admin` cannot both exist and disagree about
+     * whether the slug is allowed.
+     */
+    uniqueIndex("idx_slug_blocklist_term").on(
+      sql`lower(${t.term})`,
+      t.matchType,
+    ),
+    check(
+      "slug_blocklist_match_type_check",
+      sql`match_type IN ('exact','substring')`,
+    ),
+    check(
+      "slug_blocklist_category_check",
+      sql`category IN ('reserved','profanity','brand','other')`,
+    ),
+  ],
+);

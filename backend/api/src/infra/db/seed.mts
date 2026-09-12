@@ -11,6 +11,7 @@
  * Seeds the master price tables (P0-10), the reference template and its demo
  * invitation (P0-21).
  */
+import { readFileSync } from "node:fs";
 import { Pool } from "pg";
 
 import { loadMigrationEnv } from "./env.mts";
@@ -65,6 +66,41 @@ async function seedPackagesAndAddons(pool: Pool): Promise<void> {
   );
 }
 
+/**
+ * The reserved-word and profanity blocklist. `docs/DATABASE/12` § Seeding and Caching is
+ * explicit that this is **seed data rather than a migration**, on DATABASE/00's convention
+ * that schema and content are separate concerns.
+ *
+ * Idempotent. `created_by` stays NULL: nobody typed these, and attributing them to a
+ * person would be a lie an auditor would later have to untangle.
+ *
+ * Unlike the rest of this file, it is also needed in **production** -- `P1-09` validates
+ * every slug against it, and an empty table is a validation that passes everything,
+ * including `admin` and `api`. Until `P5-13` gives admins a write path, running
+ * `db:seed --blocklist-only` after a deploy is how the list gets there; the guards in
+ * `main()` refuse the full seed in production and that refusal is correct.
+ */
+async function seedSlugBlocklist(pool: Pool): Promise<number> {
+  const rows = JSON.parse(
+    readFileSync(
+      new URL("./seed-data/slug-blocklist.json", import.meta.url),
+      "utf8",
+    ),
+  ) as { term: string; match_type: string; category: string; reason: string }[];
+
+  for (const row of rows) {
+    await pool.query(
+      `INSERT INTO slug_blocklist (term, match_type, category, reason)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (lower(term), match_type) DO UPDATE
+         SET category = EXCLUDED.category, reason = EXCLUDED.reason`,
+      [row.term, row.match_type, row.category, row.reason],
+    );
+  }
+
+  return rows.length;
+}
+
 async function main(): Promise<void> {
   // Guard 1: refuse outright in production.
   //
@@ -112,6 +148,8 @@ async function main(): Promise<void> {
     console.log(`seeding ${rows[0]?.db}`);
 
     await seedPackagesAndAddons(pool);
+    const blocked = await seedSlugBlocklist(pool);
+    console.log(`  slug_blocklist: ${blocked} term(s)`);
     const templateVersionId = await seedReferenceTemplate(pool);
     await seedDemoInvitation(pool, templateVersionId);
 

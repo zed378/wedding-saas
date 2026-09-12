@@ -24,7 +24,7 @@
 | P1-06 | Auth, role and ownership middleware | backend | L | P1-03, P0-11 | ✅
 | P1-07 | Rate limiting for auth and general API | backend | M | P1-03 | ✅
 | P1-08 | User profile, preferences, account deletion | backend | M | P1-06 |
-| P1-09 | Create an invitation | backend | M | P1-06, P0-20 |
+| P1-09 | Create an invitation | backend | M | P1-06, P0-20 | ✅
 | P1-10 | Invitation list, detail, update, soft delete | backend | L | P1-09 |
 | P1-11 | Couple sub-resource | backend | M | P1-10 |
 | P1-12 | Events sub-resource | backend | M | P1-10 |
@@ -322,7 +322,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-09-create-invitation.md) |
 | **Depends on** | P1-06, P0-20 |
 | **Spec refs** | `docs/API/04-INVITATION-API.md`, `docs/DATABASE/04-INVITATIONS.md`, `docs/PLAN/02-BUSINESS-RULES.md` § BR-3, `docs/PLAN/10-DOMAIN-PUBLISHING.md` § Subdomain |
 | **Spec required** | Yes — data model |
@@ -341,12 +341,16 @@
 8. Rate limit to 10 per day per user (`docs/SECURITY/10`), mitigating R7 slug squatting. This stays as an abuse backstop even though the free-draft quota makes it hard to reach.
 
 **Definition of Done**
-- [ ] A created invitation has a settings row, a quote row, and exactly two people rows.
-- [ ] `template_version_id` points at a concrete published version, never resolved dynamically at read time.
-- [ ] A draft or deprecated template version is refused for new invitations.
-- [ ] Slug validation covers format, blocklist and uniqueness, each with a test.
-- [ ] `owner_id` comes from the token and cannot be set from the body.
-- [ ] The free-draft quota is enforced and counts only never-paid invitations, proven by a test where a user with a paid invitation can still create a draft.
+- [x] A created invitation has a settings row, a quote row, and exactly two people rows. The people rows are **empty, not absent**, so every later PATCH is an UPDATE rather than an upsert with a race.
+- [x] `template_version_id` points at a concrete published version, never resolved dynamically at read time. And `"a later published version does not move an existing invitation"`.
+- [x] A draft or deprecated template version is refused for new invitations. **Mutation**: removing the `status = published` predicate fails both cases.
+- [x] Slug validation covers format, blocklist and uniqueness, each with a test. Ten format cases, five blocklist cases (including that an *exact* term does not reject a slug merely containing it, and that leetspeak folding does not apply to reserved words), two uniqueness cases. `409 SLUG_TAKEN` is distinct from the 400s.
+- [x] `owner_id` comes from the token and cannot be set from the body. Three spellings rejected at HTTP; the service writes the token's user even when handed another id.
+- [x] The free-draft quota is enforced and counts only never-paid invitations, proven by a test where a user with a paid invitation can still create a draft. **A mutation replacing the never-paid predicate with `status = 'draft'` passed every test in the block** — `"a pending_payment invitation STILL counts against the quota"` was added and now catches it.
+
+**Also built here**: `slug_blocklist` (migration `0006`, `docs/DATABASE/12`) and its seed. `P5-13` was to own the table, but a slug validation reading an empty table accepts `admin` and `api`.
+
+**Two real bugs, both caught by tests**: `enabled_sections` was silently empty on every invitation (`section.key` vs `section_key`), and uppercase slugs were being accepted and silently lowercased into an address that would not resolve.
 
 **Abuse cases to test**
 | Abuse case | Source | Expectation |

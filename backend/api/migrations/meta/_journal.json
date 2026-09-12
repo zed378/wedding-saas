@@ -43,6 +43,13 @@
       "when": 1789016414453,
       "tag": "0005_unique_google_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789016414454,
+      "tag": "0006_slug_blocklist",
+      "breakpoints": true
     }
   ]
 }
