@@ -2,11 +2,15 @@
 
 Everything needed to run this system: the local stack, and the charts that will run it on a cluster.
 
-| Path                 | What it is                                               |
-| -------------------- | -------------------------------------------------------- |
-| `docker-compose.yml` | The local development stack (`P0-05`)                    |
-| `postgres/init/`     | First-run SQL: creates the unprivileged application role |
-| `helm/`              | Kubernetes charts (`P0-26`)                              |
+| Path                         | What it is                                               |
+| ---------------------------- | -------------------------------------------------------- |
+| `docker-compose.yml`         | The local development stack (`P0-05`)                    |
+| `docker-compose.staging.yml` | The deployed staging topology (`P0-23`)                  |
+| `STAGING-DEPLOY.md`          | **How to deploy.** Read it before touching the VM        |
+| `staging.env.example`        | Every variable staging needs, and where to generate it   |
+| `SECRETS.md`                 | The secret inventory, rotation and blast radius          |
+| `postgres/init/`             | First-run SQL: creates the unprivileged application role |
+| `helm/`                      | Kubernetes charts (`P0-26`)                              |
 
 The origin reverse proxy (Caddy) and the single-VPS production topology are `P0-23` and `P3-11`.
 
