@@ -27,7 +27,7 @@
 | P1-09 | Create an invitation | backend | M | P1-06, P0-20 | ✅
 | P1-10 | Invitation list, detail, update, soft delete | backend | L | P1-09 | ✅
 | P1-11 | Couple sub-resource | backend | M | P1-10 | ✅
-| P1-12 | Events sub-resource | backend | M | P1-10 |
+| P1-12 | Events sub-resource | backend | M | P1-10 | ✅
 | P1-13 | Bank accounts and quote sub-resources | backend | M | P1-10 |
 | P1-14 | Settings sub-resource and slug rules | backend | M | P1-10 |
 | P1-15 | Change template without data loss | backend | M | P1-10, P0-20 |
@@ -424,7 +424,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-12-events-subresource.md) |
 | **Depends on** | P1-10 |
 | **Spec refs** | `docs/API/04-INVITATION-API.md` § Events, `docs/DATABASE/05-EVENTS.md`, `docs/BACKEND/03-VALIDATION.md` § Example Schema |
 | **Spec required** | No |
@@ -441,10 +441,14 @@
 6. Sanitize `title`, `address` and `description`.
 
 **Definition of Done**
-- [ ] An event id belonging to another invitation returns 404 even when the path's invitation is owned by the caller.
-- [ ] `maps_url` is generated when coordinates are present and it was left empty.
-- [ ] Out-of-range latitude or longitude is rejected.
-- [ ] Deleting an invitation cascades its events.
+- [x] An event id belonging to another invitation returns 404 even when the path's invitation is owned by the caller. Two service tests **and** a repository-level test — see the warning below.
+- [x] `maps_url` is generated when coordinates are present and it was left empty. Also: never overwrites a link the caller supplied, regenerated when coordinates change, untouched when they do not.
+- [x] Out-of-range latitude or longitude is rejected. `z.coerce.number().min().max()`; the coercion is load-bearing, because `"200" > "90"` is false as a string.
+- [x] Deleting an invitation cascades its events. Asserted against a hard delete, which is what the constraint governs; the soft-delete case is asserted separately.
+
+**⚠ Read this before `P1-13`, `P1-14`, `P1-15` and Phase 2's gallery.** Both mutations on the two-step rule **passed** at first, because the read and the write were covering for each other: deleting the parent predicate from `findOwnedChild` still produced a 404 (the write refused it), and deleting the owner predicate from `updateEvent` still produced a 404 (the read refused it first). Every service-level test passed while **neither layer was verified**. Five tests now call the repository directly. **Defence in depth makes each layer untestable from the outside — every remaining sub-resource task needs repository-level tests, not only service-level ones.**
+
+**Also found**: `z.string().url()` accepts `javascript:alert(1)` and `data:text/html,...`. `maps_url` becomes an `href`, so the schema requires `^https?://` before parsing. Measured, not assumed.
 
 ---
 

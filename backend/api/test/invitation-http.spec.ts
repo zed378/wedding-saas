@@ -9,6 +9,7 @@ import { InvitationController } from "../src/modules/invitation/invitation.contr
 import { InvitationCreateService } from "../src/modules/invitation/invitation-create.service";
 import { InvitationService } from "../src/modules/invitation/invitation.service";
 import { CoupleService } from "../src/modules/invitation/couple.service";
+import { EventsService } from "../src/modules/invitation/events.service";
 import { NotFoundError } from "../src/http/errors";
 import { SessionService } from "../src/modules/auth/session.service";
 import { UnauthenticatedError } from "../src/http/errors";
@@ -44,6 +45,8 @@ const seen: {
   deleted?: string | undefined;
   coupleRole?: string | undefined;
   coupleChanges?: unknown;
+  eventInput?: unknown;
+  eventId?: string | undefined;
 } = {};
 
 const createStub = {
@@ -88,6 +91,47 @@ const detail = {
 /** Anything but the owner's own invitation is a 404, as the real service would. */
 const mineOr404 = (id: string) => {
   if (id !== INVITATION_ID) throw new NotFoundError();
+};
+
+const eventDto = {
+  id: "77777777-7777-4777-8777-777777777777",
+  type: "akad",
+  title: "Akad Nikah",
+  event_date: "2027-06-12",
+  start_time: "08:00",
+  end_time: null,
+  venue_name: "Masjid Agung",
+  address: "Jl. Merdeka No. 1",
+  latitude: null,
+  longitude: null,
+  description: null,
+  display_order: 0,
+};
+
+const eventsStub = {
+  list: async (_scope: unknown, id: string) => {
+    mineOr404(id);
+    return [eventDto];
+  },
+  create: async (_scope: unknown, id: string, input: unknown) => {
+    mineOr404(id);
+    seen.eventInput = input;
+    return eventDto;
+  },
+  update: async (
+    _scope: unknown,
+    id: string,
+    eventId: string,
+    changes: unknown,
+  ) => {
+    mineOr404(id);
+    seen.eventInput = changes;
+    seen.eventId = eventId;
+    return eventDto;
+  },
+  remove: async (_scope: unknown, id: string) => {
+    mineOr404(id);
+  },
 };
 
 const coupleStub = {
@@ -174,6 +218,7 @@ describe("POST /invitations over HTTP", () => {
         { provide: InvitationCreateService, useValue: createStub },
         { provide: InvitationService, useValue: invitationStub },
         { provide: CoupleService, useValue: coupleStub },
+        { provide: EventsService, useValue: eventsStub },
         { provide: SessionService, useValue: sessionStub },
         { provide: RATE_LIMITER, useValue: limiterStub },
         {
@@ -544,6 +589,140 @@ describe("POST /invitations over HTTP", () => {
         instagram: null,
         photoMediaId: null,
       });
+    });
+  });
+
+  describe("events endpoints (P1-12)", () => {
+    const EVENT_BODY = {
+      type: "akad",
+      title: "Akad Nikah",
+      event_date: "2027-06-12",
+      start_time: "08:00",
+      venue_name: "Masjid Agung",
+      address: "Jl. Merdeka No. 1",
+    };
+
+    it("lists, creates, updates and deletes", async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/invitations/${INVITATION_ID}/events`)
+        .set(...AUTH)
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/events`)
+        .set(...AUTH)
+        .send(EVENT_BODY)
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/invitations/${INVITATION_ID}/events/${eventDto.id}`)
+        .set(...AUTH)
+        .send({ title: "Renamed" })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .delete(`/api/v1/invitations/${INVITATION_ID}/events/${eventDto.id}`)
+        .set(...AUTH)
+        .expect(200);
+    });
+
+    it.each([
+      ["get", `/api/v1/invitations/${OTHERS_INVITATION}/events`],
+      ["post", `/api/v1/invitations/${OTHERS_INVITATION}/events`],
+    ])("%s on another user's invitation is 404", async (method, path) => {
+      const res = await request(app.getHttpServer())
+        [method as "get"](path)
+        .set(...AUTH)
+        .send(EVENT_BODY)
+        .expect(404);
+
+      expect(res.body.data).toBeUndefined();
+    });
+
+    it.each([
+      ["an unknown type", { type: "engagement" }],
+      ["a missing title", { title: undefined }],
+      ["a bad date", { event_date: "12-06-2027" }],
+      ["a bad start_time", { start_time: "8am" }],
+      ["a 24-hour start_time", { start_time: "24:00" }],
+      ["an out-of-range latitude", { latitude: 91 }],
+      ["an out-of-range longitude", { longitude: -181 }],
+      ["an over-long title", { title: "x".repeat(151) }],
+      ["an over-long address", { address: "x".repeat(2001) }],
+    ])("rejects %s", async (_name, extra) => {
+      // The coordinate ranges are the card's third DoD item. A latitude of 91 is not a
+      // place, and without the check it would render as a pin somewhere undefined.
+      await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/events`)
+        .set(...AUTH)
+        .send({ ...EVENT_BODY, ...extra })
+        .expect(400);
+    });
+
+    it.each([
+      "javascript:alert(1)",
+      "JaVaScRiPt:alert(1)",
+      "data:text/html,<script>alert(1)</script>",
+      "vbscript:msgbox(1)",
+      "//evil.test/x",
+    ])("rejects a maps_url scheme of %j", async (maps_url) => {
+      // `z.url()` alone accepts the first three -- measured. maps_url becomes an href on
+      // the public page, so the schema requires ^https?:// before parsing.
+      await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/events`)
+        .set(...AUTH)
+        .send({ ...EVENT_BODY, maps_url })
+        .expect(400);
+    });
+
+    it.each(["https://maps.app.goo.gl/x", "http://maps.example.test/x"])(
+      "accepts a maps_url of %j",
+      async (maps_url) => {
+        await request(app.getHttpServer())
+          .post(`/api/v1/invitations/${INVITATION_ID}/events`)
+          .set(...AUTH)
+          .send({ ...EVENT_BODY, maps_url })
+          .expect(201);
+      },
+    );
+
+    it("sanitizes title, venue_name, address and description", async () => {
+      seen.eventInput = undefined;
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/events`)
+        .set(...AUTH)
+        .send({
+          ...EVENT_BODY,
+          title: "<script>alert(1)</script>Akad",
+          venue_name: "<img src=x onerror=alert(1)>Masjid",
+          address: "<b>Jl.</b> Merdeka",
+          description: "<svg/onload=alert(1)>Mohon hadir",
+        })
+        .expect(201);
+
+      expect(seen.eventInput).toMatchObject({
+        title: "Akad",
+        venueName: "Masjid",
+        address: "Jl. Merdeka",
+        description: "Mohon hadir",
+      });
+    });
+
+    it("rejects a body carrying invitation_id or id", async () => {
+      for (const extra of [{ invitation_id: INVITATION_ID }, { id: "x" }]) {
+        await request(app.getHttpServer())
+          .post(`/api/v1/invitations/${INVITATION_ID}/events`)
+          .set(...AUTH)
+          .send({ ...EVENT_BODY, ...extra })
+          .expect(400);
+      }
+    });
+
+    it("is 401 without a token", async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/invitations/${INVITATION_ID}/events`)
+        .expect(401);
     });
   });
 });

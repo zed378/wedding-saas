@@ -10,6 +10,24 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — events, and a lesson about defence in depth
+
+**Added** — full CRUD over N events per invitation ([P1-12](./records/2026-09-12-P1-12-events-subresource.md))
+
+- `:event_id` is scoped by `:id` **in the query**, both conditions in one statement. `docs/SECURITY/05` § 7's two-step rule: owning the parent is necessary and not sufficient, and a caller who owns invitation A must get a 404 for an event belonging to invitation B.
+- `maps_url` is generated from coordinates when left empty, **recomputed when the coordinates change**, and never overwritten when the caller supplied their own. The failure that last point avoids is silent: a venue moves, the link keeps pointing at the old place, and the guest is simply sent somewhere else.
+- `display_order` appends, so a new event does not jump to the front of a list the couple ordered on purpose.
+
+**Worth knowing — both mutations passed at first, and the reason generalises.**
+
+Deleting the parent predicate from `findOwnedChild` broke **no test**. Deleting the owner predicate from the event `UPDATE` broke no test either. Each layer's defence was masked by the other: the read returned a row it should not have, and the write then refused it — producing the same 404, for the wrong reason. Every service-level test was green while **neither layer was actually verified**.
+
+Five tests now call the repository directly, where nothing else can cover for a missing predicate, and both mutations fail.
+
+This is the sixth time a test has verified less than its name suggested, and the first time the cause was *defence in depth* rather than a weak assertion. Two correct checks in sequence mean deleting either one changes no observable behaviour from outside — so layered checks, which are supposed to be good, make each other untestable through the front door. **Every remaining sub-resource task needs repository-level tests**, and that warning is on their cards.
+
+**Also found**: `z.string().url()` returns `true` for `javascript:alert(1)`, `JaVaScRiPt:alert(1)` and `data:text/html,...`. `maps_url` becomes an `href` on the public page, so the schema now requires `^https?://` before parsing — measured by running it, not assumed.
+
 ### 2026-09-12 — the free tier can publish, once, for three days
 
 **Changed** — a business rule, at the project owner's decision (**ADR-052**, amends BR-1.4, adds BR-2.8).

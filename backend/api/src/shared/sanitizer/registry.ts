@@ -103,6 +103,18 @@ export const NOT_USER_TEXT: Readonly<Record<string, string>> = {
   page: "a pagination integer, coerced and bounded; never stored or rendered",
 
   /**
+   * A URL that becomes an `href`, so it needs a **scheme allowlist**, not tag stripping.
+   *
+   * Sanitizing it as prose would be the wrong defence twice over: `sanitizePlainText`
+   * would mangle a legitimate query string, and it would do nothing about the actual risk.
+   * `z.url()` alone is not enough either -- measured, not assumed: it accepts
+   * `javascript:alert(1)`, `JaVaScRiPt:alert(1)` and `data:text/html,...`, because all
+   * three are valid URLs. The schema therefore requires `^https?://` before parsing.
+   */
+  maps_url:
+    "a URL rendered as an href; guarded by an http/https scheme allowlist",
+
+  /**
    * The one that deserves an argument rather than a label.
    *
    * A bank account number is digits and separators, and it is displayed to guests. It is
