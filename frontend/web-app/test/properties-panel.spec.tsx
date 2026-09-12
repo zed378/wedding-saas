@@ -142,12 +142,22 @@ describe("the form comes from the template (card DoD 1)", () => {
   });
 
   it("does not render a text box for a collection", () => {
-    // `events` names a list. A control here would ask somebody to type one.
+    // `events` names a list. A control here would ask somebody to type one, and there is no
+    // list editor for events yet — `P1-24` built the photo one only.
     withTemplate(sectionWith(["events"]));
 
     expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.getByText(/belum dapat diubah/i)).toBeInTheDocument();
+  });
+
+  it("renders the gallery manager for the photo collection", () => {
+    // The one collection that does have an editor. Recognised through the registry — the
+    // panel asks whether `<path>.*.media_id` is a `photo-multi` rather than naming the path,
+    // which `scripts/check-no-hardcoded-fields.mjs` would refuse.
+    withTemplate(sectionWith(["gallery.photos"]));
+
     expect(
-      screen.getByText(/dikelola di pengelola media/i),
+      screen.getByRole("region", { name: /galeri foto/i }),
     ).toBeInTheDocument();
   });
 

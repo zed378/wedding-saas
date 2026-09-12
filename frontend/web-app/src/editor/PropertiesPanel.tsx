@@ -7,6 +7,8 @@ import { useEditor, useEditorContext } from "./EditorProvider";
 import { FieldControl } from "./fields/FieldControl";
 import { COLLECTION_PATHS, fieldMeta } from "./fields/registry";
 import { validateField } from "./fields/validate";
+import { GalleryManager } from "./media/GalleryManager";
+import { MapPicker } from "./media/MapPicker";
 
 /**
  * P1-23 step 2 — the properties panel. `docs/FRONTEND/03`, `docs/UI-UX/12` § Properties Panel.
@@ -33,6 +35,7 @@ import { validateField } from "./fields/validate";
  */
 
 export function PropertiesPanel() {
+  const invitationId = useEditor((s) => s.invitationId);
   const definition = useEditor((s) => s.templateDefinition);
   const activeKey = useEditor((s) => s.activeSectionKey);
   const data = useEditor((s) => s.data);
@@ -69,6 +72,9 @@ export function PropertiesPanel() {
     ...optional.map((path) => ({ path, required: false })),
   ];
 
+  // A template may list both halves of a coordinate pair. The picker is rendered once.
+  const seenMapPicker = new Set<string>();
+
   return (
     <div>
       <h2 className="mb-4 text-sm font-semibold text-text">
@@ -85,11 +91,13 @@ export function PropertiesPanel() {
         {entries.map(({ path, required: isRequired }) => {
           const collectionReason = COLLECTION_PATHS[path];
           if (collectionReason !== undefined) {
-            // A container, not a control. Rendering a text box for `events` would ask
-            // somebody to type a list.
-            return (
+            // A container, not a control. Rendering a text box for one would ask somebody to
+            // type a list. The photo collection has a manager; the others do not yet.
+            return isPhotoCollection(path) ? (
+              <GalleryManager key={path} invitationId={invitationId} />
+            ) : (
               <p key={path} className="text-sm text-text-muted">
-                Daftar untuk bagian ini dikelola di pengelola media.
+                Daftar untuk bagian ini belum dapat diubah dari sini.
               </p>
             );
           }
@@ -100,6 +108,30 @@ export function PropertiesPanel() {
               <p key={path} className="text-sm text-text-muted">
                 Isian ini belum dikenali oleh versi aplikasi ini.
               </p>
+            );
+          }
+
+          // Latitude and longitude are one control, and the picker writes both. Rendering it
+          // once -- on whichever of the pair comes first -- avoids two maps on one screen
+          // fighting over the same coordinates.
+          if (meta.type === "map-picker") {
+            if (seenMapPicker.has(siblingKey(path))) return null;
+            seenMapPicker.add(siblingKey(path));
+
+            const lat = asNumber(getAtPath(data, latitudePath(path)));
+            const lng = asNumber(getAtPath(data, longitudePath(path)));
+
+            return (
+              <MapPicker
+                key={path}
+                latitude={lat}
+                longitude={lng}
+                label={meta.label}
+                onChange={(next) => {
+                  edit(latitudePath(path), next.latitude);
+                  edit(longitudePath(path), next.longitude);
+                }}
+              />
             );
           }
 
@@ -144,4 +176,38 @@ function readOptional(section: TemplateSectionDefinition): string[] {
   return Array.isArray(value)
     ? value.filter((v): v is string => typeof v === "string")
     : [];
+}
+
+/**
+ * The two coordinate paths of one event, derived from either of them.
+ *
+ * The suffix is what distinguishes them, so a path is rewritten rather than matched against a
+ * literal — `scripts/check-no-hardcoded-fields.mjs` refuses a canonical path in a component,
+ * and it is right to: a component that named `events.*.latitude` would be a component that
+ * knew about events.
+ */
+const LATITUDE_SUFFIX = "latitude";
+const LONGITUDE_SUFFIX = "longitude";
+
+function siblingKey(path: string): string {
+  return path.replace(/\.(latitude|longitude)$/, "");
+}
+
+function latitudePath(path: string): string {
+  return `${siblingKey(path)}.${LATITUDE_SUFFIX}`;
+}
+
+function longitudePath(path: string): string {
+  return `${siblingKey(path)}.${LONGITUDE_SUFFIX}`;
+}
+
+/** The photo collection, recognised by its own registry entry rather than by its name. */
+function isPhotoCollection(path: string): boolean {
+  return fieldMeta(`${path}.*.media_id`)?.type === "photo-multi";
+}
+
+function asNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? undefined : parsed;
 }

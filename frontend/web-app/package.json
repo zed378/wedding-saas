@@ -15,6 +15,7 @@
     "@wi/schema": "workspace:*",
     "@wi/template-renderer": "workspace:*",
     "@wi/ui": "workspace:*",
+    "maplibre-gl": "^6.9.0",
     "next": "^16.3.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

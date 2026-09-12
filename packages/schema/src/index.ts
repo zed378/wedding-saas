@@ -29,6 +29,12 @@ export {
   type FieldKind,
 } from "./invitation/field-registry.js";
 
+export {
+  MEDIA_PURPOSES,
+  isMediaPurpose,
+  type MediaPurpose,
+} from "./invitation/media-purpose.js";
+
 export type {
   InvitationData,
   PersonData,

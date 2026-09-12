@@ -853,7 +853,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** — 2026-09-12, [record](../MEMORY/records/2026-09-12-P1-24-media-manager.md) |
 | **Depends on** | P1-23, P1-19 |
 | **Spec refs** | `docs/FRONTEND/05-MEDIA-HANDLING.md`, `docs/PLAN/04` § F4, F5, `docs/UI-UX/17` § Keyboard navigation |
 | **Spec required** | No |
@@ -871,10 +871,15 @@
 7. Surface server rejections in plain Indonesian — "file type not supported", "photo quota reached" — never a raw error code.
 
 **Definition of Done**
-- [ ] Uploading ten photos at once succeeds with per-file progress and no lost files.
-- [ ] Reordering is fully operable by keyboard.
-- [ ] A rejected upload shows a specific, human message and leaves other fields untouched.
-- [ ] The map picker emits coordinates the events endpoint accepts.
+- [x] Uploading ten photos at once succeeds with per-file progress and no lost files — three at a time, and a failure removes one from the running set without touching the rest.
+- [x] Reordering is fully operable by keyboard. It is the **only** implemented mechanism, which is the strongest form of this guarantee — see the deviation below.
+- [x] A rejected upload shows a specific, human message and leaves other fields untouched — the message names the file, and the rest of the batch still goes.
+- [x] The map picker emits coordinates the events endpoint accepts, rounded to the six decimal places `DECIMAL(9,6)` stores.
+
+**Deviations** — two, both recorded rather than claimed:
+
+- **Step 4's drag-to-reorder is not implemented.** The keyboard alternative the DoD requires is, and it is the primary mechanism. A pointer drag needs `@dnd-kit` or hand-rolled HTML5 DnD, and neither is exercisable by any test in this repository — worth doing when a browser suite can drive it.
+- **Step 5's undo affordance is not implemented.** `P1-19` soft-deletes the media, so the file survives, but re-attaching it needs an endpoint that accepts a soft-deleted media id and `P1-19` deliberately refuses one. Offering an undo that cannot work would be worse than not offering it.
 
 ---
 
