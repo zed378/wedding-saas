@@ -10,6 +10,20 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — the authorization trio, and the test that makes the rest cheap
+
+**Added** — `requireAuth`, `requireRole`, `requireOwnership` ([P1-06](./records/2026-09-12-P1-06-auth-role-and-ownership-middleware.md))
+- **`requireOwnership` is a service-layer function, not a guard.** `docs/SECURITY/04` lists all three names together under "Mandatory Middleware", but its own Implementation Principle 2 says ownership is checked in the service "so no code path can accidentally bypass it when the service is called from elsewhere (e.g., from a job/worker)". A Nest guard runs on an HTTP request and nothing else; making this one a guard would have satisfied the heading and broken the principle **invisibly**, because the endpoint would still be safe and the worker calling the same service would not be.
+- It takes a loader rather than a resource, which is the document's own signature and what keeps the owner filter in the SQL. Because the loader already carries `WHERE owner_id = :scope`, the function never sees a row it has to judge — it only turns `null` into a 404, so it cannot judge one wrongly.
+- The current user lives under a **symbol**, not `req.user`: that name is a shared namespace half the Express ecosystem writes to, and anything setting it would silently become an authentication source.
+
+**Added** — the reusable IDOR assertion, `test/support/idor.ts`, and `backend/api/test/README.md`
+- `docs/SECURITY/04` makes "User B cannot access User A's resource" a DoD item for **every** `:id` endpoint, and dozens are coming. A mandatory test that is tedious to write is one somebody eventually writes badly, so the honest version now costs one line.
+- It refuses a service that leaks, one that answers **403** instead of 404 (which confirms the resource exists), one that answers 404 with the resource still in the body, and — the half people forget — **one that refuses everybody**, which passes every IDOR test ever written and ships a broken product.
+- **Three of its own tests pass only when an assertion fails.** A helper that cannot fail proves nothing, and every later endpoint's mandatory test inherits whatever this one is worth.
+
+**Worth knowing** — removing the `owner_id` predicate from `findOwned` fails seven tests, including the helper's own. That mutation is the closest thing this project has to a regression alarm on its highest-priority security rule.
+
 ### 2026-09-12 — a reset that actually takes the account back
 
 **Added** — forgot and reset password ([P1-05](./records/2026-09-12-P1-05-forgot-and-reset-password.md))

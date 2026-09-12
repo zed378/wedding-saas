@@ -21,7 +21,7 @@
 | P1-03 | Login, access tokens, refresh rotation | backend | L | P1-01 | ✅
 | P1-04 | Google OAuth | backend | M | P1-03 | ✅
 | P1-05 | Forgot and reset password | backend | M | P1-03, P0-15 | ✅
-| P1-06 | Auth, role and ownership middleware | backend | L | P1-03, P0-11 |
+| P1-06 | Auth, role and ownership middleware | backend | L | P1-03, P0-11 | ✅
 | P1-07 | Rate limiting for auth and general API | backend | M | P1-03 |
 | P1-08 | User profile, preferences, account deletion | backend | M | P1-06 |
 | P1-09 | Create an invitation | backend | M | P1-06, P0-20 |
@@ -219,7 +219,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-06-auth-role-and-ownership-middleware.md) |
 | **Depends on** | P1-03, P0-11 |
 | **Spec refs** | `docs/SECURITY/04-AUTHORIZATION-RBAC.md`, `docs/SECURITY/05-MULTI-TENANCY-SECURITY.md`, `docs/PLAN/03-USER-ROLES.md` |
 | **Spec required** | Yes — authorization |
@@ -236,11 +236,13 @@
 6. Write the reusable IDOR test helper on top of `createTwoTenants()`: given a method and a path template, assert 404 and an empty body for the other tenant. Every later endpoint task uses this one helper, which is what makes global DoD item 2 cheap enough to always honour.
 
 **Definition of Done**
-- [ ] The three middlewares exist with the names in `docs/SECURITY/04`.
-- [ ] Ownership is enforced in the service layer, and a test calling the service directly (not through HTTP) still fails for a non-owner.
-- [ ] Non-owner access returns 404 with no resource data.
-- [ ] The reusable IDOR test helper exists and is documented in the testing README.
-- [ ] Admin bypass writes an audit row every time.
+- [x] The three middlewares exist with the names in `docs/SECURITY/04`. `shared/auth-middleware/`. **`requireOwnership` is a function, not a guard** — the same document's Implementation Principle 2 requires ownership below HTTP, and a guard only runs on a request.
+- [x] Ownership is enforced in the service layer, and a test calling the service directly (not through HTTP) still fails for a non-owner. The whole suite calls services directly; `"a non-owner gets 404 and no data"`. **Mutation**: removing the owner predicate from `findOwned` fails 7 tests.
+- [x] Non-owner access returns 404 with no resource data. `"'absent' and 'not yours' are the same response"` asserts status, code **and** message.
+- [x] The reusable IDOR test helper exists and is documented in the testing README. `test/support/idor.ts`, documented in the new `backend/api/test/README.md`. **Three of its own tests pass only when an assertion fails** — a helper that cannot fail proves nothing.
+- [x] Admin bypass writes an audit row every time. Three tests, including the found-nothing case and the empty-reason refusal.
+
+**Every later `:id` endpoint uses `expectIdorSafe`.** That is what makes global DoD item 2 cheap enough to always honour.
 
 **Abuse cases to test**
 | Abuse case | Source | Expectation |
