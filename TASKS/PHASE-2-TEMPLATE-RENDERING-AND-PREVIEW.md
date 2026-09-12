@@ -129,7 +129,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** — 2026-09-12, [record](../MEMORY/records/2026-09-12-P2-04-error-boundaries.md) |
 | **Depends on** | P2-03 |
 | **Spec refs** | `docs/FRONTEND/08-ERROR-BOUNDARIES.md`, `docs/PLAN/18` R5 |
 | **Spec required** | No |
@@ -146,9 +146,11 @@
 6. Test by deliberately corrupting one section's data and asserting the rest of the page still renders and RSVP still works.
 
 **Definition of Done**
-- [ ] A section that throws does not blank the page; the corruption test proves it.
-- [ ] A preview crash in the editor leaves the form and local state usable.
-- [ ] Error reports carry section context and no sensitive fields.
+- [x] A section that throws does not blank the page; the corruption test proves it — four tests, including two failing sections not compounding, which is the assertion that tells per-section boundaries apart from one boundary around the list. A mutation removing it fails seven tests by name.
+- [x] A preview crash in the editor leaves the form and local state usable — five tests, including the unsaved dirty-field set surviving a crash. This is the expensive case: `P1-22` ensured a failed *save* never loses a keystroke, and an unhandled render error would have lost the same data by a different route.
+- [x] Error reports carry section context and no sensitive fields — asserted by searching the serialised report for an account number and for the word `accounts`.
+
+**Step 5 is a seam, not a shipped behaviour**: `onSectionError` and `PanelBoundary`'s `onError` exist and are tested, and nothing forwards them to error tracking yet. `invitation_id` is deliberately the caller's to attach — the renderer has no concept of which invitation it is showing. Wiring belongs with `P2-08` (server-side) and `P2-05` (the editor).
 
 ---
 

@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 
 /**
  * P2-02 — the contract every section component implements.
@@ -50,6 +50,25 @@ export interface TemplateVersionDefinition {
   readonly customizable_theme_keys?: readonly string[];
 }
 
+/**
+ * A section that threw while rendering. `docs/FRONTEND/08` § Logging.
+ *
+ * Carries the section key, the component name and the error itself — and deliberately
+ * **not** the section's data. The obvious thing to attach to a render error is the props
+ * that caused it, and for this renderer those props can be bank account numbers
+ * (`docs/SECURITY/09`) or a guest list.
+ *
+ * `invitation_id` and `user_id` are the caller's to add: this package has no concept of
+ * which invitation it is showing, and giving it one would be the first step to it
+ * behaving differently for some of them.
+ */
+export interface SectionErrorReport {
+  readonly sectionKey: string;
+  readonly component: string;
+  readonly message: string;
+  readonly componentStack?: string | undefined;
+}
+
 /** Why a section did not render. Surfaced to the caller, never logged from here. */
 export interface SectionRenderIssue {
   readonly sectionKey: string;
@@ -77,4 +96,21 @@ export interface TemplateRendererProps {
    * `public-invite` logs it server-side; the editor shows it.
    */
   readonly onSectionIssue?: ((issue: SectionRenderIssue) => void) | undefined;
+  /**
+   * A section threw while rendering. `P2-04`.
+   *
+   * Separate from `onSectionIssue`, which is about a definition naming a component that
+   * does not exist — that is a catalogue problem, knowable before render. This is a
+   * runtime failure in a component that does exist, which is a different thing to alert
+   * on and usually means corrupt data.
+   */
+  readonly onSectionError?: ((report: SectionErrorReport) => void) | undefined;
+  /**
+   * What a failed section shows instead of nothing.
+   *
+   * The public page passes nothing: a guest who never knew the gallery existed is not
+   * served by being told it is broken. The editor passes a placeholder, because there the
+   * couple IS the person who needs to know (`P2-05`).
+   */
+  readonly sectionFallback?: ReactNode;
 }

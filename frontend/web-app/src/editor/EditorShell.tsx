@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 
 import { ConflictWarning, SaveStatusIndicator } from "./SaveStatus";
 import { SectionListPanel } from "./SectionListPanel";
+import { PanelBoundary } from "../components/PanelBoundary";
 
 /**
  * P1-22 step 1 — the editor layout. `docs/UI-UX/09` § Editor Layout, `docs/UI-UX/12`.
@@ -117,7 +118,16 @@ export function EditorShell({
         </Panel>
 
         <Panel id="preview" tab={tab} className="md:min-w-0 md:flex-1">
-          <div className="h-full overflow-y-auto p-4">{preview}</div>
+          <div className="h-full overflow-y-auto p-4">
+            {/*
+             * `docs/FRONTEND/08` § Editor, and `P2-04` step 4: a preview render failure
+             * must not remove the properties panel or the user's unsaved data. Without
+             * this, one bad render unmounts the whole editor and takes the dirty-field
+             * set with it -- losing by a different route exactly what `P1-22` went to
+             * some trouble to protect.
+             */}
+            <PanelBoundary>{preview}</PanelBoundary>
+          </div>
         </Panel>
 
         <Panel

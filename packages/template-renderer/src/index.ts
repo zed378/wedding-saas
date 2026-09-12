@@ -6,6 +6,7 @@
 // honest preview rather than a second implementation that drifts.
 
 export { TemplateRenderer } from "./TemplateRenderer.js";
+export { SectionBoundary } from "./SectionBoundary.js";
 export { COMPONENT_REGISTRY, resolveComponent } from "./registry.js";
 export { resolveSectionData, readPath } from "./resolve-data.js";
 export { mergeTheme, themeToCustomProperties } from "./theme.js";
@@ -13,6 +14,7 @@ export type {
   RenderMode,
   SectionComponent,
   SectionDefinition,
+  SectionErrorReport,
   SectionProps,
   SectionRenderIssue,
   TemplateRendererProps,
