@@ -1,8 +1,10 @@
 import { Controller, Get, Inject, Res, HttpStatus } from "@nestjs/common";
 import type { Response } from "express";
 import type { Pool } from "pg";
+import type { Redis as IORedis } from "ioredis";
 
 import { DB_POOL } from "../infra/db/client";
+import { RATE_LIMIT_REDIS } from "../shared/rate-limit/rate-limiter";
 import { logger } from "../shared/logging/logger";
 
 /**
@@ -29,7 +31,23 @@ import { logger } from "../shared/logging/logger";
  */
 @Controller()
 export class HealthController {
-  constructor(@Inject(DB_POOL) private readonly pool: Pool) {}
+  constructor(
+    @Inject(DB_POOL) private readonly pool: Pool,
+    /**
+     * The **limiter's** client, deliberately, rather than a connection of this
+     * controller's own.
+     *
+     * A probe that opens its own socket answers "is the Redis server up?", which is not
+     * the question. `P1-07` shipped a limiter whose client could not issue a command
+     * against a server that was perfectly healthy and reachable from the same container
+     * -- and a private connection here would have reported `ok` throughout, exactly as
+     * the database-only version did.
+     *
+     * Checking the client the application actually depends on is what makes this a
+     * readiness check rather than a network test.
+     */
+    @Inject(RATE_LIMIT_REDIS) private readonly redis: IORedis,
+  ) {}
 
   @Get("health")
   live(): { status: "ok" } {
@@ -52,6 +70,16 @@ export class HealthController {
   async ready(@Res() res: Response): Promise<void> {
     const checks = await Promise.all([
       this.check("database", () => this.pool.query("SELECT 1")),
+      // `docs/DEVOPS/05` § Health Check names both: "connectivity to critical
+      // dependencies (DB, Redis)". Redis was missing here until `P1-07`'s cold-start
+      // defect made the cost concrete -- the limiter could not reach it, credential
+      // endpoints were failing closed with 503, and this endpoint reported `ok`.
+      //
+      // A failure here is a 503 like any other, which is the document's plain reading.
+      // It is worth knowing that nothing acts on it automatically: the container
+      // HEALTHCHECK calls `/health`, and this host has no load balancer to remove the
+      // service from. It is an operator signal, and being an honest one is the point.
+      this.check("redis", () => this.redis.ping()),
     ]);
 
     const failed = checks.filter((c) => !c.ok);
