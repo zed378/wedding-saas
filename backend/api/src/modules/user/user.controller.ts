@@ -25,6 +25,8 @@ import {
 } from "../../shared/auth-middleware";
 import { clearRefreshCookie, readRefreshCookie } from "../auth/refresh-cookie";
 import { UserService, type UserProfile } from "./user.service";
+import { sanitizeFields } from "../../shared/sanitizer/sanitize";
+import { TEXT_FIELDS } from "../../shared/sanitizer/registry";
 
 /**
  * P1-08 — `docs/API/02`.
@@ -83,9 +85,26 @@ const preferencesSchema = z
   })
   .strict();
 
+/**
+ * Validate, then sanitize. `docs/BACKEND/03` § Free-Text Input Sanitization puts them in
+ * that order and it matters: sanitizing first would let a payload change a value's LENGTH
+ * after the length check, and a 3000-character name that shrinks to 90 would pass a
+ * validation it should have failed.
+ *
+ * The sanitization is here rather than in the service so it cannot be skipped by a
+ * handler that forgets -- and `scripts/check-sanitized-fields.mjs` refuses a text field
+ * this registry does not know about.
+ */
 function parse<T>(schema: z.ZodType<T>, body: unknown): T {
   const result = schema.safeParse(body);
-  if (result.success) return result.data;
+  if (result.success) {
+    return typeof result.data === "object" && result.data !== null
+      ? (sanitizeFields(
+          result.data as Record<string, unknown>,
+          TEXT_FIELDS,
+        ) as T)
+      : result.data;
+  }
 
   throw new ValidationError(
     result.error.issues.map((issue) => ({

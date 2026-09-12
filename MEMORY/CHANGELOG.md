@@ -10,6 +10,21 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — one sanitization step, and a guard that refuses to let anyone skip it
+
+**Added** — the free-text sanitization pipeline ([P1-16](./records/2026-09-12-P1-16-sanitization-pipeline.md)), **built out of order** because every sub-resource task from `P1-11` to `P1-15` has it as a definition-of-done item.
+
+- One step between validation and the service, a registry of every free-text field in the product, and `scripts/check-sanitized-fields.mjs` — which **fails the build** when a request schema grows a string field that is in neither the registry nor an exemption list with a written reason. The card's reasoning is the load-bearing part: implemented per-endpoint it gets forgotten on the fifth endpoint; implemented as a step with a registry, forgetting requires deleting something.
+- **Validate, then sanitize.** The other order lets a payload change a value's length *after* the length check, so a 3000-character name that shrinks to 90 passes a validation it should have failed. There is a test for the ordering, not just a comment.
+- Allowlist throughout, never blacklist — and for almost every field the allowlist is **empty**, which is the strictest form of the rule rather than an exception to it. A guest's name is text; "which tags should a venue address support" has the answer "none".
+- 23 payloads, chosen to be the ones that get through allowlist mistakes rather than ten spellings of `<script>`: attribute handlers, `javascript:` and `data:` URIs, SVG, MathML parser confusion, mutation XSS, tab- and newline-separated handlers.
+
+**Worth knowing** — two things the tests caught.
+
+**The sanitizer was storing HTML, not text.** `sanitize-html` strips tags and then *encodes* what remains, so `Budi & Ani` came back as `Budi &amp; Ani`; stored that way, a correct renderer escapes it again and the user sees `Budi &amp; Ani` on their own invitation. Undoing that is not a single decode, because the attacker picks the depth — `&amp;lt;script&amp;gt;` decodes to `&lt;script&gt;` decodes to `<script>`. The sanitizer now strips, decodes and repeats to a fixed point. Caught by a `P1-09` test written for an entirely different reason.
+
+**The exemption reasons were labels, not reasons.** `"as above"`, `"a UUID"`, `"an enum"`, `"HH:MM"` — eleven entries whose justification conveyed nothing anybody could disagree with. A test requiring more than ten characters forced real ones. That list is the cheapest way past a failing build, so it is the half that will be abused, and a reviewer can only push back on a claim that has actually been made.
+
 ### 2026-09-12 — you can see, rename and delete your invitations
 
 **Added** — the four core invitation endpoints ([P1-10](./records/2026-09-12-P1-10-invitation-crud.md))

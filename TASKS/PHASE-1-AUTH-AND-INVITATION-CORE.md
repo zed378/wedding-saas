@@ -31,7 +31,7 @@
 | P1-13 | Bank accounts and quote sub-resources | backend | M | P1-10 |
 | P1-14 | Settings sub-resource and slug rules | backend | M | P1-10 |
 | P1-15 | Change template without data loss | backend | M | P1-10, P0-20 |
-| P1-16 | Free-text sanitization pipeline | backend | M | P0-13 |
+| P1-16 | Free-text sanitization pipeline | backend | M | P0-13 | ✅
 | P1-17 | Media upload — synchronous validation stage | backend | L | P1-10, P0-16 |
 | P1-18 | Media processing worker | worker | L | P1-17, P0-15 |
 | P1-19 | Gallery sub-resource, reorder, cover, quota | backend | M | P1-18 |
@@ -540,7 +540,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-16-sanitization-pipeline.md). **Built out of order**, before `P1-11`: every sub-resource task from `P1-11` to `P1-15` has this as a DoD item, and its own dependency (`P0-13`) was already met |
 | **Depends on** | P0-13 |
 | **Spec refs** | `docs/SECURITY/08-API-SECURITY.md` § Output Encoding, `docs/BACKEND/03-VALIDATION.md` § Free-Text Input Sanitization, `docs/PLAN/08` § Design Principles |
 | **Spec required** | Yes — input handling |
@@ -559,9 +559,13 @@
 6. Test with the payload set that Phase 6's XSS sweep will reuse: script tags, event-handler attributes, `javascript:` URLs, SVG payloads, encoded variants.
 
 **Definition of Done**
-- [ ] Every field in the registry is sanitized before storage, proven by a parameterized test over all of them.
-- [ ] The CI check fails when a new unregistered text field is added.
-- [ ] No sanitizer configuration uses a blacklist.
+- [x] Every field in the registry is sanitized before storage, proven by a parameterized test over all of them. The test iterates `TEXT_FIELDS` itself × 23 payloads, so a field added to the registry is covered without anybody remembering to add a case.
+- [x] The CI check fails when a new unregistered text field is added. **Demonstrated**: adding `wedding_hashtag: z.string()` to a controller makes `check-sanitized-fields.mjs` exit 1 naming the file and the field.
+- [x] No sanitizer configuration uses a blacklist. `allowedTags: []` for plain text; six tags and **zero attributes** for rich. Two tests assert that an unanticipated tag and attribute are removed without being named anywhere.
+
+**Also enforced**: validate *then* sanitize, with a test — the other order lets a payload change a value's length after the length check.
+
+**Owed by `P1-13`**: a format check for `account_number`, which is exempt from sanitization on the argument that tag stripping would silently alter a value whose exact characters matter.
 
 ---
 
