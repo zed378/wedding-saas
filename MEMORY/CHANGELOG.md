@@ -10,6 +10,50 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-12 — you can see, rename and delete your invitations
+
+**Added** — the four core invitation endpoints ([P1-10](./records/2026-09-12-P1-10-invitation-crud.md))
+
+- **The owner filter is in the SQL and there is nowhere else it could be.** `docs/SECURITY/05` § 5 names response-level filtering as the wrong implementation: it works until a `.filter()` is dropped in a refactor, and then it leaks every tenant at once through an endpoint that still looks correct. The list `total` is its own count with the same predicate — an unscoped one would leak the platform's size and make pagination lie.
+- **Explicit response projections, never the row.** Returning the row works today and becomes a leak the moment somebody adds a column, because nothing in the code would have to change for it to start being served. The detail and summary key sets are asserted exactly, so a field added or dropped fails a test.
+- `PATCH` writes one field. `status`, `owner_id`, `published_at`, `expiry_date` and `template_version_id` are not parameters anywhere in the chain — status moves only through the status service, which a build guard enforces.
+- Soft delete keeps the row and **frees the slug** (ADR-033), which the response says out loud, since that is the part a user is most likely to be surprised by in either direction.
+
+**Worth knowing** — the first mutation aimed at the update whitelist **passed**. Making the repository spread its argument changed nothing, because the _service_ builds `{ internalName }` explicitly before calling it. The whitelist is at the service and the repository's narrow type is the second layer; mutating both at once fails five tests, which is the honest statement of where the defence lives.
+
+### 2026-09-12 — you can create an invitation
+
+**Added** — `POST /invitations` ([P1-09](./records/2026-09-12-P1-09-create-invitation.md))
+
+- One transaction, five rows: the invitation, its settings, its quote and **both** people rows — empty rather than absent, so every later edit is a simple update instead of an upsert racing another tab.
+- **BR-3.1 is enforced where it can only be enforced once.** The invitation locks a concrete `template_version_id` at creation. An admin editing a template must not change the appearance of an invitation already sent to three hundred guests, and resolving the version at read time _is_ the bug that rule was written to prevent.
+- **The free-draft quota counts what has never been paid, not what is a draft.** BR-1.4 limits unpaid inventory, not customers, so a wedding organiser with five paid invitations can still start a sixth.
+- Slug validation covers format, the reserved/profanity blocklist and global uniqueness, with `409 SLUG_TAKEN` kept distinct from the 400s. **Uppercase is rejected rather than normalised**: a URL path is case-sensitive, and silently storing `budi-dan-ani` for somebody who typed `Budi-Dan-Ani` hands them an address that does not resolve, possibly after they have printed it.
+
+**Added** — the `slug_blocklist` table (migration `0006`) and its seed. `docs/DATABASE/12` specifies it and `P5-13` was to build it, but a slug validation that reads an empty table accepts `admin`, `api` and `www` — and `docs/PLAN/10` § 2 makes every path segment on the public host a reserved slug, because invitations sit at its root and an unreserved route could take a wedding page offline silently.
+
+**Worth knowing** — two bugs that would have shipped silently.
+
+`enabled_sections` was empty on **every** new invitation: the reader looked for `section.key` and the schema's field is `section_key`. That renders as a blank invitation rather than an error, so nothing would have failed until somebody opened one.
+
+And the free-draft quota's mutation **passed**. Replacing "never paid" with `status = 'draft'` broke nothing, because every test used a `paid` invitation — which is not a draft either way. The case that distinguishes them is `pending_payment`: never paid, not a draft, and therefore still unpaid inventory. A quota written the short way would have let a user park one there and start another. Fifth time in this project a test has verified less than its name suggested, and the fifth time only the mutation found it.
+
+### 2026-09-12 — your own account, and what happens when you delete it
+
+**Added** — the six endpoints of `docs/API/02` ([P1-08](./records/2026-09-12-P1-08-user-profile-and-deletion.md))
+
+- **IDOR prevention by design, taken literally.** Every path is `/users/me` and every service method takes a tenant scope derived from the authenticated row. There is no route with a parameter and no method with a user id, so the attack this section is about has nowhere to travel — it is not rejected, it cannot be expressed.
+- Mass assignment is blocked twice and the two fail differently: the schemas are `.strict()`, so a request carrying `role` is **rejected** rather than silently stripped, and below that the service builds its patch field by field so a future edit cannot spread a validated object into an update. Eight forbidden fields each have a test.
+- A password change revokes other sessions in the same transaction as the write, and **spares the session that made it** — the difference from a reset is that the user is here and authenticated.
+
+**Decided** — **ADR-051**, answering `OQ-11`: **deleting an account does not take its published invitations down.** The account is soft-deleted and every session revoked immediately; published invitations keep serving until their own expiry, and everything is hard-deleted together under BR-9.
+
+The case against an immediate takedown is concrete rather than theoretical. A couple has sent the link to three hundred guests who use it for the address, the time and the RSVP. Honouring a deletion request by breaking that removes data **the requester published on purpose, about themselves**, and lands the harm on people who did not ask for anything. The account still dies at once, so somebody deleting because they fear compromise gets what they need; the invitation outlives the login rather than the other way round. The API response says `live_invitations` and names the behaviour, because a user who finds their wedding page still up should have been told that was the intent.
+
+This remains a legal question as much as a product one. If counsel disagrees, one test needs inverting and it is named in the ADR.
+
+**Worth knowing** — `docs/API/02` says `phone` is "validated in BACKEND/03-VALIDATION.md", and `docs/BACKEND/03` contains no phone rule at all. The format implemented is this task's choice, marked as such where it is defined rather than quietly presented as a transcription.
+
 ### 2026-09-12 — rate limiting, and a decision about Redis being down
 
 **Added** — the policy table from `docs/SECURITY/10`, enforced ([P1-07](./records/2026-09-12-P1-07-rate-limiting.md))

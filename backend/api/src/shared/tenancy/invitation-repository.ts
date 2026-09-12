@@ -76,7 +76,26 @@ export interface OwnedListFilters {
   readonly offset?: number;
 }
 
-type InvitationRow = typeof invitations.$inferSelect;
+/**
+ * One invitation row.
+ *
+ * **Exported**, so a caller that needs the shape does not import the table to get it.
+ * `scripts/check-tenant-scope.mjs` is a text check and does not distinguish `import type`
+ * from a value import -- which is the correct blunt instrument, since a file that has the
+ * table in scope is one edit away from querying it. `P1-10`'s DTO needed the type and
+ * tripped the guard; re-exporting it here points the dependency the right way round.
+ */
+export type InvitationRow = typeof invitations.$inferSelect;
+
+/** Everything `docs/API/04` § Example Response embeds. `P1-10`. */
+export interface InvitationAggregate {
+  readonly people: (typeof invitationPeople.$inferSelect)[];
+  readonly events: (typeof invitationEvents.$inferSelect)[];
+  readonly gallery: (typeof invitationGallery.$inferSelect)[];
+  readonly bankAccounts: (typeof invitationBankAccounts.$inferSelect)[];
+  readonly settings: typeof invitationSettings.$inferSelect | null;
+  readonly quote: typeof invitationQuote.$inferSelect | null;
+}
 
 /** The statuses an invitation only reaches by being paid for. BR-1.4. */
 const NEVER_PAID_STATUSES = ["paid", "published", "expired"] as const;
@@ -176,6 +195,146 @@ export class InvitationRepository {
       .orderBy(desc(invitations.createdAt))
       .limit(Math.min(filters.limit ?? 50, 100))
       .offset(filters.offset ?? 0);
+  }
+
+  /**
+   * How many invitations this scope has, for pagination. `P1-10`.
+   *
+   * A separate count rather than `rows.length`, because the rows are a page and the
+   * envelope's `meta.total` means "how many are there", not "how many did you send".
+   * Same predicate as `findOwnedList`, deliberately duplicated here rather than shared
+   * through a helper: two queries that must agree are easier to check side by side than
+   * one abstraction with a boolean.
+   */
+  async countOwned(scope: TenantScope, status?: string): Promise<number> {
+    const conditions = [
+      eq(invitations.ownerId, scope),
+      isNull(invitations.deletedAt),
+    ];
+    if (status !== undefined) {
+      conditions.push(eq(invitations.status, status));
+    }
+
+    const [row] = await this.db
+      .select({ n: count() })
+      .from(invitations)
+      .where(and(...conditions));
+
+    return row?.n ?? 0;
+  }
+
+  /**
+   * Update invitation-level columns this scope owns. `P1-10`.
+   *
+   * The `changes` type is the whitelist: it has one property. `status` is absent because
+   * `InvitationStatusService` is the only permitted writer (`check-status-writes.mjs`),
+   * and `ownerId`, `templateVersionId`, `publishedAt` and `expiryDate` are absent because
+   * a client must not move them.
+   *
+   * The owner predicate is in the `WHERE`, so an update aimed at somebody else's row
+   * changes nothing rather than being refused after a read.
+   */
+  async updateOwned(
+    invitationId: string,
+    scope: TenantScope,
+    changes: { readonly internalName?: string },
+  ): Promise<void> {
+    const patch: Record<string, unknown> = {};
+    if (changes.internalName !== undefined) {
+      patch["internalName"] = changes.internalName;
+    }
+    if (Object.keys(patch).length === 0) return;
+
+    patch["updatedAt"] = new Date();
+
+    await this.db
+      .update(invitations)
+      .set(patch)
+      .where(
+        and(
+          eq(invitations.id, invitationId),
+          eq(invitations.ownerId, scope),
+          isNull(invitations.deletedAt),
+        ),
+      );
+  }
+
+  /**
+   * Soft delete one this scope owns. `P1-10`.
+   *
+   * Sets `deleted_at` and nothing else. The row survives, leaves every list (every query
+   * here carries `deleted_at IS NULL`), and **releases its slug** — the unique index is
+   * partial over live rows (ADR-033), which is what `docs/DATABASE/04` § Notes means by
+   * "a slug can be reused after the old invitation is truly deleted".
+   */
+  async softDeleteOwned(
+    invitationId: string,
+    scope: TenantScope,
+  ): Promise<void> {
+    await this.db
+      .update(invitations)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(
+        and(
+          eq(invitations.id, invitationId),
+          eq(invitations.ownerId, scope),
+          isNull(invitations.deletedAt),
+        ),
+      );
+  }
+
+  /**
+   * Everything embedded in `docs/API/04` § Example Response, in one place. `P1-10`.
+   *
+   * Each read goes through `findOwnedChildren`, which validates `child.invitation_id`
+   * **and** the parent's owner in one statement (`docs/SECURITY/05` §§ 6 and 7). The
+   * settings and quote rows are keyed by `invitation_id` and have no child id, so they
+   * are read here with the same join.
+   */
+  async loadAggregate(
+    invitationId: string,
+    scope: TenantScope,
+  ): Promise<InvitationAggregate> {
+    const [people, events, gallery, bankAccounts, settings, quote] =
+      await Promise.all([
+        this.findOwnedChildren(invitationPeople, invitationId, scope),
+        this.findOwnedChildren(invitationEvents, invitationId, scope),
+        this.findOwnedChildren(invitationGallery, invitationId, scope),
+        this.findOwnedChildren(invitationBankAccounts, invitationId, scope),
+        this.findOwnedSingleton(invitationSettings, invitationId, scope),
+        this.findOwnedSingleton(invitationQuote, invitationId, scope),
+      ]);
+
+    return { people, events, gallery, bankAccounts, settings, quote };
+  }
+
+  /**
+   * A one-per-invitation row — settings or quote — with the owner check in the join.
+   *
+   * Separate from `findOwnedChildren` because these tables have no `id` of their own;
+   * `invitation_id` IS the primary key, so there is no child id to validate against.
+   */
+  private async findOwnedSingleton<
+    T extends typeof invitationSettings | typeof invitationQuote,
+  >(
+    table: T,
+    invitationId: string,
+    scope: TenantScope,
+  ): Promise<T["$inferSelect"] | null> {
+    const rows = await this.db
+      .select({ row: table as typeof invitationSettings })
+      .from(table as typeof invitationSettings)
+      .innerJoin(invitations, eq(table.invitationId, invitations.id))
+      .where(
+        and(
+          eq(table.invitationId, invitationId),
+          eq(invitations.ownerId, scope),
+          isNull(invitations.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    return (rows[0]?.row as T["$inferSelect"] | undefined) ?? null;
   }
 
   /**

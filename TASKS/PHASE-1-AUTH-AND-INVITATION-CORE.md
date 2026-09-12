@@ -25,7 +25,7 @@
 | P1-07 | Rate limiting for auth and general API | backend | M | P1-03 | ✅
 | P1-08 | User profile, preferences, account deletion | backend | M | P1-06 |
 | P1-09 | Create an invitation | backend | M | P1-06, P0-20 | ✅
-| P1-10 | Invitation list, detail, update, soft delete | backend | L | P1-09 |
+| P1-10 | Invitation list, detail, update, soft delete | backend | L | P1-09 | ✅
 | P1-11 | Couple sub-resource | backend | M | P1-10 |
 | P1-12 | Events sub-resource | backend | M | P1-10 |
 | P1-13 | Bank accounts and quote sub-resources | backend | M | P1-10 |
@@ -365,7 +365,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** 2026-09-12 — [record](../MEMORY/records/2026-09-12-P1-10-invitation-crud.md) |
 | **Depends on** | P1-09 |
 | **Spec refs** | `docs/API/04-INVITATION-API.md`, `docs/SECURITY/05-MULTI-TENANCY-SECURITY.md`, `docs/SECURITY/08` § Mass Data Exposure |
 | **Spec required** | Yes — authorization |
@@ -382,11 +382,13 @@
 6. Apply the IDOR helper from `P1-06` to all four endpoints.
 
 **Definition of Done**
-- [ ] The list query filters by owner in SQL; a test with two seeded users proves no leakage.
-- [ ] All four endpoints return 404 for another user's invitation.
-- [ ] Status cannot be changed through `PATCH`; a test sends `status: "published"` and asserts nothing happened.
-- [ ] The detail response matches `docs/API/04`'s shape, including nested entities.
-- [ ] A soft-deleted invitation disappears from the list but its row survives with `deleted_at` set.
+- [x] The list query filters by owner in SQL; a test with two seeded users proves no leakage. **Mutation**: removing the owner predicate from `findOwnedList` fails `"list: a second user's invitations never appear"`.
+- [x] All four endpoints return 404 for another user's invitation. `expectIdorSafe` for detail; explicit tests for update and delete that also assert **nothing changed**; three HTTP tests asserting 404 with no `data`.
+- [x] Status cannot be changed through `PATCH`; a test sends `status: "published"` and asserts nothing happened. `published_at` too. **Mutation**: making both the service and the repository spread their argument fails 5 tests — mutating only the repository passes, because the whitelist lives in the service.
+- [x] The detail response matches `docs/API/04`'s shape, including nested entities. The key set is asserted **exactly**, so a field added or dropped fails.
+- [x] A soft-deleted invitation disappears from the list but its row survives with `deleted_at` set. And its slug is freed (ADR-033), and it is 404 to its own owner.
+
+**Not on this card**: `POST /:id/change-template` and `/upgrade-template-version`, which `docs/API/04` lists beside these four. They are BR-3.2 and BR-4.1 and belong with the template tasks in Phase 2.
 
 ---
 
