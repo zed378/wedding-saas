@@ -66,6 +66,8 @@ export async function listInvitations(
 export interface TemplateChoice {
   readonly id: string;
   readonly name: string;
+  /** `P2-14`: the change-template dialog reads the target's sections by slug. */
+  readonly slug: string;
 }
 
 /**
@@ -81,18 +83,66 @@ export interface TemplateChoice {
 export async function listTemplateChoices(
   api: ApiClient,
 ): Promise<readonly TemplateChoice[]> {
-  const result = await api.request<{ id: string; name: string }[]>(
-    "/templates",
-    {
-      query: { per_page: 100 },
-      anonymous: true,
-    },
-  );
+  const result = await api.request<
+    { id: string; name: string; slug: string }[]
+  >("/templates", {
+    query: { per_page: 100 },
+    anonymous: true,
+  });
 
   return result.data.map((template) => ({
     id: template.id,
     name: template.name,
+    slug: template.slug,
   }));
+}
+
+/** What the change-template confirmation needs from a template. `docs/API/03` § detail. */
+export interface TemplateShape {
+  readonly sections: readonly { readonly section_key: string }[];
+  readonly customizable_theme_keys: readonly string[];
+}
+
+/** `GET /templates/:slug` — the newest published version, which is what a change locks. */
+export async function getTemplateShape(
+  api: ApiClient,
+  slug: string,
+): Promise<TemplateShape> {
+  const result = await api.request<{
+    current_version: {
+      sections: unknown;
+      customizable_theme_keys: readonly string[];
+    };
+  }>(`/templates/${encodeURIComponent(slug)}`, { anonymous: true });
+
+  const version = result.data.current_version;
+  return {
+    sections: Array.isArray(version.sections)
+      ? (version.sections as { section_key: string }[])
+      : [],
+    customizable_theme_keys: version.customizable_theme_keys,
+  };
+}
+
+/** `POST /invitations/:id/change-template`. `docs/API/04` § change-template response. */
+export interface TemplateChangeResult {
+  readonly template_id: string;
+  readonly template_version_id: string;
+  readonly enabled_sections: readonly string[];
+  readonly hidden_sections: readonly string[];
+  readonly dropped_theme_keys: readonly string[];
+}
+
+export async function changeTemplate(
+  api: ApiClient,
+  invitationId: string,
+  templateId: string,
+): Promise<TemplateChangeResult> {
+  const result = await api.request<TemplateChangeResult>(
+    `/invitations/${encodeURIComponent(invitationId)}/change-template`,
+    { method: "POST", body: { template_id: templateId } },
+  );
+  return result.data;
 }
 
 /** `P2-12`. `POST /invitations/:id/preview-link` — the only response carrying the token. */
