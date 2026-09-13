@@ -1,3 +1,13 @@
+"use client";
+
+/*
+ * `P2-08`. Both shells own a form submit handler.
+ *
+ * The directive is here rather than in the consuming application because it is a
+ * property of THIS module: it needs the browser. `web-app` never noticed, since the
+ * editor already wraps the renderer in a client tree -- `public-invite` renders from a
+ * server component, where a hook without this directive is a build error.
+ */
 import type { SectionProps } from "../types.js";
 import { readPath } from "../resolve-data.js";
 import { SectionShell, When, rows, text } from "./primitives.js";

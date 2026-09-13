@@ -9,7 +9,11 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./src/*": "./src/*"
+    "./src/*": "./src/*",
+    "./sections/*.js": {
+      "types": "./dist/sections/*.d.ts",
+      "default": "./dist/sections/*.js"
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

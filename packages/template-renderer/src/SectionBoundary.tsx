@@ -1,3 +1,13 @@
+"use client";
+
+/*
+ * `P2-08`. An error boundary is a class component with `componentDidCatch`, which React only runs on the client.
+ *
+ * The directive is here rather than in the consuming application because it is a
+ * property of THIS module: it needs the browser. `web-app` never noticed, since the
+ * editor already wraps the renderer in a client tree -- `public-invite` renders from a
+ * server component, where a hook without this directive is a build error.
+ */
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
 import type { SectionErrorReport } from "./types.js";

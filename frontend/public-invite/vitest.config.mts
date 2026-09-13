@@ -1,4 +1,6 @@
 import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "node:url";
+
 import { defineConfig } from "vitest/config";
 
 /**
@@ -14,6 +16,21 @@ import { defineConfig } from "vitest/config";
  */
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      /*
+       * `server-only` is Next's build-time guard: importing it from a client component is
+       * a build error, which is how `lib/public-invitation.ts` and `lib/config.ts` keep
+       * the internal API address out of the browser bundle. It resolves through Next's
+       * bundler rather than Node's resolver, so Vitest cannot load it -- and the alias is
+       * an empty module rather than a stub with behaviour, because there is nothing to
+       * emulate: the guard is the import existing, not anything it does.
+       */
+      "server-only": fileURLToPath(
+        new URL("./test/server-only.ts", import.meta.url),
+      ),
+    },
+  },
   test: {
     globals: true,
     environment: "jsdom",

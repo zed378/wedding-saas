@@ -229,3 +229,23 @@ exposed" would have been false.
   `status = 'paid'` — but `P3-09` is about to start writing those rows for real.
 - **Photo URLs that 404 at the CDN** mean a media row is `ready` while its variants are
   not. The read is honest about `processing`; it trusts `ready`.
+
+---
+
+## Correction — 2026-09-13, added by `P2-08`
+
+**The payload shipped in the wrong shape**, and this record's claim that the endpoint
+serves what a guest needs to render the invitation was wrong when written.
+
+The response followed `docs/API/08`'s example — `events[].event_date`, `gallery: [...]`,
+`bank_accounts: [...]` — which mirrors `docs/API/04`. The renderer resolves a section's
+props from the **canonical** paths a template declares (`events.*.date`, `gallery.photos`,
+`gift.accounts.*.…`), so every path missed and `P2-08` rendered a page with the right
+sections and nothing in them.
+
+Fixed on `P2-08`'s branch: ADR-063, `docs/API/08` amended, and a test that walks the
+fixture template's own declared paths against the payload so the shape cannot drift again.
+
+Worth carrying forward: all 28 tests here passed against the broken payload, because they
+assert that data is **present** in the response rather than **reachable under the name the
+consumer asks for**. That distinction is the whole of the bug.

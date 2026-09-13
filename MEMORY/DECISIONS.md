@@ -1898,3 +1898,54 @@ event that does not exist until `P3-09`. Caching a page with no way to invalidat
 worse than not caching it — a couple fixing a typo on their wedding morning would watch the
 old page serve for an hour. The response is built to be deterministic (asserted by a test)
 so the cache can be added without changing it.
+
+### ADR-063 — The public payload is in the canonical field-path shape, not the owner API's
+
+**Date** 2026-09-13 · **Status** Accepted · **Task** `P2-08` · **Amends** `docs/API/08` · **Corrects** `P2-07`
+
+**Context** — `P2-07` built `GET /public/i/:slug` to the response shape written in
+`docs/API/08`: `events[].event_date`, `gallery: [...]`, `bank_accounts: [...]`,
+`couple.groom.photo_url`. That shape mirrors `docs/API/04`, which is what a reader would
+expect, and twenty-eight tests passed against it.
+
+`P2-08` then tried to render one, and the page came out with the right sections and nothing
+inside them.
+
+A template declares the data each section needs as **canonical paths** —
+`events.*.date`, `gallery.photos`, `gift.accounts.*.account_number`,
+`couple.groom.photo` — from the field registry `P0-20` built in `packages/schema`. The
+renderer resolves a section's props from exactly those paths (`resolveSectionData`,
+`docs/FRONTEND/04` Render Flow step 4). Every path missed. `events.*.date` found nothing
+because the payload said `event_date`; `gallery.photos` found nothing because the payload
+said `gallery`.
+
+`P2-02`'s own reference-template spec had already written the mapping down, in a comment
+saying *"This is the same mapping `P2-07`'s public API will perform server-side."* It did
+not, and nothing checked.
+
+**Decision** — the payload changes, not the renderer.
+
+`docs/PLAN/08`'s registry is the source of truth for what a field is called. Templates are
+data (`CLAUDE.md`), and a template's `required_fields` is the vocabulary a template author
+writes in; a payload that does not answer to that vocabulary means every consumer has to
+translate, and each translation is a place to get it wrong. There is exactly one consumer
+of this endpoint — the renderer — and it already speaks the registry's language.
+
+`docs/API/08`'s example predates the registry. It is amended.
+
+**What changed**: `events[].date` and `events[].maps_url`; `gallery.photos[]` with `order`;
+`gift.accounts[]` with `order`; `couple.<role>.photo` holding the URL. `media_id` stays out
+— the renderer falls back to an index for its React key, and an id a guest cannot resolve
+is one more internal identifier on a public page for no gain.
+
+**Why every existing test still passed.** They assert that data is *present* in the
+response, not that it is reachable under the name the template uses to ask for it. That is
+the gap, and a test now closes it: the integration suite walks the fixture template's own
+declared `required_fields` and `optional_fields` against the payload and requires each to
+resolve. It needs no list of its own, so a path added to the registry and used by a template
+is covered the day it is used.
+
+That test was itself thin at first — the event section's fixture declared only
+`events.*.title` and `events.*.venue_name`, so reverting `date` to `event_date` passed. The
+fixture now declares every path its sections could use. A guard driven by a fixture is only
+as good as the fixture.

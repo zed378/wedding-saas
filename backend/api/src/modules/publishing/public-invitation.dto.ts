@@ -23,6 +23,18 @@ import type { PublishedInvitation } from "../../shared/tenancy/public-invitation
  * `public-invitation.itest.ts` asserts the resulting object against an explicit list of
  * keys that must never appear, which is the half that catches a mistake made *here*.
  *
+ * ## The invitation is in `docs/PLAN/08`'s CANONICAL shape, not `docs/API/04`'s
+ *
+ * `events[].date`, not `event_date`. `gallery.photos`, not `gallery`. `gift.accounts`,
+ * not `bank_accounts`. `couple.groom.photo` holding a URL, not `photo_media_id`.
+ *
+ * Those are the paths `packages/schema`'s field registry defines and the paths a template
+ * declares in its `required_fields`. The renderer resolves a section's props from them,
+ * so a payload in any other shape renders an empty page — which is exactly what the first
+ * version of this file did, and what `P2-08` found the moment it tried to render one.
+ * `docs/API/08`'s example predates the registry; it is amended, and ADR-063 records why
+ * the payload rather than the renderer was the thing to change.
+ *
  * ## A disabled section contributes nothing
  *
  * BR-4.1 and `docs/API/08`: *"`bank_accounts` is ONLY included if the `gift` section is
@@ -39,26 +51,33 @@ export interface PublicPersonDto {
   readonly father_name: string | null;
   readonly mother_name: string | null;
   readonly child_order: string | null;
-  /** Absent unless the photo is `ready` and a CDN is configured. */
-  readonly photo_url?: string;
+  /**
+   * The canonical path is `couple.<role>.photo` and the renderer uses it directly as an
+   * image source, so this is a URL. Absent unless the media is `ready` and a CDN is
+   * configured.
+   */
+  readonly photo?: string;
 }
 
 export interface PublicEventDto {
   readonly type: string;
   readonly title: string;
-  readonly event_date: string;
+  /** `events.*.date` in the registry; `event_date` is the column, not the path. */
+  readonly date: string;
   readonly start_time: string;
   readonly end_time: string | null;
   readonly venue_name: string;
   readonly address: string;
   readonly latitude: string | null;
   readonly longitude: string | null;
+  readonly maps_url: string | null;
   readonly description: string | null;
 }
 
 export interface PublicGalleryDto {
   readonly caption: string | null;
   readonly is_cover: boolean;
+  readonly order: number;
   readonly width: number | null;
   readonly height: number | null;
   readonly url?: string;
@@ -70,6 +89,7 @@ export interface PublicBankAccountDto {
   readonly provider_name: string;
   readonly account_number: string;
   readonly account_holder: string;
+  readonly order: number;
 }
 
 export interface PublicSettingsDto {
@@ -101,14 +121,14 @@ export interface PublicInvitationDto {
       readonly bride: PublicPersonDto | null;
     };
     readonly events: readonly PublicEventDto[];
-    readonly gallery: readonly PublicGalleryDto[];
+    readonly gallery: { readonly photos: readonly PublicGalleryDto[] };
     readonly quote: {
       readonly text: string | null;
       readonly source: string | null;
     };
     readonly settings: PublicSettingsDto;
-    /** Present only when the `gift` section is enabled. BR-4.1. */
-    readonly bank_accounts?: readonly PublicBankAccountDto[];
+    /** Present only when a displayed section references `gift.accounts`. BR-4.1. */
+    readonly gift?: { readonly accounts: readonly PublicBankAccountDto[] };
   };
 }
 
@@ -264,13 +284,14 @@ export function toPublicInvitation(
       father_name: row.fatherName,
       mother_name: row.motherName,
       child_order: row.childOrder,
-      // `photo_url` only, never `photo_media_id`: an id a guest cannot resolve is not
-      // useful to them and is one more internal identifier on a public page.
+      // A URL, never `photo_media_id`: an id a guest cannot resolve is useless to them
+      // and is one more internal identifier on a public page. The canonical path is
+      // `couple.<role>.photo`, and the renderer uses its value as an image source.
       ...(photo === undefined
         ? {}
         : (() => {
             const urls = mediaUrls(photo, cdnBaseUrl);
-            return urls.url === undefined ? {} : { photo_url: urls.url };
+            return urls.url === undefined ? {} : { photo: urls.url };
           })()),
     };
   };
@@ -279,13 +300,14 @@ export function toPublicInvitation(
     ? byOrder(found.aggregate.events).map((e) => ({
         type: e.type,
         title: e.title,
-        event_date: e.eventDate,
+        date: e.eventDate,
         start_time: e.startTime,
         end_time: e.endTime,
         venue_name: e.venueName,
         address: e.address,
         latitude: e.latitude,
         longitude: e.longitude,
+        maps_url: e.mapsUrl,
         description: e.description,
       }))
     : [];
@@ -299,6 +321,7 @@ export function toPublicInvitation(
       ).map(({ entry }) => ({
         caption: entry.photo.caption,
         is_cover: entry.photo.isCover,
+        order: entry.photo.displayOrder,
         width: entry.media.width,
         height: entry.media.height,
         ...mediaUrls(entry.media, cdnBaseUrl),
@@ -326,7 +349,7 @@ export function toPublicInvitation(
         bride: person("bride", PATH_OF.bride),
       },
       events,
-      gallery,
+      gallery: { photos: gallery },
       quote,
       settings: {
         enabled_sections: [...enabledSections],
@@ -348,15 +371,18 @@ export function toPublicInvitation(
       // and the one BR-4.1 asks for.
       ...(shown(PATH_OF.bankAccounts)
         ? {
-            bank_accounts: byOrder(found.aggregate.bankAccounts).map((b) => ({
-              type: b.type,
-              provider_name: b.providerName,
-              // Published on purpose. `docs/SECURITY/09` § Encryption (ADR-025): the
-              // couple enters an account number IN ORDER to show it to guests, and the
-              // gift section being on is that consent.
-              account_number: b.accountNumber,
-              account_holder: b.accountHolder,
-            })),
+            gift: {
+              accounts: byOrder(found.aggregate.bankAccounts).map((b) => ({
+                type: b.type,
+                provider_name: b.providerName,
+                // Published on purpose. `docs/SECURITY/09` § Encryption (ADR-025): the
+                // couple enters an account number IN ORDER to show it to guests, and the
+                // gift section being on is that consent.
+                account_number: b.accountNumber,
+                account_holder: b.accountHolder,
+                order: b.displayOrder,
+              })),
+            },
           }
         : {}),
     },

@@ -257,7 +257,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** — 2026-09-13 ([record](../MEMORY/records/2026-09-13-P2-08-public-ssr.md)) |
 | **Depends on** | P2-07, P2-03, P0-23 |
 | **Spec refs** | `docs/FRONTEND/07-PUBLIC-INVITATION.md`, `docs/BACKEND/06-PUBLISHING.md` § Slug Resolution, `docs/DEVOPS/03-REVERSE-PROXY.md` |
 | **Spec required** | Yes — public surface |
@@ -275,10 +275,12 @@
 7. Keep the initial JavaScript payload within the `docs/FRONTEND/09` budget by code-splitting so only the active template's section components ship.
 
 **Definition of Done**
-- [ ] The initial HTML contains the invitation's content and meta tags, verified with JavaScript disabled.
-- [ ] An unknown slug renders the friendly not-found page, not a framework error.
-- [ ] Only the active template's components are in the bundle, verified by bundle analysis.
-- [ ] Desktop letterboxing matches `docs/UI-UX/15`.
+- [x] The initial HTML contains the invitation's content and meta tags, verified with JavaScript disabled. — `test-ssr/initial-html.ssr.ts` reads the raw bytes from a production server against a stub API; nothing has executed when the assertion runs.
+- [x] An unknown slug renders the friendly not-found page, not a framework error. — and the page never says which of the five reasons applied.
+- [ ] **Only the active template's components are in the bundle, verified by bundle analysis. — NOT MET.** The mechanism is in place (`resolve` prop, `next/dynamic` per name, per-module subpath exports) and Turbopack merges the eleven imports into one chunk anyway: a hero-only template references an identical chunk list to a full one. Measured, not assumed. The cost is 7.5KB gzip for the whole library, pinned by a test at under 10KB. Carried to `P2-13`, which owns the performance budget.
+- [x] Desktop letterboxing matches `docs/UI-UX/15`. — a 26rem cap on a neutral surround.
+
+**Also**: found and fixed a defect in `P2-07` — the payload was in `docs/API/04`'s shape and the renderer resolves canonical field paths, so the page rendered the right sections with nothing in them. ADR-063, `docs/API/08` amended, regression test added. Initial JS measures 138.6KB of the 150KB budget, which `P2-13` inherits.
 
 ---
 
