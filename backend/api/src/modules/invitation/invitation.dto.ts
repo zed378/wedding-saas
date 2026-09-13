@@ -2,6 +2,7 @@ import type {
   InvitationAggregate,
   InvitationRow,
 } from "../../shared/tenancy/invitation-repository";
+import { toClockTime } from "../../shared/time/clock-time";
 
 /**
  * P1-10 — the explicit response shapes. `docs/API/04` § Example Response.
@@ -176,8 +177,9 @@ export function toInvitationDetail(
       type: e.type,
       title: e.title,
       event_date: e.eventDate,
-      start_time: e.startTime,
-      end_time: e.endTime,
+      // `HH:MM`, the shape the write schema accepts (`P2-15`).
+      start_time: toClockTime(e.startTime),
+      end_time: toClockTime(e.endTime),
       venue_name: e.venueName,
       address: e.address,
       latitude: e.latitude,

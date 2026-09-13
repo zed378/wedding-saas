@@ -114,6 +114,11 @@ export interface TemplateDefinition {
 
 export interface EditorActions {
   readonly setField: (path: FieldPath, value: unknown) => void;
+  /**
+   * `P2-15`. Write a value the SERVER has already stored — a row it just created, or the list
+   * without a row it just deleted. Not dirty, so autosave does not send it back.
+   */
+  readonly applyServerValue: (path: FieldPath, value: unknown) => void;
   readonly setActiveSection: (key: string) => void;
   readonly beginSave: (fields: readonly FieldPath[]) => void;
   readonly markSaved: (
@@ -175,6 +180,10 @@ export function createEditorStore(init: EditorInit) {
       });
     },
 
+    applyServerValue: (path, value) => {
+      set((state) => ({ data: setAtPath(state.data, path, value) }));
+    },
+
     setActiveSection: (key) => {
       set({ activeSectionKey: key });
     },
@@ -234,31 +243,64 @@ export function createEditorStore(init: EditorInit) {
  * leave every subscriber holding the same reference and rendering the old value until
  * something else happened to re-render them. That is the "preview is one keystroke behind"
  * bug, and it is invisible in a test that reads the store directly.
+ *
+ * ## Rows are addressed by id (`P2-15`)
+ *
+ * Inside an array a segment names a row by its `id` — `events.<uuid>.title` — or, failing
+ * that, by index. By id is what the editor writes: a save queued for a row must reach that
+ * row even if another was deleted or reordered while it waited, and an index would silently
+ * move the edit onto a neighbour. A path to a row that does not exist changes nothing rather
+ * than inventing one.
  */
 export function setAtPath(
-  object: Readonly<Record<string, unknown>>,
+  object: Readonly<Record<string, unknown>> | readonly unknown[],
   path: FieldPath,
   value: unknown,
 ): Record<string, unknown> {
-  const segments = path.split(".");
-  const head = segments[0]!;
+  return setIn(object, path.split("."), value) as Record<string, unknown>;
+}
 
-  if (segments.length === 1) {
-    return { ...object, [head]: value };
+function setIn(
+  container: unknown,
+  segments: readonly string[],
+  value: unknown,
+): unknown {
+  const head = segments[0]!;
+  const rest = segments.slice(1);
+
+  if (Array.isArray(container)) {
+    const index = rowIndex(container, head);
+    if (index === -1) return container;
+    const copy = [...container];
+    copy[index] = rest.length === 0 ? value : setIn(copy[index], rest, value);
+    return copy;
   }
+
+  const object =
+    typeof container === "object" && container !== null
+      ? (container as Record<string, unknown>)
+      : {};
+
+  if (rest.length === 0) return { ...object, [head]: value };
 
   const existing = object[head];
   const child =
-    typeof existing === "object" &&
-    existing !== null &&
-    !Array.isArray(existing)
-      ? (existing as Record<string, unknown>)
-      : {};
+    typeof existing === "object" && existing !== null ? existing : {};
+  return { ...object, [head]: setIn(child, rest, value) };
+}
 
-  return {
-    ...object,
-    [head]: setAtPath(child, segments.slice(1).join("."), value),
-  };
+/** A row by its `id`, else by a numeric index; `-1` when neither matches. */
+function rowIndex(rows: readonly unknown[], segment: string): number {
+  const byId = rows.findIndex(
+    (row) =>
+      typeof row === "object" &&
+      row !== null &&
+      (row as { id?: unknown }).id === segment,
+  );
+  if (byId !== -1) return byId;
+  return /^\d+$/.test(segment) && Number(segment) < rows.length
+    ? Number(segment)
+    : -1;
 }
 
 /** Read a dotted path back, for a form field that needs its current value. */
@@ -266,13 +308,13 @@ export function getAtPath(
   object: Readonly<Record<string, unknown>>,
   path: FieldPath,
 ): unknown {
-  return path
-    .split(".")
-    .reduce<unknown>(
-      (current, segment) =>
-        typeof current === "object" && current !== null
-          ? (current as Record<string, unknown>)[segment]
-          : undefined,
-      object,
-    );
+  return path.split(".").reduce<unknown>((current, segment) => {
+    if (Array.isArray(current)) {
+      const index = rowIndex(current, segment);
+      return index === -1 ? undefined : current[index];
+    }
+    return typeof current === "object" && current !== null
+      ? (current as Record<string, unknown>)[segment]
+      : undefined;
+  }, object);
 }

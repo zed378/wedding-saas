@@ -1,14 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+
+import { sectionLabel } from "@wi/schema";
 
 import { getAtPath, type TemplateSectionDefinition } from "./store";
 import { useEditor, useEditorContext } from "./EditorProvider";
+import { CollectionEditor } from "./fields/CollectionEditor";
 import { FieldControl } from "./fields/FieldControl";
-import { COLLECTION_PATHS, fieldMeta } from "./fields/registry";
+import {
+  COLLECTION_PATHS,
+  collectionPathOf,
+  fieldMeta,
+} from "./fields/registry";
 import { validateField } from "./fields/validate";
 import { GalleryManager } from "./media/GalleryManager";
 import { MapPicker } from "./media/MapPicker";
+import { COLLECTIONS } from "./transport";
 
 /**
  * P1-23 step 2 — the properties panel. `docs/FRONTEND/03`, `docs/UI-UX/12` § Properties Panel.
@@ -20,6 +28,15 @@ import { MapPicker } from "./media/MapPicker";
  * no component named after a section. Adding a field to a template's `required_fields`
  * changes the rendered form with **no frontend change at all** — which is the card's first
  * definition-of-done item and the reason the template system exists (`docs/PLAN/07`).
+ *
+ * ## Collections are rows (`P2-15`)
+ *
+ * A template names a collection's fields by pattern — `events.*.title`. Until `P2-15` the panel
+ * rendered one control per pattern, bound to the literal path `events.*.title`, which no data
+ * has: the fields were always empty and an edit never reached the API. The patterns of one
+ * collection are now gathered into a `CollectionEditor`, which draws them once per row,
+ * addressed by the row's id, with add and delete. Which collections exist is read from the
+ * registry and the transport, never named here.
  *
  * ## Required is marked; optional is explained
  *
@@ -33,6 +50,11 @@ import { MapPicker } from "./media/MapPicker";
  * against a later registry, or a field was removed. Rendering nothing would show a section
  * that is silently missing a control. It says so instead, quietly, where somebody can see it.
  */
+
+interface Entry {
+  readonly path: string;
+  readonly required: boolean;
+}
 
 export function PropertiesPanel() {
   const invitationId = useEditor((s) => s.invitationId);
@@ -67,7 +89,7 @@ export function PropertiesPanel() {
   const required = section.required_fields ?? [];
   const optional = readOptional(section);
 
-  const entries = [
+  const entries: Entry[] = [
     ...required.map((path) => ({ path, required: true })),
     ...optional.map((path) => ({ path, required: false })),
   ];
@@ -75,10 +97,141 @@ export function PropertiesPanel() {
   // A template may list both halves of a coordinate pair. The picker is rendered once.
   const seenMapPicker = new Set<string>();
 
+  /** One control for one concrete path — a scalar, or one field of one row. */
+  const renderField = (path: string, isRequired: boolean): ReactNode => {
+    const meta = fieldMeta(path);
+    if (meta === undefined) {
+      return (
+        <p key={path} className="text-sm text-text-muted">
+          Isian ini belum dikenali oleh versi aplikasi ini.
+        </p>
+      );
+    }
+
+    // Latitude and longitude are one control, and the picker writes both. Rendering it
+    // once -- on whichever of the pair comes first -- avoids two maps on one screen
+    // fighting over the same coordinates.
+    if (meta.type === "map-picker") {
+      if (seenMapPicker.has(siblingKey(path))) return null;
+      seenMapPicker.add(siblingKey(path));
+
+      const lat = asNumber(getAtPath(data, latitudePath(path)));
+      const lng = asNumber(getAtPath(data, longitudePath(path)));
+
+      return (
+        <MapPicker
+          key={path}
+          latitude={lat}
+          longitude={lng}
+          label={meta.label}
+          onChange={(next) => {
+            edit(latitudePath(path), next.latitude);
+            edit(longitudePath(path), next.longitude);
+          }}
+        />
+      );
+    }
+
+    const value = getAtPath(data, path);
+    const error = touched.has(path)
+      ? validateField(meta, path, value)
+      : undefined;
+
+    return (
+      <FieldControl
+        key={path}
+        path={path}
+        meta={meta}
+        value={value}
+        required={isRequired}
+        {...(error !== undefined ? { error } : {})}
+        onChange={(next) => {
+          // Touched on first change, not on mount: a form that shows errors before
+          // anybody has typed is a form that shouts at people for arriving.
+          setTouched((current) =>
+            current.has(path) ? current : new Set(current).add(path),
+          );
+          edit(path, next);
+        }}
+      />
+    );
+  };
+
+  // Gather each collection's patterns in the order the template lists them, and draw the
+  // collection where its first pattern appears.
+  const rendered: ReactNode[] = [];
+  const drawnCollections = new Set<string>();
+
+  for (const { path } of entries) {
+    const collectionPath = collectionPathOf(path);
+    const collection = COLLECTIONS.find((c) => c.path === collectionPath);
+
+    if (collectionPath !== undefined && collection !== undefined) {
+      if (drawnCollections.has(collectionPath)) continue;
+      drawnCollections.add(collectionPath);
+
+      const fields = entries
+        .filter(
+          (entry) =>
+            entry.path === collectionPath ||
+            entry.path.startsWith(`${collectionPath}.*.`),
+        )
+        .map((entry) => ({
+          name:
+            entry.path === collectionPath
+              ? undefined
+              : entry.path.slice(collectionPath.length + 3),
+          required: entry.required,
+        }));
+
+      rendered.push(
+        <CollectionEditor
+          key={collectionPath}
+          collection={collection}
+          // A bare container path (`events`) means "the section shows this list": every
+          // field of a row is offered. Patterns narrow it to what the template draws.
+          fields={fields.flatMap((f) =>
+            f.name === undefined
+              ? []
+              : [{ name: f.name, required: f.required }],
+          )}
+          allFields={fields.some((f) => f.name === undefined)}
+          renderField={renderField}
+        />,
+      );
+      continue;
+    }
+
+    if (collectionPath !== undefined && path !== collectionPath) {
+      // A field of a collection that has its own manager (the photos: caption, cover and
+      // order are edited inside it). A control bound to the pattern itself would edit nothing.
+      continue;
+    }
+
+    if (COLLECTION_PATHS[path] !== undefined) {
+      // A container the transport has no row endpoint for. The photo collection has its own
+      // manager, which uploads through `docs/API/05`.
+      rendered.push(
+        isPhotoCollection(path) ? (
+          <GalleryManager key={path} invitationId={invitationId} />
+        ) : (
+          <p key={path} className="text-sm text-text-muted">
+            Daftar untuk bagian ini belum dapat diubah dari sini.
+          </p>
+        ),
+      );
+      continue;
+    }
+
+    rendered.push(
+      renderField(path, entries.find((e) => e.path === path)!.required),
+    );
+  }
+
   return (
     <div>
       <h2 className="mb-4 text-sm font-semibold text-text">
-        {section.section_key}
+        {sectionLabel(section.section_key)}
       </h2>
 
       {entries.length === 0 && (
@@ -87,79 +240,7 @@ export function PropertiesPanel() {
         </p>
       )}
 
-      <div className="space-y-4">
-        {entries.map(({ path, required: isRequired }) => {
-          const collectionReason = COLLECTION_PATHS[path];
-          if (collectionReason !== undefined) {
-            // A container, not a control. Rendering a text box for one would ask somebody to
-            // type a list. The photo collection has a manager; the others do not yet.
-            return isPhotoCollection(path) ? (
-              <GalleryManager key={path} invitationId={invitationId} />
-            ) : (
-              <p key={path} className="text-sm text-text-muted">
-                Daftar untuk bagian ini belum dapat diubah dari sini.
-              </p>
-            );
-          }
-
-          const meta = fieldMeta(path);
-          if (meta === undefined) {
-            return (
-              <p key={path} className="text-sm text-text-muted">
-                Isian ini belum dikenali oleh versi aplikasi ini.
-              </p>
-            );
-          }
-
-          // Latitude and longitude are one control, and the picker writes both. Rendering it
-          // once -- on whichever of the pair comes first -- avoids two maps on one screen
-          // fighting over the same coordinates.
-          if (meta.type === "map-picker") {
-            if (seenMapPicker.has(siblingKey(path))) return null;
-            seenMapPicker.add(siblingKey(path));
-
-            const lat = asNumber(getAtPath(data, latitudePath(path)));
-            const lng = asNumber(getAtPath(data, longitudePath(path)));
-
-            return (
-              <MapPicker
-                key={path}
-                latitude={lat}
-                longitude={lng}
-                label={meta.label}
-                onChange={(next) => {
-                  edit(latitudePath(path), next.latitude);
-                  edit(longitudePath(path), next.longitude);
-                }}
-              />
-            );
-          }
-
-          const value = getAtPath(data, path);
-          const error = touched.has(path)
-            ? validateField(meta, path, value)
-            : undefined;
-
-          return (
-            <FieldControl
-              key={path}
-              path={path}
-              meta={meta}
-              value={value}
-              required={isRequired}
-              {...(error !== undefined ? { error } : {})}
-              onChange={(next) => {
-                // Touched on first change, not on mount: a form that shows errors before
-                // anybody has typed is a form that shouts at people for arriving.
-                setTouched((current) =>
-                  current.has(path) ? current : new Set(current).add(path),
-                );
-                edit(path, next);
-              }}
-            />
-          );
-        })}
-      </div>
+      <div className="space-y-4">{rendered}</div>
     </div>
   );
 }

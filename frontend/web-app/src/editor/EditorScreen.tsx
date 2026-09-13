@@ -9,6 +9,7 @@ import { EditorShell } from "./EditorShell";
 import { LivePreview } from "./LivePreview";
 import { PropertiesPanel } from "./PropertiesPanel";
 import type { TemplateDefinition } from "./store";
+import { toEditorDocument, type MediaUrls } from "./transport";
 
 /**
  * P1-22 — loading one invitation into an editor session. `docs/FRONTEND/06` § Editor Modules.
@@ -39,6 +40,8 @@ type LoadState =
   | {
       readonly kind: "loaded";
       readonly detail: InvitationDetail;
+      /** `P2-15`: the detail in `docs/PLAN/08`'s canonical shape, which the editor works in. */
+      readonly document: Record<string, unknown>;
       readonly definition: TemplateDefinition | undefined;
     }
   | { readonly kind: "failed"; readonly message: string };
@@ -89,7 +92,43 @@ export function EditorScreen({
 
         if (controller.signal.aborted) return;
 
-        setState({ kind: "loaded", detail: result.data, definition });
+        /*
+         * `P2-15`. Photo URLs for the preview. The detail carries media ids only; the gallery
+         * list carries the CDN addresses. Optional in the same way as the definition: without
+         * it the editor works and the preview draws no photos.
+         */
+        const media: MediaUrls = await api
+          .request<Record<string, unknown>[]>(
+            `/invitations/${invitationId}/gallery`,
+            {
+              signal: controller.signal,
+            },
+          )
+          .then(
+            (response) =>
+              new Map(
+                response.data
+                  .filter((row) => typeof row["media_id"] === "string")
+                  .map((row) => [
+                    row["media_id"] as string,
+                    {
+                      url: row["url"] as string | undefined,
+                      medium_url: row["medium_url"] as string | undefined,
+                      thumbnail_url: row["thumbnail_url"] as string | undefined,
+                    },
+                  ]),
+              ),
+          )
+          .catch(() => new Map());
+
+        if (controller.signal.aborted) return;
+
+        setState({
+          kind: "loaded",
+          detail: result.data,
+          document: toEditorDocument(result.data, media),
+          definition: withInvitationSections(definition, result.data),
+        });
       } catch (error) {
         if (!controller.signal.aborted) {
           setState({ kind: "failed", message: toFriendlyError(error).message });
@@ -135,12 +174,12 @@ export function EditorScreen({
     );
   }
 
-  const { detail, definition } = state;
+  const { detail, document, definition } = state;
 
   return (
     <EditorProvider
       invitationId={invitationId}
-      data={detail as unknown as Record<string, unknown>}
+      data={document}
       templateDefinition={definition}
       knownUpdatedAt={detail.updated_at}
     >
@@ -166,6 +205,26 @@ function PreviewPlaceholder() {
       Pratinjau langsung akan tersedia setelah komponen template siap.
     </div>
   );
+}
+
+/**
+ * `P2-15` — the sections this invitation shows, not the ones its template starts with.
+ *
+ * `toDefinition` derives `enabledSections` from the template's `enabled_by_default`, and the
+ * section list drew its toggles from that. So every visit showed the template's defaults
+ * instead of the couple's choices — a section they had turned on appeared off — and toggling
+ * one sent the defaults plus that one change, silently undoing every other choice they had
+ * made. The invitation's stored selection wins whenever it has one.
+ */
+export function withInvitationSections(
+  definition: TemplateDefinition | undefined,
+  detail: {
+    readonly settings?: { readonly enabled_sections?: readonly string[] };
+  },
+): TemplateDefinition | undefined {
+  const stored = detail.settings?.enabled_sections;
+  if (definition === undefined || !Array.isArray(stored)) return definition;
+  return { ...definition, enabledSections: [...stored] };
 }
 
 /** `docs/API/03`'s detail shape, narrowed to what the editor reads. */

@@ -6,6 +6,7 @@ import { InvitationRepository } from "../../shared/tenancy/invitation-repository
 import { requireOwned, requireOwnership } from "../../shared/auth-middleware";
 import type { EventDto } from "./invitation.dto";
 import type { InvitationEventRow } from "../../shared/tenancy/invitation-repository";
+import { toClockTime } from "../../shared/time/clock-time";
 
 /**
  * P1-12 — events. `docs/API/04` § Events, `docs/DATABASE/05`.
@@ -85,8 +86,9 @@ function toDto(row: InvitationEventRow): EventDto {
     type: row.type,
     title: row.title,
     event_date: row.eventDate,
-    start_time: row.startTime,
-    end_time: row.endTime,
+    // `HH:MM`, the shape the write schema accepts (`P2-15`).
+    start_time: toClockTime(row.startTime),
+    end_time: toClockTime(row.endTime ?? null),
     venue_name: row.venueName,
     address: row.address,
     latitude: row.latitude,

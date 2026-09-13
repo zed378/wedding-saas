@@ -10,6 +10,17 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-13 — The editor saves
+
+**Fixed** — editor against the real API ([P2-15](./records/2026-09-13-P2-15-editor-canonical-document.md))
+
+- **Changes in the editor are saved.** Autosave failed silently in every browser; edits stayed on screen as "Perubahan belum tersimpan" and were lost on leaving.
+- **Events and gift accounts can be edited, added and removed** in the editor. Before, their fields showed empty even when the invitation had events.
+- **The live preview shows event dates and times, gift accounts, the cover photo and the gallery.**
+- **Section switches show the invitation's own choices**, instead of the template's defaults — and switching one no longer resets the others.
+- **Times show as 08:00, not 08:00:00**, on published invitations and in the editor.
+- The section list shows section names ("Acara", "Hadiah") rather than internal keys.
+
 ### 2026-09-13 — The public invitation, measured on a slow phone
 
 **Fixed** — performance budget and Core Web Vitals ([P2-13](./records/2026-09-13-P2-13-performance-budget.md))
