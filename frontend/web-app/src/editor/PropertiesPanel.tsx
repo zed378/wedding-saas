@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 
-import { sectionLabel } from "@wi/schema";
+import { sectionLabel, timezoneForCoordinates } from "@wi/schema";
 
 import { getAtPath, type TemplateSectionDefinition } from "./store";
 import { useEditor, useEditorContext } from "./EditorProvider";
@@ -127,6 +127,10 @@ export function PropertiesPanel() {
           onChange={(next) => {
             edit(latitudePath(path), next.latitude);
             edit(longitudePath(path), next.longitude);
+            // `P2-16`, ADR-070 (`OQ-27`): the pin decides the event's zone. The zone field stays
+            // editable for a pin the rule gets wrong or a wedding abroad.
+            const zone = timezoneForCoordinates(next.latitude, next.longitude);
+            if (zone !== undefined) edit(timezonePath(path), zone);
           }}
         />
       );
@@ -268,6 +272,7 @@ function readOptional(section: TemplateSectionDefinition): string[] {
  * knew about events.
  */
 const LATITUDE_SUFFIX = "latitude";
+const TIMEZONE_SUFFIX = "timezone";
 const LONGITUDE_SUFFIX = "longitude";
 
 function siblingKey(path: string): string {
@@ -276,6 +281,10 @@ function siblingKey(path: string): string {
 
 function latitudePath(path: string): string {
   return `${siblingKey(path)}.${LATITUDE_SUFFIX}`;
+}
+
+function timezonePath(path: string): string {
+  return `${siblingKey(path)}.${TIMEZONE_SUFFIX}`;
 }
 
 function longitudePath(path: string): string {

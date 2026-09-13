@@ -10,6 +10,13 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-13 — Events in WITA and WIT
+
+**Added** — event timezone ([P2-16](./records/2026-09-13-P2-16-event-timezone.md))
+
+- **Every event has a timezone: WIB, WITA or WIT.** Placing the pin on the map fills it in; the couple can change it.
+- **Invitations show the right zone and count down to the right moment.** A wedding in Bali or Makassar used to say "WIB" and count down to an hour after the ceremony began.
+
 ### 2026-09-13 — Phase 2 complete: changing template, end to end
 
 **Added** — Phase 2 acceptance ([P2-14](./records/2026-09-13-P2-14-phase-2-acceptance.md), [summary](./records/2026-09-13-PHASE-2-SUMMARY.md))

@@ -1,4 +1,4 @@
-import { INVITATION_FIELD_PATHS } from "@wi/schema";
+import { EVENT_TIMEZONES, INVITATION_FIELD_PATHS } from "@wi/schema";
 
 /**
  * P1-23 step 1 — the canonical field registry. `docs/FRONTEND/03` § Canonical Field Metadata.
@@ -124,6 +124,16 @@ const EVENT_FIELDS = {
   "events.*.date": { type: "date" as const, label: "Tanggal" },
   "events.*.start_time": { type: "time" as const, label: "Waktu mulai" },
   "events.*.end_time": { type: "time" as const, label: "Waktu selesai" },
+  // `P2-16`, ADR-070. Filled from the map pin when one is dropped; the couple can change it.
+  "events.*.timezone": {
+    type: "select" as const,
+    label: "Zona waktu",
+    helperText: "Terisi otomatis dari lokasi di peta. Ubah bila keliru.",
+    options: EVENT_TIMEZONES.map((zone) => ({
+      value: zone.value,
+      label: zone.abbreviation,
+    })),
+  },
   "events.*.venue_name": {
     type: "text" as const,
     label: "Nama tempat",

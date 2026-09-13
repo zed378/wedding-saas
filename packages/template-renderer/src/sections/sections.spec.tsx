@@ -317,6 +317,43 @@ describe("the countdown", () => {
     expect(at).toBe(Date.parse("2027-05-15T01:00:00Z"));
   });
 
+  it.each([
+    ["Asia/Makassar", "2027-05-15T00:00:00Z"], // 08:00 WITA
+    ["Asia/Jayapura", "2027-05-14T23:00:00Z"], // 08:00 WIT
+  ])(
+    "reads a time in its own zone (%s), not always WIB (P2-16)",
+    (timezone, instant) => {
+      // Before P2-16 a wedding at 08:00 in Denpasar counted down to 08:00 WIB — an hour after
+      // the ceremony had started.
+      const at = nearestUpcoming(
+        [{ date: "2027-05-15", start_time: "08:00", timezone }],
+        Date.parse("2020-01-01T00:00:00Z"),
+      );
+      expect(at).toBe(Date.parse(instant));
+    },
+  );
+
+  it("labels the time with the event's zone", () => {
+    const Component = COMPONENT_REGISTRY["EventCardDouble"]!;
+    render(
+      <Component
+        {...props({
+          ...FULL,
+          events: [
+            {
+              title: "Resepsi",
+              date: "2027-05-15",
+              start_time: "11:00",
+              timezone: "Asia/Makassar",
+            },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByText(/11:00 WITA/)).toBeInTheDocument();
+    expect(screen.queryByText(/WIB/)).toBeNull();
+  });
+
   it("has nothing to count once every event has passed", () => {
     // What stops an interval firing forever on a page somebody left open.
     expect(

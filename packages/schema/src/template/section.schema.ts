@@ -113,6 +113,24 @@ export const sectionSchema = sectionShape.superRefine((section, ctx) => {
     });
   }
 
+  // --- A time needs its zone (`P2-16`, ADR-070) ------------------------------
+  // `start_time` and `end_time` are local to the event's `timezone`, and the renderer only
+  // passes a section the fields it declares. A section that showed a time without declaring
+  // the zone would label and count down every event as WIB — the bug `P2-16` fixed.
+  const declared = [...section.required_fields, ...section.optional_fields];
+  const showsTime = declared.some(
+    (f) => f === "events.*.start_time" || f === "events.*.end_time",
+  );
+  if (showsTime && !declared.includes("events.*.timezone")) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["optional_fields"],
+      message:
+        'a section that shows an event time must also declare "events.*.timezone" ' +
+        "(WIB, WITA or WIT), or every time is read as WIB",
+    });
+  }
+
   // --- An always-on section cannot default to off ---------------------------
   // docs/FRONTEND/04 step 2 renders a section unconditionally when
   // `configurable: false`. Together with `enabled_by_default: false` that describes a

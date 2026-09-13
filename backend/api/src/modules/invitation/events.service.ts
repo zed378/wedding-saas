@@ -7,6 +7,7 @@ import { requireOwned, requireOwnership } from "../../shared/auth-middleware";
 import type { EventDto } from "./invitation.dto";
 import type { InvitationEventRow } from "../../shared/tenancy/invitation-repository";
 import { toClockTime } from "../../shared/time/clock-time";
+import { DEFAULT_EVENT_TIMEZONE, timezoneForCoordinates } from "@wi/schema";
 
 /**
  * P1-12 — events. `docs/API/04` § Events, `docs/DATABASE/05`.
@@ -44,6 +45,8 @@ export interface EventInput {
   readonly eventDate: string;
   readonly startTime: string;
   readonly endTime?: string | null | undefined;
+  /** `P2-16`. Absent: detected from the coordinates, else WIB. */
+  readonly timezone?: string | undefined;
   readonly venueName: string;
   readonly address: string;
   readonly latitude?: string | null | undefined;
@@ -89,6 +92,7 @@ function toDto(row: InvitationEventRow): EventDto {
     // `HH:MM`, the shape the write schema accepts (`P2-15`).
     start_time: toClockTime(row.startTime),
     end_time: toClockTime(row.endTime ?? null),
+    timezone: row.timezone,
     venue_name: row.venueName,
     address: row.address,
     latitude: row.latitude,
@@ -96,6 +100,16 @@ function toDto(row: InvitationEventRow): EventDto {
     description: row.description,
     display_order: row.displayOrder,
   };
+}
+
+/** The zone a pin falls in, from the stored decimal strings; `undefined` without a pin. */
+function detectTimezone(
+  latitude: string | null | undefined,
+  longitude: string | null | undefined,
+): string | undefined {
+  if (latitude === null || latitude === undefined) return undefined;
+  if (longitude === null || longitude === undefined) return undefined;
+  return timezoneForCoordinates(Number(latitude), Number(longitude));
 }
 
 @Injectable()
@@ -125,6 +139,11 @@ export class EventsService {
 
     const row = await this.repository.createEvent(invitationId, scope, {
       ...input,
+      // `P2-16`, ADR-070. An explicit zone wins; otherwise the pin decides; otherwise WIB.
+      timezone:
+        input.timezone ??
+        detectTimezone(input.latitude, input.longitude) ??
+        DEFAULT_EVENT_TIMEZONE,
       // Step 4. Only when the caller left it empty: a user who supplied their own link --
       // a shared Google Maps short URL, say -- must keep it.
       mapsUrl:
@@ -179,11 +198,25 @@ export class EventsService {
           ? buildMapsUrl(nextLatitude, nextLongitude)
           : undefined;
 
+    // `P2-16`, ADR-070 — the same rule as the maps link: an explicit zone wins; moving the
+    // pin re-detects it. A couple who picks a zone by hand does so after placing the pin, which
+    // is the order the editor presents them in.
+    const timezone =
+      changes.timezone !== undefined
+        ? changes.timezone
+        : coordinatesChanged
+          ? detectTimezone(nextLatitude, nextLongitude)
+          : undefined;
+
     const row = await this.repository.updateEvent(
       eventId,
       invitationId,
       scope,
-      { ...changes, ...(mapsUrl !== undefined ? { mapsUrl } : {}) },
+      {
+        ...changes,
+        ...(mapsUrl !== undefined ? { mapsUrl } : {}),
+        ...(timezone !== undefined ? { timezone } : {}),
+      },
     );
 
     if (row === null) throw new NotFoundError();

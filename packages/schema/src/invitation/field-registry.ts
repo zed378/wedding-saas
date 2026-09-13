@@ -78,6 +78,8 @@ export const INVITATION_FIELDS: readonly FieldDefinition[] = [
       "date",
       "start_time",
       "end_time",
+      // `P2-16`, ADR-070: WIB, WITA or WIT. Stored per event; detected from the pin.
+      "timezone",
       "venue_name",
       "address",
       "latitude",

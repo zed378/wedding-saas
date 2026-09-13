@@ -35,6 +35,7 @@ import { PreviewLinkService } from "./preview-link.service";
 import { SlugService, SLUG_MAX_LENGTH, SLUG_MIN_LENGTH } from "./slug.service";
 import { sanitizeFields } from "../../shared/sanitizer/sanitize";
 import { TEXT_FIELDS } from "../../shared/sanitizer/registry";
+import { EVENT_TIMEZONE_VALUES } from "@wi/schema";
 
 /**
  * P1-09 — `POST /invitations`. `docs/API/04`.
@@ -114,6 +115,9 @@ const eventBase = {
   end_time: z
     .union([z.string().regex(TIME, "Gunakan format HH:MM."), z.null()])
     .optional(),
+  // `P2-16`, ADR-070: WIB, WITA or WIT. Optional: absent, the service detects it from the
+  // coordinates, and without coordinates it is WIB, as every event was before.
+  timezone: z.enum(EVENT_TIMEZONE_VALUES as [string, ...string[]]).optional(),
   venue_name: z.string().trim().min(1).max(200),
   address: z.string().trim().min(1).max(2000),
   latitude: z.union([z.coerce.number().min(-90).max(90), z.null()]).optional(),
@@ -156,6 +160,7 @@ const updateEventSchema = z
     event_date: eventBase.event_date.optional(),
     start_time: eventBase.start_time.optional(),
     end_time: eventBase.end_time,
+    timezone: eventBase.timezone,
     venue_name: eventBase.venue_name.optional(),
     address: eventBase.address.optional(),
     latitude: eventBase.latitude,
@@ -613,6 +618,7 @@ export class InvitationController {
         eventDate: input.event_date,
         startTime: input.start_time,
         ...(input.end_time !== undefined ? { endTime: input.end_time } : {}),
+        ...(input.timezone !== undefined ? { timezone: input.timezone } : {}),
         venueName: input.venue_name,
         address: input.address,
         ...(input.latitude !== undefined
@@ -656,6 +662,7 @@ export class InvitationController {
           ? { startTime: input.start_time }
           : {}),
         ...(input.end_time !== undefined ? { endTime: input.end_time } : {}),
+        ...(input.timezone !== undefined ? { timezone: input.timezone } : {}),
         ...(input.venue_name !== undefined
           ? { venueName: input.venue_name }
           : {}),

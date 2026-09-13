@@ -30,6 +30,8 @@
 | P2-12 | Share-preview links | backend, public-invite | M | P2-08 |
 | P2-13 | Performance budget and Core Web Vitals baseline | public-invite | M | P2-10 |
 | P2-15 | Editor document in canonical shape; event and gift lists | backend, web-app | L | P2-05, P1-23 |
+| P2-16 | Event timezone (WIB/WITA/WIT) | all | M | P2-15 |
+| P2-17 | Indonesian administrative regions (province to village) | backend, web-app | L | P2-16 |
 | P2-14 | Phase 2 test suite and acceptance | all | M | all above |
 
 ---
@@ -496,4 +498,51 @@
 - [x] The live preview shows event dates, times and gift accounts for a real invitation. — E2E, and a parity test against the public payload shape.
 - [x] Times round-trip: what the API serves, the API accepts. — `events.itest.ts` round trip.
 - [x] Every canonical scalar path the registry knows resolves in the editor document built from a full owner detail. — drift-guard test, mutation-verified.
+
+---
+
+## P2-16 — Event Timezone (WIB/WITA/WIT)
+
+| | |
+|---|---|
+| **Status** | DONE — [record](../MEMORY/records/2026-09-13-P2-16-event-timezone.md) |
+| **Depends on** | P2-15 |
+| **Spec refs** | `OQ-27` (answered by the project owner 2026-09-13), `docs/PLAN/08` § Entity: Event, `docs/DATABASE/05` |
+| **Spec required** | No — the owner's answer is the spec; ADR-070 records it |
+| **Surface** | schema, backend, renderer, web-app, public-invite |
+
+**Added 2026-09-13 after Phase 2 closed**, from the owner's answer to `OQ-27`: *detect the timezone from the map pin, or let the couple choose it in the form* — both.
+
+**Definition of Done**
+- [x] Every event stores WIB, WITA or WIT; nothing else can be stored. — CHECK constraint (`events.itest.ts` › "refuses a zone outside Indonesia's three at the database") and request schema (`invitation-http.spec.ts` › "rejects a timezone outside Indonesia").
+- [x] Dropping a pin fills the zone; the couple can change it. — `editor-document.spec.tsx` › "switches the zone to WITA when the pin moves to Denpasar…", "lets the couple choose a different zone by hand".
+- [x] The public page labels and counts down in the event's zone. — `sections.spec.tsx` › "reads a time in its own zone…", "labels the time with the event's zone"; JSON-LD offset in `metadata.spec.ts`.
+- [x] The API defaults and re-detects by the same rule. — `events.itest.ts` › "the event's timezone" (5).
+
+---
+
+## P2-17 — Indonesian Administrative Regions (Province to Village)
+
+| | |
+|---|---|
+| **Status** | TODO |
+| **Depends on** | P2-16 |
+| **Spec refs** | Requested by the project owner 2026-09-13; Kemendagri region codes (`Kepmendagri` on kode dan data wilayah administrasi pemerintahan) |
+| **Spec required** | **Yes** — source, licence, data model and API are not in `docs/` |
+| **Surface** | backend, web-app |
+
+**Goal** — A reference database of every province, regency/city, district (kecamatan) and village (kelurahan/desa) in Indonesia, so an event's location can be chosen from real administrative units, and a province decides its timezone exactly rather than by approximation.
+
+**Steps**
+1. Choose the source: the latest Kemendagri code list, through a dataset whose licence permits redistribution; record the version and date.
+2. Reference tables with the official codes, seeded idempotently; the province carries its timezone.
+3. Read-only public endpoints for provinces, and children by parent code.
+4. Event location pickers in the editor; a chosen province sets the timezone; a pin suggests the nearest regency where coordinates are available.
+5. Keep `timezoneForCoordinates` as the fallback where no region is chosen.
+
+**Definition of Done**
+- [ ] Counts match the source: provinces, regencies/cities, districts, villages.
+- [ ] Every province maps to exactly one timezone, verified against the three zones' province lists.
+- [ ] The endpoints are public, cached, rate-limited, and in the IDOR inventory's exemption list with a reason.
+- [ ] Choosing a province in the editor sets the event's timezone.
 

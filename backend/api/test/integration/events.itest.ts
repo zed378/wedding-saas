@@ -388,6 +388,79 @@ describe("events sub-resource", () => {
     });
   });
 
+  describe("the event's timezone (P2-16, ADR-070)", () => {
+    it("is WIB when neither a zone nor a pin is given, as every event was before", async () => {
+      const { user, invitationId } = await withInvitation();
+      const created = await service.create(user.scope, invitationId, EVENT);
+      expect(created.timezone).toBe("Asia/Jakarta");
+    });
+
+    it("is detected from the pin when no zone is given", async () => {
+      const { user, invitationId } = await withInvitation();
+      const created = await service.create(user.scope, invitationId, {
+        ...EVENT,
+        latitude: "-8.650000",
+        longitude: "115.220000", // Denpasar
+      });
+      expect(created.timezone).toBe("Asia/Makassar");
+    });
+
+    it("keeps a zone the caller chose over the pin", async () => {
+      // A wedding abroad, or a pin on a provincial line the rule gets wrong.
+      const { user, invitationId } = await withInvitation();
+      const created = await service.create(user.scope, invitationId, {
+        ...EVENT,
+        latitude: "-8.650000",
+        longitude: "115.220000",
+        timezone: "Asia/Jakarta",
+      });
+      expect(created.timezone).toBe("Asia/Jakarta");
+    });
+
+    it("is re-detected when the pin moves, and left alone when it does not", async () => {
+      const { user, invitationId } = await withInvitation();
+      const created = await service.create(user.scope, invitationId, EVENT);
+
+      const moved = await service.update(user.scope, invitationId, created.id, {
+        latitude: "-2.530000",
+        longitude: "140.700000", // Jayapura
+      });
+      expect(moved.timezone).toBe("Asia/Jayapura");
+
+      const retitled = await service.update(
+        user.scope,
+        invitationId,
+        created.id,
+        {
+          title: "Akad",
+        },
+      );
+      expect(retitled.timezone).toBe("Asia/Jayapura");
+
+      const chosen = await service.update(
+        user.scope,
+        invitationId,
+        created.id,
+        {
+          timezone: "Asia/Makassar",
+        },
+      );
+      expect(chosen.timezone).toBe("Asia/Makassar");
+    });
+
+    it("refuses a zone outside Indonesia's three at the database", async () => {
+      // The last line behind the request schema: a direct write cannot store one either.
+      const { user, invitationId } = await withInvitation();
+      const created = await service.create(user.scope, invitationId, EVENT);
+      await expect(
+        harness.pool.query(
+          "UPDATE invitation_events SET timezone = 'Europe/London' WHERE id = $1",
+          [created.id],
+        ),
+      ).rejects.toThrow(/invitation_events_timezone_check/);
+    });
+  });
+
   describe("maps_url generation (the DoD's second item)", () => {
     it("is generated when coordinates are present and it was left empty", async () => {
       // docs/DATABASE/05 § Notes, at the service layer.

@@ -83,7 +83,11 @@ const SECTIONS = [
       "events.*.venue_name",
       "events.*.address",
     ],
-    optional_fields: ["events.*.end_time", "events.*.description"],
+    optional_fields: [
+      "events.*.end_time",
+      "events.*.timezone",
+      "events.*.description",
+    ],
   },
   {
     section_key: "gallery",

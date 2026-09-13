@@ -2187,3 +2187,33 @@ gift section was gone, and a section switched off on A would equally have come b
 
 **Consequences** — Existing rows start with `{}`: behaviour is unchanged for them until their
 next switch. A future "reset to template defaults" action must clear the memory as well.
+
+### ADR-070 — Every event has a timezone, detected from its pin and chosen in the form
+
+**Date** 2026-09-13 · **Task** `P2-16` · **Status** Accepted · **Answers** `OQ-27` (timezone half) · **Amends** `docs/PLAN/08`, `docs/DATABASE/05`, `docs/API/04`, `docs/API/08`
+
+**Context** — `docs/PLAN/08` gave an event a date and local times and no zone. The renderer
+labelled every time "WIB" and counted down to `+07:00`, so a wedding in Bali, Makassar or
+Kalimantan's east (WITA) showed the wrong zone and a countdown an hour late, and one in Maluku or
+Papua (WIT) two hours late. Raised as `OQ-27`; **the project owner answered on 2026-09-13**:
+detect the zone from the map pin, and let the couple choose it in the form.
+
+**Decisions**
+
+1. **`invitation_events.timezone`**, one of `Asia/Jakarta`, `Asia/Makassar`, `Asia/Jayapura`,
+   default `Asia/Jakarta`, enforced by a CHECK constraint and by the request schema.
+2. **Detection lives in `@wi/schema`** (`timezoneForCoordinates`) so the API's default and the
+   editor's pin agree. Simplified province-boundary rules, verified against 47 real places
+   weighted to the borders (Banyuwangi/Gilimanuk, Kuala Kapuas/Banjarmasin, Manado/Ternate,
+   Alor/Wetar). It is an approximation near provincial lines and does not exclude neighbouring
+   countries; the form field always wins. A province/city database (`P2-17`, requested by the
+   owner the same day) is expected to supersede it.
+3. **Same precedence as `maps_url`**: an explicit zone wins; else the pin decides on create and
+   when the pin moves; else WIB. Existing rows keep WIB — exactly how they were read before.
+4. **A template section that declares `events.*.start_time` or `end_time` must declare
+   `events.*.timezone`** (template validator). The renderer passes a section only the fields it
+   declares, so without the rule a template could still show every time as WIB.
+5. **The renderer labels with the event's abbreviation and counts down to its offset; the
+   link-preview `startDate` carries the offset.** A payload without a zone reads as WIB.
+
+**Not decided here** — the date display format, the other half of `OQ-27`, stays open.

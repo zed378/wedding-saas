@@ -280,6 +280,14 @@ export const invitationEvents = pgTable(
     eventDate: date("event_date").notNull(),
     startTime: time("start_time").notNull(),
     endTime: time("end_time"),
+    /**
+     * `P2-16`, ADR-070 — WIB, WITA or WIT, as an IANA name. `start_time` and `end_time` are
+     * local times in this zone. Before this column every event was read as WIB, which put
+     * the countdown for a wedding in Bali or Makassar an hour late.
+     */
+    timezone: varchar("timezone", { length: 40 })
+      .notNull()
+      .default("Asia/Jakarta"),
     venueName: varchar("venue_name", { length: 200 }).notNull(),
     address: text("address").notNull(),
     /**
@@ -305,6 +313,10 @@ export const invitationEvents = pgTable(
     check(
       "invitation_events_type_check",
       sql`type IN ('akad', 'reception', 'custom')`,
+    ),
+    check(
+      "invitation_events_timezone_check",
+      sql`timezone IN ('Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura')`,
     ),
   ],
 );
