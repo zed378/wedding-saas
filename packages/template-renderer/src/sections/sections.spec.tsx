@@ -333,6 +333,38 @@ describe("the countdown", () => {
     },
   );
 
+  it("shows the date as 15 Mei 2027, keeping ISO for machines (P2-18)", () => {
+    const Component = COMPONENT_REGISTRY["EventCardDouble"]!;
+    render(
+      <Component
+        {...props({
+          ...FULL,
+          events: [{ title: "Akad", date: "2027-05-15", start_time: "08:00" }],
+        })}
+      />,
+    );
+    const time = screen.getByText("15 Mei 2027");
+    expect(time.tagName).toBe("TIME");
+    expect(time).toHaveAttribute("datetime", "2027-05-15");
+    expect(screen.queryByText(/2027-05-15/)).toBeNull();
+  });
+
+  it("shows the hero's date the same way", () => {
+    const Component = COMPONENT_REGISTRY["HeroClassic"]!;
+    render(
+      <Component
+        {...props({
+          ...FULL,
+          events: [{ title: "Akad", date: "2027-05-15", start_time: "08:00" }],
+        })}
+      />,
+    );
+    expect(screen.getByText("15 Mei 2027")).toHaveAttribute(
+      "datetime",
+      "2027-05-15",
+    );
+  });
+
   it("labels the time with the event's zone", () => {
     const Component = COMPONENT_REGISTRY["EventCardDouble"]!;
     render(

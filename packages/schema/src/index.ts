@@ -120,3 +120,6 @@ export {
   timezoneOffset,
   type EventTimezone,
 } from "./invitation/event-timezone.js";
+
+// `P2-18` — an event date as guests read it: `15 Mei 2027`.
+export { formatEventDate } from "./invitation/event-date.js";

@@ -3,6 +3,7 @@
 import { InvitationStatusBadge } from "@wi/ui";
 
 import type { InvitationSummary } from "../lib/invitations";
+import { formatEventDate } from "@wi/schema";
 
 /**
  * P1-21 — one invitation in the dashboard list. `docs/UI-UX/10` § InvitationCard.
@@ -32,21 +33,14 @@ export interface InvitationCardProps {
   readonly onDelete?: (invitation: InvitationSummary) => void;
 }
 
-/** `2027-06-12` → `12 Juni 2027`, in the user's language rather than ISO. */
+/**
+ * `2027-06-12` → `12 Juni 2027`. `P2-18`: the one formatter the public page uses too, so the
+ * dashboard and the invitation cannot show the same date two ways.
+ */
 function formatDate(iso: string | null | undefined): string | undefined {
   if (iso === null || iso === undefined || iso.length === 0) return undefined;
-
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return undefined;
-
-  return new Intl.DateTimeFormat("id-ID", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    // The stored value is a date, not an instant. Formatting it in the browser's zone would
-    // show 11 June to somebody west of the wedding.
-    timeZone: "UTC",
-  }).format(date);
+  // The API may send a full timestamp; only the calendar date is shown.
+  return formatEventDate(iso.slice(0, 10));
 }
 
 export function InvitationCard({

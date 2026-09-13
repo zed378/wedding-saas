@@ -32,6 +32,7 @@
 | P2-15 | Editor document in canonical shape; event and gift lists | backend, web-app | L | P2-05, P1-23 |
 | P2-16 | Event timezone (WIB/WITA/WIT) | all | M | P2-15 |
 | P2-17 | Indonesian administrative regions (province to village) | backend, web-app | L | P2-16 |
+| P2-18 | Event date format: 15 Mei 2027 | schema, renderer, public-invite, web-app | S | P2-16 |
 | P2-14 | Phase 2 test suite and acceptance | all | M | all above |
 
 ---
@@ -545,4 +546,21 @@
 - [x] Every province maps to exactly one timezone, verified against the three zones' province lists. — `regions.itest.ts`.
 - [x] The endpoints are public, cached, rate-limited, and in the IDOR inventory's exemption list with a reason.
 - [x] Choosing a province in the editor sets the event's timezone. — `region-picker.spec.tsx`; full-stack `editor-collections.e2e.ts`.
+
+---
+
+## P2-18 — Event Date Format: 15 Mei 2027
+
+| | |
+|---|---|
+| **Status** | DONE — [record](../MEMORY/records/2026-09-13-P2-18-date-format.md) |
+| **Depends on** | P2-16 |
+| **Spec refs** | `OQ-27` (answered by the project owner 2026-09-13: *"only use 15 Mei 2027"*), `docs/UI-UX/14` |
+| **Spec required** | No — the answer is the spec; ADR-072 records it |
+| **Surface** | schema, renderer, public-invite, web-app |
+
+**Definition of Done**
+- [x] Every date a guest or couple reads is `15 Mei 2027`: hero, event cards, link-preview description, dashboard card. — `sections.spec.tsx` (event card and hero), `metadata.spec.ts`, full-stack `editor-collections.e2e.ts`.
+- [x] Machine-readable dates stay ISO (`<time datetime>`, JSON-LD). — asserted in `sections.spec.tsx`; `metadata.spec.ts` `startDate` unchanged.
+- [x] No new JavaScript weight on the public page. — SSR budget suite passes; the formatter is a dependency-free subpath.
 

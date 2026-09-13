@@ -8,6 +8,8 @@
  * across the boundary for no gain.
  */
 
+import { formatEventDate } from "@wi/schema/event-date";
+
 import type { SectionProps } from "../types.js";
 import { Photo, When, rows, text } from "./primitives.js";
 import { readPath } from "../resolve-data.js";
@@ -99,7 +101,12 @@ export function HeroClassic({ data }: SectionProps) {
         <p className="wi-hero-date">Kami akan menikah</p>
         <h1 className="wi-hero-names">{names}</h1>
         <When value={date}>
-          {(present) => <p className="wi-hero-date">{present}</p>}
+          {(present) => (
+            // `P2-18`: `15 Mei 2027`; the machine-readable date stays in `dateTime`.
+            <p className="wi-hero-date">
+              <time dateTime={present}>{formatEventDate(present)}</time>
+            </p>
+          )}
         </When>
       </div>
     </div>

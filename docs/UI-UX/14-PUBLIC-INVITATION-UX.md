@@ -6,7 +6,7 @@
 - Fast loading is UX priority #1 (see FRONTEND/09-PERFORMANCE.md) — a guest's first impression happens within the first few seconds.
 
 ## Section Order (Default, may vary per template — determined by `template_version.sections`)
-1. **Cover/Hero** — the couple's nicknames, the date, an "Open Invitation" button (if there's an opening animation/cover-gate for dramatic effect & to trigger music autoplay with a user gesture — a modern browser requirement).
+1. **Cover/Hero** — the couple's nicknames, the date (shown as `15 Mei 2027` everywhere a guest reads a date — day, Indonesian month name, year; no weekday, no Hijri date; `P2-18`, ADR-072), an "Open Invitation" button (if there's an opening animation/cover-gate for dramatic effect & to trigger music autoplay with a user gesture — a modern browser requirement).
 2. **Quote** — an opening verse/quote.
 3. **Couple** — photos & info about both the bride and groom + parents.
 4. **Event** — details for the Akad & Reception, with a countdown to the nearest event.

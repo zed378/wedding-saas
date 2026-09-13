@@ -12,6 +12,10 @@
     "./event-timezone": {
       "types": "./dist/invitation/event-timezone.d.ts",
       "default": "./dist/invitation/event-timezone.js"
+    },
+    "./event-date": {
+      "types": "./dist/invitation/event-date.d.ts",
+      "default": "./dist/invitation/event-date.js"
     }
   },
   "scripts": {

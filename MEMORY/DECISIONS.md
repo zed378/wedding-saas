@@ -2249,3 +2249,23 @@ province, and a coordinate rule only approximates province lines.
    rule at once and, once still, asks `/regions/locate` and fills an empty or contradicted region.
 
 **Not decided here** — whether guests see region names on the public page.
+
+### ADR-072 — Event dates are shown as `15 Mei 2027`
+
+**Date** 2026-09-13 · **Task** `P2-18` · **Status** Accepted · **Answers** `OQ-27` (format half) · **Amends** `docs/UI-UX/14-PUBLIC-INVITATION-UX.md`
+
+**Context** — The hero, the event cards and the link-preview description printed the stored ISO
+date (`2027-05-15`). `docs/UI-UX/14` said only "the date". Raised as `OQ-27`; **the project owner
+answered on 2026-09-13: "only use 15 Mei 2027"**.
+
+**Decisions**
+
+1. **Day, Indonesian month name, year** — `15 Mei 2027`, `5 Mei 2027`. No weekday, no Hijri date.
+2. **One formatter**, `formatEventDate` in `@wi/schema` (subpath `@wi/schema/event-date`, free of
+   dependencies so client components do not pull in Zod), used by the renderer's hero and event
+   card, the public page's link-preview description, and the dashboard's invitation card.
+3. **A month table, not `Intl`**: server and browser can ship different ICU data, which would make a
+   server-rendered date disagree with the hydrated one. The date is formatted from its own digits,
+   never through `Date`, so no timezone can shift the day.
+4. **Machine-readable forms stay ISO**: `<time datetime="2027-05-15">` and the JSON-LD `startDate`.
+5. **An invalid value is shown unchanged**, not hidden or replaced.

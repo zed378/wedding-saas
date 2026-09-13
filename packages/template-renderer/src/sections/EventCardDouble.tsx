@@ -16,6 +16,7 @@ import {
   timezoneAbbreviation,
   timezoneOffset,
 } from "@wi/schema/event-timezone";
+import { formatEventDate } from "@wi/schema/event-date";
 
 import type { SectionProps } from "../types.js";
 import { readPath } from "../resolve-data.js";
@@ -52,7 +53,8 @@ export function EventCardDouble({ data, mode }: SectionProps) {
             <When value={event["date"]}>
               {(date) => (
                 <p>
-                  <time dateTime={date}>{date}</time>
+                  {/* `P2-18`: `15 Mei 2027` for guests, ISO for machines. */}
+                  <time dateTime={date}>{formatEventDate(date)}</time>
                   <When value={event["start_time"]}>
                     {(start) => (
                       <>

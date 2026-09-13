@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { timezoneOffset } from "@wi/schema";
+import { formatEventDate, timezoneOffset } from "@wi/schema";
 
 import type { PublicInvitation } from "./public-invitation";
 
@@ -204,7 +204,13 @@ function describe(
 
   const parts = [
     names === undefined ? undefined : `${names} mengundang Anda`,
-    event === undefined ? undefined : str(event["date"]),
+    // `P2-18`: the link preview reads `15 Mei 2027`, like the page.
+    event === undefined
+      ? undefined
+      : (() => {
+          const date = str(event["date"]);
+          return date === undefined ? undefined : formatEventDate(date);
+        })(),
     event === undefined ? undefined : str(event["venue_name"]),
   ].filter((value): value is string => value !== undefined);
 

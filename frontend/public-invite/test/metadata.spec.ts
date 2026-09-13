@@ -134,7 +134,9 @@ describe("the preview card", () => {
 
     expect(meta.title).toBe("Undangan Pernikahan Budi & Siti");
     expect(meta.openGraph?.title).toBe("Undangan Pernikahan Budi & Siti");
-    expect(String(meta.description)).toContain("2027-05-15");
+    // `P2-18`: the owner's format, not ISO.
+    expect(String(meta.description)).toContain("15 Mei 2027");
+    expect(String(meta.description)).not.toContain("2027-05-15");
     expect(String(meta.description)).toContain("Masjid Agung Bandung");
   });
 
