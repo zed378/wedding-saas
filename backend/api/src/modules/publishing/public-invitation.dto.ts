@@ -102,8 +102,13 @@ export interface PublicSettingsDto {
 }
 
 export interface PublicInvitationDto {
-  /** Always `"published"`. Anything else is a 404, so this carries no information. */
-  readonly status: "published";
+  /**
+   * `"published"` on the public route, where anything else is a 404. `"preview"` on a
+   * share-preview response (`P2-12`): a preview usually shows a DRAFT, and a payload claiming
+   * `"published"` about an unpublished invitation would be false in the one field a consumer
+   * might branch on.
+   */
+  readonly status: "published" | "preview";
   readonly template: {
     readonly sections: unknown;
     readonly theme: unknown;
@@ -116,7 +121,11 @@ export interface PublicInvitationDto {
     /** `P2-09`'s `og:image` fallback when the invitation has no cover photo. */
     readonly thumbnail_url: string | null;
   };
-  readonly display: { readonly watermark: boolean };
+  readonly display: {
+    readonly watermark: boolean;
+    /** `P2-12`: present, and `true`, only on a share-preview response. */
+    readonly preview?: true;
+  };
   readonly invitation: {
     readonly couple: {
       readonly groom: PublicPersonDto | null;

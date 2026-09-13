@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { ConflictWarning, SaveStatusIndicator } from "./SaveStatus";
 import { SectionListPanel } from "./SectionListPanel";
 import { PublishCta } from "./PublishCta";
+import { SharePreview } from "./SharePreview";
 import { PanelBoundary } from "../components/PanelBoundary";
 
 /**
@@ -71,6 +72,8 @@ export function EditorShell({
             cannot publish, not that their invitation is incomplete. */}
         <div className="flex items-center gap-3">
           <SaveStatusIndicator />
+          {/* `P2-12`. Beside publish, because a preview is what a couple sends before it. */}
+          <SharePreview />
           <PublishCta />
         </div>
       </header>

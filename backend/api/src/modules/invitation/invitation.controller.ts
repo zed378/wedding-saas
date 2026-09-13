@@ -31,6 +31,7 @@ import { SettingsService } from "./settings.service";
 import { ChangeTemplateService } from "./change-template.service";
 import { GalleryService } from "./gallery.service";
 import { PublishCheckService } from "./publish-check.service";
+import { PreviewLinkService } from "./preview-link.service";
 import { SlugService, SLUG_MAX_LENGTH, SLUG_MIN_LENGTH } from "./slug.service";
 import { sanitizeFields } from "../../shared/sanitizer/sanitize";
 import { TEXT_FIELDS } from "../../shared/sanitizer/registry";
@@ -382,6 +383,7 @@ export class InvitationController {
     private readonly gallery: GalleryService,
     private readonly slugs: SlugService,
     private readonly publishCheckService: PublishCheckService,
+    private readonly previewLinks: PreviewLinkService,
   ) {}
 
   /**
@@ -885,6 +887,50 @@ export class InvitationController {
     @Param("id") id: string,
   ) {
     return ok(await this.publishCheckService.check(user.scope, id));
+  }
+
+  // ----------------------------------------------------------- preview links
+
+  /**
+   * `POST /invitations/:id/preview-link`. `P2-12`, `docs/API/04` § Preview.
+   *
+   * 201 with the token, the only time it is ever returned. Nothing is accepted from the body:
+   * the expiry is `docs/PLAN/04`'s seven days, not a value a client could stretch.
+   */
+  @Post(":id/preview-link")
+  @HttpCode(201)
+  async createPreviewLink(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+  ) {
+    return ok(await this.previewLinks.create(user.scope, id));
+  }
+
+  /** `GET /invitations/:id/preview-links` — active links, never their tokens. */
+  @Get(":id/preview-links")
+  async listPreviewLinks(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+  ) {
+    return ok(await this.previewLinks.list(user.scope, id));
+  }
+
+  /**
+   * `DELETE /invitations/:id/preview-links/:tokenId` — revoke.
+   *
+   * The link stops working on the next request; the row stays, so `last_accessed_at` still
+   * tells the owner whether it was opened before they took it back.
+   */
+  @Delete(":id/preview-links/:tokenId")
+  @HttpCode(200)
+  async revokePreviewLink(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+    @Param("tokenId") tokenId: string,
+  ) {
+    await this.previewLinks.revoke(user.scope, id, tokenId);
+
+    return ok({ status: "revoked" });
   }
 
   @Get(":id/gallery")

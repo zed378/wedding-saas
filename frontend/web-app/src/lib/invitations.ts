@@ -95,6 +95,55 @@ export async function listTemplateChoices(
   }));
 }
 
+/** `P2-12`. `POST /invitations/:id/preview-link` — the only response carrying the token. */
+export interface CreatedPreviewLink {
+  readonly id: string;
+  readonly token: string;
+  readonly url: string;
+  readonly expires_at: string;
+  readonly created_at: string;
+}
+
+/** `GET /invitations/:id/preview-links` — never a token, only when and whether it was used. */
+export interface PreviewLink {
+  readonly id: string;
+  readonly expires_at: string;
+  readonly created_at: string;
+  readonly last_accessed_at: string | null;
+}
+
+export async function createPreviewLink(
+  api: ApiClient,
+  invitationId: string,
+): Promise<CreatedPreviewLink> {
+  const result = await api.request<CreatedPreviewLink>(
+    `/invitations/${encodeURIComponent(invitationId)}/preview-link`,
+    { method: "POST" },
+  );
+  return result.data;
+}
+
+export async function listPreviewLinks(
+  api: ApiClient,
+  invitationId: string,
+): Promise<readonly PreviewLink[]> {
+  const result = await api.request<PreviewLink[]>(
+    `/invitations/${encodeURIComponent(invitationId)}/preview-links`,
+  );
+  return result.data;
+}
+
+export async function revokePreviewLink(
+  api: ApiClient,
+  invitationId: string,
+  linkId: string,
+): Promise<void> {
+  await api.request(
+    `/invitations/${encodeURIComponent(invitationId)}/preview-links/${encodeURIComponent(linkId)}`,
+    { method: "DELETE" },
+  );
+}
+
 /** `GET /invitations/slug-available`. Advisory — see ADR-057. */
 export interface SlugAvailability {
   readonly available: boolean;

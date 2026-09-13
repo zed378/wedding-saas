@@ -49,6 +49,12 @@ GET    /public/preview/:token                      Render an unpublished invitat
 - `gift.accounts` is ONLY included if the `gift` section is active in `enabled_sections` — respect the user's toggle even if data exists in the DB (BR-4.1). Absent, not an empty array: an empty array says "the couple listed no accounts", and absence says "this invitation does not show gift accounts", which is the true statement.
 - The same rule applies to **every** section that owns data, not only to gift accounts. The implementation asks *"does any displayed section reference this data?"*, reading the field paths the template itself declares in `required_fields`/`optional_fields`, rather than mapping section keys to payload keys in code. Two consequences worth knowing: a `configurable: false` section is displayed whatever `enabled_sections` says (FRONTEND/04 § Render Flow step 2), so its data is always served; and data a **still-displayed** section references is kept even when the section usually associated with it is off — the reference template's `hero` lists `gallery.photos.*.media_id`, so turning the gallery off does not remove the hero's background photo. Added by `P2-07` (ADR-062).
 
+## GET /public/preview/:token — Response (`P2-12`)
+- The same payload as `GET /public/i/:slug`, built by the same code, with four fields forced whatever the invitation's own settings say: `status: "preview"` (a preview usually shows a draft, and claiming `"published"` would be false), `display: { watermark: true, preview: true }`, `settings.seo_indexable: false`, and `settings.rsvp_enabled` / `settings.guestbook_enabled: false`.
+- Served with `Cache-Control: private, no-store` — a shared cache holding a preview would keep serving the draft after the owner revoked it — and `X-Robots-Tag: noindex, nofollow`.
+- The token's shape is checked before it is hashed or queried. A malformed, unknown, expired or revoked token, and a token for a deleted invitation, all answer with the identical 404 the slug route uses.
+- A successful resolve records `last_accessed_at` on the token.
+
 ## RSVP & Guestbook Submission
 - Rate-limited per IP+slug (e.g., max 10 submissions/hour) — see SECURITY/10.
 - Input validation & sanitization is just as strict as authenticated endpoints (SECURITY/08).

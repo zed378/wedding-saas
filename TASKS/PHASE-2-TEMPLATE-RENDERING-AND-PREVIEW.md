@@ -380,7 +380,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** — 2026-09-13 ([record](../MEMORY/records/2026-09-13-P2-12-share-preview.md)) |
 | **Depends on** | P2-08 |
 | **Spec refs** | `docs/API/04` § Preview, `docs/PLAN/04` § F6, `docs/PLAN/01` FR-4.3 |
 | **Spec required** | Yes — public surface |
@@ -398,10 +398,10 @@
 7. Rate limit the resolve route, and make an invalid or expired token indistinguishable from a nonexistent one.
 
 **Definition of Done**
-- [ ] Preview tokens are hashed at rest, expire in 7 days, and are revocable.
-- [ ] A preview page is always `noindex` and always watermarked.
-- [ ] RSVP and guestbook submissions from a preview create no rows.
-- [ ] An expired token and an invented token produce identical responses.
+- [x] Preview tokens are hashed at rest, expire in 7 days, and are revocable. — SHA-256 only in the database; expiry compared against the database's `now()`; revocation is a timestamp the resolve refuses. Named tests and mutations in the record.
+- [x] A preview page is always `noindex` and always watermarked. — forced in the API payload, sent as `X-Robots-Tag`, and rendered as metadata plus a banner and tiled overlay; asserted at the API and in the server's HTML.
+- [x] RSVP and guestbook submissions from a preview create no rows. — structural today (no submission route exists; `P4`'s routes address a *published* invitation by slug) and both flags forced off in the payload. `P4-01` already refuses a draft; `P4-03`'s DoD gained the same line.
+- [x] An expired token and an invented token produce identical responses. — status and body, alongside revoked, malformed and deleted-invitation tokens.
 
 ---
 

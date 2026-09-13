@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { PublicInvitationController } from "./public-invitation.controller";
+import { PublicPreviewController } from "./public-preview.controller";
 import { PublicInvitationService } from "./public-invitation.service";
 
 /**
@@ -11,7 +12,7 @@ import { PublicInvitationService } from "./public-invitation.service";
  * of `docs/BACKEND/06` is what this controller already is.
  */
 @Module({
-  controllers: [PublicInvitationController],
+  controllers: [PublicInvitationController, PublicPreviewController],
   // The repository comes from the global `TenancyModule`.
   providers: [PublicInvitationService],
   exports: [PublicInvitationService],

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 import { DB, type Database } from "../../infra/db/client";
 import {
@@ -10,6 +10,7 @@ import {
   invitationEvents,
   invitationGallery,
   invitationBankAccounts,
+  invitationPreviewTokens,
   media,
   orders,
   packages,
@@ -131,6 +132,82 @@ export class PublicInvitationRepository {
     const found = rows[0];
     if (found === undefined) return null;
 
+    return this.#assemble(found);
+  }
+
+  /**
+   * `P2-12` — the invitation behind a share-preview token, whatever its status, or `null`.
+   *
+   * `docs/DATABASE/04` § Share-Preview Tokens: the token *"is the only thing between an
+   * unpublished invitation and the public internet"*. So the predicates are the whole
+   * authorization model, as with the slug lookup, and all of them are in SQL:
+   *
+   *   - the **hash** matches — the token itself is never stored;
+   *   - it is **not revoked**;
+   *   - it has **not expired**, compared in the database against `now()` rather than a clock
+   *     the application passes in, so a skewed application host cannot extend a link;
+   *   - the invitation is **not deleted**.
+   *
+   * **Status is deliberately not a predicate.** A preview exists to show a draft or a paid
+   * but unpublished invitation; that is its purpose. A preview of a published invitation is
+   * also allowed — the couple sent the link before publishing and it should keep working.
+   *
+   * `null` for an unknown, expired, revoked or deleted token alike, and the caller cannot
+   * tell them apart for the same reason as the slug lookup: `docs/DATABASE/04` requires they
+   * produce the same response, and the cheapest way to keep that is to not know.
+   *
+   * A successful resolve records `last_accessed_at`, so the owner can see whether a link was
+   * opened. Written after the read and not awaited by the result's correctness: a failed
+   * timestamp update must not turn a valid preview into an error.
+   */
+  async findPreviewByTokenHash(
+    tokenHash: string,
+  ): Promise<PublishedInvitation | null> {
+    const rows = await this.db
+      .select({
+        invitation: invitations,
+        version: templateVersions,
+        thumbnailUrl: templates.thumbnailUrl,
+        tokenId: invitationPreviewTokens.id,
+      })
+      .from(invitationPreviewTokens)
+      .innerJoin(
+        invitations,
+        eq(invitationPreviewTokens.invitationId, invitations.id),
+      )
+      .innerJoin(
+        templateVersions,
+        eq(invitations.templateVersionId, templateVersions.id),
+      )
+      .innerJoin(templates, eq(templateVersions.templateId, templates.id))
+      .where(
+        and(
+          eq(invitationPreviewTokens.tokenHash, tokenHash),
+          isNull(invitationPreviewTokens.revokedAt),
+          sql`${invitationPreviewTokens.expiresAt} > now()`,
+          isNull(invitations.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    const found = rows[0];
+    if (found === undefined) return null;
+
+    await this.db
+      .update(invitationPreviewTokens)
+      .set({ lastAccessedAt: new Date() })
+      .where(eq(invitationPreviewTokens.id, found.tokenId))
+      .catch(() => undefined);
+
+    return this.#assemble(found);
+  }
+
+  /** The aggregate behind an invitation row the caller has already authorized. */
+  async #assemble(found: {
+    readonly invitation: InvitationRow;
+    readonly version: typeof templateVersions.$inferSelect;
+    readonly thumbnailUrl: string | null;
+  }): Promise<PublishedInvitation> {
     const invitationId = found.invitation.id;
 
     const [

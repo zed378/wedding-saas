@@ -32,6 +32,8 @@ import { join } from "node:path";
 const SLUG = "andi-sarah";
 const API_PORT = 34_771;
 const APP_PORT = 34_772;
+/** `P2-12`. A token in the shape the API generates: 43 URL-safe characters. */
+const PREVIEW_TOKEN = "Pv7kQ2mX9aLw4rT8nB3cY6dF1gH5jK0zE_s-uVoI2pA";
 
 /** The canonical shape `docs/API/08` serves (ADR-063). */
 const PAYLOAD = {
@@ -144,6 +146,38 @@ beforeAll(async () => {
   api = createServer((request, response) => {
     if (mode === "broken") {
       response.writeHead(503).end();
+      return;
+    }
+    // `P2-12`. One valid preview token; everything else under the preview route is a 404.
+    if (request.url?.startsWith("/public/preview/") === true) {
+      if (request.url !== `/public/preview/${PREVIEW_TOKEN}`) {
+        response.writeHead(404, { "content-type": "application/json" }).end(
+          JSON.stringify({
+            success: false,
+            error: { code: "NOT_FOUND", message: "Undangan tidak ditemukan." },
+          }),
+        );
+        return;
+      }
+      response.writeHead(200, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          success: true,
+          data: {
+            ...PAYLOAD,
+            status: "preview",
+            display: { watermark: true, preview: true },
+            invitation: {
+              ...PAYLOAD.invitation,
+              settings: {
+                ...PAYLOAD.invitation.settings,
+                seo_indexable: false,
+                rsvp_enabled: false,
+                guestbook_enabled: false,
+              },
+            },
+          },
+        }),
+      );
       return;
     }
     if (mode === "missing" || !request.url?.endsWith(`/public/i/${SLUG}`)) {
@@ -561,6 +595,64 @@ describe("the cover gate does not hide the invitation from anything that cannot 
     const { body } = await html(`/${SLUG}`);
 
     expect(body).toContain("Buka Undangan");
+  });
+});
+
+/**
+ * `P2-12` — `/preview/{token}`, from the bytes the server sends.
+ *
+ * The three promises `docs/DATABASE/04` makes about a preview are all about what reaches a
+ * reader who never runs JavaScript: a crawler that must see `noindex`, a screenshot that must
+ * carry the watermark, and a head that must not leak the credential.
+ */
+describe("a share preview", () => {
+  it("renders the invitation with the watermark in the HTML", async () => {
+    mode = "ok";
+    const { status, body } = await html(`/preview/${PREVIEW_TOKEN}`);
+
+    expect(status).toBe(200);
+    expect(body).toContain("Budi Santoso");
+    expect(body).toContain('data-preview-watermark="true"');
+    expect(body).toMatch(/Pratinjau — belum diterbitkan/i);
+  });
+
+  it("is noindex regardless of anything the payload says", async () => {
+    mode = "ok";
+    const { body } = await html(`/preview/${PREVIEW_TOKEN}`);
+
+    expect(body).toMatch(/name="robots"[^>]*content="[^"]*noindex/);
+  });
+
+  it("sends no referrer, so the token does not leak to a linked site", async () => {
+    mode = "ok";
+    const { body } = await html(`/preview/${PREVIEW_TOKEN}`);
+
+    expect(body).toMatch(/name="referrer"[^>]*content="no-referrer"/);
+  });
+
+  it("never puts the token in the page head", async () => {
+    // A canonical or og:url echoing the path would publish the credential in the markup a
+    // sharing bot caches.
+    mode = "ok";
+    const { body } = await html(`/preview/${PREVIEW_TOKEN}`);
+
+    const head = /<head\b[^>]*>([\s\S]*?)<\/head>/i.exec(body)?.[1] ?? "";
+    expect(head).not.toContain(PREVIEW_TOKEN);
+  });
+
+  it("has no share bar, because the public address does not exist yet", async () => {
+    mode = "ok";
+    const { body } = await html(`/preview/${PREVIEW_TOKEN}`);
+
+    expect(body).not.toContain('data-share-bar="true"');
+  });
+
+  it("answers an unknown token with the friendly not-found page", async () => {
+    mode = "ok";
+    const { status, body } = await html(`/preview/${"Z".repeat(43)}`);
+
+    expect(status).toBe(404);
+    expect(body).toContain("Undangan tidak tersedia");
   });
 });
 

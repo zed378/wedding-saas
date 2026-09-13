@@ -9,6 +9,10 @@ import {
   type PublicInvitationDto,
 } from "./public-invitation.dto";
 import { checkSlugFormat } from "../invitation/slug.service";
+import {
+  hashPreviewToken,
+  PREVIEW_TOKEN_PATTERN,
+} from "../invitation/preview-link.service";
 
 /**
  * `P2-07` — `GET /public/i/:slug`. `docs/API/08`.
@@ -51,6 +55,55 @@ export class PublicInvitationService {
     if (found === null) throw notFound();
 
     return toPublicInvitation(found, this.env.CDN_BASE_URL);
+  }
+
+  /**
+   * `P2-12` — `GET /public/preview/:token`. `docs/API/08`, `docs/DATABASE/04`.
+   *
+   * The same payload as the public invitation, built by the same function, with four things
+   * forced regardless of what the invitation's own settings say — each one a line in
+   * `docs/DATABASE/04` § Share-Preview Tokens:
+   *
+   *   - `display.watermark: true` and `display.preview: true` — *"always watermarked"*
+   *     (FR-4.3's "PREVIEW — NOT YET PUBLISHED");
+   *   - `settings.seo_indexable: false` — *"always `noindex`"*;
+   *   - `settings.rsvp_enabled` and `settings.guestbook_enabled: false` — *"submissions are
+   *     disabled in preview mode"*.
+   *
+   * Forced in the payload rather than left to the page to remember. A preview renderer that
+   * forgot one flag would publish an unfinished invitation to a search index, and the payload
+   * is the one place every future consumer reads.
+   *
+   * **The same 404 as the slug lookup.** A malformed, unknown, expired or revoked token all
+   * answer with `notFound()` — the identical object — so a token cannot be probed for
+   * whether it once existed.
+   */
+  async byPreviewToken(rawToken: string): Promise<PublicInvitationDto> {
+    // Shape first: a string that `randomBytes(32).toString("base64url")` cannot produce is
+    // answered without hashing or querying anything.
+    if (!PREVIEW_TOKEN_PATTERN.test(rawToken)) throw notFound();
+
+    const found = await this.repository.findPreviewByTokenHash(
+      hashPreviewToken(rawToken),
+    );
+    if (found === null) throw notFound();
+
+    const payload = toPublicInvitation(found, this.env.CDN_BASE_URL);
+
+    return {
+      ...payload,
+      status: "preview",
+      display: { watermark: true, preview: true },
+      invitation: {
+        ...payload.invitation,
+        settings: {
+          ...payload.invitation.settings,
+          seo_indexable: false,
+          rsvp_enabled: false,
+          guestbook_enabled: false,
+        },
+      },
+    };
   }
 }
 

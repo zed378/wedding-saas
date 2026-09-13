@@ -326,6 +326,48 @@ const CASES: readonly SweepCase[] = [
       ),
   },
   {
+    // P2-12. A share-preview token is a credential for an UNPUBLISHED invitation. Minting
+    // one for somebody else's draft would publish it to whoever holds the link.
+    label: "POST /invitations/:id/preview-link",
+    send: (c, token, t) =>
+      auth(
+        api(c).post(`/api/v1/invitations/${t.invitation.id}/preview-link`),
+        token,
+      ),
+  },
+  {
+    label: "GET /invitations/:id/preview-links",
+    send: (c, token, t) =>
+      auth(
+        api(c).get(`/api/v1/invitations/${t.invitation.id}/preview-links`),
+        token,
+      ),
+  },
+  {
+    label: "DELETE /invitations/:id/preview-links/:tokenId",
+    send: (c, token, t) =>
+      auth(
+        api(c).delete(
+          `/api/v1/invitations/${t.invitation.id}/preview-links/${t.previewTokenId}`,
+        ),
+        token,
+      ),
+    crossChild: (c) =>
+      auth(
+        api(c).delete(
+          `/api/v1/invitations/${c.mallory.invitation.id}/preview-links/${c.alice.previewTokenId}`,
+        ),
+        c.mallory.token,
+      ),
+    crossOwnParent: (c) =>
+      auth(
+        api(c).delete(
+          `/api/v1/invitations/${c.alice.invitation.id}/preview-links/${c.alice.second.previewTokenId}`,
+        ),
+        c.alice.token,
+      ),
+  },
+  {
     label: "GET /invitations/:id/gallery",
     send: (c, token, t) =>
       auth(api(c).get(`/api/v1/invitations/${t.invitation.id}/gallery`), token),
