@@ -25,6 +25,8 @@ CREATE TABLE invitation_events (
   event_date                DATE NOT NULL,
   start_time                  TIME NOT NULL,
   end_time                     TIME,
+  timezone                      VARCHAR(40) NOT NULL DEFAULT 'Asia/Jakarta'
+                                  CHECK (timezone IN ('Asia/Jakarta','Asia/Makassar','Asia/Jayapura')),  -- P2-16, ADR-070
   venue_name                    VARCHAR(200) NOT NULL,
   address                         TEXT NOT NULL,
   latitude                         DECIMAL(9,6),
@@ -42,3 +44,4 @@ CREATE INDEX idx_events_invitation ON invitation_events(invitation_id);
 - `invitation_people` is limited to 2 rows per invitation via the `UNIQUE (invitation_id, role)` constraint — a design matching the domain model (Groom & Bride), not a generic N-person setup for MVP.
 - `invitation_events` supports N events per invitation (Akad, Reception, custom events like a post-wedding reception) per PLAN/08.
 - `maps_url` is auto-generated from `latitude/longitude` at the service layer if left empty during create/update (BACKEND/02-SERVICE-LAYER.md).
+- `timezone` (`P2-16`, ADR-070) is the zone `start_time`/`end_time` are local to. Indonesia has three and no daylight saving, so each is a fixed offset (WIB +07:00, WITA +08:00, WIT +09:00). The same rule as `maps_url`: an explicit value wins; otherwise it is detected from `latitude/longitude` (`@wi/schema` `timezoneForCoordinates`) on create, and re-detected when the coordinates change; otherwise WIB.

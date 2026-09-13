@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { timezoneOffset } from "@wi/schema";
 
 import type { PublicInvitation } from "./public-invitation";
 
@@ -136,10 +137,15 @@ export function buildEventJsonLd(
       names === undefined
         ? (str(event["title"]) ?? "Acara Pernikahan")
         : `Pernikahan ${names}`,
-    // `YYYY-MM-DDTHH:MM` when a time is known. No zone: the column is a local date and a
-    // local time (`docs/DATABASE/05`), and inventing `+07:00` would be a guess about
-    // where the wedding is, not a fact about it.
-    startDate: time === undefined ? date : `${date}T${time}`,
+    // `YYYY-MM-DDTHH:MM:SS+08:00` when a time is known. Until `P2-16` this carried no zone:
+    // the time was local and inventing `+07:00` would have been a guess about where the
+    // wedding is. The event's `timezone` is now stored (ADR-070), so the offset is a fact —
+    // and a search engine or calendar reading a zoneless time assumes the reader's own.
+    // A payload from before the column reads as WIB, as the page itself does.
+    startDate:
+      time === undefined
+        ? date
+        : `${date}T${time}:00${timezoneOffset(event["timezone"])}`,
     eventStatus: "https://schema.org/EventScheduled",
     eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
     url,

@@ -494,3 +494,45 @@ describe("the registries themselves", () => {
     expect([...SECTION_KEYS].filter((k) => !covered.has(k))).toEqual([]);
   });
 });
+
+/** `P2-16`, ADR-070 — a section that shows an event time must declare the event's zone. */
+describe("event times and their timezone", () => {
+  const base = {
+    section_key: "event",
+    component: "EventCardDouble",
+    enabled_by_default: true,
+    configurable: false,
+    required_fields: ["events.*.title", "events.*.date", "events.*.start_time"],
+  };
+  const definition = (optional: string[]) => ({
+    sections: [{ ...base, optional_fields: optional }],
+    theme: {
+      colors: {
+        primary: "#8b5e3c",
+        secondary: "#f4ede4",
+        accent: "#c9a876",
+        text: "#2b2b2b",
+      },
+      typography: {
+        heading_font: "Playfair Display",
+        body_font: "Lato",
+        scale: "default",
+      },
+      spacing: "comfortable",
+      border_radius: "rounded",
+    },
+    customizable_theme_keys: [],
+  });
+
+  it("refuses a section showing start_time without events.*.timezone", () => {
+    expect(() => assertValidTemplateVersion(definition([]))).toThrow(
+      /events\.\*\.timezone/,
+    );
+  });
+
+  it("accepts it once the zone is declared", () => {
+    expect(() =>
+      assertValidTemplateVersion(definition(["events.*.timezone"])),
+    ).not.toThrow();
+  });
+});

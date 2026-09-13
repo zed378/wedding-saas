@@ -28,7 +28,7 @@ GET    /public/preview/:token                      Render an unpublished invitat
     "display": { "watermark": true },
     "invitation": {
       "couple": { "groom": {...}, "bride": {...} },
-      "events": [ { "type": "akad", "title": "...", "date": "2027-05-15", "start_time": "08:00", "venue_name": "...", ... } ],
+      "events": [ { "type": "akad", "title": "...", "date": "2027-05-15", "start_time": "08:00", "timezone": "Asia/Jakarta", "venue_name": "...", ... } ],
       "gallery": { "photos": [ { "url": "...", "medium_url": "...", "thumbnail_url": "...", "caption": "...", "is_cover": true, "order": 0 } ] },
       "gift": { "accounts": [ { "type": "bank", "provider_name": "...", "account_number": "...", "account_holder": "...", "order": 0 } ] },
       "quote": { "text": "...", "source": "..." },

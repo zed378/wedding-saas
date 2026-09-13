@@ -1,4 +1,5 @@
 import type { ApiClient } from "@wi/api-client";
+import { DEFAULT_EVENT_TIMEZONE } from "@wi/schema";
 
 import { getAtPath } from "./store";
 import type { AutosaveTransport, SaveGroup, SaveGroupKey } from "./autosave";
@@ -85,6 +86,7 @@ export function eventFromApi(row: Row): Row {
     date: row["event_date"],
     start_time: row["start_time"],
     end_time: row["end_time"] ?? null,
+    timezone: row["timezone"] ?? DEFAULT_EVENT_TIMEZONE,
     venue_name: row["venue_name"],
     address: row["address"],
     latitude: row["latitude"] ?? null,
@@ -227,7 +229,7 @@ export const COLLECTIONS: readonly CollectionEndpoint[] = [
     rename: { date: "event_date", order: "display_order" },
     fromApi: eventFromApi,
     required: ["type", "title", "date", "start_time", "venue_name", "address"],
-    defaults: { type: "akad" },
+    defaults: { type: "akad", timezone: DEFAULT_EVENT_TIMEZONE },
   },
   {
     path: "gift.accounts",

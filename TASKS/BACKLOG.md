@@ -28,7 +28,7 @@ Nothing on the board is `BLOCKED`. The remaining questions shape work rather tha
 
 ## Open Questions — Remaining
 
-### OQ-27 — How are event dates and times shown, and in which timezone is an event?
+### OQ-27 — How are event dates and times shown, and in which timezone is an event? *(timezone half answered — ADR-070)*
 
 **Affects**: `P2-03` renderer sections, `P2-09` link-preview text, `P4-*` reminders — **not blocking**, but visible on every published invitation.
 
@@ -38,6 +38,8 @@ Two gaps found in `P2-13`'s visual baselines and confirmed in `P2-14`:
 2. **Timezone.** `docs/PLAN/08` § Entity: Event has no timezone. The renderer labels every time `WIB` and computes the countdown as `+07:00`, which is wrong by an hour for a wedding in Bali or Makassar (WITA) and by two in Papua (WIT) — the countdown would reach zero before or after the ceremony. Options: an `events.timezone` field (`Asia/Jakarta` | `Asia/Makassar` | `Asia/Jayapura`), a per-invitation timezone, or keeping WIB and saying so in the editor.
 
 Neither is decided in code. The renderer's date output is a single place (`EventCardDouble`, `HeroClassic`) once the answer exists.
+
+**Timezone half answered 2026-09-13 by the project owner**: detect the zone from the event's map pin and let the couple choose it in the form. Implemented by `P2-16` (ADR-070). The owner also asked for a database of every province, city/regency, district and village (`P2-17`). **Still open: the date display format** (and whether to show the Hijri date).
 
 ### OQ-26 — Which "simulated 4G" does the public page's LCP target mean?
 

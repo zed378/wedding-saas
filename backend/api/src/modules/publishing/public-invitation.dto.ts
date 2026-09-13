@@ -66,6 +66,7 @@ export interface PublicEventDto {
   /** `events.*.date` in the registry; `event_date` is the column, not the path. */
   readonly date: string;
   readonly start_time: string;
+  readonly timezone: string;
   readonly end_time: string | null;
   readonly venue_name: string;
   readonly address: string;
@@ -326,6 +327,8 @@ export function toPublicInvitation(
         // `HH:MM`: Postgres reads `time` back with seconds (`P2-15`).
         start_time: toClockTime(e.startTime),
         end_time: toClockTime(e.endTime),
+        // `P2-16`: the zone `start_time` is in, for the label and the countdown.
+        timezone: e.timezone,
         venue_name: e.venueName,
         address: e.address,
         latitude: e.latitude,

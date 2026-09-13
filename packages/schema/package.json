@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./event-timezone": {
+      "types": "./dist/invitation/event-timezone.d.ts",
+      "default": "./dist/invitation/event-timezone.js"
     }
   },
   "scripts": {

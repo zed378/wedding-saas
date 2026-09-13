@@ -10,6 +10,13 @@
  */
 import { useEffect, useState } from "react";
 
+// The dependency-free subpath, not the package root: the root pulls in Zod, and importing it
+// here put 93KB of it into the public page's first load (`P2-16`, caught by the SSR budget).
+import {
+  timezoneAbbreviation,
+  timezoneOffset,
+} from "@wi/schema/event-timezone";
+
 import type { SectionProps } from "../types.js";
 import { readPath } from "../resolve-data.js";
 import { SectionShell, When, rows, text } from "./primitives.js";
@@ -54,7 +61,8 @@ export function EventCardDouble({ data, mode }: SectionProps) {
                         <When value={event["end_time"]}>
                           {(end) => <> – {end}</>}
                         </When>
-                        {" WIB"}
+                        {/* `P2-16`: the event's own zone, not WIB for everyone. */}
+                        {` ${timezoneAbbreviation(event["timezone"])}`}
                       </>
                     )}
                   </When>
@@ -163,11 +171,11 @@ export function remainingUntil(target: number, now: number): Remaining {
  *
  * ## The timezone is the interesting part
  *
- * `event_date` is a date and `start_time` is `HH:MM`, both stored without a zone
- * (`docs/DATABASE/05`). The product is Indonesian and `worker-cron` already runs in
- * `Asia/Jakarta` for the same reason — so an event at 08:00 means 08:00 WIB, which is
- * `+07:00`, and appending that is what stops a guest in another timezone seeing a
- * countdown seven hours out.
+ * `event_date` is a date and `start_time` is `HH:MM`, local to the event's `timezone`
+ * (`P2-16`, ADR-070): WIB `+07:00`, WITA `+08:00` or WIT `+09:00`. Appending the offset is what
+ * stops a guest in another zone seeing a countdown hours out. Until `P2-16` every event was
+ * read as `+07:00`, so a wedding in Bali counted down to an hour after it began; an event with
+ * no zone (a template that does not declare one) still reads as WIB.
  *
  * Returning `undefined` when everything has passed is what stops the interval starting.
  */
@@ -188,6 +196,8 @@ function toTimestamp(event: Record<string, unknown>): number | undefined {
   if (date === undefined) return undefined;
 
   const start = text(event["start_time"]) ?? "00:00";
-  const at = Date.parse(`${date}T${start}:00+07:00`);
+  const at = Date.parse(
+    `${date}T${start}:00${timezoneOffset(event["timezone"])}`,
+  );
   return Number.isFinite(at) ? at : undefined;
 }

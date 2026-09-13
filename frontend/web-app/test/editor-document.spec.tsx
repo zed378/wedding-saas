@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -379,7 +380,10 @@ const DEFINITION: TemplateDefinition = {
   enabledSections: ["event", "gift"],
 };
 
-function renderPanel(activeSection: string) {
+function renderPanel(
+  activeSection: string,
+  definition: TemplateDefinition = DEFINITION,
+) {
   const saved: { key: string; fields: string[] }[] = [];
   const requests: { method: string; path: string; body: unknown }[] = [];
 
@@ -415,7 +419,7 @@ function renderPanel(activeSection: string) {
       <EditorProvider
         invitationId="inv-1"
         data={toEditorDocument(DETAIL, MEDIA)}
-        templateDefinition={DEFINITION}
+        templateDefinition={definition}
         activeSectionKey={activeSection}
         transport={{
           save: async (group) => {
@@ -526,6 +530,72 @@ describe("the panel edits collections row by row", () => {
     });
     await waitFor(() => {
       expect(screen.queryByRole("group", { name: "Rekening 1" })).toBeNull();
+    });
+  });
+});
+
+describe("an event's timezone follows its map pin (P2-16, OQ-27)", () => {
+  const withMap: TemplateDefinition = {
+    sections: [
+      {
+        section_key: "event",
+        component: "EventCardDouble",
+        configurable: false,
+        enabled_by_default: true,
+        required_fields: ["events.*.title", "events.*.start_time"],
+        optional_fields: [
+          "events.*.timezone",
+          "events.*.latitude",
+          "events.*.longitude",
+        ],
+      },
+    ],
+    enabledSections: ["event"],
+  };
+
+  it("switches the zone to WITA when the pin moves to Denpasar, and saves it with the pin", async () => {
+    const { saved } = renderPanel("event", withMap);
+    const first = screen.getByRole("group", { name: "Acara 1" });
+    expect(
+      within(first).getByRole("combobox", { name: /zona waktu/i }),
+    ).toHaveValue("Asia/Jakarta");
+
+    const latitude = within(first).getByRole("spinbutton", {
+      name: /lintang/i,
+    });
+    const longitude = within(first).getByRole("spinbutton", { name: /bujur/i });
+    // One change per field: a controlled number input drops intermediate keystrokes such as
+    // "-", which parse as NaN, so typing character by character tests the keyboard, not this.
+    fireEvent.change(latitude, { target: { value: "-8.65" } });
+    fireEvent.change(longitude, { target: { value: "115.22" } });
+
+    expect(
+      within(first).getByRole("combobox", { name: /zona waktu/i }),
+    ).toHaveValue("Asia/Makassar");
+    await waitFor(() => {
+      expect(saved.at(-1)?.fields).toEqual(
+        expect.arrayContaining([
+          `events.${EVENT_ID}.longitude`,
+          `events.${EVENT_ID}.timezone`,
+        ]),
+      );
+    });
+  });
+
+  it("lets the couple choose a different zone by hand", async () => {
+    const { saved } = renderPanel("event", withMap);
+    const first = screen.getByRole("group", { name: "Acara 1" });
+
+    await userEvent.selectOptions(
+      within(first).getByRole("combobox", { name: /zona waktu/i }),
+      "Asia/Jayapura",
+    );
+
+    await waitFor(() => {
+      expect(saved.at(-1)).toEqual({
+        key: `events:${EVENT_ID}`,
+        fields: [`events.${EVENT_ID}.timezone`],
+      });
     });
   });
 });

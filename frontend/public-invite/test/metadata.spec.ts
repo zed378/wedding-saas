@@ -233,7 +233,8 @@ describe("the structured data", () => {
     expect(jsonLd).toMatchObject({
       "@type": "Event",
       name: "Pernikahan Budi & Siti",
-      startDate: "2027-05-15T08:00",
+      // `P2-16`: with the event's zone, which a payload without one reads as WIB.
+      startDate: "2027-05-15T08:00:00+07:00",
       url,
       location: { "@type": "Place", name: "Masjid Agung Bandung" },
     });
@@ -345,5 +346,26 @@ describe("the JSON-LD script cannot be closed early", () => {
     expect(JSON.parse(safeJsonLd({ name: "Budi & Siti" }))).toEqual({
       name: "Budi & Siti",
     });
+  });
+});
+
+describe("the structured data's start time carries the event's zone (P2-16)", () => {
+  it("is +08:00 for a wedding in WITA", () => {
+    const jsonLd = buildEventJsonLd(
+      withInvitation({
+        events: [
+          {
+            title: "Resepsi",
+            date: "2027-05-15",
+            start_time: "11:00",
+            timezone: "Asia/Makassar",
+            venue_name: "Denpasar",
+          },
+        ],
+      }),
+      `${ORIGIN}/bali`,
+    );
+
+    expect(jsonLd?.["startDate"]).toBe("2027-05-15T11:00:00+08:00");
   });
 });

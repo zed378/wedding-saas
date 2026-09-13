@@ -839,6 +839,8 @@ describe("POST /invitations over HTTP", () => {
       ["an out-of-range longitude", { longitude: -181 }],
       ["an over-long title", { title: "x".repeat(151) }],
       ["an over-long address", { address: "x".repeat(2001) }],
+      // `P2-16`: only Indonesia's three zones.
+      ["a timezone outside Indonesia", { timezone: "Europe/London" }],
     ])("rejects %s", async (_name, extra) => {
       // The coordinate ranges are the card's third DoD item. A latitude of 91 is not a
       // place, and without the check it would render as a pin somewhere undefined.
