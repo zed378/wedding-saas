@@ -67,20 +67,69 @@ export function Photo({
   src,
   caption,
   className,
+  srcSet,
+  sizes,
+  priority = false,
 }: {
   readonly src: string;
   readonly caption?: string | undefined;
   readonly className?: string | undefined;
+  /** `P2-13`. The pre-generated variants (`thumbnail` 300w, `medium` 800w, `large` 1600w). */
+  readonly srcSet?: string | undefined;
+  readonly sizes?: string | undefined;
+  /**
+   * `P2-13`. The LCP image: loaded eagerly at high priority.
+   *
+   * `docs/FRONTEND/09`: "`priority`/eager loading only for the cover photo (the LCP element)".
+   * Every photo used to be `loading="lazy"`, including the cover — which tells the browser to
+   * defer the single most important image on the page until layout decides it is near the
+   * viewport, and costs the whole LCP budget on a slow phone.
+   */
+  readonly priority?: boolean;
 }) {
   return (
     <img
       className={className ?? "wi-photo"}
       src={src}
+      {...(srcSet === undefined ? {} : { srcSet })}
+      {...(sizes === undefined ? {} : { sizes })}
       alt={caption ?? ""}
-      loading="lazy"
-      decoding="async"
+      loading={priority ? "eager" : "lazy"}
+      decoding={priority ? "sync" : "async"}
+      // React 19 passes `fetchPriority` through as the `fetchpriority` attribute.
+      {...(priority ? { fetchPriority: "high" as const } : {})}
+      // Element Timing: the LCP image's paint time, observable on its own. Chrome does not
+      // always make the cover an LCP candidate (`P2-13` saw it skipped in about a third of
+      // throttled runs with no input, scroll or replacement), so the browser suite measures
+      // the cover's paint directly instead of trusting the candidate list.
+      {...(priority ? { elementtiming: "wi-lcp-image" } : {})}
     />
   );
+}
+
+/**
+ * `P2-13` — a `srcset` from the variants a photo row carries, or `undefined`.
+ *
+ * Only variants that are actually present: a photo from an older payload, or one still being
+ * processed, has fewer URLs, and a `srcset` naming a URL that does not exist is worse than none.
+ */
+export function variantSrcSet(
+  photo: Readonly<Record<string, unknown>>,
+): string | undefined {
+  const candidates: [unknown, number][] = [
+    [photo["thumbnail_url"], 300],
+    [photo["medium_url"], 800],
+    [photo["url"], 1600],
+  ];
+
+  const entries = candidates
+    .filter(
+      (candidate): candidate is [string, number] =>
+        typeof candidate[0] === "string" && candidate[0].length > 0,
+    )
+    .map(([url, width]) => `${url} ${String(width)}w`);
+
+  return entries.length > 1 ? entries.join(", ") : undefined;
 }
 
 /** Rows of a collection, already narrowed by the resolver. */

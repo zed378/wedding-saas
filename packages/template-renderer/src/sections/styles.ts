@@ -31,6 +31,14 @@ export const SECTION_STYLES = `
   font-size: calc(1rem * var(--font-scale));
   background: var(--color-secondary);
 }
+/* P2-13, ADR-067. A gallery is skipped by layout until it nears the viewport, and a lazy
+   photo in a skipped section is not fetched. Without this, Chrome's lazy-load distance
+   fetched the gallery's photos while the cover gate still clipped them, and they shared a
+   slow link with the cover: LCP 5.2s instead of 3.4s. Unlike display or visibility,
+   content-visibility keeps the photos in the accessibility tree and in find-in-page.
+   Galleries only: applied to every section, it produced a 0.03 layout shift on whichever
+   section sat just below the fold, for photos that are small thumbnails anyway. */
+.wi-section:has(.wi-gallery-grid, .wi-gallery-carousel) { content-visibility: auto; contain-intrinsic-size: auto 32rem; }
 .wi-section h2, .wi-section h3 {
   font-family: var(--typography-heading-font), Georgia, serif;
   color: var(--color-primary);
@@ -53,7 +61,7 @@ export const SECTION_STYLES = `
 .wi-hero-bg { position: absolute; inset: 0; z-index: -2; object-fit: cover; width: 100%; height: 100%; }
 .wi-hero-scrim {
   position: absolute; inset: 0; z-index: -1;
-  background: linear-gradient(to bottom, rgb(0 0 0 / 45%), rgb(0 0 0 / 65%));
+  background: linear-gradient(to bottom, rgb(0 0 0 / 60%), rgb(0 0 0 / 70%));
 }
 .wi-hero-names { font-size: calc(2.25rem * var(--font-scale)); color: #fff; margin: 0; }
 .wi-hero-date { color: #fff; opacity: 0.92; }

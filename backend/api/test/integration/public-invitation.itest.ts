@@ -39,7 +39,7 @@ import {
  * A template whose sections each reference only their own data.
  *
  * The reference template deliberately shares paths between sections — its `hero` lists
- * `gallery.photos.*.media_id`, because it draws a photo behind the couple's names — which
+ * `gallery.photos`, because it draws the cover photo behind the couple's names — which
  * is realistic and is the wrong fixture for a per-section omission test: disabling
  * `gallery` there correctly keeps the photos, and the test would be asserting the
  * sharing rather than the omission. There is a dedicated test for the sharing below.
@@ -403,7 +403,7 @@ describe("P2-07 — GET /public/i/:slug", () => {
       // the photo away from a section that is still drawing it.
       const shared = SECTIONS.map((section) =>
         section.section_key === "couple"
-          ? { ...section, optional_fields: ["gallery.photos.*.media_id"] }
+          ? { ...section, optional_fields: ["gallery.photos"] }
           : section,
       );
 
@@ -596,6 +596,29 @@ describe("P2-07 — GET /public/i/:slug", () => {
       );
       expect(data.invitation.gallery.photos[0]?.thumbnail_url).toMatch(
         /^https:\/\/cdn\.test\//,
+      );
+    });
+
+    it("serves a couple portrait as the thumbnail variant, not the 1600w file", async () => {
+      // `P2-13`, ADR-067: the portrait is drawn 140px square; the large file cost ~150KB each
+      // on the page whose LCP budget is 2.5s on slow 4G.
+      const invitation = await publish();
+      const portrait = await createTestMedia(owner, {
+        invitation,
+        uploadedBy: alice,
+        status: "ready",
+      });
+      await owner.query(
+        "UPDATE invitation_people SET photo_media_id = $1 WHERE invitation_id = $2 AND role = 'groom'",
+        [portrait.id, invitation.id],
+      );
+
+      const data = await expectSuccess<{
+        invitation: { couple: { groom: { photo?: string } } };
+      }>(await get(invitation.slug));
+
+      expect(data.invitation.couple.groom.photo).toMatch(
+        new RegExp(`^https://cdn\\.test/.*/${portrait.id}/thumbnail\\.webp$`),
       );
     });
 

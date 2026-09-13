@@ -46,7 +46,7 @@
         "couple.bride.nickname",
         "events.*.date"
       ],
-      "optional_fields": ["gallery.photos.*.media_id"]
+      "optional_fields": ["gallery.photos"]
     },
     {
       "section_key": "quote",

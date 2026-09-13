@@ -4,6 +4,7 @@ import { createServer, type Server } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { join } from "node:path";
+import { createRequire } from "node:module";
 
 /**
  * `P2-08` DoD item 1 — *"the initial HTML contains the invitation's content and meta
@@ -50,7 +51,7 @@ const PAYLOAD = {
           "couple.bride.nickname",
           "events.*.date",
         ],
-        optional_fields: ["gallery.photos.*.media_id"],
+        optional_fields: ["gallery.photos"],
       },
       {
         section_key: "couple",
@@ -93,6 +94,7 @@ const PAYLOAD = {
       photos: [
         {
           url: "https://cdn.test/cover.webp",
+          medium_url: "https://cdn.test/cover-medium.webp",
           thumbnail_url: "https://cdn.test/cover-thumb.webp",
           caption: "Prewedding",
           is_cover: true,
@@ -124,14 +126,22 @@ const PAYLOAD = {
 
 let api: Server;
 let app: ChildProcess;
+/**
+ * `P2-13`. Every request the stub API received, in order, with the address header the page
+ * forwarded — how the suite sees what one guest's visit costs the API.
+ */
+const received: { url: string; forwardedFor: string | undefined }[] = [];
 /** Which slugs the stub answers. Mutated per test to produce a 404 or an outage. */
 let mode: "ok" | "missing" | "broken" | "hero-only" | "private" | "no-photos" =
   "ok";
 
 const html = async (
   path: string,
+  headers: Record<string, string> = {},
 ): Promise<{ status: number; body: string }> => {
-  const response = await fetch(`http://127.0.0.1:${String(APP_PORT)}${path}`);
+  const response = await fetch(`http://127.0.0.1:${String(APP_PORT)}${path}`, {
+    headers,
+  });
   return { status: response.status, body: await response.text() };
 };
 
@@ -144,6 +154,10 @@ beforeAll(async () => {
   }
 
   api = createServer((request, response) => {
+    received.push({
+      url: request.url ?? "",
+      forwardedFor: request.headers["x-forwarded-for"] as string | undefined,
+    });
     if (mode === "broken") {
       response.writeHead(503).end();
       return;
@@ -319,6 +333,69 @@ afterAll(async () => {
   });
 });
 
+describe("P2-13 — what one guest's visit costs", () => {
+  it("asks the API once per page view, not once for the page and again for its metadata", async () => {
+    mode = "ok";
+    received.length = 0;
+
+    const { status } = await html(`/${SLUG}`);
+
+    expect(status).toBe(200);
+    expect(
+      received.filter((entry) => entry.url.endsWith(`/public/i/${SLUG}`)),
+    ).toHaveLength(1);
+  });
+
+  it("forwards the guest's address, so the API limits the guest rather than this server", async () => {
+    // Without it every guest of every wedding shares one `general-public` bucket.
+    mode = "ok";
+    received.length = 0;
+
+    await html(`/${SLUG}`, { "x-forwarded-for": "198.51.100.23" });
+
+    const call = received.find((entry) =>
+      entry.url.endsWith(`/public/i/${SLUG}`),
+    );
+    expect(call?.forwardedFor).toBe("198.51.100.23");
+  });
+
+  it("forwards the address for a preview too", async () => {
+    received.length = 0;
+
+    await html(`/preview/${PREVIEW_TOKEN}`, {
+      "x-forwarded-for": "198.51.100.24",
+    });
+
+    const call = received.find((entry) =>
+      entry.url.startsWith("/public/preview/"),
+    );
+    expect(call?.forwardedFor).toBe("198.51.100.24");
+  });
+
+  it("loads the hero photo eagerly, at high priority, at the 800w variant", async () => {
+    // The hero photo is the largest element above the fold, so it IS the LCP element. A
+    // lazy-loaded LCP image waits for layout before it is even requested.
+    mode = "ok";
+    const { body } = await html(`/${SLUG}`);
+
+    const hero = /<img[^>]*wi-hero-bg[^>]*>/.exec(body)?.[0];
+    expect(hero, "the cover photo is in the HTML").toBeDefined();
+    expect(hero).not.toContain('loading="lazy"');
+    expect(hero).toMatch(/fetchpriority="high"/i);
+    // ADR-067: the medium file, with no srcset from which a dense phone would pick 1600w.
+    expect(hero).toContain('src="https://cdn.test/cover-medium.webp"');
+    expect(hero).not.toMatch(/srcset=/i);
+  });
+
+  it("declares the photo's box before it loads, so it cannot shift the page", async () => {
+    // CLS: the hero is sized by CSS (`.wi-hero` min-height), not by the image arriving.
+    mode = "ok";
+    const { body } = await html(`/${SLUG}`);
+
+    expect(body).toMatch(/\.wi-hero\s*\{[^}]*min-height/);
+  });
+});
+
 describe("the invitation is in the HTML the server sends", () => {
   it("carries the couple, the date and the venue before any script runs", async () => {
     mode = "ok";
@@ -466,9 +543,30 @@ describe("what a guest downloads", () => {
     });
 
     expect(library, "no chunk contains the section components").toBeDefined();
+
+    /*
+     * `P2-13` put the web-vitals reporter on the page, and Turbopack merged Next's compiled
+     * `web-vitals` library into this same chunk — 10.6KB on the first run, against 7.5KB
+     * before. The budget below is for the SECTIONS, so the library's own gzip size is
+     * measured from the installed file and taken off, rather than the budget quietly being
+     * raised to fit. (Gzip is not additive; the estimate errs by a few hundred bytes.) The
+     * whole-page 150KB budget above counts everything and is not adjusted.
+     */
+    const source = readFileSync(join(CHUNKS, library!.name), "utf8");
+    const vitals = source.includes("largest-contentful-paint")
+      ? gzipSync(
+          readFileSync(
+            createRequire(join(process.cwd(), "package.json")).resolve(
+              "next/dist/compiled/web-vitals/web-vitals.js",
+            ),
+          ),
+        ).length
+      : 0;
+    const sections = ((library?.gzip ?? 0) - vitals) / 1024;
+
     expect(
-      (library?.gzip ?? 0) / 1024,
-      `the section library is ${((library?.gzip ?? 0) / 1024).toFixed(1)}KB gzip`,
+      sections,
+      `the section library is ${sections.toFixed(1)}KB gzip (chunk ${((library?.gzip ?? 0) / 1024).toFixed(1)}KB, web-vitals ${(vitals / 1024).toFixed(1)}KB)`,
     ).toBeLessThan(10);
   });
 });

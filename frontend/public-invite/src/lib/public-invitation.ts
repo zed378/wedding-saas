@@ -1,5 +1,7 @@
 import "server-only";
 
+import { forwardedForHeaders } from "./forwarded-for";
+
 import type { SectionDefinition } from "@wi/template-renderer";
 
 /**
@@ -56,12 +58,20 @@ export interface PublicInvitation {
  */
 export async function fetchPublicInvitation(
   slug: string,
-  options: { readonly baseUrl: string; readonly signal?: AbortSignal },
+  options: {
+    readonly baseUrl: string;
+    readonly signal?: AbortSignal;
+    /** The guest's `X-Forwarded-For`, so the API limits the guest, not this server. */
+    readonly forwardedFor?: string | null;
+  },
 ): Promise<PublicInvitation | null> {
   const base = options.baseUrl.replace(/\/+$/, "");
 
   const response = await fetch(`${base}/public/i/${encodeURIComponent(slug)}`, {
-    headers: { accept: "application/json" },
+    headers: {
+      accept: "application/json",
+      ...forwardedForHeaders(options.forwardedFor),
+    },
     /*
      * `docs/ARCHITECTURE/06` wants this response cached with event-driven invalidation,
      * and the event arrives with `P3-09`. Until there is something to invalidate WITH, a
@@ -95,13 +105,19 @@ export async function fetchPublicInvitation(
  */
 export async function fetchPreviewInvitation(
   token: string,
-  options: { readonly baseUrl: string },
+  options: { readonly baseUrl: string; readonly forwardedFor?: string | null },
 ): Promise<PublicInvitation | null> {
   const base = options.baseUrl.replace(/\/+$/, "");
 
   const response = await fetch(
     `${base}/public/preview/${encodeURIComponent(token)}`,
-    { headers: { accept: "application/json" }, cache: "no-store" },
+    {
+      headers: {
+        accept: "application/json",
+        ...forwardedForHeaders(options.forwardedFor),
+      },
+      cache: "no-store",
+    },
   );
 
   if (response.status === 404) return null;

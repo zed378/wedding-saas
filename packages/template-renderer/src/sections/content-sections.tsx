@@ -12,7 +12,14 @@ import { useEffect, useRef, useState } from "react";
 
 import type { SectionProps } from "../types.js";
 import { readPath } from "../resolve-data.js";
-import { Photo, SectionShell, When, rows, text } from "./primitives.js";
+import {
+  Photo,
+  SectionShell,
+  When,
+  rows,
+  text,
+  variantSrcSet,
+} from "./primitives.js";
 
 /**
  * P2-03 — the sections that present stored content and take no input.
@@ -170,6 +177,13 @@ function Gallery({
           <Photo
             key={text(photo["media_id"]) ?? String(index)}
             src={text(photo["url"]) ?? ""}
+            srcSet={variantSrcSet(photo)}
+            // Two columns of a 26rem frame, or 80% of it in the carousel.
+            sizes={
+              effective === "carousel"
+                ? "(min-width: 26rem) 21rem, 80vw"
+                : "(min-width: 26rem) 13rem, 50vw"
+            }
             caption={text(photo["caption"])}
           />
         ))}

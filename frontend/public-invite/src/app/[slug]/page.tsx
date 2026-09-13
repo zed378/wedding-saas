@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { CoverGate } from "../../components/CoverGate";
 import { GuestGreeting } from "../../components/GuestGreeting";
 import { Invitation } from "../../components/Invitation";
 import { ShareBar } from "../../components/ShareBar";
+import { WebVitals } from "../../components/WebVitals";
 import { InvitationFrame } from "../../components/InvitationFrame";
 import { readConfig } from "../../lib/config";
 import {
@@ -49,22 +52,45 @@ interface RouteParams {
   readonly params: Promise<{ readonly slug: string }>;
 }
 
-/** Resolve the address, then load it. Shared by the page and its metadata. */
+/**
+ * Resolve the address, then load it. Shared by the page and its metadata.
+ *
+ * ## Once per request (`P2-13`)
+ *
+ * `generateMetadata` and the page both need the invitation. Today Next's request
+ * memoization already collapses the two identical GETs into one — `P2-13` suspected
+ * otherwise, removed this `cache` to prove it, and the SSR suite's "once per page view"
+ * test still passed. It stays anyway, because that memoization is silently lost the moment
+ * the fetch is given an `AbortSignal` (a render timeout is the obvious next change), and
+ * two requests per guest is two of their rate-limit allowance. React's `cache` lives for one
+ * server request and is keyed by the segment string — the `params` promise is not
+ * guaranteed to be the same object in both callers.
+ */
+const loadSegment = cache(
+  async (
+    segment: string,
+  ): Promise<{ slug: string; invitation: PublicInvitation } | undefined> => {
+    const config = readConfig();
+
+    const slug = resolveSlug(config.slugStrategy, { pathname: `/${segment}` });
+    if (slug === undefined) return undefined;
+
+    const invitation = await fetchPublicInvitation(slug, {
+      baseUrl: config.apiBaseUrl,
+      // `lib/forwarded-for.ts`: without it every guest shares this server's rate limit.
+      forwardedFor: (await headers()).get("x-forwarded-for"),
+    });
+    if (invitation === null) return undefined;
+
+    return { slug, invitation };
+  },
+);
+
 async function load(
   params: RouteParams["params"],
 ): Promise<{ slug: string; invitation: PublicInvitation } | undefined> {
   const { slug: segment } = await params;
-  const config = readConfig();
-
-  const slug = resolveSlug(config.slugStrategy, { pathname: `/${segment}` });
-  if (slug === undefined) return undefined;
-
-  const invitation = await fetchPublicInvitation(slug, {
-    baseUrl: config.apiBaseUrl,
-  });
-  if (invitation === null) return undefined;
-
-  return { slug, invitation };
+  return loadSegment(segment);
 }
 
 /**
@@ -115,6 +141,7 @@ export default async function InvitationPage({ params }: RouteParams) {
 
   return (
     <InvitationFrame>
+      <WebVitals pageKind="invitation" />
       {/*
        * `P2-10` step 2. Above the cover, and rendered only after hydration — a
        * server-rendered guest name would mean one cache entry per guest

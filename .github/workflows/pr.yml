@@ -81,3 +81,35 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
+
+  # P2-13 — the public invitation's performance budget, enforced rather than remembered.
+  #
+  # `docs/FRONTEND/09` § Budget: under 150KB gzip of initial JavaScript. The SSR suite boots
+  # the production build against a stub API and measures the scripts a guest's browser
+  # would actually fetch; the browser suite measures LCP and CLS under Lighthouse's mobile
+  # throttling profile.
+  #
+  # Runs on every pull request rather than on public-invite paths only: the page's bundle
+  # also moves when `@wi/template-renderer`, `@wi/ui` or a lockfile bump changes, and a path
+  # filter that misses one of those is how a budget drifts.
+  public-invite-budget:
+    name: Public invitation budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build the public invitation
+        run: pnpm turbo build --filter @wi/public-invite...
+      - name: Initial JavaScript under 150KB gzip, content in the server's HTML
+        run: pnpm --filter @wi/public-invite test:ssr
+      - name: Install Chromium
+        run: pnpm --filter @wi/e2e exec playwright install --with-deps chromium
+      # `@visual` is excluded: its baselines are win32 renders, and a Linux run with no
+      # baselines would write new ones and pass by definition. See the P2-13 record.
+      - name: LCP, CLS, lazy loading, RUM and contrast
+        run: pnpm --filter @wi/e2e exec playwright test public-performance --grep-invert @visual

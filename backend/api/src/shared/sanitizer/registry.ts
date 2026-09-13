@@ -107,6 +107,15 @@ export const NOT_USER_TEXT: Readonly<Record<string, string>> = {
     "a pagination integer, coerced and bounded; never stored or rendered",
   page: "a pagination integer, coerced and bounded; never stored or rendered",
 
+  // --- RUM reports (`P2-13`, `POST /public/rum`). Deliberately specific key names: this
+  //     registry is global per key, and exempting a bare `name` here would exempt every
+  //     future `name` field -- a template's name, say, which IS prose on a public page. ---
+  metric:
+    "a web-vital metric name from a closed `z.enum`; logged, never stored or rendered",
+  rating: "one of three enum values; logged, never stored or rendered",
+  page_kind:
+    "one of three page kinds from a `z.enum`; logged, never stored or rendered",
+
   /*
    * The catalog's read filters (`P2-01`). None of the three is ever written anywhere or
    * rendered anywhere: they narrow a SELECT and form part of a cache key, and the

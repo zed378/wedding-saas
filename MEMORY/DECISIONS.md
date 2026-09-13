@@ -2073,3 +2073,51 @@ always watermarked, submissions are disabled, and a dead token looks like an inv
 because no submission route exists, and the routes `P4-01`/`P4-03` build are addressed by the
 slug of a *published* invitation. `P4-01`'s DoD already refuses a draft; `P4-03`'s did not, and
 now does.
+
+### ADR-067 — The public page's image bytes are chosen for the budget, measured in a real browser
+
+**Date** 2026-09-13 · **Status** Accepted · **Task** `P2-13` · **Amends** `docs/API/08`, `docs/FRONTEND/09`
+
+**Context** — `docs/FRONTEND/09` sets LCP under 2.5s and CLS under 0.1 "on a simulated 4G
+connection", initial JavaScript under 150KB gzip, eager loading for the cover and lazy loading
+for everything else. The first measurement of the reference template with representative
+photos (sized like the media worker's 300/800/1600w WebP variants) on Lighthouse's mobile
+Slow 4G profile with a 4x CPU slowdown was **LCP 5.2s**. The waterfall showed the cover
+preloaded at 0.7s and finishing at 5.2s because it shared the link with ~145KB of framework
+JavaScript, a 1600w cover picked out of a srcset by the phone's 2.6x density, two 1600w
+portraits drawn at 140px, and four gallery photos Chrome's lazy-load distance fetched while
+the cover gate still clipped them.
+
+**Decisions**
+
+1. **The hero uses the 800w variant, with no srcset.** The hero is never wider than the 26rem
+   letterbox, so 800px covers it at up to 1.9x density, and above that the upscale sits under a
+   60–70% black scrim. A srcset let dense phones choose 1600w. Measured: 5.2s → 4.0s alone.
+2. **`couple.<role>.photo` is the 300w thumbnail**, not the 1600w file. The portrait is 140px.
+3. **Gallery sections get `content-visibility: auto`**, so a lazy photo in a skipped section is
+   not fetched until the gallery nears the viewport. Measured: 5.2s → 3.4s alone. Scoped to
+   galleries because on every section it produced a 0.03 layout shift on whichever section sat
+   just below the fold. It keeps the photos in the accessibility tree, unlike `display` or
+   `visibility`, which matters because the cover gate deliberately clips rather than hides.
+4. **The hero scrim is 60% → 70%**, up from 45% → 65%. Over a white photograph the old value
+   gave white text about 3.4:1; it is now asserted arithmetically (`hero-contrast.spec.ts`) and
+   measured from rendered pixels in a browser (5.97–6.90:1).
+5. **No blurred-thumbnail placeholder.** Tried: Chrome discounts an upscaled image's area by its
+   natural size, so the placeholder is a smaller LCP candidate than the sharp image that
+   replaces it; LCP stayed on the sharp image and got ~80ms later from the extra bytes.
+6. **RUM is a same-origin beacon to `POST /public/rum`**, logged, not stored; it carries metric,
+   value, rating and page kind, never a URL.
+7. **Server-side fetches forward the guest's `X-Forwarded-For` unchanged.** Every guest of every
+   wedding otherwise shares the public page server's 100-a-minute `general-public` allowance.
+   Forwarded as received, not appended to, so one `TRUSTED_PROXY_HOPS` value is right both for
+   a request through the public page and for one straight to the API.
+8. **Two throttling profiles are measured, one asserted.** Chrome DevTools' Fast 4G is held to
+   2.5s (measured 0.78–1.01s). Slow 4G measures 2.9–3.3s in the suite and 2.78–2.83s under
+   Lighthouse's simulated throttling, and is held to a 4s regression ceiling. Which profile the
+   criterion means is **raised as `OQ-26`**, not decided here.
+
+**Consequences** — The remaining Slow 4G cost is the framework's own JavaScript (React DOM and
+the App Router runtime, ~120KB of the ~145KB) sharing the link with an 84KB cover. Meeting
+2.5s on that profile means less framework JavaScript or a smaller cover, and both are larger
+decisions than a performance card. The CDN must send `Timing-Allow-Origin: *` on media so RUM
+sees image paint times.
