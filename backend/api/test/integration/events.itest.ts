@@ -285,6 +285,32 @@ describe("events sub-resource", () => {
   });
 
   describe("CRUD", () => {
+    it("serves times as HH:MM, the shape it accepts, so a read can be written back (P2-15)", async () => {
+      // Postgres returns `time` as `HH:MM:SS`. Served as-is, the editor read `08:00:00` and
+      // the PATCH it built from it was refused by the `HH:MM` write schema.
+      const { user, invitationId } = await withInvitation();
+      const created = await service.create(user.scope, invitationId, {
+        ...EVENT,
+        endTime: "10:30",
+      });
+
+      expect(created.start_time).toBe("08:00");
+      expect(created.end_time).toBe("10:30");
+      const [listed] = await service.list(user.scope, invitationId);
+      expect(listed!.start_time).toBe("08:00");
+
+      // And the value read is accepted back unchanged.
+      const updated = await service.update(
+        user.scope,
+        invitationId,
+        created.id,
+        {
+          startTime: listed!.start_time,
+        },
+      );
+      expect(updated.start_time).toBe("08:00");
+    });
+
     it("creates and lists", async () => {
       const { user, invitationId } = await withInvitation();
       const created = await service.create(user.scope, invitationId, EVENT);

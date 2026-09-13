@@ -582,6 +582,18 @@ describe("P2-07 — GET /public/i/:slug", () => {
       expect(data.template).toHaveProperty("thumbnail_url");
     });
 
+    it("serves event times as HH:MM, not Postgres's HH:MM:SS (P2-15)", async () => {
+      // The fixture inserts '08:00'; a `time` column reads back as '08:00:00', which is what
+      // a published invitation showed its guests.
+      const { slug } = await publish();
+
+      const data = await expectSuccess<{
+        invitation: { events: { start_time: string }[] };
+      }>(await get(slug));
+
+      expect(data.invitation.events[0]?.start_time).toBe("08:00");
+    });
+
     it("serves media as URLs, never as ids", async () => {
       const { slug } = await publish();
 

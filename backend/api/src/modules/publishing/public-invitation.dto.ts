@@ -8,6 +8,7 @@ import type {
   MediaRow,
 } from "../../shared/tenancy/invitation-repository";
 import type { PublishedInvitation } from "../../shared/tenancy/public-invitation-repository";
+import { toClockTime } from "../../shared/time/clock-time";
 
 /**
  * `P2-07` — what a published invitation is allowed to expose. `docs/API/08`.
@@ -322,8 +323,9 @@ export function toPublicInvitation(
         type: e.type,
         title: e.title,
         date: e.eventDate,
-        start_time: e.startTime,
-        end_time: e.endTime,
+        // `HH:MM`: Postgres reads `time` back with seconds (`P2-15`).
+        start_time: toClockTime(e.startTime),
+        end_time: toClockTime(e.endTime),
         venue_name: e.venueName,
         address: e.address,
         latitude: e.latitude,

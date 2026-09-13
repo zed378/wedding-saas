@@ -156,6 +156,52 @@ describe("the editor store", () => {
   });
 });
 
+describe("the autosave manager in a browser's rules (P2-15)", () => {
+  it("schedules its debounce without calling the timer unbound", async () => {
+    // Chrome's `setTimeout` throws "Illegal invocation" unless `this` is the global object.
+    // Node's and jsdom's do not, which is how autosave shipped calling it as a method of an
+    // options object and saved nothing in any real browser until `P2-15`. Reproduced here.
+    const realSetTimeout = globalThis.setTimeout;
+    const realClearTimeout = globalThis.clearTimeout;
+    const strict = <T extends (...args: never[]) => unknown>(fn: T): T =>
+      function (this: unknown, ...args: never[]) {
+        if (this !== undefined && this !== globalThis) {
+          throw new TypeError("Illegal invocation");
+        }
+        return fn(...args);
+      } as unknown as T;
+    vi.stubGlobal("setTimeout", strict(realSetTimeout));
+    vi.stubGlobal("clearTimeout", strict(realClearTimeout));
+
+    try {
+      const sent: string[] = [];
+      const autosave = new AutosaveManager({
+        transport: {
+          save: async (group) => {
+            sent.push(group.key);
+          },
+        },
+        callbacks: {
+          onBeginSave: () => undefined,
+          onSaved: () => undefined,
+          onFailed: () => undefined,
+        },
+        groupFor: defaultGroupFor,
+        debounceMs: 5,
+      });
+
+      expect(() => {
+        autosave.queue("quote.text");
+        autosave.queue("quote.text");
+      }).not.toThrow();
+      await new Promise((resolve) => realSetTimeout(resolve, 50));
+      expect(sent).toEqual(["quote"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe("the autosave manager", () => {
   let saved: SaveGroup[];
   let began: string[][];

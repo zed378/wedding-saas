@@ -135,6 +135,29 @@ export async function startFullStack(): Promise<FullStack> {
     // The second design: the reference template's own sections, minus five. Built from the
     // seed rather than written out, so it stays valid when the reference template changes.
     const kept = new Set(["hero", "quote", "couple", "event", "closing"]);
+    // `docs/DATABASE/03` § Schema Validation: validated before it is written, like every other
+    // writer of this table (`scripts/check-template-version-writes.mjs`). A fixture storing a
+    // definition the application would refuse would test a state the product cannot reach.
+    const { assertValidTemplateVersion } = fromApi("@wi/schema") as {
+      assertValidTemplateVersion: (definition: unknown) => {
+        sections: unknown;
+        theme: unknown;
+        customizable_theme_keys: string[];
+      };
+    };
+    const minimal = assertValidTemplateVersion({
+      // Without the seed file's `_why` annotations, which the seed loader strips too
+      // (`seed-data/load.mts`) and the schema refuses as unknown keys.
+      sections: reference.sections
+        .filter((s) => kept.has(s.section_key))
+        .map((section) =>
+          Object.fromEntries(
+            Object.entries(section).filter(([key]) => !key.startsWith("_")),
+          ),
+        ),
+      theme: reference.theme,
+      customizable_theme_keys: reference.customizable_theme_keys,
+    });
     minimalTemplateId = (
       await pool.query<{ id: string }>(
         `INSERT INTO templates (slug, name, category, is_premium, thumbnail_url, status)
@@ -151,11 +174,9 @@ export async function startFullStack(): Promise<FullStack> {
        ON CONFLICT (template_id, version) DO UPDATE SET sections = EXCLUDED.sections`,
       [
         minimalTemplateId,
-        JSON.stringify(
-          reference.sections.filter((s) => kept.has(s.section_key)),
-        ),
-        JSON.stringify(reference.theme),
-        reference.customizable_theme_keys,
+        JSON.stringify(minimal.sections),
+        JSON.stringify(minimal.theme),
+        minimal.customizable_theme_keys,
       ],
     );
   } finally {

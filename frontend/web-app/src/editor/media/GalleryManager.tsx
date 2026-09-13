@@ -10,6 +10,8 @@ import { toFriendlyError } from "../../lib/error-messages";
 import { FormError, FormStatus } from "../../components/AuthShell";
 import { moveItem, ReorderSender } from "./reorder";
 import { preCheck, UploadQueue, type UploadItem } from "./upload-queue";
+import { useEditorContext } from "../EditorProvider";
+import { GALLERY_PHOTOS_PATH, galleryPhotoFromApi } from "../transport";
 
 /**
  * P1-24 — the gallery manager. `docs/FRONTEND/05` § Gallery Manager Component.
@@ -40,6 +42,7 @@ export interface GalleryPhoto {
   readonly is_cover: boolean;
   readonly status: string;
   readonly url?: string;
+  readonly medium_url?: string;
   readonly thumbnail_url?: string;
 }
 
@@ -50,6 +53,24 @@ export interface GalleryManagerProps {
 export function GalleryManager({ invitationId }: GalleryManagerProps) {
   const { api } = useAuth();
   const [photos, setPhotos] = useState<readonly GalleryPhoto[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  /*
+   * `P2-15`. The live preview draws the gallery and the hero's cover from the editor document,
+   * so every change this manager makes — upload, removal, reorder, a new cover — is written
+   * there too. Only after the first load: syncing the empty initial list would blank the
+   * preview's photos for a moment on every visit.
+   */
+  const { store } = useEditorContext();
+  useEffect(() => {
+    if (!loaded) return;
+    store.getState().applyServerValue(
+      GALLERY_PHOTOS_PATH,
+      [...photos]
+        .sort((a, b) => a.display_order - b.display_order)
+        .map((photo) => galleryPhotoFromApi({ ...photo })),
+    );
+  }, [loaded, photos, store]);
   const [uploads, setUploads] = useState<readonly UploadItem[]>([]);
   const [problem, setProblem] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState<string | undefined>(undefined);
@@ -139,6 +160,7 @@ export function GalleryManager({ invitationId }: GalleryManagerProps) {
         `/invitations/${invitationId}/gallery`,
       );
       setPhotos(result.data);
+      setLoaded(true);
     } catch (error) {
       setProblem(toFriendlyError(error).message);
     }

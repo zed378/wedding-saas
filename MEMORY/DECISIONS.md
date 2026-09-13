@@ -2121,3 +2121,41 @@ the App Router runtime, ~120KB of the ~145KB) sharing the link with an 84KB cove
 2.5s on that profile means less framework JavaScript or a smaller cover, and both are larger
 decisions than a performance card. The CDN must send `Timing-Allow-Origin: *` on media so RUM
 sees image paint times.
+
+### ADR-068 — The editor works in the canonical shape; the transport owns both directions of the API boundary
+
+**Date** 2026-09-13 · **Task** `P2-15` · **Status** Accepted · **Amends** `docs/API/04`
+
+**Context** — `docs/PLAN/08` defines one canonical invitation shape, and the field registry
+(`P0-20`, `P1-23`), the renderer (`P2-02`) and the public payload (ADR-063) all use it.
+`docs/API/04`'s owner endpoints use a different one (`event_date`, `bank_accounts`, a flat
+`gallery`, `photo_media_id`, a sub-resource per row). `P1-22` loaded the API's shape straight
+into the editor store, so the panel and the preview addressed paths the data did not have. The
+first full-stack browser test (`P2-14`) showed the result: event fields empty, no request sent
+on edit, no dates or gift accounts in the preview. It also exposed that autosave called
+`setTimeout` unbound and threw in every real browser, and that the section toggles showed
+template defaults rather than the couple's stored selection.
+
+**Decisions**
+
+1. **The editor store holds the canonical document**, built by `toEditorDocument` from the
+   owner detail at load. The preview, panel, publish checklist and registry all read it without
+   translation.
+2. **Both directions of the translation live in `transport.ts`**, the one file
+   `check-no-hardcoded-fields` already allowed to know `docs/API/04`'s tree. No second
+   exemption.
+3. **Collection rows are addressed by id** (`events.<uuid>.title`). The store resolves an id
+   segment inside an array; the transport takes the row's sub-resource from the path. An index
+   is refused rather than guessed, so a queued save cannot land on a neighbouring row after a
+   delete.
+4. **New rows are created in one `POST`** from a small form holding the API's required fields;
+   existing rows save field by field through autosave like any scalar.
+5. **Photo URLs are joined from the gallery list** at load and kept in step by the gallery
+   manager, so the preview draws the cover and gallery. The gallery list gains `medium_url`.
+6. **Event times are served as `HH:MM`** everywhere they leave the API.
+7. **The couple portrait's upload control is not built here.** The document carries the
+   portrait's URL for the preview; the field is still `P1-23`'s text placeholder.
+
+**Consequences** — `P2-05`'s parity test was replaced by one that renders the editor document
+and the public payload for the same invitation. Any future owner-endpoint field must be added to
+`toEditorDocument`; the registry drift test fails otherwise.

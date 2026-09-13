@@ -29,6 +29,7 @@
 | P2-11 | Template catalog and detail UI, demo mode | web-app | L | P2-01, P2-03 |
 | P2-12 | Share-preview links | backend, public-invite | M | P2-08 |
 | P2-13 | Performance budget and Core Web Vitals baseline | public-invite | M | P2-10 |
+| P2-15 | Editor document in canonical shape; event and gift lists | backend, web-app | L | P2-05, P1-23 |
 | P2-14 | Phase 2 test suite and acceptance | all | M | all above |
 
 ---
@@ -460,3 +461,37 @@
 - [ ] The template-switch E2E passes.
 - [ ] Both performance budgets pass in CI.
 - [ ] The phase summary exists in `MEMORY/records/`.
+
+---
+
+## P2-15 — Editor Document in Canonical Shape; Event and Gift Lists
+
+| | |
+|---|---|
+| **Status** | DONE — [record](../MEMORY/records/2026-09-13-P2-15-editor-canonical-document.md) |
+| **Depends on** | P2-05, P1-23 |
+| **Spec refs** | `docs/PLAN/08` (canonical shape), `docs/API/04` § Sub-resources, `docs/FRONTEND/03` § Canonical Field Metadata, `docs/FRONTEND/06` § Live Preview, `docs/UI-UX/12` |
+| **Spec required** | No — every contract exists; this card makes the editor honour them |
+| **Surface** | backend, web-app |
+
+**Added 2026-09-13 during `P2-14`**, whose full-stack template-switch E2E was the first test to drive the editor against the real API. It found that no card had joined the two shapes the editor sits between:
+
+- The editor store holds the invitation exactly as `GET /invitations/:id` returns it — `docs/API/04`'s shape (`events[].event_date`, `bank_accounts`, `gallery[]`, `photo_media_id`) — while the properties panel, the field registry and the renderer all address `docs/PLAN/08`'s canonical paths (`events.*.date`, `gift.accounts.*`, `gallery.photos`). In the running application the event panel shows empty fields for an event that exists, typing in them sends **no request at all**, and the live preview shows no event date and no gift accounts. `P2-05`'s parity test rendered the same component twice with a hand-written canonical fixture, so it could not see this; `P1-23`'s registry anticipated rows addressed by id (`canonicalise` turns uuids into `*`), and nothing produced such paths.
+- The API accepts `HH:MM` and returns Postgres's `HH:MM:SS`, so a time read by the editor is rejected when written back, and a published invitation shows `08:00:00`.
+- Events are required to publish (`hero` and `event` require `events.*.date` and more), so a couple cannot complete an invitation through the editor at all.
+
+**Steps**
+1. Normalise event times to `HH:MM` wherever the API serves them.
+2. Build the editor document from the owner detail in canonical shape, at one boundary, with rows keyed by their ids; join gallery URLs so the preview can draw photos.
+3. Let the store address array rows by id (`events.<uuid>.title`), so a queued save always reaches the row it was typed into, whatever reordering or deletion happened meanwhile.
+4. Map canonical paths to sub-resource endpoints and field names in the transport, the one file that owns that mapping.
+5. Render event and gift collections in the properties panel as rows with add and delete, generically from the registry — no collection named in a component.
+6. Replace the vacuous parity test with one that feeds the preview the editor's document and the public page the public payload, for the same invitation.
+
+**Definition of Done**
+- [x] Editing an event's field or a gift account in the running editor saves to the right row, and the value survives a reload — proven in the full-stack E2E. — `editor-collections.e2e.ts`; it also found autosave had never worked in a browser.
+- [x] A couple can add and remove events and gift accounts from the editor. — add in the full-stack E2E; delete in `editor-document.spec.tsx` only.
+- [x] The live preview shows event dates, times and gift accounts for a real invitation. — E2E, and a parity test against the public payload shape.
+- [x] Times round-trip: what the API serves, the API accepts. — `events.itest.ts` round trip.
+- [x] Every canonical scalar path the registry knows resolves in the editor document built from a full owner detail. — drift-guard test, mutation-verified.
+
