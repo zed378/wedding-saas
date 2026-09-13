@@ -19,7 +19,8 @@ import type { SectionDefinition } from "@wi/template-renderer";
 
 /** `docs/PLAN/08`'s canonical shape, as `docs/API/08` serves it (ADR-063). */
 export interface PublicInvitation {
-  readonly status: "published";
+  /** `"preview"` on a share-preview response (`P2-12`). */
+  readonly status: "published" | "preview";
   readonly template: {
     readonly sections: readonly SectionDefinition[];
     readonly theme: Record<string, unknown>;
@@ -27,7 +28,7 @@ export interface PublicInvitation {
     /** `P2-09`'s `og:image` fallback for an invitation with no cover photo. */
     readonly thumbnail_url?: string | null;
   };
-  readonly display: { readonly watermark: boolean };
+  readonly display: { readonly watermark: boolean; readonly preview?: true };
   readonly invitation: {
     readonly couple: Record<string, unknown>;
     readonly events: readonly Record<string, unknown>[];
@@ -81,7 +82,40 @@ export async function fetchPublicInvitation(
   }
 
   const body: unknown = await response.json();
-  return unwrap(body);
+  return unwrap(body, "published");
+}
+
+/**
+ * `P2-12` — the invitation behind a share-preview token, or `null`.
+ *
+ * Same contract as `fetchPublicInvitation`: `null` for a 404 (unknown, expired, revoked — the
+ * API does not say which), and a throw for anything else, so an outage is not presented as a
+ * dead link. Never cached, anywhere: the response is an unpublished invitation keyed by a
+ * credential, and a cached copy would outlive the owner revoking it.
+ */
+export async function fetchPreviewInvitation(
+  token: string,
+  options: { readonly baseUrl: string },
+): Promise<PublicInvitation | null> {
+  const base = options.baseUrl.replace(/\/+$/, "");
+
+  const response = await fetch(
+    `${base}/public/preview/${encodeURIComponent(token)}`,
+    { headers: { accept: "application/json" }, cache: "no-store" },
+  );
+
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`preview request failed with ${String(response.status)}`);
+  }
+
+  const body: unknown = await response.json();
+  const preview = unwrap(body, "preview");
+
+  // Belt and braces on the two properties a preview must never lose. The API forces both;
+  // a page that trusted an API regression would publish a draft to a search index.
+  if (preview === null || preview.display.watermark !== true) return null;
+  return preview;
 }
 
 /**
@@ -91,7 +125,10 @@ export async function fetchPublicInvitation(
  * response shape it did not expect — including an error envelope arriving with a 200,
  * which is what a misconfigured proxy in front of the API produces.
  */
-function unwrap(body: unknown): PublicInvitation | null {
+function unwrap(
+  body: unknown,
+  expected: PublicInvitation["status"],
+): PublicInvitation | null {
   if (typeof body !== "object" || body === null) return null;
   if ((body as { success?: unknown }).success !== true) return null;
 
@@ -99,7 +136,7 @@ function unwrap(body: unknown): PublicInvitation | null {
   if (typeof data !== "object" || data === null) return null;
 
   const shaped = data as Partial<PublicInvitation>;
-  if (shaped.status !== "published") return null;
+  if (shaped.status !== expected) return null;
   if (typeof shaped.template !== "object" || shaped.template === null) {
     return null;
   }

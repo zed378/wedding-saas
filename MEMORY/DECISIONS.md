@@ -2035,3 +2035,41 @@ invitation query.
 - **Per-section previews are rendered, not screenshots.** There are no screenshots in the
   data model; each slide is the real section drawn by the renderer in `demo` mode from the
   demo's public payload, so it cannot drift from the product.
+
+### ADR-066 — A share preview is the public payload with four fields forced, and says `"preview"`
+
+**Date** 2026-09-13 · **Status** Accepted · **Task** `P2-12` · **Amends** `docs/API/04`, `docs/API/08`
+
+**Context** — `docs/DATABASE/04` § Share-Preview Tokens fixes the rules: the token is a
+credential (high entropy, hashed, expiring, revocable), a preview is always `noindex` and
+always watermarked, submissions are disabled, and a dead token looks like an invented one.
+`docs/API/04` and `docs/API/08` name the endpoints and give no response shapes.
+
+**Decisions**
+
+1. **The preview payload is the public payload, built by the same function, with four fields
+   forced** — `display.watermark`/`preview`, `settings.seo_indexable`, and the two submission
+   flags. Forced in the API rather than left to the page to remember, because the payload is
+   the one thing every future consumer reads, and a renderer that forgot one flag would put an
+   unfinished invitation into a search index.
+2. **`status: "preview"`, not `"published"`.** The public DTO's status was a literal
+   `"published"` because nothing else could reach it. A preview usually shows a draft, and a
+   payload asserting `"published"` about an unpublished invitation is false in the one field a
+   consumer might branch on. The public page's fetcher accepts only the status its route
+   expects, so a preview payload can never be rendered as a published invitation or vice versa.
+3. **SHA-256, not a slow hash, and not HMAC.** Following `P1-02`'s single-use tokens: a slow
+   hash protects a secret a person chose, and a 256-bit random token has nothing to
+   brute-force. On a public route a slow hash is a load lever with no security in exchange.
+4. **Revocation is a timestamp.** The row stays, so `last_accessed_at` still tells the owner
+   whether the link was opened before they took it back.
+5. **The resolve's expiry compares against the database's `now()`**, not a clock the
+   application passes in, so a skewed application host cannot extend a link.
+6. **A minimal editor control ships with the card.** The card's surface is the backend and
+   the public page, and neither is usable without somewhere to create a link. `SharePreview`
+   sits beside the publish button, shows a new link once, and lists active links with their
+   last-opened time and a revoke action. No other card owns this UI.
+
+**Not decided here, and pinned for `P4`**: submissions from a preview create no rows today
+because no submission route exists, and the routes `P4-01`/`P4-03` build are addressed by the
+slug of a *published* invitation. `P4-01`'s DoD already refuses a draft; `P4-03`'s did not, and
+now does.

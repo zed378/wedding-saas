@@ -1665,6 +1665,130 @@ export class InvitationRepository {
     return rows[0] ?? null;
   }
 
+  // ------------------------------------------------------------ preview tokens (P2-12)
+
+  /**
+   * Store a share-preview token's HASH for an owned invitation. `P2-12`, `docs/DATABASE/04`
+   * § Share-Preview Tokens.
+   *
+   * The owner check and the insert are one statement — `INSERT … SELECT … WHERE owner_id` —
+   * rather than a check followed by an insert. A token is the only thing standing between an
+   * unpublished invitation and the internet, so the window in which one could be minted for
+   * somebody else's invitation must not exist at all, not merely be narrow.
+   *
+   * `null` when the invitation is not the caller's, or is deleted.
+   */
+  async createPreviewToken(
+    invitationId: string,
+    scope: TenantScope,
+    input: { readonly tokenHash: string; readonly expiresAt: Date },
+  ): Promise<typeof invitationPreviewTokens.$inferSelect | null> {
+    const result = await this.db.execute<{
+      id: string;
+      invitation_id: string;
+      token_hash: string;
+      created_by: string;
+      expires_at: Date;
+      revoked_at: Date | null;
+      last_accessed_at: Date | null;
+      created_at: Date;
+    }>(sql`
+      INSERT INTO invitation_preview_tokens (invitation_id, token_hash, created_by, expires_at)
+      SELECT i.id, ${input.tokenHash}, ${scope}, ${input.expiresAt}
+      FROM invitations i
+      WHERE i.id = ${invitationId}
+        AND i.owner_id = ${scope}
+        AND i.deleted_at IS NULL
+      RETURNING id, invitation_id, token_hash, created_by, expires_at, revoked_at,
+                last_accessed_at, created_at
+    `);
+
+    const row = result.rows[0];
+    if (row === undefined) return null;
+
+    return {
+      id: row.id,
+      invitationId: row.invitation_id,
+      tokenHash: row.token_hash,
+      createdBy: row.created_by,
+      expiresAt: new Date(row.expires_at),
+      revokedAt: row.revoked_at === null ? null : new Date(row.revoked_at),
+      lastAccessedAt:
+        row.last_accessed_at === null ? null : new Date(row.last_accessed_at),
+      createdAt: new Date(row.created_at),
+    };
+  }
+
+  /**
+   * The live preview links of an owned invitation — not revoked, not expired — newest first.
+   *
+   * `docs/API/04`: "List active preview links". An expired link is not active and listing it
+   * would invite a couple to send a link that no longer works.
+   */
+  async findOwnedActivePreviewTokens(
+    invitationId: string,
+    scope: TenantScope,
+    now: Date,
+  ): Promise<(typeof invitationPreviewTokens.$inferSelect)[]> {
+    const rows = await this.db
+      .select({ token: invitationPreviewTokens })
+      .from(invitationPreviewTokens)
+      .innerJoin(
+        invitations,
+        eq(invitationPreviewTokens.invitationId, invitations.id),
+      )
+      .where(
+        and(
+          eq(invitationPreviewTokens.invitationId, invitationId),
+          eq(invitations.ownerId, scope),
+          isNull(invitations.deletedAt),
+          isNull(invitationPreviewTokens.revokedAt),
+          sql`${invitationPreviewTokens.expiresAt} > ${now}`,
+        ),
+      )
+      .orderBy(desc(invitationPreviewTokens.createdAt));
+
+    return rows.map((row) => row.token);
+  }
+
+  /**
+   * Revoke one preview link. Child, parent and owner in one statement (`docs/SECURITY/05`
+   * § 6-7), so a token id from another invitation — even the caller's own other invitation —
+   * revokes nothing.
+   *
+   * Revoking is a timestamp, not a delete: `last_accessed_at` on a revoked link is how a
+   * couple finds out whether it was opened before they took it back.
+   *
+   * `false` for not found, not the caller's, or already revoked — one answer, so revoking
+   * twice is idempotent and says nothing about whether the id ever existed.
+   */
+  async revokeOwnedPreviewToken(
+    tokenId: string,
+    invitationId: string,
+    scope: TenantScope,
+    now: Date,
+  ): Promise<boolean> {
+    const rows = await this.db
+      .update(invitationPreviewTokens)
+      .set({ revokedAt: now })
+      .where(
+        and(
+          eq(invitationPreviewTokens.id, tokenId),
+          eq(invitationPreviewTokens.invitationId, invitationId),
+          isNull(invitationPreviewTokens.revokedAt),
+          sql`EXISTS (
+            SELECT 1 FROM invitations i
+            WHERE i.id = ${invitationPreviewTokens.invitationId}
+              AND i.owner_id = ${scope}
+              AND i.deleted_at IS NULL
+          )`,
+        ),
+      )
+      .returning({ id: invitationPreviewTokens.id });
+
+    return rows.length > 0;
+  }
+
   async loadAggregate(
     invitationId: string,
     scope: TenantScope,

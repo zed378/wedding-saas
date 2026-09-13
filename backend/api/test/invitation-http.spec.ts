@@ -19,6 +19,7 @@ import { ChangeTemplateService } from "../src/modules/invitation/change-template
 import { GalleryService } from "../src/modules/invitation/gallery.service";
 import { SlugService } from "../src/modules/invitation/slug.service";
 import { PublishCheckService } from "../src/modules/invitation/publish-check.service";
+import { PreviewLinkService } from "../src/modules/invitation/preview-link.service";
 import { NotFoundError } from "../src/http/errors";
 import { SessionService } from "../src/modules/auth/session.service";
 import { UnauthenticatedError } from "../src/http/errors";
@@ -399,6 +400,7 @@ describe("POST /invitations over HTTP", () => {
         { provide: GalleryService, useValue: galleryStub },
         { provide: SlugService, useValue: slugStub },
         { provide: PublishCheckService, useValue: publishCheckStub },
+        { provide: PreviewLinkService, useValue: {} },
         { provide: SessionService, useValue: sessionStub },
         { provide: RATE_LIMITER, useValue: limiterStub },
         {

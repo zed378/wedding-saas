@@ -47,6 +47,8 @@ export interface TenantInvitation {
    */
   readonly spareMediaId: string;
   readonly photoId: string;
+  /** `P2-12`. A live share-preview token's id, for the revoke endpoint. */
+  readonly previewTokenId: string;
   readonly markers: readonly string[];
 }
 
@@ -156,8 +158,16 @@ async function createInvitationWithChildren(
     [invitation.id, `${name} quote text`, `${name} source`],
   );
 
+  // `P2-12`. A hash that no token produces; the sweep only needs the row's id.
+  const { rows: previewTokens } = await pool.query<{ id: string }>(
+    `INSERT INTO invitation_preview_tokens (invitation_id, token_hash, created_by, expires_at)
+     VALUES ($1, $2, $3, now() + interval '7 days') RETURNING id`,
+    [invitation.id, `fixture-${unique()}`, user.id],
+  );
+
   return {
     invitation,
+    previewTokenId: previewTokens[0]!.id,
     eventId: events[0]!.id,
     bankAccountId: accounts[0]!.id,
     mediaId,

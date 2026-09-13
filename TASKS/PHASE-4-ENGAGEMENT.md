@@ -127,6 +127,7 @@
 - [ ] With moderation on, a new entry is invisible in the public listing until approved, proven end to end.
 - [ ] The approved filter is in SQL, not applied after fetching.
 - [ ] Submissions to a disabled guestbook are rejected.
+- [ ] Submitting to a draft, unpublished or expired invitation — including one being viewed through a share-preview link — returns 404 and stores nothing. *(Added by `P2-12`, ADR-066: `docs/DATABASE/04` promises a preview creates no guest rows, and this route is where that promise is kept.)*
 - [ ] The guest sees an honest message about whether their entry is live.
 
 ---

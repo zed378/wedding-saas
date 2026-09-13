@@ -144,6 +144,12 @@ DELETE /api/v1/invitations/:id/preview-links/:token_id   Revoke a link
 
 The token is returned **once**, at creation, and stored only as a hash (DATABASE/04 § Share-Preview Tokens). It is consumed by the public route `GET /public/preview/:token` (API/08), which always renders `noindex` and watermarked, with submissions disabled.
 
+Response shapes (`P2-12`):
+
+- `POST /preview-link` → **201** `{ id, token, url, expires_at, created_at }`. The only response that ever carries `token`; `url` is `{PUBLIC_INVITE_ORIGIN}/preview/{token}`. Nothing is read from the body — the seven-day expiry is not a client's to choose. The token is 256 random bits, `base64url` (43 characters), stored as its SHA-256.
+- `GET /preview-links` → `[{ id, expires_at, created_at, last_accessed_at }]`, active links only (not revoked, not expired), newest first. Never a token: there is none to return.
+- `DELETE /preview-links/:token_id` → `{ status: "revoked" }`. A timestamp, not a delete, so `last_accessed_at` still says whether the link was opened before it was taken back. 404 for a link that is not this invitation's, not the caller's, or already revoked.
+
 ### Why the detail carries a `template` object
 
 `template_id` and `template_version_id` are uuids, and every endpoint in `API/03` is addressed by **slug** and **semver**. Without the object a client holding an invitation cannot fetch the definition it is rendering — and BR-3.1 makes that worse rather than better: the invitation stays on the version it locked, so `GET /templates/:slug`, which serves the newest published version, is the wrong answer for an existing invitation.

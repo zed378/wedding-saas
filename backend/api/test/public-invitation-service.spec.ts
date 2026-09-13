@@ -30,6 +30,11 @@ function serviceThatMustNotQuery(): PublicInvitationService {
         "the repository was queried for a slug that cannot be valid",
       );
     },
+    findPreviewByTokenHash: () => {
+      throw new Error(
+        "the repository was queried for a token that cannot be valid",
+      );
+    },
   } as unknown as PublicInvitationRepository;
 
   return new PublicInvitationService(repository, env);
@@ -94,5 +99,38 @@ describe("the slug is validated before anything is queried", () => {
 
     expect(fromInvalid.code).toBe(fromMissing.code);
     expect(fromInvalid.message).toBe(fromMissing.message);
+  });
+});
+
+describe("P2-12 — a preview token is validated before anything is hashed or queried", () => {
+  it.each([
+    ["empty", ""],
+    ["too short", "A".repeat(42)],
+    ["too long", "A".repeat(44)],
+    ["a character base64url never produces", `${"A".repeat(42)}+`],
+    ["padding", `${"A".repeat(42)}=`],
+    ["a path separator", `${"A".repeat(21)}/${"A".repeat(21)}`],
+  ])("answers 404 for %s without a round trip", async (_label, token) => {
+    await expect(
+      serviceThatMustNotQuery().byPreviewToken(token),
+    ).rejects.toMatchObject({ status: 404, code: "NOT_FOUND" });
+  });
+
+  it("gives an invalid token the same error as a missing slug", async () => {
+    // One `notFound()` object for both public routes, so neither can be used to tell the
+    // other's failures apart.
+    const missing = {
+      findPublishedBySlug: () => Promise.resolve(null),
+    } as unknown as PublicInvitationRepository;
+
+    const fromSlug = await rejection(() =>
+      new PublicInvitationService(missing, env).bySlug("andi-sarah"),
+    );
+    const fromToken = await rejection(() =>
+      serviceThatMustNotQuery().byPreviewToken("nope"),
+    );
+
+    expect(fromToken.code).toBe(fromSlug.code);
+    expect(fromToken.message).toBe(fromSlug.message);
   });
 });

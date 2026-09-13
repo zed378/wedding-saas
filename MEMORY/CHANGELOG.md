@@ -10,6 +10,15 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-13 — Showing an invitation before publishing it
+
+**Added** — share-preview links ([P2-12](./records/2026-09-13-P2-12-share-preview.md))
+
+- **A couple can send an unpublished invitation to a partner or organizer** with a link that lasts seven days. "Bagikan pratinjau" in the editor creates one, shows it once, lists active links with when they were last opened, and revokes them.
+- **The link is treated as a password.** 256 random bits; only its hash is stored, so it cannot be recovered from the database or shown twice; it stops working the moment it is revoked or expires.
+- **A preview can never pass for the real thing**: every page is watermarked "PRATINJAU — BELUM DITERBITKAN" (across the whole page, so a screenshot still says so), never indexed, never cached, and has RSVP and guestbook turned off.
+- **A dead link reveals nothing** — expired, revoked and made-up links all show the same "not available" page as an address that never existed.
+
 ### 2026-09-13 — Browsing before signing up
 
 **Added** — the template catalogue ([P2-11](./records/2026-09-13-P2-11-catalog-ui.md))
