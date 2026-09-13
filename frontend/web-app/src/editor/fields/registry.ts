@@ -221,6 +221,36 @@ export const FIELD_REGISTRY: Readonly<Record<string, FieldMeta>> = {
 };
 
 /**
+ * `P2-15` — what one row of a collection is called, for "Acara 2" and "Tambah acara".
+ *
+ * Keyed by the collection's canonical path, beside `COLLECTION_PATHS`, so the panel can label
+ * a row without naming a collection itself.
+ */
+export const COLLECTION_ITEM_LABELS: Readonly<Record<string, string>> = {
+  events: "Acara",
+  "gift.accounts": "Rekening",
+};
+
+/**
+ * `P2-15` — the collection a registry pattern belongs to: `events.*.title` → `events`.
+ * `undefined` for a scalar path.
+ */
+export function collectionPathOf(pattern: string): string | undefined {
+  return Object.keys(COLLECTION_PATHS).find(
+    (collection) =>
+      pattern === collection || pattern.startsWith(`${collection}.*.`),
+  );
+}
+
+/** Every field a row of `collection` has, in registry order: `title`, `date`, … */
+export function collectionFieldNames(collection: string): string[] {
+  const prefix = `${collection}.*.`;
+  return Object.keys(FIELD_REGISTRY)
+    .filter((key) => key.startsWith(prefix))
+    .map((key) => key.slice(prefix.length));
+}
+
+/**
  * The metadata for a path a template asked for.
  *
  * A template references a concrete path (`events.0.title`), and the registry is keyed by the

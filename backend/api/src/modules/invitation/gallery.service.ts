@@ -46,6 +46,7 @@ export interface GalleryPhotoDto {
   readonly width: number | null;
   readonly height: number | null;
   readonly url?: string;
+  readonly medium_url?: string;
   readonly thumbnail_url?: string;
 }
 
@@ -240,6 +241,8 @@ export class GalleryService {
     return {
       ...base,
       url: `${cdn}/${mediaKey(entry.media.invitationId, entry.media.id, "large")}`,
+      // `P2-15`: the editor's preview draws the hero from it, as the public page does.
+      medium_url: `${cdn}/${mediaKey(entry.media.invitationId, entry.media.id, "medium")}`,
       thumbnail_url: `${cdn}/${mediaKey(entry.media.invitationId, entry.media.id, "thumbnail")}`,
     };
   }

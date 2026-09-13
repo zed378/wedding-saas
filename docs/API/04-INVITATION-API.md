@@ -49,14 +49,17 @@ PATCH  /api/v1/invitations/:id/couple/bride       (same fields)
 ## Sub-resource: Events
 ```
 GET    /api/v1/invitations/:id/events
-POST   /api/v1/invitations/:id/events             { type, title, date, start_time, end_time, venue_name, address, latitude, longitude, description }
+POST   /api/v1/invitations/:id/events             { type, title, event_date, start_time, end_time, venue_name, address, latitude, longitude, description }
 PATCH  /api/v1/invitations/:id/events/:event_id
 DELETE /api/v1/invitations/:id/events/:event_id
 ```
 
+- The body field is `event_date`, as the implementation has accepted since `P1-12`; this line said `date`, which is the **canonical** name (`PLAN/08`) the editor and the public payload use. The editor translates between the two in one place (`frontend/web-app/src/editor/transport.ts`). Corrected by `P2-15` (ADR-068).
+- `start_time` and `end_time` are accepted and **served** as `HH:MM`. The column is a Postgres `time`, which reads back as `HH:MM:SS`; until `P2-15` it was served that way, so a time read from the API was refused when written back, and published invitations showed `08:00:00`.
+
 ## Sub-resource: Gallery
 ```
-GET    /api/v1/invitations/:id/gallery
+GET    /api/v1/invitations/:id/gallery            each photo carries url (1600w), medium_url (800w, since P2-15), thumbnail_url (300w) once ready
 POST   /api/v1/invitations/:id/gallery            { media_id, caption?, is_cover? }
 PATCH  /api/v1/invitations/:id/gallery/:photo_id    { caption?, order? }
 DELETE /api/v1/invitations/:id/gallery/:photo_id

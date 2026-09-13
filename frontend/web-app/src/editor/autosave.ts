@@ -102,8 +102,23 @@ export class AutosaveManager {
       transport: options.transport,
       callbacks: options.callbacks,
       debounceMs: options.debounceMs ?? DEFAULT_DEBOUNCE_MS,
-      setTimeout: options.setTimeout ?? globalThis.setTimeout,
-      clearTimeout: options.clearTimeout ?? globalThis.clearTimeout,
+      /*
+       * Wrapped, not stored bare. `this.#options.setTimeout(...)` calls the timer with the
+       * options object as `this`, and a browser's `setTimeout` refuses that with "Illegal
+       * invocation" — Node's and jsdom's do not. So from `P1-22` until `P2-15` autosave threw
+       * on the first keystroke in every real browser and saved nothing, while every unit test
+       * passed. The full-stack E2E found it; `editor-autosave.spec.ts` now reproduces the
+       * browser's rule.
+       */
+      setTimeout:
+        options.setTimeout ??
+        (((handler: () => void, ms?: number) =>
+          globalThis.setTimeout(handler, ms)) as typeof globalThis.setTimeout),
+      clearTimeout:
+        options.clearTimeout ??
+        (((timer?: Parameters<typeof globalThis.clearTimeout>[0]) => {
+          globalThis.clearTimeout(timer);
+        }) as typeof globalThis.clearTimeout),
       groupFor: options.groupFor,
     };
   }

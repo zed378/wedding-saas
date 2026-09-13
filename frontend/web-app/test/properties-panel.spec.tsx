@@ -142,12 +142,14 @@ describe("the form comes from the template (card DoD 1)", () => {
   });
 
   it("does not render a text box for a collection", () => {
-    // `events` names a list. A control here would ask somebody to type one, and there is no
-    // list editor for events yet — `P1-24` built the photo one only.
+    // `events` names a list. A control here would ask somebody to type one. Since `P2-15` the
+    // list has a row editor, which with no rows offers to add one.
     withTemplate(sectionWith(["events"]));
 
     expect(screen.queryByRole("textbox")).toBeNull();
-    expect(screen.getByText(/belum dapat diubah/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /tambah acara/i }),
+    ).toBeInTheDocument();
   });
 
   it("renders the gallery manager for the photo collection", () => {

@@ -5,12 +5,20 @@ import type { AutosaveTransport, SaveGroup, SaveGroupKey } from "./autosave";
 import type { FieldPath } from "./store";
 
 /**
- * P1-22 — turning a save group into the right `PATCH`. `docs/API/04`.
+ * P1-22, P2-15 — the one file that knows `docs/API/04`'s shape, in both directions.
  *
- * The manager knows nothing about URLs and this knows nothing about debouncing. That split is
- * what lets the manager's tests be about losing work rather than about HTTP, and it is what
- * makes "dispatch to the correct sub-resource" (card step 3) a table rather than a decision
- * spread through the editor.
+ * The editor works in `docs/PLAN/08`'s **canonical** shape: the field registry, the
+ * properties panel and the renderer all address `events.*.date`, `gift.accounts.*` and
+ * `gallery.photos`. The API speaks `docs/API/04`'s: `event_date`, `bank_accounts`, a flat
+ * `gallery` array and a sub-resource per row. This file translates between them —
+ * `toEditorDocument` on the way in, `endpointFor` and `COLLECTIONS` on the way out — so no
+ * component, and no other module, needs to know that both shapes exist.
+ *
+ * `P1-22` put only the outbound half here and loaded the API's shape straight into the store.
+ * Every path the panel wrote then missed: an event edit went to `PATCH /events/*`, nothing
+ * reached the API, and the live preview showed no event date and no gift account for any real
+ * invitation (`P2-15`). The inbound half now lives beside the outbound one, so the two cannot
+ * drift apart without one file showing it.
  *
  * ## The body is built from the store, not from the change
  *
@@ -18,6 +26,13 @@ import type { FieldPath } from "./store";
  * time. So a field edited three times during one debounce sends its latest value, and a field
  * edited again while the request was out sends its newer value on the next cycle rather than
  * an older one captured when the keystroke happened.
+ *
+ * ## Rows are addressed by id
+ *
+ * A collection row's path carries its id — `events.<uuid>.title` — never its index, so a save
+ * queued for one row cannot land on a neighbour after a deletion (`store.ts` § Rows are
+ * addressed by id). The id is also the sub-resource's, which is what makes the endpoint a
+ * lookup.
  */
 
 export interface TransportDeps {
@@ -29,43 +44,267 @@ export interface TransportDeps {
 
 interface Endpoint {
   readonly path: string;
-  /** Strips the group prefix, so `couple.groom.nickname` becomes `nickname`. */
+  /** The API's field name for a canonical path, e.g. `events.<id>.date` → `event_date`. */
   readonly fieldName: (path: string) => string;
 }
 
-/**
- * Which sub-resource owns a path. `docs/API/04`.
- *
- * The first one or two segments, because that is the shape of the endpoint tree:
- * `couple.groom.*` is one endpoint and `couple.bride.*` is another, while everything under
- * `settings.*` is one PATCH. An unknown prefix groups by its first segment rather than
- * throwing — a new sub-resource should produce its own requests, not break the editor.
- *
- * It lives here, beside `endpointFor`, so **one file** holds the path-to-endpoint mapping.
- * It was in `autosave.ts` first, and `scripts/check-no-hardcoded-fields.mjs` flagged it:
- * the manager is about timing and queuing, and the moment it also knew that `couple.groom.*`
- * is one endpoint it was a second home for the field vocabulary.
- */
-export function defaultGroupFor(path: FieldPath): SaveGroupKey {
-  const [head, second] = path.split(".");
-  if (head === "couple" && second !== undefined) return `couple:${second}`;
-  if (head === "events" && second !== undefined) return `events:${second}`;
-  if (head === "bank_accounts" && second !== undefined) {
-    return `bank_accounts:${second}`;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// ---------------------------------------------------------------------------------------------
+// Inbound: the owner detail, as the editor document.
+// ---------------------------------------------------------------------------------------------
+
+/** Media URLs by media id, joined from `GET /invitations/:id/gallery` so the preview can draw. */
+export type MediaUrls = ReadonlyMap<
+  string,
+  {
+    readonly url?: string | undefined;
+    readonly medium_url?: string | undefined;
+    readonly thumbnail_url?: string | undefined;
   }
-  return head ?? "invitation";
+>;
+
+type Row = Record<string, unknown>;
+
+const rows = (value: unknown): Row[] =>
+  Array.isArray(value)
+    ? value.filter((row): row is Row => typeof row === "object" && row !== null)
+    : [];
+
+const byOrder = (list: Row[]): Row[] =>
+  [...list].sort(
+    (a, b) => Number(a["display_order"] ?? 0) - Number(b["display_order"] ?? 0),
+  );
+
+/** `docs/API/04`'s event row → `docs/PLAN/08`'s. Also used for a row the API just created. */
+export function eventFromApi(row: Row): Row {
+  return {
+    id: row["id"],
+    type: row["type"],
+    title: row["title"],
+    date: row["event_date"],
+    start_time: row["start_time"],
+    end_time: row["end_time"] ?? null,
+    venue_name: row["venue_name"],
+    address: row["address"],
+    latitude: row["latitude"] ?? null,
+    longitude: row["longitude"] ?? null,
+    maps_url: row["maps_url"] ?? null,
+    description: row["description"] ?? null,
+    order: row["display_order"],
+  };
+}
+
+/** Where the editor document keeps the gallery. */
+export const GALLERY_PHOTOS_PATH = "gallery.photos";
+
+/** `docs/API/04`'s gallery row (with the URLs the gallery list adds) → `docs/PLAN/08`'s photo. */
+export function galleryPhotoFromApi(
+  row: Readonly<Record<string, unknown>>,
+  urls?: {
+    readonly url?: string | undefined;
+    readonly medium_url?: string | undefined;
+    readonly thumbnail_url?: string | undefined;
+  },
+): Row {
+  const url = urls?.url ?? row["url"];
+  const medium = urls?.medium_url ?? row["medium_url"];
+  const thumbnail = urls?.thumbnail_url ?? row["thumbnail_url"];
+  return {
+    id: row["id"],
+    media_id: row["media_id"],
+    caption: row["caption"] ?? null,
+    is_cover: row["is_cover"] === true,
+    order: row["display_order"],
+    ...(typeof url === "string" ? { url } : {}),
+    ...(typeof medium === "string" ? { medium_url: medium } : {}),
+    ...(typeof thumbnail === "string" ? { thumbnail_url: thumbnail } : {}),
+  };
+}
+
+/** `docs/API/04`'s bank account row → `docs/PLAN/08`'s gift account. */
+export function accountFromApi(row: Row): Row {
+  return {
+    id: row["id"],
+    type: row["type"],
+    provider_name: row["provider_name"],
+    account_number: row["account_number"],
+    account_holder: row["account_holder"],
+    order: row["display_order"],
+  };
+}
+
+function personFromApi(person: unknown, media: MediaUrls): Row | null {
+  if (typeof person !== "object" || person === null) return null;
+  const row = person as Row;
+  const photoId = row["photo_media_id"];
+  const urls = typeof photoId === "string" ? media.get(photoId) : undefined;
+  return {
+    full_name: row["full_name"],
+    nickname: row["nickname"],
+    instagram: row["instagram"] ?? null,
+    father_name: row["father_name"] ?? null,
+    mother_name: row["mother_name"] ?? null,
+    child_order: row["child_order"] ?? null,
+    photo_media_id: photoId ?? null,
+    // The canonical `photo` is an image source, as the public payload serves it (ADR-063).
+    ...(urls?.thumbnail_url === undefined ? {} : { photo: urls.thumbnail_url }),
+  };
 }
 
 /**
- * Where each group goes. `docs/API/04` § Sub-resources.
+ * `GET /invitations/:id` → the editor document, in `docs/PLAN/08`'s canonical shape.
  *
- * `settings` is the only one whose API field names differ from the store's paths — they do
- * not, in fact, which is why this is a prefix strip rather than a rename map. If they ever
- * diverge, this is the one place to say so.
+ * Everything the detail carries that is not reshaped passes through unchanged (`template`,
+ * `settings`, `quote`, the identifiers), so the rest of the editor keeps reading what it read.
  */
+export function toEditorDocument(
+  detail: Readonly<Record<string, unknown>>,
+  media: MediaUrls = new Map(),
+): Record<string, unknown> {
+  const {
+    couple,
+    events,
+    gallery,
+    bank_accounts: bankAccounts,
+    ...rest
+  } = detail as Row;
+
+  const pair =
+    typeof couple === "object" && couple !== null ? (couple as Row) : {};
+
+  return {
+    ...rest,
+    couple: {
+      groom: personFromApi(pair["groom"], media),
+      bride: personFromApi(pair["bride"], media),
+    },
+    events: byOrder(rows(events)).map(eventFromApi),
+    gallery: {
+      photos: byOrder(rows(gallery)).map((row) =>
+        galleryPhotoFromApi(
+          row,
+          typeof row["media_id"] === "string"
+            ? media.get(row["media_id"])
+            : undefined,
+        ),
+      ),
+    },
+    gift: { accounts: byOrder(rows(bankAccounts)).map(accountFromApi) },
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Outbound: canonical paths → sub-resources.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The collections the editor edits row by row, and how each maps onto its sub-resource.
+ *
+ * `required` is what the API refuses a new row without (`docs/API/04`), in canonical field
+ * names — which can be more than a template's own `required_fields`, since a template that
+ * does not display an event's type still cannot create an event without one.
+ */
+export interface CollectionEndpoint {
+  /** The canonical path of the list, e.g. `events`. */
+  readonly path: string;
+  readonly createPath: (invitationId: string) => string;
+  readonly rowPath: (invitationId: string, rowId: string) => string;
+  /** Canonical field name → the API's. Unlisted names are the same in both. */
+  readonly rename: Readonly<Record<string, string>>;
+  readonly fromApi: (row: Row) => Row;
+  readonly required: readonly string[];
+  /** Values a new row starts with, so a select has a choice before anyone opens it. */
+  readonly defaults: Readonly<Record<string, string>>;
+}
+
+export const COLLECTIONS: readonly CollectionEndpoint[] = [
+  {
+    path: "events",
+    createPath: (invitationId) => `/invitations/${invitationId}/events`,
+    rowPath: (invitationId, rowId) =>
+      `/invitations/${invitationId}/events/${rowId}`,
+    rename: { date: "event_date", order: "display_order" },
+    fromApi: eventFromApi,
+    required: ["type", "title", "date", "start_time", "venue_name", "address"],
+    defaults: { type: "akad" },
+  },
+  {
+    path: "gift.accounts",
+    createPath: (invitationId) => `/invitations/${invitationId}/bank-accounts`,
+    rowPath: (invitationId, rowId) =>
+      `/invitations/${invitationId}/bank-accounts/${rowId}`,
+    rename: { order: "display_order" },
+    fromApi: accountFromApi,
+    required: ["type", "provider_name", "account_number", "account_holder"],
+    defaults: { type: "bank" },
+  },
+];
+
+/** The collection a canonical path belongs to, and the row id in it, if any. */
+export function collectionOf(
+  path: FieldPath,
+):
+  { collection: CollectionEndpoint; rowId: string; field: string } | undefined {
+  for (const collection of COLLECTIONS) {
+    const prefix = `${collection.path}.`;
+    if (!path.startsWith(prefix)) continue;
+    const [rowId, ...field] = path.slice(prefix.length).split(".");
+    if (rowId === undefined || field.length === 0) return undefined;
+    return { collection, rowId, field: field.join(".") };
+  }
+  return undefined;
+}
+
+/** A canonical row → the body its sub-resource accepts. */
+export function toApiBody(
+  collection: CollectionEndpoint,
+  values: Readonly<Record<string, unknown>>,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(values)) {
+    body[collection.rename[name] ?? name] = value;
+  }
+  return body;
+}
+
+/**
+ * Which save group a path belongs to — one group per request the API needs.
+ *
+ * `couple.groom.*` is one endpoint and `couple.bride.*` another; each event and each gift
+ * account is its own row; everything under `settings.*` is one PATCH. An unknown prefix groups
+ * by its first segment rather than throwing — a new sub-resource should produce its own
+ * requests, not break the editor.
+ */
+export function defaultGroupFor(path: FieldPath): SaveGroupKey {
+  const row = collectionOf(path);
+  if (row !== undefined) return `${row.collection.path}:${row.rowId}`;
+
+  const [head, second] = path.split(".");
+  if (head === "couple" && second !== undefined) return `couple:${second}`;
+  return head ?? "invitation";
+}
+
+/** Where each group goes. `docs/API/04` § Sub-resources. */
 function endpointFor(key: string, invitationId: string): Endpoint | undefined {
   const base = `/invitations/${invitationId}`;
-  const [group, id] = key.split(":");
+  const separator = key.lastIndexOf(":");
+  const group = separator === -1 ? key : key.slice(0, separator);
+  const id = separator === -1 ? undefined : key.slice(separator + 1);
+
+  const collection = COLLECTIONS.find((c) => c.path === group);
+  if (collection !== undefined) {
+    // A row without a server id has nowhere to go. An index or a `*` here means a path the
+    // editor invented, and saying so beats a PATCH to `/events/0`.
+    if (id === undefined || !UUID.test(id)) return undefined;
+    return {
+      path: collection.rowPath(invitationId, id),
+      fieldName: (p) => {
+        const field = collectionOf(p)?.field ?? p;
+        return collection.rename[field] ?? field;
+      },
+    };
+  }
 
   switch (group) {
     case "couple":
@@ -73,21 +312,10 @@ function endpointFor(key: string, invitationId: string): Endpoint | undefined {
         ? undefined
         : {
             path: `${base}/couple/${id}`,
-            fieldName: (p) => p.split(".").slice(2).join("."),
-          };
-    case "events":
-      return id === undefined
-        ? undefined
-        : {
-            path: `${base}/events/${id}`,
-            fieldName: (p) => p.split(".").slice(2).join("."),
-          };
-    case "bank_accounts":
-      return id === undefined
-        ? undefined
-        : {
-            path: `${base}/bank-accounts/${id}`,
-            fieldName: (p) => p.split(".").slice(2).join("."),
+            fieldName: (p) => {
+              const field = p.split(".").slice(2).join(".");
+              return field === "photo" ? "photo_media_id" : field;
+            },
           };
     case "settings":
       return {

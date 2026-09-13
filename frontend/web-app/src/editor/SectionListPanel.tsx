@@ -2,6 +2,7 @@
 
 import {
   collectMissingRequiredFields,
+  sectionLabel,
   type SectionDefinition,
 } from "@wi/schema";
 
@@ -80,7 +81,10 @@ export function SectionListPanel() {
                     setActiveSection(section.section_key);
                   }}
                 >
-                  <span className="truncate">{section.section_key}</span>
+                  {/* `P2-15`: the section's name, not its key — "Acara", not "event". */}
+                  <span className="truncate">
+                    {sectionLabel(section.section_key)}
+                  </span>
 
                   {missing > 0 && (
                     <>
@@ -107,7 +111,13 @@ export function SectionListPanel() {
                       }}
                     />
                     {/* Visible label text, so the control is not a bare checkbox. */}
-                    <span>Tampilkan</span>
+                    <span>
+                      Tampilkan
+                      {/* Nine checkboxes all named "Tampilkan" cannot be told apart by ear. */}
+                      <span className="sr-only">
+                        {` ${sectionLabel(section.section_key)}`}
+                      </span>
+                    </span>
                   </label>
                 )}
               </div>
