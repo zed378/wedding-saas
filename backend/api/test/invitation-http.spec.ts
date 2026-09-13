@@ -18,6 +18,7 @@ import { SettingsService } from "../src/modules/invitation/settings.service";
 import { ChangeTemplateService } from "../src/modules/invitation/change-template.service";
 import { GalleryService } from "../src/modules/invitation/gallery.service";
 import { SlugService } from "../src/modules/invitation/slug.service";
+import { PublishCheckService } from "../src/modules/invitation/publish-check.service";
 import { NotFoundError } from "../src/http/errors";
 import { SessionService } from "../src/modules/auth/session.service";
 import { UnauthenticatedError } from "../src/http/errors";
@@ -370,6 +371,15 @@ const validBody = {
   internal_name: "Budi & Ani",
 };
 
+/**
+ * P2-06. This file wires the controller by hand rather than booting `AppModule`, so a new
+ * constructor dependency fails here before it fails anywhere interesting -- which is what
+ * it did when `publish-check` was added.
+ */
+const publishCheckStub = {
+  check: async () => ({ ready: true, details: [], incomplete_sections: [] }),
+};
+
 describe("POST /invitations over HTTP", () => {
   let app: INestApplication;
 
@@ -388,6 +398,7 @@ describe("POST /invitations over HTTP", () => {
         { provide: ChangeTemplateService, useValue: changeTemplateStub },
         { provide: GalleryService, useValue: galleryStub },
         { provide: SlugService, useValue: slugStub },
+        { provide: PublishCheckService, useValue: publishCheckStub },
         { provide: SessionService, useValue: sessionStub },
         { provide: RATE_LIMITER, useValue: limiterStub },
         {

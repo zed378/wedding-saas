@@ -99,3 +99,11 @@ export {
   missingFieldPaths,
   type MissingRequiredField,
 } from "./resolver/completeness.js";
+
+export {
+  FIELD_LABELS,
+  SECTION_LABELS,
+  describeMissingField,
+  fieldLabel,
+  sectionLabel,
+} from "./invitation/field-labels.js";

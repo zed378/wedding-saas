@@ -30,6 +30,7 @@ import { GiftService, QuoteService } from "./gift.service";
 import { SettingsService } from "./settings.service";
 import { ChangeTemplateService } from "./change-template.service";
 import { GalleryService } from "./gallery.service";
+import { PublishCheckService } from "./publish-check.service";
 import { SlugService, SLUG_MAX_LENGTH, SLUG_MIN_LENGTH } from "./slug.service";
 import { sanitizeFields } from "../../shared/sanitizer/sanitize";
 import { TEXT_FIELDS } from "../../shared/sanitizer/registry";
@@ -380,6 +381,7 @@ export class InvitationController {
     private readonly changeTemplate: ChangeTemplateService,
     private readonly gallery: GalleryService,
     private readonly slugs: SlugService,
+    private readonly publishCheckService: PublishCheckService,
   ) {}
 
   /**
@@ -869,6 +871,21 @@ export class InvitationController {
   }
 
   // ------------------------------------------------------------------ gallery
+
+  /**
+   * `GET /invitations/:id/publish-check`. `P2-06`, BR-4.2.
+   *
+   * Read-only and safe to call on every keystroke's worth of saved state, which is what
+   * the editor's checklist does. The authoritative check is `POST /publish`'s own — this
+   * one exists so a user is told what is left BEFORE they press a button that fails.
+   */
+  @Get(":id/publish-check")
+  async publishCheck(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("id") id: string,
+  ) {
+    return ok(await this.publishCheckService.check(user.scope, id));
+  }
 
   @Get(":id/gallery")
   async listGallery(

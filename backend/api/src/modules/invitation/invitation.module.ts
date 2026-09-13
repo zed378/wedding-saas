@@ -13,6 +13,7 @@ import { ChangeTemplateService } from "./change-template.service";
 import { GalleryService } from "./gallery.service";
 import { AuditModule } from "../../shared/audit/audit.module";
 import { SlugService } from "./slug.service";
+import { PublishCheckService } from "./publish-check.service";
 import { InvitationStatusService } from "../../shared/invitation-status/invitation-status.service";
 
 /** P1-09 and P1-10. The sub-resources are `P1-11` onwards. */
@@ -31,6 +32,7 @@ import { InvitationStatusService } from "../../shared/invitation-status/invitati
     GalleryService,
     SlugService,
     InvitationStatusService,
+    PublishCheckService,
   ],
   exports: [
     InvitationCreateService,

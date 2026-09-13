@@ -1,6 +1,10 @@
 "use client";
 
-import { getAtPath } from "./store";
+import {
+  collectMissingRequiredFields,
+  type SectionDefinition,
+} from "@wi/schema";
+
 import { useEditor, useEditorContext } from "./EditorProvider";
 
 /**
@@ -49,7 +53,11 @@ export function SectionListPanel() {
     <nav aria-label="Bagian undangan" className="h-full overflow-y-auto p-2">
       <ul className="space-y-1">
         {definition.sections.map((section) => {
-          const missing = missingRequired(section.required_fields ?? [], data);
+          const missing = missingRequired(
+            section,
+            definition.enabledSections,
+            data,
+          );
           const isActive = active === section.section_key;
           const isOn = enabled.has(section.section_key);
 
@@ -118,15 +126,41 @@ export function SectionListPanel() {
  * check that accepted it would let somebody publish an invitation with a blank hero and a
  * green tick beside it.
  */
+/**
+ * How many of a section's required fields are still empty.
+ *
+ * `P1-22` implemented the emptiness rule here by hand, because `P2-06` did not exist yet.
+ * It now delegates to `collectMissingRequiredFields` — the same function the publish check
+ * and `POST /publish` run (`P0-20`, shared through `@wi/schema`).
+ *
+ * That matters more than the duplication: a sidebar that disagreed with the publish check
+ * about what is complete would show a finished section next to a button refusing to
+ * publish it, and the user has no way to tell which one is wrong.
+ *
+ * The section is passed whole rather than as a field list, because enablement is part of
+ * the rule and only the section knows it.
+ */
 export function missingRequired(
-  requiredFields: readonly string[],
+  section: {
+    readonly section_key: string;
+    readonly required_fields?: readonly string[];
+    readonly configurable?: boolean;
+  },
+  enabledSections: readonly string[],
   data: Readonly<Record<string, unknown>>,
 ): number {
-  return requiredFields.filter((path) => {
-    const value = getAtPath(data, path);
-    if (value === undefined || value === null) return true;
-    if (typeof value === "string") return value.trim().length === 0;
-    if (Array.isArray(value)) return value.length === 0;
-    return false;
-  }).length;
+  return collectMissingRequiredFields(
+    [
+      {
+        section_key: section.section_key,
+        component: "",
+        enabled_by_default: true,
+        configurable: section.configurable ?? true,
+        required_fields: section.required_fields ?? [],
+        optional_fields: [],
+      } as unknown as SectionDefinition,
+    ],
+    enabledSections,
+    data,
+  ).length;
 }

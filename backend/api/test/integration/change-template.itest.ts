@@ -636,6 +636,80 @@ describe("changing a template without losing data", () => {
 
   // ------------------------------------------------------------------- IDOR
 
+  describe("a published invitation re-runs the publish check (OQ-23, ADR-061)", () => {
+    it("refuses a change that would leave the live page incomplete", async () => {
+      // The hole OQ-23 named: BR-4.2 says required fields must not be empty when
+      // publishing, and a template change never re-checked. Without this an invitation
+      // could be published AND incomplete -- a state no endpoint could produce directly.
+      //
+      // Template B requires `couple.groom.nickname`; this invitation has never had one.
+      const { user, invitationId } = await onTemplateA({ status: "published" });
+      const templateB = await templateWith(SECTIONS_B, ["colors.primary"]);
+
+      const error = await rejection(() =>
+        service.change(user.scope, invitationId, templateB.templateId),
+      );
+
+      expect(error).toMatchObject({ status: 422 });
+      expect(
+        (error as { details?: { message: string }[] }).details?.[0]?.message,
+      ).toContain("Nama panggilan mempelai pria");
+    });
+
+    it("leaves the invitation on its original template when it refuses", async () => {
+      // All-or-nothing: a refusal that had already moved the version would leave the live
+      // page on a template the server just said it could not use.
+      const { user, invitationId, templateA } = await onTemplateA({
+        status: "published",
+      });
+      const templateB = await templateWith(SECTIONS_B, ["colors.primary"]);
+
+      await rejection(() =>
+        service.change(user.scope, invitationId, templateB.templateId),
+      );
+
+      const { rows } = await harness.pool.query<{
+        template_version_id: string;
+      }>("SELECT template_version_id FROM invitations WHERE id = $1", [
+        invitationId,
+      ]);
+      expect(rows[0]?.template_version_id).toBe(templateA.versionId);
+    });
+
+    it("allows the change once the required field is filled", async () => {
+      const { user, invitationId } = await onTemplateA({ status: "published" });
+      await harness.pool.query(
+        `INSERT INTO invitation_people (invitation_id, role, full_name, nickname)
+         VALUES ($1, 'groom', 'Budi Santoso', 'Budi')`,
+        [invitationId],
+      );
+      const templateB = await templateWith(SECTIONS_B, ["colors.primary"]);
+
+      const result = await service.change(
+        user.scope,
+        invitationId,
+        templateB.templateId,
+      );
+
+      expect(result.template_version_id).toBe(templateB.versionId);
+    });
+
+    it("does not check a DRAFT, because a draft is expected to be incomplete", async () => {
+      // That is what drafts are. BR-4.2 applies to a draft at `POST /publish`, which is
+      // where the user is asking for it to go live.
+      const { user, invitationId } = await onTemplateA();
+      const templateB = await templateWith(SECTIONS_B, ["colors.primary"]);
+
+      const result = await service.change(
+        user.scope,
+        invitationId,
+        templateB.templateId,
+      );
+
+      expect(result.template_version_id).toBe(templateB.versionId);
+    });
+  });
+
   describe("cross-tenant access (docs/SECURITY/05)", () => {
     it("a foreign scope cannot change my template, and mine does not move", async () => {
       const alice = await onTemplateA();

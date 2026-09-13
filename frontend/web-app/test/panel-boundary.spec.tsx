@@ -44,6 +44,11 @@ const DEFINITION = {
       optional_fields: [],
     },
   ],
+  // Required by `TemplateDefinition`, and read by the header's publish button since
+  // `P2-06`: a definition with no enabled list is not a shape the editor ever holds
+  // (`EditorScreen` derives it, `store.ts` fills it in), so omitting it here made the
+  // boundary tests fail on a state production cannot reach.
+  enabledSections: ["couple"],
   theme: {},
   customizable_theme_keys: [],
 };

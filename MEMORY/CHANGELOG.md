@@ -10,6 +10,21 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-13 — The editor can say what is left, and a live page can no longer be stranded
+
+**Added** — the publish check, end to end ([P2-06](./records/2026-09-13-P2-06-publish-check.md))
+
+- **`GET /invitations/:id/publish-check`** returns the required fields still empty, as the same `details[]` that `POST /publish` will return in its 422. One shape, so the editor has one rendering path for "here is what is left" and "you cannot publish yet, here is why".
+- **The editor shows it without a round trip** — a count in the header, a mark beside each incomplete section, and a Publish button that is visible, disabled, and explains itself through `aria-describedby` rather than a tooltip a screen reader and a touch screen both miss. It runs **the same function** the server runs, imported from `@wi/schema`: a client-side copy that disagrees with the server about what is complete is the failure this design exists to prevent, and sharing the code is the only way to guarantee it cannot.
+- **No field path reaches the interface.** `couple.bride.nickname` becomes *"Nama panggilan mempelai wanita di bagian Mempelai"*, from a 24-entry label table whose coverage is asserted in both directions — an unlabelled path fails the build, and so does a label for a path nobody can store.
+- A **disabled section's** required fields block nothing. A couple who turned the gift section off has no account number and is not incomplete; they made a choice. A `configurable: false` section still counts, because the template displays it whatever the settings say.
+
+**Changed** — a published invitation's template change is now checked first (`OQ-23`, ADR-061)
+
+- `POST /invitations/:id/change-template` re-runs the BR-4.2 required-field check against the **target** template when the invitation is `published`, and refuses with 422 `TEMPLATE_WOULD_LEAVE_PUBLISHED_INVITATION_INCOMPLETE`. Without it a live page — with however many guests already holding the link — could be moved onto a template requiring a field the couple never filled: published *and* incomplete, a state no endpoint can produce directly.
+- A **draft** is deliberately not checked. A draft is expected to be incomplete, and `POST /publish` is where the rule applies to it.
+- `OQ-23`'s other half — whether the change should also require a confirmation field, as BR-6.2 requires for a slug — is raised as **`OQ-24`** and left to `P3-15`, which owns the screen it would live on.
+
 ### 2026-09-12 — Phase 2 opens: the catalog, and the renderer everything else runs through
 
 **Added** — the live preview, and a backend gap closed to make it possible ([P2-05](./records/2026-09-12-P2-05-live-preview.md))

@@ -333,6 +333,13 @@ describe("the conflict warning (card DoD 4)", () => {
 // ------------------------------------------------------------- the section list
 
 describe("missingRequired", () => {
+  /** A section whose one required field is the groom's nickname. */
+  const HERO = {
+    section_key: "hero",
+    configurable: false,
+    required_fields: ["couple.groom.nickname"],
+  };
+
   it.each([
     ["absent", {}, 1],
     ["null", { couple: { groom: { nickname: null } } }, 1],
@@ -340,13 +347,36 @@ describe("missingRequired", () => {
     ["an empty array", { couple: { groom: { nickname: [] } } }, 1],
     ["filled", { couple: { groom: { nickname: "Budi" } } }, 0],
   ])("counts a %s value", (_name, data, expected) => {
-    expect(missingRequired(["couple.groom.nickname"], data)).toBe(expected);
+    expect(missingRequired(HERO, ["hero"], data)).toBe(expected);
   });
 
   it('treats "   " as empty, so a blank hero cannot pass as complete', () => {
     // BR-4.2 blocks publishing on an empty required field. A check that accepted whitespace
     // would show a green tick beside a section that will be refused.
-    expect(missingRequired(["a"], { a: " \t " })).toBe(1);
+    expect(
+      missingRequired(
+        { section_key: "hero", configurable: false, required_fields: ["a"] },
+        ["hero"],
+        { a: " \t " },
+      ),
+    ).toBe(1);
+  });
+
+  it("counts nothing for a configurable section the user turned off", () => {
+    // P2-06's first DoD item, at the sidebar rather than the publish check: a required
+    // field inside a disabled section is not missing, because the couple chose not to
+    // show it. A mark beside a section they deliberately switched off is a to-do list
+    // item they can never clear.
+    expect(
+      missingRequired({ ...HERO, configurable: true }, ["gallery"], {}),
+    ).toBe(0);
+  });
+
+  it("still counts a NON-configurable section the enabled list omits", () => {
+    // `configurable: false` means the template always displays it, so its required fields
+    // apply whatever the settings say. The mirror of the service-level test in
+    // `publish-check.itest.ts`.
+    expect(missingRequired(HERO, [], {})).toBe(1);
   });
 });
 
