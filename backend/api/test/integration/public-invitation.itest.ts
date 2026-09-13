@@ -563,8 +563,23 @@ describe("P2-07 — GET /public/i/:slug", () => {
         "customizable_theme_keys",
         "sections",
         "theme",
+        "thumbnail_url",
       ]);
       expect(Array.isArray(data.template.sections)).toBe(true);
+    });
+
+    it("carries the template thumbnail, for the og:image fallback", async () => {
+      // `docs/FRONTEND/07` § SEO Meta Generation: the cover photo, "falling back to the
+      // template thumbnail if there's no cover photo". `P2-09` needs it here, and it is
+      // not new exposure -- `docs/API/03` serves the same URL to anyone browsing the
+      // catalogue.
+      const { slug } = await publish();
+
+      const data = await expectSuccess<{
+        template: { thumbnail_url: string | null };
+      }>(await get(slug));
+
+      expect(data.template).toHaveProperty("thumbnail_url");
     });
 
     it("serves media as URLs, never as ids", async () => {

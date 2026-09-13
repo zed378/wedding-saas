@@ -14,6 +14,7 @@ import {
   orders,
   packages,
   templateVersions,
+  templates,
 } from "../../infra/db/schema/index";
 import type {
   InvitationAggregate,
@@ -64,6 +65,19 @@ export interface PublishedInvitation {
     readonly sections: unknown;
     readonly theme: unknown;
     readonly customizableThemeKeys: readonly string[];
+    /**
+     * The catalogue thumbnail, for `P2-09`'s `og:image` fallback.
+     *
+     * `docs/FRONTEND/07` § SEO Meta Generation: the cover photo, "falling back to the
+     * template thumbnail if there's no cover photo". A published invitation with no
+     * gallery would otherwise share with no preview image at all -- which is the case a
+     * couple who has not uploaded photos yet is in, and exactly when they are testing the
+     * link.
+     *
+     * Not new exposure: `docs/API/03` serves the same URL to anyone browsing the
+     * catalogue.
+     */
+    readonly thumbnailUrl: string | null;
   };
   /**
    * `packages.has_watermark` of the package this invitation was paid for, or `true` when
@@ -92,12 +106,17 @@ export class PublicInvitationRepository {
    */
   async findPublishedBySlug(slug: string): Promise<PublishedInvitation | null> {
     const rows = await this.db
-      .select({ invitation: invitations, version: templateVersions })
+      .select({
+        invitation: invitations,
+        version: templateVersions,
+        thumbnailUrl: templates.thumbnailUrl,
+      })
       .from(invitations)
       .innerJoin(
         templateVersions,
         eq(invitations.templateVersionId, templateVersions.id),
       )
+      .innerJoin(templates, eq(templateVersions.templateId, templates.id))
       .where(
         and(
           eq(invitations.slug, slug),
@@ -193,6 +212,7 @@ export class PublicInvitationRepository {
         sections: found.version.sections,
         theme: found.version.theme,
         customizableThemeKeys: found.version.customizableThemeKeys,
+        thumbnailUrl: found.thumbnailUrl,
       },
       watermark,
     };

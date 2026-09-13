@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
@@ -69,6 +69,7 @@ const PAYLOAD = {
     ],
     theme: { colors: { primary: "#8B5E3C" } },
     customizable_theme_keys: ["colors.primary"],
+    thumbnail_url: "https://cdn.test/template-thumb.webp",
   },
   display: { watermark: false },
   invitation: {
@@ -122,7 +123,8 @@ const PAYLOAD = {
 let api: Server;
 let app: ChildProcess;
 /** Which slugs the stub answers. Mutated per test to produce a 404 or an outage. */
-let mode: "ok" | "missing" | "broken" | "hero-only" = "ok";
+let mode: "ok" | "missing" | "broken" | "hero-only" | "private" | "no-photos" =
+  "ok";
 
 const html = async (
   path: string,
@@ -154,28 +156,73 @@ beforeAll(async () => {
       return;
     }
     const data =
-      mode === "hero-only"
+      mode === "private"
         ? {
             ...PAYLOAD,
-            template: {
-              ...PAYLOAD.template,
-              sections: PAYLOAD.template.sections.slice(0, 1),
-            },
             invitation: {
               ...PAYLOAD.invitation,
               settings: {
                 ...PAYLOAD.invitation.settings,
-                enabled_sections: ["hero"],
+                seo_indexable: false,
               },
             },
           }
-        : PAYLOAD;
+        : mode === "no-photos"
+          ? {
+              ...PAYLOAD,
+              invitation: {
+                ...PAYLOAD.invitation,
+                gallery: { photos: [] },
+              },
+            }
+          : mode === "hero-only"
+            ? {
+                ...PAYLOAD,
+                template: {
+                  ...PAYLOAD.template,
+                  sections: PAYLOAD.template.sections.slice(0, 1),
+                },
+                invitation: {
+                  ...PAYLOAD.invitation,
+                  settings: {
+                    ...PAYLOAD.invitation.settings,
+                    enabled_sections: ["hero"],
+                  },
+                },
+              }
+            : PAYLOAD;
 
     response
       .writeHead(200, { "content-type": "application/json" })
       .end(JSON.stringify({ success: true, data }));
   });
   await new Promise<void>((resolve) => api.listen(API_PORT, resolve));
+
+  /*
+   * Refuse to run against a server this suite did not start.
+   *
+   * `P1-21` recorded this exact trap and it caught me again here: a `next start` left
+   * over from an earlier run keeps answering on the port, serving a build from before the
+   * change under test. Three assertions failed against a page that was in fact correct,
+   * and the symptom — a feature missing from the HTML — looks precisely like a bug in the
+   * feature.
+   *
+   * On Windows the leak is structural rather than careless: `shell: true` means `kill()`
+   * kills the shell and leaves `node` holding the socket. So the check is here, before
+   * anything is spawned, with the command to clear it.
+   */
+  const occupied = await fetch(`http://127.0.0.1:${String(APP_PORT)}/`)
+    .then(() => true)
+    .catch(() => false);
+
+  if (occupied) {
+    throw new Error(
+      `something is already listening on ${String(APP_PORT)}. It is almost certainly a ` +
+        "`next start` left over from an earlier run, and it is serving an older build — " +
+        "every assertion below would be made against the wrong page. Kill it first: " +
+        `netstat -ano | grep ${String(APP_PORT)}`,
+    );
+  }
 
   app = spawn(
     process.platform === "win32" ? "npx.cmd" : "npx",
@@ -208,7 +255,29 @@ beforeAll(async () => {
 }, 90_000);
 
 afterAll(async () => {
-  app?.kill();
+  /*
+   * Kill the TREE, not the child.
+   *
+   * With `shell: true` the child is `cmd.exe` and `next start` is its grandchild;
+   * `kill()` reaps the shell and leaves the server holding the port, which is what makes
+   * the next run of this suite lie. `taskkill /T` takes the tree.
+   */
+  if (app?.pid !== undefined) {
+    if (process.platform === "win32") {
+      // `spawnSync`, not `spawn`: the process exits as soon as this hook returns, and an
+      // asynchronous kill never runs. That is not a detail — it is the difference between
+      // this suite being repeatable and it refusing to start next time.
+      spawnSync("taskkill", ["/PID", String(app.pid), "/T", "/F"], {
+        stdio: "ignore",
+      });
+    } else {
+      app.kill();
+    }
+  }
+
+  // Give the socket a moment to close before the next run tries the same port.
+  await new Promise((resolve) => setTimeout(resolve, 500));
+
   await new Promise<void>((resolve) => {
     api?.close(() => {
       resolve();
@@ -367,6 +436,80 @@ describe("what a guest downloads", () => {
       (library?.gzip ?? 0) / 1024,
       `the section library is ${((library?.gzip ?? 0) / 1024).toFixed(1)}KB gzip`,
     ).toBeLessThan(10);
+  });
+});
+
+/**
+ * `P2-09` — what a scraper and a crawler actually receive.
+ *
+ * `metadata.spec.ts` proves the object is built correctly. This proves it survives to the
+ * wire: `generateMetadata` runs on the server, and a page that computed perfect metadata
+ * and failed to render it would pass every unit test.
+ */
+describe("the metadata a scraper reads", () => {
+  it("emits the og and twitter tags a link preview needs", async () => {
+    mode = "ok";
+    const { body } = await html(`/${SLUG}`);
+
+    for (const tag of [
+      'property="og:title"',
+      'property="og:description"',
+      'property="og:url"',
+      'property="og:type"',
+      'property="og:image"',
+      'name="twitter:card"',
+    ]) {
+      expect(body, tag).toContain(tag);
+    }
+    expect(body).toContain("summary_large_image");
+  });
+
+  it("emits noindex by default", async () => {
+    // The stub's invitation has `seo_indexable: true`, so this uses one that does not --
+    // and the assertion is on the rendered document, because the default only protects
+    // anybody if it reaches the `<head>`.
+    mode = "private";
+    const { body } = await html(`/${SLUG}`);
+
+    expect(body).toMatch(/name="robots"[^>]*content="[^"]*noindex/);
+  });
+
+  it("emits index only when the owner enabled it", async () => {
+    mode = "ok";
+    const { body } = await html(`/${SLUG}`);
+
+    expect(body).not.toMatch(/name="robots"[^>]*content="[^"]*noindex/);
+  });
+
+  it("carries a canonical link", async () => {
+    mode = "ok";
+    const { body } = await html(`/${SLUG}`);
+
+    expect(body).toContain(
+      `rel="canonical" href="https://invitation.test/${SLUG}"`,
+    );
+  });
+
+  it("emits schema.org Event structured data with no account number", async () => {
+    mode = "ok";
+    const { body } = await html(`/${SLUG}`);
+
+    expect(body).toContain('type="application/ld+json"');
+
+    const block =
+      /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(body);
+    expect(block, "no JSON-LD block in the document").not.toBeNull();
+
+    const jsonLd = JSON.parse(block![1]!) as Record<string, unknown>;
+    expect(jsonLd["@type"]).toBe("Event");
+    expect(JSON.stringify(jsonLd)).not.toContain("1234567890");
+  });
+
+  it("falls back to the template thumbnail when there is no cover photo", async () => {
+    mode = "no-photos";
+    const { body } = await html(`/${SLUG}`);
+
+    expect(body).toContain("https://cdn.test/template-thumb.webp");
   });
 });
 

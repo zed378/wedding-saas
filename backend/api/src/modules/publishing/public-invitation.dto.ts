@@ -113,6 +113,8 @@ export interface PublicInvitationDto {
      * rule the editor applied. Template metadata, already public through `API/03`.
      */
     readonly customizable_theme_keys: readonly string[];
+    /** `P2-09`'s `og:image` fallback when the invitation has no cover photo. */
+    readonly thumbnail_url: string | null;
   };
   readonly display: { readonly watermark: boolean };
   readonly invitation: {
@@ -341,6 +343,7 @@ export function toPublicInvitation(
       sections: found.template.sections,
       theme: found.template.theme,
       customizable_theme_keys: [...found.template.customizableThemeKeys],
+      thumbnail_url: found.template.thumbnailUrl,
     },
     display: { watermark: found.watermark },
     invitation: {

@@ -84,6 +84,16 @@ const ALLOWED = [
    * consumer, with no knowledge of which template it is showing.
    */
   "frontend/public-invite/src/app/[slug]/page.tsx",
+  /*
+   * P2-09. The same rule, moved into its own module so it can be unit tested: this is
+   * where `og:image`, the description and the schema.org `Event` are built. The fields it
+   * names are fixed by `docs/PLAN/15` and `docs/FRONTEND/07` for every invitation on the
+   * platform — a link preview is not a template's to design — and the file is a pure
+   * function with no branch on a template or a section key. Its own test asserts over the
+   * whole serialized result that nothing ELSE reaches a scraper, which is the property
+   * that actually matters here.
+   */
+  "frontend/public-invite/src/lib/metadata.ts",
 ];
 
 const isTest = (rel) =>
