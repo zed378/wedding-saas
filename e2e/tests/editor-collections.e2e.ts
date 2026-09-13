@@ -118,7 +118,7 @@ test("an event edited and a gift account added in the editor are stored, survive
 
   const preview = page.locator("[data-device]");
   await expect(preview.locator('[data-section="event"]')).toContainText(
-    "2027-05-15",
+    "15 Mei 2027",
   );
 
   // ---- Edit the title; autosave must PATCH that event and succeed.

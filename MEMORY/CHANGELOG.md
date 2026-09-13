@@ -10,6 +10,12 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-13 — Dates read 15 Mei 2027
+
+**Changed** — event date format ([P2-18](./records/2026-09-13-P2-18-date-format.md))
+
+- **Dates on invitations read "15 Mei 2027"** — on the cover, every event, the link preview and the dashboard — instead of `2027-05-15`.
+
 ### 2026-09-13 — Every region of Indonesia
 
 **Added** — administrative regions ([P2-17](./records/2026-09-13-P2-17-regions.md))

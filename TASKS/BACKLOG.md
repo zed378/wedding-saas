@@ -28,7 +28,7 @@ Nothing on the board is `BLOCKED`. The remaining questions shape work rather tha
 
 ## Open Questions — Remaining
 
-### OQ-27 — How are event dates and times shown, and in which timezone is an event? *(timezone half answered — ADR-070)*
+### OQ-27 — How are event dates and times shown, and in which timezone is an event? *(answered — ADR-070, ADR-072)*
 
 **Affects**: `P2-03` renderer sections, `P2-09` link-preview text, `P4-*` reminders — **not blocking**, but visible on every published invitation.
 
@@ -39,7 +39,7 @@ Two gaps found in `P2-13`'s visual baselines and confirmed in `P2-14`:
 
 Neither is decided in code. The renderer's date output is a single place (`EventCardDouble`, `HeroClassic`) once the answer exists.
 
-**Timezone half answered 2026-09-13 by the project owner**: detect the zone from the event's map pin and let the couple choose it in the form. Implemented by `P2-16` (ADR-070). The owner also asked for a database of every province, city/regency, district and village (`P2-17`). **Still open: the date display format** (and whether to show the Hijri date).
+**Timezone half answered 2026-09-13 by the project owner**: detect the zone from the event's map pin and let the couple choose it in the form. Implemented by `P2-16` (ADR-070). The owner also asked for a database of every province, city/regency, district and village (`P2-17`). **Format half answered 2026-09-13 by the project owner**: *"only use 15 Mei 2027"* — no weekday, no Hijri date. Implemented by `P2-18` (ADR-072). **`OQ-27` is fully answered.**
 
 ### OQ-26 — Which "simulated 4G" does the public page's LCP target mean?
 
