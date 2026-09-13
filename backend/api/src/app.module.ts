@@ -17,6 +17,7 @@ import { UserModule } from "./modules/user/user.module";
 import { InvitationModule } from "./modules/invitation/invitation.module";
 import { MediaModule } from "./modules/media/media.module";
 import { TemplateModule } from "./modules/template/template.module";
+import { PublishingModule } from "./modules/publishing/publishing.module";
 import { RateLimitModule } from "./shared/rate-limit/rate-limit.module";
 
 /**
@@ -60,6 +61,7 @@ import { RateLimitModule } from "./shared/rate-limit/rate-limit.module";
     InvitationModule,
     MediaModule,
     TemplateModule,
+    PublishingModule,
     // Scaffolding, not a feature. Removed once a real module exists on each surface.
     ...(process.env["NODE_ENV"] === "production" ? [] : [ReferenceModule]),
   ],

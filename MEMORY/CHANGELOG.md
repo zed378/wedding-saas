@@ -10,6 +10,19 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-13 — The public page has something to serve
+
+**Added** — `GET /public/i/:slug` ([P2-07](./records/2026-09-13-P2-07-public-invitation-api.md))
+
+- **A published invitation is served to anybody**, with no authentication: the template's sections, theme and customizable keys, the couple, events, gallery, gift accounts, quote and display settings, and a `display.watermark` derived server-side from the package the invitation was paid for.
+- **Everything else is one 404.** A draft, a `paid` but unpublished invitation, an unpublished one, an expired one, a soft-deleted one, a slug that never existed and a slug that could not be valid all answer with identical bytes. `docs/SECURITY/01` names leaking an unpublished invitation as the risk on this surface, and the distinction is destroyed at the query rather than preserved and then hidden.
+- **A disabled section contributes nothing** (ADR-062) — decided from the field paths the template itself declares rather than a section-to-payload table in the backend, so a `configurable: false` section still renders and a photo two sections share is not removed with one of them.
+- **Media is served as URLs**, since a guest has no authenticated media endpoint — and only for a photo that is actually `ready`, never a bucket URL as a fallback.
+
+**Changed** — `docs/API/08` amended three times, all additive (ADR-062): `template.customizable_theme_keys` joins the theme so the page can apply the same override whitelist the editor applies; the `settings` object is written out in full, with `seo_indexable` in and `guestbook_moderation` deliberately out; and the media-URL rule is stated.
+
+**Not done, on purpose** — the response is not cached. `docs/ARCHITECTURE/06` wants it cached with event-driven invalidation, and the invalidation half needs a publish event that arrives with `P3-09`. A cached page with no way to invalidate it would show a couple's typo back to them for an hour on their wedding morning. The response is deterministic, asserted by a test, so the cache can be added without changing it.
+
 ### 2026-09-13 — The editor can say what is left, and a live page can no longer be stranded
 
 **Added** — the publish check, end to end ([P2-06](./records/2026-09-13-P2-06-publish-check.md))

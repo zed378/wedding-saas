@@ -1836,3 +1836,65 @@ is a product question, and the screen it would live on is `P3-15`'s. Raised as `
 message reworded. It used to say the design changed *without a publish check*; that half is
 now false, and a log line that describes a risk which no longer exists is how a real one
 stops being noticed.
+
+### ADR-062 — A disabled section's data is decided by field paths, not by a section-to-payload table
+
+**Date** 2026-09-13 · **Status** Accepted · **Task** `P2-07` · **Amends** `docs/API/08`
+
+**Context** — `docs/API/08` states the rule once, for gift accounts: *"`bank_accounts` is
+ONLY included if the `gift` section is active in `enabled_sections` — respect the user's
+toggle even if data exists in the DB (BR-4.1)"*. `P2-07`'s card generalizes it — *"omit a
+section's data entirely when the owner disabled it"* — and its DoD asks for a per-section
+test.
+
+The obvious implementation is a table in the public DTO: `bank_accounts -> "gift"`,
+`gallery -> "gallery"`, `couple -> "couple"`, and an `if` per entry.
+
+It is wrong in three ways, and the third only shows up against a real template.
+
+1. **It ignores `configurable: false`.** `docs/FRONTEND/04` § Render Flow step 2 says such
+   a section is displayed whatever `enabled_sections` contains. A settings row that omits
+   `couple` would strip the couple's names off a live page.
+2. **It is template-specific logic in the backend**, which `CLAUDE.md`'s first
+   non-negotiable rule forbids: templates are data.
+3. **Sections share data.** The reference template's `hero` lists
+   `gallery.photos.*.media_id` among its optional fields, because it draws a photo behind
+   the couple's names. Under a section table, a couple who turns the gallery section off
+   loses the hero background too — the payload omits data a section that is still on the
+   page needs.
+
+**Decision** — the payload asks *"does any **displayed** section reference this data?"*,
+answered from the field paths the template itself declares.
+
+- Displayed is `isSectionEnabled` from `@wi/schema` — `P0-20`'s function, the same one the
+  publish check and the editor's checklist run. `configurable: false` is handled because
+  that function handles it.
+- The paths come from each displayed section's own `required_fields` and `optional_fields`.
+- The payload maps each of its parts to a canonical **path prefix** —
+  `couple.groom`, `events`, `gallery.photos`, `quote`, `gift.accounts`. Those are facts
+  about the data model (`docs/PLAN/08`), fixed across every template, not about any one
+  template.
+
+For gift accounts this is exactly equivalent to what `docs/API/08` states, since only a
+gift section ever references `gift.accounts`. `docs/API/08` is amended to describe the
+general rule and both of its consequences.
+
+**Two further amendments to `docs/API/08` in the same task**, both additive:
+
+- **`template.customizable_theme_keys`** joins `sections` and `theme`. The renderer
+  validates `theme_override` against that whitelist (`P2-02`); serving the override
+  without it would leave the public page unable to apply the rule the editor applied. The
+  list is template metadata already public through `docs/API/03`.
+- **The `settings` object is written out in full**, which settles two questions the
+  original `[...]` left open. `seo_indexable` is **in** — `P2-09` emits `robots` from it,
+  and it is the owner's instruction about their own page. `guestbook_moderation` is
+  **out**: it is a setting, so it looks like it belongs beside its neighbours, but it tells
+  a guest whether their message appears immediately or waits for approval, which is
+  precisely the knowledge that makes moderation worth evading.
+
+**What was not decided here.** Whether the response should be cached. `docs/ARCHITECTURE/06`
+wants it cached with event-driven invalidation, and the invalidation half needs a publish
+event that does not exist until `P3-09`. Caching a page with no way to invalidate it is
+worse than not caching it — a couple fixing a typo on their wedding morning would watch the
+old page serve for an hour. The response is built to be deterministic (asserted by a test)
+so the cache can be added without changing it.

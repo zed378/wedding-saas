@@ -219,7 +219,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** — 2026-09-13 ([record](../MEMORY/records/2026-09-13-P2-07-public-invitation-api.md)) |
 | **Depends on** | P1-14, P2-01 |
 | **Spec refs** | `docs/API/08-PUBLIC-INVITATION-API.md`, `docs/SECURITY/02-TRUST-BOUNDARIES.md`, `docs/PLAN/02` § BR-4.1, `docs/ARCHITECTURE/06` § Caching |
 | **Spec required** | Yes — public surface |
@@ -237,9 +237,11 @@
 7. Apply public rate limiting from `P1-07`.
 
 **Definition of Done**
-- [ ] A draft, unpublished, expired or deleted slug returns an identical 404.
-- [ ] Disabled sections' data is absent from the payload, proven per section by tests, with a dedicated one for `bank_accounts`.
-- [ ] The response contains no owner or commercial fields; a test asserts against an explicit forbidden-key list.
+- [x] A draft, unpublished, expired or deleted slug returns an identical 404. — one test asserts status **and** body across all five cases plus a malformed slug; a shared status with a differing message would still be an oracle.
+- [x] Disabled sections' data is absent from the payload, proven per section by tests, with a dedicated one for `bank_accounts`. — five omission cases, five inclusion mirrors, the dedicated gift case, plus the two cases a section table would have got wrong (a `configurable: false` section the settings omit, and data a still-displayed section shares). ADR-062.
+- [x] The response contains no owner or commercial fields; a test asserts against an explicit forbidden-key list. — 18 keys, checked over the serialized body. One honest exception recorded: the invitation id appears inside photo URLs, because `docs/ARCHITECTURE/05` puts it in the storage path.
+
+**Also**: `docs/API/08` amended three times (ADR-062) — `template.customizable_theme_keys`, the full `settings` shape, and the media-URL rule. Caching is deliberately deferred until `P3-09` provides an invalidation event; the determinism it needs is asserted by a test.
 - [ ] Two requests for the same invitation produce byte-identical responses.
 
 **Abuse cases to test**
