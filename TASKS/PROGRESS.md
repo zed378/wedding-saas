@@ -3,10 +3,10 @@
 Single source of truth for where the project stands. Updated in the same commit as the work it describes (`00-TASK-CONVENTIONS.md` global DoD item 11).
 
 **Last updated**: 2026-09-13
-**Current phase**: Phase 2 — Template Rendering and Preview (9 / 14 done). **Phase 1 is complete** (25 / 25, [summary](../MEMORY/records/2026-09-12-PHASE-1-SUMMARY.md)); Phase 0 is 26 / 27 done. **Staging is live**: `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
+**Current phase**: Phase 2 — Template Rendering and Preview (10 / 14 done). **Phase 1 is complete** (25 / 25, [summary](../MEMORY/records/2026-09-12-PHASE-1-SUMMARY.md)); Phase 0 is 26 / 27 done. **Staging is live**: `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
 
 The only task left is `P0-17` (CI/CD), deferred by ADR-028. Its **deployment** half was waived by the project owner on 2026-09-11; deploying is `git pull` plus a compose command. Its **verification** half was not waived and is the one Phase 0 exit criterion still unmet — see below. **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
-**Overall**: 60 / 136 tasks done
+**Overall**: 61 / 136 tasks done
 
 **No automated pipeline**: `P0-17` is deferred (ADR-028). Before merging to `main`, run `scripts/verify.sh`. The `:id`-endpoint gate blocks in `.githooks/pre-push`; integration tests, the coverage floor, SAST and dependency scanning are **not** running anywhere until `P0-17` is picked up — revisit before Phase 3 payment code.
 
@@ -25,7 +25,7 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 |---|---|---|---|---|
 | [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 27 | 26 | **ACTIVE** | — |
 | [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 25 | **COMPLETE** — 2026-09-12 | Phase 0 exit criteria |
-| [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 14 | 9 | **ACTIVE** | Phase 1 exit + `P1-25` — **met** |
+| [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 14 | 10 | **ACTIVE** | Phase 1 exit + `P1-25` — **met** |
 | [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 0 | Not started | Phase 2 exit |
 | [Phase 4 — Engagement](./PHASE-4-ENGAGEMENT.md) | 12 | 0 | Not started | Phase 3 exit |
 | [Phase 5 — Admin Panel](./PHASE-5-ADMIN-PANEL.md) | 14 | 0 | Not started | Phase 4 exit |
@@ -129,7 +129,7 @@ Roadmap: Week 6-7.
 | P2-07 | Public invitation API | backend | L | **DONE** — the only unauthenticated read of user data in the product. `status = 'published' AND deleted_at IS NULL` in SQL *is* the authorization model, and everything unpublished answers a byte-identical 404. A disabled section's data is omitted by field path rather than a section table (ADR-062) | P1-14, P2-01 |
 | P2-08 | Public SSR app and host routing | public-invite | L | **DONE** — the whole invitation is in the HTML before any JS runs, checked against a real production server. Found that P2-07's payload was in a shape the renderer could not read (ADR-063). One DoD item **not met**: per-template chunk loading does not happen under Turbopack, measured and left to P2-13 | P2-07, P2-03, P0-23 |
 | P2-09 | SEO metadata and robots | public-invite | M | **DONE** — `noindex` by default and read as *exactly* true, so a missing setting cannot start indexing somebody's wedding (ADR-064). Structured data is a whitelist with an argued absence: no `offers`, no `attendee`. **One step is not done and cannot be**: the real WhatsApp/Facebook/Telegram check needs a published staging invitation, which needs `P3-09` | P2-08 |
-| P2-10 | Public page interactions | public-invite | M | TODO | P2-08 |
+| P2-10 | Public page interactions | public-invite | M | **DONE** — and it found two defects with passing tests over them: `P2-03`'s cover gate hid only its own button, and its copy button's “announcement” wrote to an element that did not exist. Step 6 (music) is **not applicable** — there is no music section. One DoD item needs a real device and goes to `P2-13` | P2-08 |
 | P2-11 | Catalog and detail UI, demo mode | web-app | L | TODO | P2-01, P2-03 |
 | P2-12 | Share-preview links | backend, public-invite | M | TODO | P2-08 |
 | P2-13 | Performance budget and CWV baseline | public-invite | M | TODO | P2-10 |

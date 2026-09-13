@@ -8,6 +8,8 @@
  * editor already wraps the renderer in a client tree -- `public-invite` renders from a
  * server component, where a hook without this directive is a build error.
  */
+import { useEffect, useRef, useState } from "react";
+
 import type { SectionProps } from "../types.js";
 import { readPath } from "../resolve-data.js";
 import { Photo, SectionShell, When, rows, text } from "./primitives.js";
@@ -294,23 +296,64 @@ function CopyButton({
   readonly value: string | undefined;
   readonly disabled: boolean;
 }) {
+  const [message, setMessage] = useState("");
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(
+    () => () => {
+      if (timer.current !== undefined) clearTimeout(timer.current);
+    },
+    [],
+  );
+
   if (value === undefined) return null;
 
+  /*
+   * `P2-10` step 3 rewrote this. The first version reached for
+   * `button.nextElementSibling.textContent` and there was no sibling to find — so the
+   * comment above claimed an announcement the code did not make, and a guest tapping
+   * "Salin nomor" got no confirmation of any kind. React state and a real live region,
+   * which is what the comment always described.
+   */
+  const announce = (text: string) => {
+    setMessage(text);
+    if (timer.current !== undefined) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      setMessage("");
+    }, 4000);
+  };
+
   return (
-    <button
-      type="button"
-      className="wi-button wi-button-quiet"
-      disabled={disabled}
-      onClick={(event) => {
-        const button = event.currentTarget;
-        void navigator.clipboard?.writeText(value).then(() => {
-          const status = button.nextElementSibling;
-          if (status !== null) status.textContent = "Nomor disalin";
-        });
-      }}
-    >
-      Salin nomor
-    </button>
+    <>
+      <button
+        type="button"
+        className="wi-button wi-button-quiet"
+        disabled={disabled}
+        onClick={() => {
+          // Absent on an insecure origin, and it rejects when the document is not
+          // focused. Both are ordinary; neither may throw into somebody's wedding page.
+          void navigator.clipboard
+            ?.writeText(value)
+            .then(() => {
+              announce("Nomor rekening disalin.");
+            })
+            .catch(() => {
+              announce("Nomor tidak bisa disalin. Silakan salin manual.");
+            });
+        }}
+      >
+        Salin nomor
+      </button>
+
+      {/*
+       * Always in the document, empty until there is something to say. A live region
+       * inserted at the moment it gains content is frequently not announced at all — the
+       * screen reader has to have been watching it beforehand.
+       */}
+      <p role="status" aria-live="polite" className="wi-muted">
+        {message}
+      </p>
+    </>
   );
 }
 

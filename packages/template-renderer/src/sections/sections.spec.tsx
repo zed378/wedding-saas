@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 
 import { COMPONENT_REGISTRY } from "../registry.js";
@@ -213,24 +214,29 @@ describe("the hero", () => {
     );
   });
 
-  it("shows a real button for the cover gate", () => {
-    // A guest using a keyboard reaches the whole invitation through this one control.
-    const Component = COMPONENT_REGISTRY["HeroClassic"]!;
-    render(<Component {...props(FULL)} />);
+  it.each(["public", "live", "demo"] as const)(
+    "carries no cover gate in %s mode — a section cannot gate its siblings",
+    (mode) => {
+      /*
+       * `P2-10` removed the gate button from this component, and this test replaced the
+       * one that asserted its presence.
+       *
+       * `P2-03`'s button hid **itself** on click while every section below stayed
+       * rendered and scrollable, so the "single readable first screen" `docs/UI-UX/14`
+       * asks for never happened. A section has no access to its siblings and cannot
+       * contain them; the control belongs to whatever owns the whole page, which is
+       * `public-invite`'s `CoverGate` (`cover-gate.spec.tsx`).
+       *
+       * Asserted in all three modes so the button cannot come back for one of them.
+       */
+      const Component = COMPONENT_REGISTRY["HeroClassic"]!;
+      render(<Component {...props(FULL, { mode })} />);
 
-    expect(
-      screen.getByRole("button", { name: /buka undangan/i }),
-    ).toBeInTheDocument();
-  });
-
-  it("does not gate the editor preview", () => {
-    // In `live` the couple would otherwise see a button instead of their invitation on
-    // every re-render, which is the opposite of a preview.
-    const Component = COMPONENT_REGISTRY["HeroClassic"]!;
-    render(<Component {...props(FULL, { mode: "live" })} />);
-
-    expect(screen.queryByRole("button", { name: /buka undangan/i })).toBeNull();
-  });
+      expect(
+        screen.queryByRole("button", { name: /buka undangan/i }),
+      ).toBeNull();
+    },
+  );
 });
 
 describe("the maps section carries no map SDK", () => {
@@ -356,7 +362,7 @@ describe("the countdown", () => {
 });
 
 describe("the gift section", () => {
-  it("offers a copy button that announces the result", () => {
+  it("copies the account number", () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
 
@@ -365,6 +371,53 @@ describe("the gift section", () => {
 
     screen.getByRole("button", { name: /salin nomor/i }).click();
     expect(writeText).toHaveBeenCalledWith("1234567890");
+  });
+
+  it("announces that it copied, in a live region", async () => {
+    /*
+     * `P2-10` step 3 added this assertion, and it found the bug it was written for.
+     *
+     * This test used to be called "offers a copy button that announces the result" and
+     * asserted only that `writeText` had been called. The announcement half was a claim in
+     * a comment: the implementation set `button.nextElementSibling.textContent`, there was
+     * no sibling to find, and a guest tapping the button got no confirmation of any kind.
+     *
+     * A test named after a behaviour it does not check is worse than no test, because it
+     * makes the behaviour look covered.
+     */
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+
+    const Component = COMPONENT_REGISTRY["GiftAccountList"]!;
+    render(<Component {...props(FULL)} />);
+
+    // Present before the click: a live region inserted at the moment it gains content is
+    // frequently not announced at all.
+    const status = screen.getByRole("status");
+    expect(status.textContent).toBe("");
+
+    await userEvent.click(screen.getByRole("button", { name: /salin nomor/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("status").textContent).toMatch(/disalin/i);
+    });
+  });
+
+  it("says so when the clipboard refuses", async () => {
+    // It rejects when the document is not focused and is absent on an insecure origin.
+    // Silence looks exactly like a button that does nothing.
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+    });
+
+    const Component = COMPONENT_REGISTRY["GiftAccountList"]!;
+    render(<Component {...props(FULL)} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /salin nomor/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("status").textContent).toMatch(/tidak bisa/i);
+    });
   });
 
   it("disables the copy button outside the public page", () => {

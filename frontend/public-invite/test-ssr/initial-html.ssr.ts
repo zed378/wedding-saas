@@ -513,6 +513,111 @@ describe("the metadata a scraper reads", () => {
   });
 });
 
+/**
+ * `P2-10` — the interactions, from the server's side.
+ *
+ * The card's DoD item is *"personalization never affects the server response or the cache
+ * key"*, and that is a claim about bytes. `docs/ARCHITECTURE/06` § Cache Segmentation
+ * gives the consequence of getting it wrong: a server-rendered guest name means one cache
+ * entry per guest, which for one wedding is four hundred distinct documents and a hit
+ * ratio of nothing — on the morning the page matters most.
+ *
+ * Only a real server can answer it. A jsdom test would be asserting about the component,
+ * which is not where the failure would be.
+ */
+/**
+ * `P2-10` step 5 — the cover gate, from the server's side.
+ *
+ * The gate renders closed, which is a visual decision with two consequences that only the
+ * server's bytes can settle: the invitation must still be **in** the document for a
+ * sharing bot, and a guest without JavaScript must not be left on a cover with a dead
+ * button.
+ */
+describe("the cover gate does not hide the invitation from anything that cannot click", () => {
+  it("leaves every section in the HTML while the gate is closed", async () => {
+    mode = "ok";
+    const { body } = await html(`/${SLUG}`);
+
+    expect(body).toContain('data-cover-gate="true"');
+    expect(body).toContain('data-open="false"');
+    // The content a scraper and a screen reader need, present despite the clip.
+    expect(body).toContain("Budi");
+    expect(body).toContain("Masjid Agung Bandung");
+  });
+
+  it("ships the noscript rule that releases the clip", async () => {
+    // Without it, a guest with JavaScript disabled sees a cover and a button that cannot
+    // work. With it they simply get the whole invitation and no gate.
+    mode = "ok";
+    const { body } = await html(`/${SLUG}`);
+
+    expect(body).toContain("<noscript>");
+    expect(body).toContain("max-height:none");
+    expect(body).toContain("[data-cover-gate-control]");
+  });
+
+  it("renders the gate's button server-side, so it works on first paint", async () => {
+    mode = "ok";
+    const { body } = await html(`/${SLUG}`);
+
+    expect(body).toContain("Buka Undangan");
+  });
+});
+
+describe("personalization stays off the server", () => {
+  /**
+   * The document with every `<script>` removed.
+   *
+   * Next serializes the request's query string into its own RSC router payload, inside a
+   * script element, whatever the page does — that is framework state, not rendered
+   * content, and no app-level change removes it. So the assertion is made against the
+   * markup a guest and a scraper actually see.
+   *
+   * The consequence is real and belongs in the deployment rather than in the code: a CDN
+   * in front of this host must **strip query parameters from the cache key**, or `?to=`
+   * will segment the cache at the edge exactly as `docs/ARCHITECTURE/06` warns. Recorded
+   * as a follow-up on the `P2-10` record.
+   */
+  const rendered = (body: string): string =>
+    body.replace(/<script\b[\s\S]*?<\/script>/gi, "");
+
+  it("renders identical markup with and without ?to=", async () => {
+    mode = "ok";
+
+    const plain = await html(`/${SLUG}`);
+    const personalized = await html(`/${SLUG}?to=Dewi%20Lestari`);
+
+    expect(personalized.status).toBe(plain.status);
+    expect(rendered(personalized.body)).toBe(rendered(plain.body));
+  });
+
+  it("never puts the guest's name in the rendered markup", async () => {
+    // Not merely "the same as without" — the name must be absent outright, so a link
+    // preview of a forwarded invitation cannot reveal who it was addressed to.
+    mode = "ok";
+
+    const { body } = await html(`/${SLUG}?to=Dewi%20Lestari`);
+
+    expect(rendered(body)).not.toContain("Dewi");
+  });
+
+  it("keeps the greeting out of the head, so a preview cannot name the guest", async () => {
+    mode = "ok";
+    const { body } = await html(`/${SLUG}?to=Dewi%20Lestari`);
+
+    const head = /<head\b[^>]*>([\s\S]*?)<\/head>/i.exec(body)?.[1] ?? "";
+    expect(head).not.toContain("Dewi");
+  });
+
+  it("renders the share controls server-side, since they are not per-visitor", async () => {
+    mode = "ok";
+    const { body } = await html(`/${SLUG}`);
+
+    expect(body).toContain('data-share-bar="true"');
+    expect(body).toContain("wa.me");
+  });
+});
+
 describe("an address with no invitation", () => {
   it("renders the friendly page, not a framework error", async () => {
     mode = "missing";

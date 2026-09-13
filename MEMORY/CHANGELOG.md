@@ -10,6 +10,23 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-13 — The public page answers back
+
+**Added** — the guest-facing interactions ([P2-10](./records/2026-09-13-P2-10-public-interactions.md))
+
+- **A guest sees their own name** when the link carried one, read from `?to=` after hydration so the server's response stays identical for everybody — `docs/ARCHITECTURE/06` § Cache Segmentation is explicit that a server-rendered name means one cache entry per guest. A side effect nobody asked for: a link preview can never name the guest it was addressed to, so a forwarded card does not reveal who had the link first.
+- **The name is cleaned, not merely escaped.** React escapes markup; what it cannot help with is a zero-width character or a **bidirectional override**, which reverses the direction of the surrounding text without being markup at all. Those are stripped, the value is capped, and whitespace is collapsed to one line.
+- **A cover gate that actually gates** — the opening screen is one screen, and tapping "Buka Undangan" reveals the invitation. It keeps the whole page in the document (a sharing bot reads HTML, a screen reader reads the document) and ships a `<noscript>` rule so a guest with JavaScript disabled gets the full invitation instead of a dead button.
+- **Share to WhatsApp and copy link**, both server-rendered and both pointing at the invitation's **canonical** address rather than the one in the guest's address bar — forwarding a card addressed to somebody else is exactly what a guest would not notice doing.
+- **Copy confirmations are announced**, in a live region present from the start, and both real clipboard failures (an insecure origin, an unfocused document) say so rather than looking like a button that did nothing.
+
+**Fixed** — two things that had passing tests over them
+
+- `P2-03`'s cover gate lived inside the hero section and hid **its own button**; every section below stayed rendered and scrollable. A section cannot contain its siblings, so the control moved to the page.
+- The gift section's copy button set `nextElementSibling.textContent` and there was no sibling, so a guest tapping "Salin nomor" got no confirmation at all. Its test was named "announces the result" and asserted only that the clipboard had been called.
+
+**Not applicable** — background music. `docs/UI-UX/14` scopes it to "if the section is active", and there is no music section in the schema. The gesture such a section would need is what the cover gate already provides.
+
 ### 2026-09-13 — A shared invitation looks like an invitation
 
 **Added** — link previews, robots and structured data ([P2-09](./records/2026-09-13-P2-09-seo-metadata.md))
