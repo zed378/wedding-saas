@@ -87,6 +87,7 @@ export function eventFromApi(row: Row): Row {
     start_time: row["start_time"],
     end_time: row["end_time"] ?? null,
     timezone: row["timezone"] ?? DEFAULT_EVENT_TIMEZONE,
+    region_code: row["region_code"] ?? null,
     venue_name: row["venue_name"],
     address: row["address"],
     latitude: row["latitude"] ?? null,

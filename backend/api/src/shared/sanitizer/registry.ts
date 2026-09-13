@@ -110,6 +110,8 @@ export const NOT_USER_TEXT: Readonly<Record<string, string>> = {
   // --- RUM reports (`P2-13`, `POST /public/rum`). Deliberately specific key names: this
   //     registry is global per key, and exempting a bare `name` here would exempt every
   //     future `name` field -- a template's name, say, which IS prose on a public page. ---
+  region_code:
+    "a Kemendagri region code, format-validated (`NN.NN.NN.NNNN`) and checked to exist in `regions` (P2-17)",
   timezone:
     "an event zone from a closed `z.enum` of three IANA names (P2-16), backed by a CHECK constraint",
   metric:

@@ -271,6 +271,7 @@ export class InvitationRepository {
       readonly startTime: string;
       readonly endTime?: string | null | undefined;
       readonly timezone?: string | undefined;
+      readonly regionCode?: string | null | undefined;
       readonly venueName: string;
       readonly address: string;
       readonly latitude?: string | null | undefined;
@@ -293,6 +294,9 @@ export class InvitationRepository {
         startTime: input.startTime,
         endTime: input.endTime ?? null,
         ...(input.timezone !== undefined ? { timezone: input.timezone } : {}),
+        ...(input.regionCode !== undefined
+          ? { regionCode: input.regionCode }
+          : {}),
         venueName: input.venueName,
         address: input.address,
         latitude: input.latitude ?? null,
@@ -1335,6 +1339,7 @@ export class InvitationRepository {
       readonly startTime?: string | undefined;
       readonly endTime?: string | null | undefined;
       readonly timezone?: string | undefined;
+      readonly regionCode?: string | null | undefined;
       readonly venueName?: string | undefined;
       readonly address?: string | undefined;
       readonly latitude?: string | null | undefined;
@@ -1353,6 +1358,8 @@ export class InvitationRepository {
     if (changes.startTime !== undefined) patch["startTime"] = changes.startTime;
     if (changes.endTime !== undefined) patch["endTime"] = changes.endTime;
     if (changes.timezone !== undefined) patch["timezone"] = changes.timezone;
+    if (changes.regionCode !== undefined)
+      patch["regionCode"] = changes.regionCode;
     if (changes.venueName !== undefined) patch["venueName"] = changes.venueName;
     if (changes.address !== undefined) patch["address"] = changes.address;
     if (changes.latitude !== undefined) patch["latitude"] = changes.latitude;

@@ -45,6 +45,7 @@ Event
 ├── start_time         time, required
 ├── end_time           time, optional
 ├── timezone           enum: Asia/Jakarta (WIB) | Asia/Makassar (WITA) | Asia/Jayapura (WIT), default WIB — the zone start/end times are in; detected from the map pin, editable (P2-16, ADR-070)
+├── region_code        Kemendagri region code, optional — province to village (P2-17, ADR-071); its province decides timezone
 ├── venue_name         string, required
 ├── address            text, required
 ├── latitude           decimal, optional

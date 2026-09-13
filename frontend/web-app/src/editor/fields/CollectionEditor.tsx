@@ -10,9 +10,11 @@ import { toApiBody, type CollectionEndpoint } from "../transport";
 import { FieldControl } from "./FieldControl";
 import {
   COLLECTION_ITEM_LABELS,
+  ZONE_FIELD,
   collectionFieldNames,
   fieldMeta,
 } from "./registry";
+import { timezoneForRegionCode } from "@wi/schema";
 
 /**
  * `P2-15` — a collection edited row by row: events, gift accounts. `docs/UI-UX/12`.
@@ -196,7 +198,15 @@ export function CollectionEditor({
                 value={draft[name]}
                 required={collection.required.includes(name)}
                 onChange={(next) => {
-                  setDraft((current) => ({ ...current, [name]: next }));
+                  setDraft((current) => ({
+                    ...current,
+                    [name]: next,
+                    // `P2-17`: a region chosen for a new row sets its zone too, so the default
+                    // WIB in the draft does not override the province's zone on the server.
+                    ...(meta.type === "region" && typeof next === "string"
+                      ? zoneFromRegion(next)
+                      : {}),
+                  }));
                 }}
               />
             );
@@ -244,3 +254,8 @@ export function CollectionEditor({
 }
 
 const EMPTY: Record<string, unknown>[] = [];
+
+function zoneFromRegion(code: string): Record<string, string> {
+  const zone = timezoneForRegionCode(code);
+  return zone === undefined ? {} : { [ZONE_FIELD]: zone };
+}

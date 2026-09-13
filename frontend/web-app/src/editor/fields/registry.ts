@@ -33,7 +33,9 @@ export type FieldType =
   | "photo-multi"
   | "select"
   | "map-picker"
-  | "toggle";
+  | "toggle"
+  // `P2-17`: Indonesia's administrative regions, province to village.
+  | "region";
 
 export interface FieldMeta {
   readonly type: FieldType;
@@ -124,6 +126,13 @@ const EVENT_FIELDS = {
   "events.*.date": { type: "date" as const, label: "Tanggal" },
   "events.*.start_time": { type: "time" as const, label: "Waktu mulai" },
   "events.*.end_time": { type: "time" as const, label: "Waktu selesai" },
+  // `P2-17`. Choosing a region sets the event's zone from its province.
+  "events.*.region_code": {
+    type: "region" as const,
+    label: "Wilayah acara",
+    helperText:
+      "Pilih sampai tingkat yang Anda ketahui. Zona waktu mengikuti provinsinya.",
+  },
   // `P2-16`, ADR-070. Filled from the map pin when one is dropped; the couple can change it.
   "events.*.timezone": {
     type: "select" as const,
@@ -229,6 +238,17 @@ export const FIELD_REGISTRY: Readonly<Record<string, FieldMeta>> = {
     maxLength: 200,
   },
 };
+
+/**
+ * `P2-16`/`P2-17` — the field a region or a map pin writes the zone to, beside itself
+ * (`events.<id>.region_code` → `events.<id>.timezone`). Named here so no component spells a field.
+ */
+export const ZONE_FIELD = "timezone";
+
+/** The zone path beside a sibling path in the same row. */
+export function zonePathBeside(path: string): string {
+  return `${path.slice(0, path.lastIndexOf("."))}.${ZONE_FIELD}`;
+}
 
 /**
  * `P2-15` — what one row of a collection is called, for "Acara 2" and "Tambah acara".

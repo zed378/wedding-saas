@@ -10,6 +10,7 @@
     "db:migrate": "node src/infra/db/migrate.mts",
     "db:rollback": "node src/infra/db/rollback.mts",
     "db:seed": "node src/infra/db/seed.mts",
+    "db:seed:regions": "node src/infra/db/seed-regions.mts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "echo \"[P0-17] lint not wired yet\"",
     "test": "vitest run",

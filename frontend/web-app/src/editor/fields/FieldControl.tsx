@@ -3,6 +3,7 @@
 import { Input, Select, Textarea } from "@wi/ui";
 
 import type { FieldMeta } from "./registry";
+import { RegionPicker } from "./RegionPicker";
 
 /**
  * P1-23 step 3 — the reusable field components. `docs/FRONTEND/03` § Reusable Field Components.
@@ -59,6 +60,17 @@ export function FieldControl({
             : {})}
           onChange={(e) => {
             onChange(e.target.value);
+          }}
+        />
+      );
+
+    case "region":
+      return (
+        <RegionPicker
+          label={meta.label}
+          value={typeof value === "string" ? value : null}
+          onChange={(code) => {
+            onChange(code);
           }}
         />
       );

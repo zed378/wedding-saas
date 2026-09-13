@@ -16,6 +16,9 @@ import {
 } from "../support/factories";
 import { createTwoTenants, expectServiceIdorSafe } from "../support/idor";
 import { resetTenantData } from "./helpers.ts";
+import { RegionsRepository } from "../../src/modules/regions/regions.repository";
+import { RegionsService } from "../../src/modules/regions/regions.service";
+import { ensureRegionsSeeded, noCache } from "../support/regions";
 
 /**
  * P1-12 — events.
@@ -44,7 +47,14 @@ describe("events sub-resource", () => {
   beforeAll(async () => {
     harness = await startHarness();
     repository = new InvitationRepository(harness.db);
-    service = new EventsService(repository);
+    await ensureRegionsSeeded(harness.pool);
+    service = new EventsService(
+      repository,
+      new RegionsService(
+        new RegionsRepository(harness.db as never),
+        noCache as never,
+      ),
+    );
   }, 120_000);
 
   afterAll(async () => {
@@ -446,6 +456,85 @@ describe("events sub-resource", () => {
         },
       );
       expect(chosen.timezone).toBe("Asia/Makassar");
+    });
+
+    it("takes the zone from the chosen region's province (P2-17)", async () => {
+      // Kota Denpasar (51.71) is WITA, and no pin is needed to know it.
+      const { user, invitationId } = await withInvitation();
+      const created = await service.create(user.scope, invitationId, {
+        ...EVENT,
+        regionCode: "51.71",
+      });
+      expect(created.timezone).toBe("Asia/Makassar");
+      expect(created.region_code).toBe("51.71");
+
+      // Any level: a village in Kota Jayapura (91.71) is WIT.
+      const moved = await service.update(user.scope, invitationId, created.id, {
+        regionCode: "91.71.01.1001",
+      });
+      expect(moved.timezone).toBe("Asia/Jayapura");
+    });
+
+    it("takes a pin's zone from the province boundary that contains it (P2-17)", async () => {
+      // Denpasar is inside Bali's boundary in the seeded data, and the event gets that
+      // province's zone. The coordinate rule is only the fallback when no boundary matches.
+      const { user, invitationId } = await withInvitation();
+      const regions = new RegionsService(
+        new RegionsRepository(harness.db as never),
+        noCache as never,
+      );
+      const located = await regions
+        .locate(-8.65, 115.22)
+        .catch(() => undefined);
+      expect(
+        located?.province.code,
+        "Denpasar lies inside Bali's boundary",
+      ).toBe("51");
+
+      const created = await service.create(user.scope, invitationId, {
+        ...EVENT,
+        latitude: "-8.650000",
+        longitude: "115.220000",
+      });
+      expect(created.timezone).toBe(located!.timezone);
+    });
+
+    it("keeps an explicit zone over the region", async () => {
+      const { user, invitationId } = await withInvitation();
+      const created = await service.create(user.scope, invitationId, {
+        ...EVENT,
+        regionCode: "51.71",
+        timezone: "Asia/Jakarta",
+      });
+      expect(created.timezone).toBe("Asia/Jakarta");
+    });
+
+    it("refuses a region code that does not exist, with a field error", async () => {
+      const { user, invitationId } = await withInvitation();
+      await expect(
+        service.create(user.scope, invitationId, {
+          ...EVENT,
+          regionCode: "99.99",
+        }),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it("clears the region with null and keeps the zone", async () => {
+      const { user, invitationId } = await withInvitation();
+      const created = await service.create(user.scope, invitationId, {
+        ...EVENT,
+        regionCode: "51.71",
+      });
+      const cleared = await service.update(
+        user.scope,
+        invitationId,
+        created.id,
+        {
+          regionCode: null,
+        },
+      );
+      expect(cleared.region_code).toBeNull();
+      expect(cleared.timezone).toBe("Asia/Makassar");
     });
 
     it("refuses a zone outside Indonesia's three at the database", async () => {

@@ -1,8 +1,12 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { sectionLabel, timezoneForCoordinates } from "@wi/schema";
+import {
+  sectionLabel,
+  timezoneForCoordinates,
+  timezoneForRegionCode,
+} from "@wi/schema";
 
 import { getAtPath, type TemplateSectionDefinition } from "./store";
 import { useEditor, useEditorContext } from "./EditorProvider";
@@ -12,7 +16,10 @@ import {
   COLLECTION_PATHS,
   collectionPathOf,
   fieldMeta,
+  zonePathBeside,
 } from "./fields/registry";
+import { useAuth } from "../lib/auth";
+import { locateRegion } from "../lib/regions";
 import { validateField } from "./fields/validate";
 import { GalleryManager } from "./media/GalleryManager";
 import { MapPicker } from "./media/MapPicker";
@@ -61,9 +68,40 @@ export function PropertiesPanel() {
   const definition = useEditor((s) => s.templateDefinition);
   const activeKey = useEditor((s) => s.activeSectionKey);
   const data = useEditor((s) => s.data);
-  const { edit } = useEditorContext();
+  const { edit, store } = useEditorContext();
+  const { api } = useAuth();
 
   const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
+
+  /*
+   * `P2-17`. A pin moved: once it has been still for a moment, ask the API which province's real
+   * boundary contains it. That answer replaces the instant coordinate rule's zone, and fills the
+   * region when the couple has not chosen one — or has chosen one in a different province, which a
+   * moved pin has just contradicted. A region they chose inside the same province is left alone.
+   */
+  const locateTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  useEffect(() => () => clearTimeout(locateTimer.current), []);
+  const refineFromBoundary = (
+    pinPath: string,
+    latitude: number,
+    longitude: number,
+  ) => {
+    clearTimeout(locateTimer.current);
+    locateTimer.current = setTimeout(() => {
+      void locateRegion(api, latitude, longitude).then((located) => {
+        if (located === undefined) return;
+        edit(zonePathBeside(pinPath), located.timezone);
+        const regionPath = regionPathBeside(pinPath);
+        const current = getAtPath(store.getState().data, regionPath);
+        const chosen = typeof current === "string" ? current : "";
+        if (chosen === "" || !chosen.startsWith(located.province.code)) {
+          edit(regionPath, located.regency?.code ?? located.province.code);
+        }
+      });
+    }, LOCATE_DELAY_MS);
+  };
 
   const section = useMemo(
     () => definition?.sections.find((s) => s.section_key === activeKey),
@@ -127,10 +165,12 @@ export function PropertiesPanel() {
           onChange={(next) => {
             edit(latitudePath(path), next.latitude);
             edit(longitudePath(path), next.longitude);
-            // `P2-16`, ADR-070 (`OQ-27`): the pin decides the event's zone. The zone field stays
-            // editable for a pin the rule gets wrong or a wedding abroad.
+            // `P2-16`, ADR-070 (`OQ-27`): the pin decides the event's zone — at once by the
+            // coordinate rule, then exactly by the province boundary (`P2-17`). The zone field
+            // stays editable for a wedding abroad.
             const zone = timezoneForCoordinates(next.latitude, next.longitude);
-            if (zone !== undefined) edit(timezonePath(path), zone);
+            if (zone !== undefined) edit(zonePathBeside(path), zone);
+            refineFromBoundary(path, next.latitude, next.longitude);
           }}
         />
       );
@@ -156,6 +196,11 @@ export function PropertiesPanel() {
             current.has(path) ? current : new Set(current).add(path),
           );
           edit(path, next);
+          // `P2-17`: a chosen region decides the zone from its province, exactly.
+          if (meta.type === "region" && typeof next === "string") {
+            const zone = timezoneForRegionCode(next);
+            if (zone !== undefined) edit(zonePathBeside(path), zone);
+          }
         }}
       />
     );
@@ -272,7 +317,10 @@ function readOptional(section: TemplateSectionDefinition): string[] {
  * knew about events.
  */
 const LATITUDE_SUFFIX = "latitude";
-const TIMEZONE_SUFFIX = "timezone";
+const REGION_SUFFIX = "region_code";
+
+/** How long a pin must be still before the boundary lookup runs. */
+const LOCATE_DELAY_MS = 600;
 const LONGITUDE_SUFFIX = "longitude";
 
 function siblingKey(path: string): string {
@@ -283,8 +331,8 @@ function latitudePath(path: string): string {
   return `${siblingKey(path)}.${LATITUDE_SUFFIX}`;
 }
 
-function timezonePath(path: string): string {
-  return `${siblingKey(path)}.${TIMEZONE_SUFFIX}`;
+function regionPathBeside(path: string): string {
+  return `${siblingKey(path)}.${REGION_SUFFIX}`;
 }
 
 function longitudePath(path: string): string {

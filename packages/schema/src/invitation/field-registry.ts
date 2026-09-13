@@ -80,6 +80,8 @@ export const INVITATION_FIELDS: readonly FieldDefinition[] = [
       "end_time",
       // `P2-16`, ADR-070: WIB, WITA or WIT. Stored per event; detected from the pin.
       "timezone",
+      // `P2-17`: a Kemendagri region code at any level.
+      "region_code",
       "venue_name",
       "address",
       "latitude",

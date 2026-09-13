@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 import { Pool } from "pg";
 
 import { loadMigrationEnv } from "./env.mts";
+import { seedRegions } from "./seed-data/regions/seed-regions.mts";
 import {
   seedDemoInvitation,
   seedReferenceTemplate,
@@ -150,6 +151,9 @@ async function main(): Promise<void> {
     await seedPackagesAndAddons(pool);
     const blocked = await seedSlugBlocklist(pool);
     console.log(`  slug_blocklist: ${blocked} term(s)`);
+    // P2-17. Reference data the editor's location pickers need; also `db:seed:regions` alone.
+    const regionResult = await seedRegions(pool);
+    console.log(`  regions: ${JSON.stringify(regionResult.regions)}`);
     const templateVersionId = await seedReferenceTemplate(pool);
     await seedDemoInvitation(pool, templateVersionId);
 

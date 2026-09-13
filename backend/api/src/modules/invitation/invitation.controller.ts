@@ -118,6 +118,18 @@ const eventBase = {
   // `P2-16`, ADR-070: WIB, WITA or WIT. Optional: absent, the service detects it from the
   // coordinates, and without coordinates it is WIB, as every event was before.
   timezone: z.enum(EVENT_TIMEZONE_VALUES as [string, ...string[]]).optional(),
+  // `P2-17`: a Kemendagri code at any level; `null` clears it. Existence is the service's check.
+  region_code: z
+    .union([
+      z
+        .string()
+        .regex(
+          /^\d{2}(\.\d{2}(\.\d{2}(\.\d{4})?)?)?$/,
+          "Kode wilayah tidak valid.",
+        ),
+      z.null(),
+    ])
+    .optional(),
   venue_name: z.string().trim().min(1).max(200),
   address: z.string().trim().min(1).max(2000),
   latitude: z.union([z.coerce.number().min(-90).max(90), z.null()]).optional(),
@@ -161,6 +173,7 @@ const updateEventSchema = z
     start_time: eventBase.start_time.optional(),
     end_time: eventBase.end_time,
     timezone: eventBase.timezone,
+    region_code: eventBase.region_code,
     venue_name: eventBase.venue_name.optional(),
     address: eventBase.address.optional(),
     latitude: eventBase.latitude,
@@ -619,6 +632,9 @@ export class InvitationController {
         startTime: input.start_time,
         ...(input.end_time !== undefined ? { endTime: input.end_time } : {}),
         ...(input.timezone !== undefined ? { timezone: input.timezone } : {}),
+        ...(input.region_code !== undefined
+          ? { regionCode: input.region_code }
+          : {}),
         venueName: input.venue_name,
         address: input.address,
         ...(input.latitude !== undefined
@@ -663,6 +679,9 @@ export class InvitationController {
           : {}),
         ...(input.end_time !== undefined ? { endTime: input.end_time } : {}),
         ...(input.timezone !== undefined ? { timezone: input.timezone } : {}),
+        ...(input.region_code !== undefined
+          ? { regionCode: input.region_code }
+          : {}),
         ...(input.venue_name !== undefined
           ? { venueName: input.venue_name }
           : {}),

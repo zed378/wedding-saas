@@ -27,6 +27,7 @@ CREATE TABLE invitation_events (
   end_time                     TIME,
   timezone                      VARCHAR(40) NOT NULL DEFAULT 'Asia/Jakarta'
                                   CHECK (timezone IN ('Asia/Jakarta','Asia/Makassar','Asia/Jayapura')),  -- P2-16, ADR-070
+  region_code                    VARCHAR(13) REFERENCES regions(code) ON DELETE SET NULL,           -- P2-17, ADR-071; see DATABASE/13
   venue_name                    VARCHAR(200) NOT NULL,
   address                         TEXT NOT NULL,
   latitude                         DECIMAL(9,6),

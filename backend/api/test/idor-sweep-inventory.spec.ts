@@ -31,6 +31,8 @@ const EXEMPT: Readonly<Record<string, string>> = {
     "the public catalogue (ADR-059) — template-catalog.itest.ts",
   "GET /api/v1/templates/:slug/versions/:version":
     "the public catalogue (ADR-059) — template-catalog.itest.ts",
+  "GET /api/v1/regions/:code":
+    "public reference data with no tenant: Indonesia's administrative regions (P2-17) — regions.itest.ts › 'returns a village with its province, regency and district'",
 };
 
 function files(dir: string): string[] {
