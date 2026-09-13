@@ -18,28 +18,21 @@ Every entry names the task it blocks or affects, so nothing here is a note witho
 
 Nothing on the board is `BLOCKED`. The remaining questions shape work rather than stopping it, and `OQ-12` is worth answering early because it decides whether the roadmap's timeline is achievable at all.
 
+**2026-09-13**: `OQ-23` is answered by ADR-061 (`P2-06`). Answering it raised `OQ-24` — the confirmation-step half it deliberately left to `P3-15` — so the open count is unchanged at four.
+
 ---
 
 ## Open Questions — Remaining
 
-### OQ-23 — May a `published` invitation change template, and must the publish check re-run?
+### OQ-24 — Should changing the template of a published invitation require a confirmation field?
 
-**Affects**: `P1-15` — **not blocking**; implemented as allowed, and logged at `warn`. Needs an answer before `P2-06` builds the publish check.
+**Affects**: `P3-15` — **not blocking**; the template change is allowed today without one.
 
-Nothing in `docs/` forbids changing the template of a live invitation, and BR-2.5's "data is not lost" ethos points towards allowing it. `P1-15` therefore allows it, because refusing would be inventing a rule.
+The half of `OQ-23` that its answer deliberately did not decide. BR-6.2 requires `confirm_slug_change: true` when a user changes a slug they have already shared, and the reason it gives — the user is changing something already in other people's hands — applies just as directly to changing the design of a live invitation.
 
-But two consequences are unaddressed:
+Against adding one: the two acts are not equally destructive. A slug change **breaks** every link already sent; a template change does not, and the invitation stays complete because `OQ-23`'s answer now guarantees it. A confirmation dialog on a non-breaking change is the kind of friction that trains users to click through confirmations that matter.
 
-1. **BR-4.2 does not re-run.** A template's `required_fields` must be non-empty at publish time. A change can move a live invitation onto a template requiring a field the couple never filled — and nothing re-validates, because the check belongs to publishing and no publish happens. The page is live and incomplete.
-2. **The design changes under the guests.** Several hundred people may hold the link. There is no confirmation step, unlike BR-6.2's for a slug change, and the reason BR-6.2 gives — that the user is changing something already shared — applies here just as directly.
-
-Three candidate answers, none of which should be picked while coding:
-
-- **Allow, and re-run the publish check**, refusing the change when the new template's required fields are not satisfied. Correct, and it makes `P1-15` depend on `P2-06`, which is a phase inversion.
-- **Allow, but require a confirmation field**, the way BR-6.2 does for a slug. Cheap, consistent, and does nothing about the required-field hole.
-- **Refuse while `published`**, asking the user to unpublish first. Safest and the most annoying; it also gives "unpublish" a second meaning.
-
-Until then, the `warn` line `invitation.template_changed_while_published` makes it visible in production rather than silent.
+Needs a product decision, not an engineering one. `P3-15` builds the screen where it would live.
 
 ### OQ-22 — Is the (email, IP) login key the right one against a distributed attacker?
 
@@ -179,6 +172,18 @@ The vendor is decided (ADR-011: Cloudflare Turnstile). What is not decided is th
 ---
 
 ## Open Questions — Answered
+
+### ~~OQ-23 — May a `published` invitation change template, and must the publish check re-run?~~ — ANSWERED 2026-09-13
+
+**Answer**: **yes to both** — the change is allowed, and BR-4.2's required-field check now re-runs before it is applied, refusing the change with a 422 when the target template needs something the couple has not filled. Candidate answer 1, as raised. ADR-061.
+
+The objection recorded against that answer was that it makes `P1-15` depend on `P2-06`, a phase inversion. That objection expired rather than being overruled: `P2-06` is now implemented, in the same phase, and `ChangeTemplateService` imports the check from it in the ordinary direction.
+
+The refusal is scoped to `published` invitations only. A **draft** is expected to be incomplete — that is what a draft is — and `POST /publish` is where BR-4.2 applies to it. Refusing a draft's template change over an empty field would make the template gallery unusable before any data exists.
+
+Candidate answer 3 (refuse while published) was rejected for the reason given when it was raised: it gives "unpublish" a second meaning, and it refuses something no rule forbids.
+
+**Still open, and deliberately**: candidate answer 2's confirmation step. BR-6.2 requires a confirmation when a user changes a slug they have already shared, and the same argument applies to a design change under guests who hold the link — but a confirmation field is a UI and API-contract change that belongs with `P3-15`'s publish and share flow, not with the completeness rule. The `warn` line `invitation.template_changed_while_published` stays until then, with its message reworded to say what it now means. Tracked as **`OQ-24`** below.
 
 ### ~~OQ-19 — Which media variants are actually produced?~~ — ANSWERED 2026-09-12
 

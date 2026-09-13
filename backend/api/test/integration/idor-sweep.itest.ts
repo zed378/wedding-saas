@@ -315,6 +315,17 @@ const CASES: readonly SweepCase[] = [
       ).send({ template_id: t.otherTemplate.templateId }),
   },
   {
+    // P2-06. Read-only and cheap, which is exactly why it is worth sweeping: an endpoint
+    // that only reports "what is still missing" looks harmless enough to skip, and it
+    // reports on another tenant's invitation data if its scope is wrong.
+    label: "GET /invitations/:id/publish-check",
+    send: (c, token, t) =>
+      auth(
+        api(c).get(`/api/v1/invitations/${t.invitation.id}/publish-check`),
+        token,
+      ),
+  },
+  {
     label: "GET /invitations/:id/gallery",
     send: (c, token, t) =>
       auth(api(c).get(`/api/v1/invitations/${t.invitation.id}/gallery`), token),

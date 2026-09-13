@@ -1780,3 +1780,59 @@ invitation uses.
 **Only on the detail, not the summary.** The list already carries `template_id`, and a
 join per row to serve a name nobody has asked for yet is a cost with no caller. `P2-11`'s
 catalogue UI is the first thing that might want it, and it can ask then.
+
+### ADR-061 — A published invitation may change template, and the required-field check re-runs first
+
+**Date** 2026-09-13 · **Status** Accepted · **Task** `P2-06` · **Closes** `OQ-23` · **Raises** `OQ-24`
+
+**Context** — `P1-15` implemented `POST /invitations/:id/change-template` and allowed it on
+a `published` invitation, because nothing in `docs/` forbids it and BR-2.5's "data is not
+lost" ethos points towards allowing it. It raised `OQ-23` against two consequences it could
+not address at the time.
+
+The serious one is BR-4.2. A template's `required_fields` must be non-empty when an
+invitation is published — but the check belongs to publishing, and a template change is not
+a publish. So a change could move a live page onto a template requiring a field the couple
+never filled, and nothing would re-validate. The result is a state no endpoint can produce
+directly: **published and incomplete**, in front of however many guests already hold the
+link.
+
+`OQ-23` listed three candidate answers and refused to pick one while coding. The correct
+one — allow, and re-run the check — was recorded with an objection: it makes `P1-15` depend
+on `P2-06`, a phase inversion, and `TASKS/README.md` forbids building a Phase N+1 feature
+while Phase N is incomplete.
+
+**Decision** — candidate answer 1, as raised. `ChangeTemplateService` runs
+`collectMissingRequiredFields` against the **target** template's sections before applying
+the change, and refuses with a 422 `TEMPLATE_WOULD_LEAVE_PUBLISHED_INVITATION_INCOMPLETE`
+when anything is missing.
+
+The phase-inversion objection expired rather than being overruled. `P2-06` is implemented,
+`P1-15` is in Phase 1 and `P2-06` in Phase 2, and the dependency now runs forwards:
+`change-template.service.ts` imports `summarise` from `publish-check.service.ts`, not the
+other way round.
+
+**Only `published`.** A draft is not checked. A draft is *expected* to be incomplete —
+that is what a draft is — and `POST /publish` is where BR-4.2 applies to it. Checking a
+draft would make the template gallery unusable before any data exists, which is exactly
+when a couple browses it.
+
+**The same `details[]` shape** as the publish check and as `POST /publish`'s 422, through
+the shared `summarise()`. Three endpoints can tell a user a field is missing; one list
+rendering means they cannot word it three different ways.
+
+**Against candidate 3 (refuse while published)**: it invents a prohibition no document
+contains, and it gives "unpublish" a second meaning — a step you take to edit rather than a
+statement about whether guests can see the page.
+
+**Deliberately not decided: candidate 2's confirmation field.** BR-6.2 requires
+`confirm_slug_change` when a user changes a slug they have already shared, and the same
+argument reaches a design change under guests holding the link. But a slug change *breaks*
+every link already sent and a template change does not — and, after this decision, cannot
+leave the page incomplete either. Whether the weaker consequence still earns a confirmation
+is a product question, and the screen it would live on is `P3-15`'s. Raised as `OQ-24`.
+
+**What stays**: the `invitation.template_changed_while_published` `warn` line, with its
+message reworded. It used to say the design changed *without a publish check*; that half is
+now false, and a log line that describes a risk which no longer exists is how a real one
+stops being noticed.

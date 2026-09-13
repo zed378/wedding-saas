@@ -4,12 +4,19 @@ import { and, desc, eq } from "drizzle-orm";
 import { DB, type Database } from "../../infra/db/client";
 import { templateVersions, templates } from "../../infra/db/schema/templates";
 import { BusinessRuleError, NotFoundError } from "../../http/errors";
+import {
+  collectMissingRequiredFields,
+  type SectionDefinition,
+} from "@wi/schema";
+
 import { logger } from "../../shared/logging/logger";
 import { requireOwnership } from "../../shared/auth-middleware";
 import { AuditLogService } from "../../shared/audit/audit-log.service";
 import { InvitationRepository } from "../../shared/tenancy/invitation-repository";
 import type { TenantScope } from "../../shared/tenancy/tenant-scope";
 import { parseSections } from "./settings.service";
+import { toInvitationDetail } from "./invitation.dto";
+import { summarise } from "./publish-check.service";
 
 /**
  * P1-15 — `POST /invitations/:id/change-template`. BR-3.1, BR-4.1, `docs/PLAN/07`
@@ -116,6 +123,50 @@ export class ChangeTemplateService {
       target.customizableThemeKeys,
     );
 
+    /**
+     * OQ-23, answered by ADR-061 — a **published** invitation may change template, and
+     * the publish check re-runs before it does.
+     *
+     * The question was raised by `P1-15` and deferred for a concrete reason: the correct
+     * answer made `P1-15` depend on `P2-06`, which did not exist. It does now, so the
+     * objection is gone rather than overruled.
+     *
+     * What this prevents: a live page, several hundred guests holding the link, moved
+     * onto a template that requires a field the couple never filled. BR-4.2 says required
+     * fields must not be empty when publishing, and without this the invitation would be
+     * published *and* incomplete — a state no endpoint could have produced directly.
+     *
+     * A **draft** is not checked. A draft is expected to be incomplete; that is what
+     * drafts are, and `POST /publish` is where BR-4.2 applies to it.
+     */
+    if (invitation.status === "published") {
+      const aggregate = await this.repository.loadAggregate(
+        invitationId,
+        scope,
+      );
+      const detail = toInvitationDetail(invitation, aggregate, {
+        slug: "",
+        name: "",
+        version: "",
+      });
+
+      const missing = collectMissingRequiredFields(
+        target.sections as readonly SectionDefinition[],
+        enabled,
+        detail,
+      );
+
+      if (missing.length > 0) {
+        // 422 with the same `details[]` the publish check and the publish 422 use, so the
+        // editor renders one list however it arrived.
+        throw new BusinessRuleError(
+          "TEMPLATE_WOULD_LEAVE_PUBLISHED_INVITATION_INCOMPLETE",
+          "Template ini membutuhkan isian yang belum lengkap. Lengkapi dulu sebelum mengganti template pada undangan yang sudah tayang.",
+          summarise(missing).details,
+        );
+      }
+    }
+
     const moved = await this.repository.changeTemplate(
       invitationId,
       scope,
@@ -175,9 +226,12 @@ export class ChangeTemplateService {
     );
 
     if (invitation.status === "published") {
-      // Not refused: no rule forbids it, and BR-2.5's "data is not lost" ethos points the
-      // other way. But it changes the page several hundred guests may have open right now,
-      // and BR-4.2's required-field check does not re-run — OQ-23.
+      // Still worth a warn line, and now for a smaller reason than before. The required
+      // fields HAVE been re-checked (above, ADR-061), so the page cannot have become
+      // incomplete — but its design changed under several hundred people who may have
+      // the link open, and nobody confirmed anything. `docs/PLAN/02` BR-6.2 asks for a
+      // confirmation on a slug change for exactly this reason; whether this deserves one
+      // too is the open half of OQ-23.
       logger.warn(
         {
           context: {
@@ -186,7 +240,7 @@ export class ChangeTemplateService {
             event: "invitation.template_changed_while_published",
           },
         },
-        "template changed on a published invitation; the live page changed design without a publish check",
+        "template changed on a published invitation; the design changed for guests who already hold the link",
       );
     }
 

@@ -190,7 +190,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** — 2026-09-13 ([record](../MEMORY/records/2026-09-13-P2-06-publish-check.md)) |
 | **Depends on** | P0-20, P1-14 |
 | **Spec refs** | `docs/API/04` § Publish, `docs/BACKEND/03` § Validating Completeness, `docs/PLAN/02` § BR-4.2, `docs/UI-UX/12` § Publish CTA |
 | **Spec required** | Yes — business rule |
@@ -206,10 +206,12 @@
 5. Evaluate the checklist client-side for immediacy while treating the server as authoritative (`docs/FRONTEND/03` § Validation).
 
 **Definition of Done**
-- [ ] A required field inside a disabled section does not block publishing; a test covers exactly this.
-- [ ] The endpoint's `details[]` shape matches the publish endpoint's 422 body.
-- [ ] The editor shows per-section incompleteness and never hides the Publish button.
-- [ ] Field paths never reach the user interface untranslated.
+- [x] A required field inside a disabled section does not block publishing; a test covers exactly this. — `publish-check.itest.ts` "is ready once the gift section is turned off"; `publish-cta.spec.tsx` "does not hold publishing back over a field it would have required". The mirror case is covered too: a `configurable: false` section still blocks.
+- [x] The endpoint's `details[]` shape matches the publish endpoint's 422 body. — one `summarise()` produces both; `docs/API/04` amended to say so.
+- [x] The editor shows per-section incompleteness and never hides the Publish button. — `SectionListPanel` marks each section; `publish-cta.spec.tsx` "is in the document and disabled while a required field is empty".
+- [x] Field paths never reach the user interface untranslated. — `field-labels.spec.ts` asserts it over all 240 path x section combinations; `publish-cta.spec.tsx` over the rendered markup.
+
+**Also**: answered `OQ-23` (ADR-061) — a published invitation may change template, and the BR-4.2 check re-runs against the target first. Raised `OQ-24` for the confirmation-step half, which belongs to `P3-15`.
 
 ---
 

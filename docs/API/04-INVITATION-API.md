@@ -38,6 +38,7 @@ The response is the source for the confirmation modal in UI-UX/05 § Change Temp
 - `hidden_sections` is what was enabled and the new template does not define. The data behind those sections **is not deleted** (BR-4.1); switching back restores the display.
 - `dropped_theme_keys` is what was removed from `theme_override` because the new template does not list it in `customizable_theme_keys`. Unlike section data these are not retained: a theme key's meaning belongs to the template that defines it.
 - 422 `TEMPLATE_NOT_AVAILABLE` when the target template has no published version (BR-3.3); 422 `TEMPLATE_UNCHANGED` when the invitation is already on it; 404 when the template id is unknown, indistinguishable from an invitation that is not the caller's.
+- 422 `TEMPLATE_WOULD_LEAVE_PUBLISHED_INVITATION_INCOMPLETE`, with `details[]`, when the invitation is **published** and the target template requires a field the invitation has not filled. The BR-4.2 check re-runs here because a template change is the one way a live page could otherwise become incomplete, and a published page has guests holding its link. A **draft** is not checked; `POST /publish` is where BR-4.2 applies to it. Added by `P2-06` (`OQ-23`, ADR-061).
 
 ## Sub-resource: Couple/Person
 ```
@@ -109,6 +110,31 @@ POST   /api/v1/invitations/:id/unpublish
 GET    /api/v1/invitations/:id/publish-check         Check missing fields without actually publishing (used for a UI checklist indicator)
 ```
 
+### What `publish-check` answers
+
+```json
+{
+  "success": true,
+  "data": {
+    "ready": false,
+    "details": [
+      { "field": "couple.bride.nickname", "message": "Nama panggilan mempelai wanita di bagian Mempelai" }
+    ],
+    "incomplete_sections": ["couple"]
+  }
+}
+```
+
+`details[]` is the standard `ErrorDetail[]` of `API/00`, and is deliberately **the same array `POST /publish` returns in its 422**. The editor renders one list whether it arrived from the advisory check or from a refused publish; two renderings of one list is how the two wordings drift apart.
+
+`message` is a human label in the product's language — never the field path. `field` keeps the canonical dot-notation path for a client that wants to focus the control it names.
+
+`incomplete_sections` is the deduped set of section keys, for the sidebar's per-section marks. `details[]` may name the same path twice when two enabled sections both require it; that repetition says which sections are blocked and is kept.
+
+A **disabled** section's required fields are absent from all three, per BR-4.1 — except for a `configurable: false` section, which is displayed whatever `enabled_sections` says and is therefore still checked (`FRONTEND/04` § Render Flow step 2).
+
+The check is **advisory**, like `slug-available`: `POST /publish` runs its own and remains authoritative. Where the template definition cannot be read at all, the check answers `ready: true` rather than an error — a server-side read failure is not the user's incompleteness, and nothing is published by a checklist. Added by `P2-06`.
+
 ## Preview
 ```
 GET    /api/v1/invitations/:id/preview-links         List active preview links
@@ -152,3 +178,4 @@ The token is returned **once**, at creation, and stored only as a hash (DATABASE
 - `PATCH` is partial (JSON merge); fields not included are left unchanged.
 - All free-text input is sanitized server-side before saving (see SECURITY/08).
 - `POST /publish` returns a 422 with `details[]` listing the missing fields if validation fails (BR-4.2).
+- `POST /change-template` runs the same BR-4.2 check against the **target** template when the invitation is `published`, and returns 422 `TEMPLATE_WOULD_LEAVE_PUBLISHED_INVITATION_INCOMPLETE` with the same `details[]` rather than leaving a live page incomplete. A draft is not checked — a draft is expected to be incomplete. Added by `P2-06` (`OQ-23`, ADR-061).

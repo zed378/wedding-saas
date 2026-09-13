@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 
 import { ConflictWarning, SaveStatusIndicator } from "./SaveStatus";
 import { SectionListPanel } from "./SectionListPanel";
+import { PublishCta } from "./PublishCta";
 import { PanelBoundary } from "../components/PanelBoundary";
 
 /**
@@ -51,7 +52,7 @@ export function EditorShell({
 
   return (
     <div className="flex h-dvh flex-col">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+      <header className="relative flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
           <a
             className="focus-ring rounded-md px-2 py-1 text-sm font-medium text-text-muted underline"
@@ -64,9 +65,14 @@ export function EditorShell({
           </h1>
         </div>
 
-        {/* The status indicator lives in the header, as `docs/UI-UX/12` specifies: visible
-            from every panel, at every width, without scrolling. */}
-        <SaveStatusIndicator />
+        {/* Both live in the header, as `docs/UI-UX/12` specifies: visible from every
+            panel, at every width, without scrolling. The publish button in particular
+            must never be hidden -- a user who cannot find it concludes the product
+            cannot publish, not that their invitation is incomplete. */}
+        <div className="flex items-center gap-3">
+          <SaveStatusIndicator />
+          <PublishCta />
+        </div>
       </header>
 
       {/*
