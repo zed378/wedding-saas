@@ -37,6 +37,16 @@ export interface TemplateVersionDto {
 
 export interface TemplateDetailDto extends TemplateSummaryDto {
   readonly current_version: TemplateVersionDto;
+  /**
+   * `P2-11` — the public slug of this template's seeded demo invitation, or `null`.
+   *
+   * `docs/UI-UX/11`'s "View Live Demo" opens it on the public invitation host, so the
+   * demo is rendered by the production renderer from the production payload rather
+   * than by a mock (`docs/PLAN/07` § Demo Data). `null` means no demo is seeded, and
+   * the button is not shown — a link to a not-found page is worse than no link.
+   * ADR-065.
+   */
+  readonly demo_slug: string | null;
 }
 
 /**
@@ -80,9 +90,11 @@ export function toSummary(
 export function toDetail(
   template: TemplateRow,
   version: VersionRow,
+  demoSlug: string | null = null,
 ): TemplateDetailDto {
   return {
     ...toSummary(template, version.sections),
+    demo_slug: demoSlug,
     current_version: {
       id: version.id,
       version: version.version,

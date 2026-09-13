@@ -4,7 +4,12 @@ import type { Pool } from "pg";
 
 import { connect, resetTenantData } from "./helpers.ts";
 import { startHarness, type Harness } from "../support/harness";
-import { createTestTemplateVersion } from "../support/factories";
+import { PublicInvitationRepository } from "../../src/shared/tenancy/public-invitation-repository";
+import { SYSTEM_ACCOUNT_ID } from "../../src/shared/demo/demo-account";
+import {
+  createTestTemplateVersion,
+  createTestUser,
+} from "../support/factories";
 import { RedisCache } from "../../src/infra/cache/redis-cache";
 import { TemplateRepository } from "../../src/modules/template/template.repository";
 import {
@@ -64,7 +69,11 @@ describe("P2-01 — the template catalog", () => {
     await redis.ping();
 
     cache = new RedisCache(redis);
-    service = new TemplateService(new TemplateRepository(harness.db), cache);
+    service = new TemplateService(
+      new TemplateRepository(harness.db),
+      cache,
+      new PublicInvitationRepository(harness.db),
+    );
   }, 60_000);
 
   afterAll(async () => {
@@ -214,6 +223,7 @@ describe("P2-01 — the template catalog", () => {
       expect(Object.keys(detail).sort()).toEqual([
         "category",
         "current_version",
+        "demo_slug",
         "id",
         "is_premium",
         "name",
@@ -234,6 +244,92 @@ describe("P2-01 — the template catalog", () => {
       expect(detail.current_version.customizable_theme_keys).toEqual([
         "colors.primary",
       ]);
+    });
+
+    describe("demo_slug (P2-11, ADR-065)", () => {
+      /** The system account the demo belongs to, created the way the seeder creates it. */
+      const systemAccount = async () => {
+        await owner.query(
+          `INSERT INTO users (id, email, full_name, email_verified)
+           VALUES ($1, 'system-demo@wedding-invitation.invalid', 'Demo', true)
+           ON CONFLICT (id) DO NOTHING`,
+          [SYSTEM_ACCOUNT_ID],
+        );
+      };
+
+      const invitationOn = async (
+        slug: string,
+        ownerId: string,
+        options: { status?: string; deleted?: boolean; invitationSlug: string },
+      ) => {
+        const { rows } = await owner.query<{ id: string; vid: string }>(
+          `SELECT t.id, v.id AS vid FROM templates t
+           JOIN template_versions v ON v.template_id = t.id
+           WHERE t.slug = $1 ORDER BY v.created_at DESC LIMIT 1`,
+          [slug],
+        );
+        await owner.query(
+          `INSERT INTO invitations
+             (owner_id, template_id, template_version_id, status, slug, published_at, deleted_at)
+           VALUES ($1, $2, $3, $4, $5, now(), $6)`,
+          [
+            ownerId,
+            rows[0]!.id,
+            rows[0]!.vid,
+            options.status ?? "published",
+            options.invitationSlug,
+            options.deleted === true ? new Date() : null,
+          ],
+        );
+      };
+
+      it("names the seeded demo when the system account has published one", async () => {
+        await publish("elegant-rose");
+        await systemAccount();
+        await invitationOn("elegant-rose", SYSTEM_ACCOUNT_ID, {
+          invitationSlug: "demo-elegant-rose",
+        });
+
+        expect((await service.detail("elegant-rose")).demo_slug).toBe(
+          "demo-elegant-rose",
+        );
+      });
+
+      it("is null when no demo is seeded", async () => {
+        // The detail page hides "View Live Demo" on null. A link to the not-found page
+        // would be worse than no link.
+        await publish("elegant-rose");
+
+        expect((await service.detail("elegant-rose")).demo_slug).toBeNull();
+      });
+
+      it("never offers a customer's invitation on the same template as the demo", async () => {
+        // The predicate that matters. Without the owner filter, the first published
+        // invitation on a popular template would become every visitor's "demo" -- a real
+        // couple's wedding page, handed to strangers from the catalogue.
+        await publish("elegant-rose");
+        const customer = await createTestUser(owner, { fullName: "Budi" });
+        await invitationOn("elegant-rose", customer.id, {
+          invitationSlug: "budi-dan-siti",
+        });
+
+        expect((await service.detail("elegant-rose")).demo_slug).toBeNull();
+      });
+
+      it("ignores a demo that is unpublished or deleted", async () => {
+        await publish("elegant-rose");
+        await systemAccount();
+        await invitationOn("elegant-rose", SYSTEM_ACCOUNT_ID, {
+          invitationSlug: "demo-draft",
+          status: "draft",
+        });
+        await invitationOn("elegant-rose", SYSTEM_ACCOUNT_ID, {
+          invitationSlug: "demo-deleted",
+          deleted: true,
+        });
+
+        expect((await service.detail("elegant-rose")).demo_slug).toBeNull();
+      });
     });
 
     it("never exposes the template's own status column", async () => {
@@ -387,6 +483,7 @@ describe("P2-01 — the template catalog", () => {
       const degraded = new TemplateService(
         new TemplateRepository(harness.db),
         new RedisCache(broken),
+        new PublicInvitationRepository(harness.db),
       );
 
       await publish("still-works");

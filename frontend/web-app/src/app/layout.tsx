@@ -15,6 +15,11 @@ import "./globals.css";
  * `docs/UI-UX/17` requires the page language to be set for exactly this reason.
  */
 export const metadata: Metadata = {
+  // `P2-11`. The catalogue pages declare relative canonical URLs; without a base, Next emits
+  // them relative, and a relative canonical is ignored by every crawler that reads it.
+  metadataBase: new URL(
+    process.env["APP_PUBLIC_ORIGIN"] ?? "http://localhost:3100",
+  ),
   title: {
     default: "Undangan Digital",
     template: "%s · Undangan Digital",

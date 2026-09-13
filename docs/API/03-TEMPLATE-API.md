@@ -40,7 +40,8 @@ DELETE /api/v1/admin/templates/:id                       (only if never used by 
       "theme": { "colors": { "primary": "#8B5E3C" }, "typography": { "heading_font": "Playfair Display" } },
       "customizable_theme_keys": ["colors.primary"],
       "status": "published"
-    }
+    },
+    "demo_slug": "demo-elegant-rose"
   }
 }
 ```
@@ -49,6 +50,7 @@ DELETE /api/v1/admin/templates/:id                       (only if never used by 
 - `GET /templates` only returns templates whose version has `status = published` (deprecated/draft versions are hidden from the public catalog) — per BR-3.3.
 - The admin endpoint for publishing a new version does NOT change the `template_version_id` already locked by existing invitations (BR-3.1) — old invitations continue to render the old version until the user explicitly upgrades.
 - `supported_sections` is the badge list UI-UX/11 § Template Detail Page asks for ("Info on which sections the template supports"). It is **derived** from `current_version.sections`, in the canonical section order from the component registry — not stored separately, because a second copy would be one more thing to keep in step and the two disagreeing would show a "Guestbook" badge on a template with no guestbook. Added by P2-01 (ADR-059).
+- `demo_slug` is the public slug of the template's seeded demo invitation (PLAN/07 § Demo Data), or `null` when none is published. UI-UX/11's "View Live Demo" opens it on the public invitation host, so the demo is the production renderer reading the production payload rather than a mock. It is looked up — an invitation on this template, owned by the system account, `published` and not deleted — and not derived from a naming convention, because nothing in these documents defines one. Only `GET /templates/:slug` carries it; the catalogue list does not need it. Added by P2-11 (ADR-065).
 - `current_version.status` is present so a preview or demo surface can say which version it is showing. On `GET /templates/:slug` it is always `published`; on `GET /templates/:slug/versions/:version` it may be `deprecated`. Added by P2-01 (ADR-059).
 - `GET /templates/:slug/versions/:version` serves `published` and `deprecated` versions, never a `draft` one. A deprecated version was released and invitations are locked to it; a draft never was, and serving one would let anyone holding the URL preview unreleased work.
 - The three catalog reads do **not** require a session. UI-UX/11 § "Use This Template" specifies that a visitor browses the catalog and is redirected to register only once they choose — so a 401 here would block exactly the people the catalog exists for. They are rate limited per IP on the `general-public` policy (ADR-059).

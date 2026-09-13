@@ -10,6 +10,24 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-13 — Browsing before signing up
+
+**Added** — the template catalogue ([P2-11](./records/2026-09-13-P2-11-catalog-ui.md))
+
+- **`/templates`** — a server-rendered, indexable catalogue with search, category and price filters, all carried in the URL so a filtered view can be shared, bookmarked and restored by Back. The filter form works with JavaScript off; with it on, search updates as the visitor types.
+- **`/templates/:slug`** — the detail page: category tags, a premium badge, the sections a template supports, a live preview of each section, and a "Use This Template" action that stays pinned to the bottom of a phone screen.
+- **"View Live Demo" opens a real invitation** — the seeded demo on the public invitation host, rendered by the production renderer from the production payload. The template detail API now names it (`demo_slug`), looked up by ownership so a customer's own invitation can never be shown to strangers as a demo (ADR-065).
+- **Section previews are the product, not screenshots** — each slide is the section itself, drawn from the demo's public data, so a preview cannot fall out of date.
+- **A template chosen while logged out survives the login detour** — the choice travels in the URL through the existing login guard, and nothing is written to the browser's storage.
+- **A sitemap and `robots.txt`** — the catalogue and templates are listed; invitations never are.
+
+**Fixed**
+
+- The staging deployment never gave the public invitation app the API's address, so a deployed invitation page would have failed on every request. Both Next applications now receive their server-side configuration.
+- The create-invitation wizard still offered no templates: it had been left with an empty list before the catalogue API existed and was never connected to it.
+
+**Deferred** — a "Most Popular" sort (`DF-12`). `docs/UI-UX/11` conditions it on usage data being available, and the anonymous catalogue has none.
+
 ### 2026-09-13 — The public page answers back
 
 **Added** — the guest-facing interactions ([P2-10](./records/2026-09-13-P2-10-public-interactions.md))
