@@ -38,7 +38,7 @@ describe("the canonical field registry", () => {
     ).toEqual([]);
   });
 
-  it("covers both people, all twelve event fields, and every collection", () => {
+  it("covers both people, all thirteen event fields, and every collection", () => {
     // Named counts rather than a total, so adding a field to one entity cannot be
     // absorbed by removing one from another.
     const under = (prefix: string) =>
@@ -46,7 +46,7 @@ describe("the canonical field registry", () => {
 
     expect(under("couple.groom.")).toHaveLength(7);
     expect(under("couple.bride.")).toHaveLength(7);
-    expect(under("events.*.")).toHaveLength(12); // `timezone` added by P2-16
+    expect(under("events.*.")).toHaveLength(13); // `timezone` P2-16, `region_code` P2-17
     expect(under("gallery.photos.*.")).toHaveLength(4);
     expect(under("gift.accounts.*.")).toHaveLength(5);
     expect(under("quote.")).toHaveLength(2);

@@ -16,10 +16,11 @@ import { SlugService } from "./slug.service";
 import { PublishCheckService } from "./publish-check.service";
 import { PreviewLinkService } from "./preview-link.service";
 import { InvitationStatusService } from "../../shared/invitation-status/invitation-status.service";
+import { RegionsModule } from "../regions/regions.module";
 
 /** P1-09 and P1-10. The sub-resources are `P1-11` onwards. */
 @Module({
-  imports: [AuthModule, TenancyModule, AuditModule],
+  imports: [AuthModule, TenancyModule, AuditModule, RegionsModule],
   controllers: [InvitationController],
   providers: [
     InvitationCreateService,

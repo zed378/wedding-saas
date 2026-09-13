@@ -2217,3 +2217,35 @@ detect the zone from the map pin, and let the couple choose it in the form.
    link-preview `startDate` carries the offset.** A payload without a zone reads as WIB.
 
 **Not decided here** — the date display format, the other half of `OQ-27`, stays open.
+
+### ADR-071 — Indonesia's administrative regions as reference data; a region's province decides an event's zone
+
+**Date** 2026-09-13 · **Task** `P2-17` · **Status** Accepted · **Spec** `MEMORY/specs/P2-17-regions.md` · **Adds** `docs/API/10`, `docs/DATABASE/13` · **Amends** `docs/API/04`, `docs/DATABASE/05`, `docs/PLAN/08`
+
+**Context** — The project owner asked for a database of every province and city, then of every
+district and village too. The immediate use is `P2-16`'s timezone: a zone is a property of a
+province, and a coordinate rule only approximates province lines.
+
+**Decisions**
+
+1. **Source**: `cahyadsn/wilayah` at commit `686c3400`, MIT, whose files cite Kepmendagri No.
+   300.2.2-2138 Tahun 2025. Chosen over older datasets (34 provinces, pre-2022) because it has the
+   six Papua provinces, and over official PDFs because it carries coordinates, UTC offsets and
+   boundaries. Counts, parent integrity and zone consistency verified on import; the MIT notice is
+   vendored in `seed-data/regions/NOTICE.md`.
+2. **One `regions` table for four levels**, keyed by the official code, which already encodes the
+   hierarchy; a separate `region_boundaries` table for provinces and regencies, simplified to about
+   55 m (707k points → 280k; 0 wrong zones on the 47 test places, 5 offshore points falling back to
+   the coordinate rule).
+3. **Read-only for the application role**, loaded by `db:seed:regions`, which runs in production,
+   unlike the development seed. Stale codes are reported, not deleted.
+4. **Public endpoints** (`docs/API/10`), cached for a day, exempt from the IDOR sweep with a named
+   test.
+5. **`invitation_events.region_code`**, any level, owner-only (not in the public payload). Zone
+   precedence: explicit → region's province → province boundary containing the pin → `P2-16`'s rule
+   → WIB.
+6. **In the editor**, a four-level cascading picker; a chosen region sets the zone immediately
+   (`timezoneForRegionCode`, a 38-province table in `@wi/schema`); a dropped pin sets the zone by the
+   rule at once and, once still, asks `/regions/locate` and fills an empty or contradicted region.
+
+**Not decided here** — whether guests see region names on the public page.

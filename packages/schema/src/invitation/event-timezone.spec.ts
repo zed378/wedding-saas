@@ -4,6 +4,7 @@ import {
   isEventTimezone,
   timezoneAbbreviation,
   timezoneForCoordinates,
+  timezoneForRegionCode,
   timezoneOffset,
 } from "./event-timezone.js";
 
@@ -80,6 +81,26 @@ describe("timezoneForCoordinates", () => {
     ["not a number", Number.NaN, 106.8],
   ])("does not guess for %s", (_place, latitude, longitude) => {
     expect(timezoneForCoordinates(latitude, longitude)).toBeUndefined();
+  });
+});
+
+describe("timezoneForRegionCode", () => {
+  it.each([
+    ["31.71", "Asia/Jakarta"], // Kota Jakarta Pusat
+    ["62.71", "Asia/Jakarta"], // Kota Palangka Raya
+    ["51.71.01.1001", "Asia/Makassar"], // a kelurahan in Denpasar
+    ["63.71", "Asia/Makassar"], // Kota Banjarmasin
+    ["82.71", "Asia/Jayapura"], // Kota Ternate
+    ["96", "Asia/Jayapura"], // Papua Barat Daya, one of the 2022 provinces
+  ])("%s is %s", (code, zone) => {
+    expect(timezoneForRegionCode(code)).toBe(zone);
+  });
+
+  it("covers exactly the 38 provinces", () => {
+    const provinces = Array.from({ length: 100 }, (_, i) =>
+      String(i).padStart(2, "0"),
+    ).filter((code) => timezoneForRegionCode(code) !== undefined);
+    expect(provinces).toHaveLength(38);
   });
 });
 

@@ -90,6 +90,8 @@ export interface EventDto {
   readonly end_time: string | null;
   /** `P2-16`: `Asia/Jakarta` | `Asia/Makassar` | `Asia/Jayapura`. */
   readonly timezone: string;
+  /** `P2-17`: the Kemendagri code the couple chose, any level. Owner-only; not in the public payload. */
+  readonly region_code: string | null;
   readonly venue_name: string;
   readonly address: string;
   readonly latitude: string | null;
@@ -183,6 +185,7 @@ export function toInvitationDetail(
       start_time: toClockTime(e.startTime),
       end_time: toClockTime(e.endTime),
       timezone: e.timezone,
+      region_code: e.regionCode,
       venue_name: e.venueName,
       address: e.address,
       latitude: e.latitude,

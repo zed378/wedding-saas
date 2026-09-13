@@ -113,6 +113,67 @@ export function timezoneForCoordinates(
 }
 
 /**
+ * `P2-17` — the zone of an administrative region, from its Kemendagri province code.
+ *
+ * Exact, unlike `timezoneForCoordinates`: a zone is a property of a province. The lists match the
+ * `regions` table (`regions.itest.ts` › "puts every province in the zone ADR-070 lists"), and are
+ * here so the editor can set the zone the moment a region is chosen, without a request.
+ * `undefined` for a code whose province is not one of the 38.
+ */
+export function timezoneForRegionCode(code: string): EventTimezone | undefined {
+  const province = code.slice(0, 2);
+  if (WIT_PROVINCES.includes(province)) return "Asia/Jayapura";
+  if (WITA_PROVINCES.includes(province)) return "Asia/Makassar";
+  if (WIB_PROVINCES.includes(province)) return "Asia/Jakarta";
+  return undefined;
+}
+
+const WIB_PROVINCES: readonly string[] = [
+  "11",
+  "12",
+  "13",
+  "14",
+  "15",
+  "16",
+  "17",
+  "18",
+  "19",
+  "21",
+  "31",
+  "32",
+  "33",
+  "34",
+  "35",
+  "36",
+  "61",
+  "62",
+];
+const WITA_PROVINCES: readonly string[] = [
+  "51",
+  "52",
+  "53",
+  "63",
+  "64",
+  "65",
+  "71",
+  "72",
+  "73",
+  "74",
+  "75",
+  "76",
+];
+const WIT_PROVINCES: readonly string[] = [
+  "81",
+  "82",
+  "91",
+  "92",
+  "93",
+  "94",
+  "95",
+  "96",
+];
+
+/**
  * West and Central Kalimantan, with Belitung, as `[longitude, latitude]` — simplified.
  *
  * The eastern edge follows the Central Kalimantan border: Kuala Kapuas and Muara Teweh fall

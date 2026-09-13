@@ -8,6 +8,8 @@ import type { EventDto } from "./invitation.dto";
 import type { InvitationEventRow } from "../../shared/tenancy/invitation-repository";
 import { toClockTime } from "../../shared/time/clock-time";
 import { DEFAULT_EVENT_TIMEZONE, timezoneForCoordinates } from "@wi/schema";
+import { RegionsService } from "../regions/regions.service";
+import { ValidationError } from "../../http/errors";
 
 /**
  * P1-12 — events. `docs/API/04` § Events, `docs/DATABASE/05`.
@@ -45,8 +47,10 @@ export interface EventInput {
   readonly eventDate: string;
   readonly startTime: string;
   readonly endTime?: string | null | undefined;
-  /** `P2-16`. Absent: detected from the coordinates, else WIB. */
+  /** `P2-16`. Absent: from the region's province, else the pin, else WIB. */
   readonly timezone?: string | undefined;
+  /** `P2-17`. A Kemendagri code at any level; `null` clears it. */
+  readonly regionCode?: string | null | undefined;
   readonly venueName: string;
   readonly address: string;
   readonly latitude?: string | null | undefined;
@@ -93,6 +97,7 @@ function toDto(row: InvitationEventRow): EventDto {
     start_time: toClockTime(row.startTime),
     end_time: toClockTime(row.endTime ?? null),
     timezone: row.timezone,
+    region_code: row.regionCode,
     venue_name: row.venueName,
     address: row.address,
     latitude: row.latitude,
@@ -114,7 +119,38 @@ function detectTimezone(
 
 @Injectable()
 export class EventsService {
-  constructor(private readonly repository: InvitationRepository) {}
+  constructor(
+    private readonly repository: InvitationRepository,
+    private readonly regions: RegionsService,
+  ) {}
+
+  /**
+   * `P2-17`, the zone precedence of `MEMORY/specs/P2-17-regions.md` R1: the region's province;
+   * else the province whose real boundary contains the pin; else `P2-16`'s coordinate rule. An
+   * explicit `timezone` in the request is applied by the caller before this is asked.
+   */
+  private async inferZone(
+    regionCode: string | null | undefined,
+    latitude: string | null | undefined,
+    longitude: string | null | undefined,
+  ): Promise<string | undefined> {
+    if (regionCode !== null && regionCode !== undefined) {
+      const zone = await this.regions.timezoneFor(regionCode);
+      if (zone === undefined) {
+        throw new ValidationError([
+          { field: "region_code", message: "Wilayah tidak dikenal." },
+        ]);
+      }
+      return zone;
+    }
+    if (latitude === null || latitude === undefined) return undefined;
+    if (longitude === null || longitude === undefined) return undefined;
+    const located = await this.regions
+      .locate(Number(latitude), Number(longitude))
+      .then((found) => found.timezone)
+      .catch(() => undefined);
+    return located ?? detectTimezone(latitude, longitude);
+  }
 
   async list(scope: TenantScope, invitationId: string): Promise<EventDto[]> {
     await requireOwned(
@@ -139,10 +175,14 @@ export class EventsService {
 
     const row = await this.repository.createEvent(invitationId, scope, {
       ...input,
-      // `P2-16`, ADR-070. An explicit zone wins; otherwise the pin decides; otherwise WIB.
+      // `P2-16`/`P2-17`. An explicit zone wins; then the region; then the pin; then WIB.
       timezone:
         input.timezone ??
-        detectTimezone(input.latitude, input.longitude) ??
+        (await this.inferZone(
+          input.regionCode,
+          input.latitude,
+          input.longitude,
+        )) ??
         DEFAULT_EVENT_TIMEZONE,
       // Step 4. Only when the caller left it empty: a user who supplied their own link --
       // a shared Google Maps short URL, say -- must keep it.
@@ -201,12 +241,16 @@ export class EventsService {
     // `P2-16`, ADR-070 — the same rule as the maps link: an explicit zone wins; moving the
     // pin re-detects it. A couple who picks a zone by hand does so after placing the pin, which
     // is the order the editor presents them in.
+    const regionChanged =
+      changes.regionCode !== undefined && changes.regionCode !== null;
     const timezone =
       changes.timezone !== undefined
         ? changes.timezone
-        : coordinatesChanged
-          ? detectTimezone(nextLatitude, nextLongitude)
-          : undefined;
+        : regionChanged
+          ? await this.inferZone(changes.regionCode, undefined, undefined)
+          : coordinatesChanged
+            ? await this.inferZone(undefined, nextLatitude, nextLongitude)
+            : undefined;
 
     const row = await this.repository.updateEvent(
       eventId,

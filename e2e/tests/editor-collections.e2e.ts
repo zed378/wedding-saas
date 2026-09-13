@@ -133,6 +133,24 @@ test("an event edited and a gift account added in the editor are stored, survive
     "Akad Nikah Keluarga",
   );
 
+  // ---- P2-17: choose the event's region; its province decides the zone.
+  const province = row.getByRole("combobox", { name: "Provinsi" });
+  await expect(province.getByRole("option", { name: "Bali" })).toBeAttached({
+    timeout: 30_000,
+  });
+  const regionSaved = page.waitForResponse(
+    (response) =>
+      response.request().method() === "PATCH" &&
+      /\/events\/[0-9a-f-]{36}$/.test(response.url()) &&
+      (response.request().postData() ?? "").includes("region_code"),
+  );
+  await province.selectOption("51");
+  await expect(row.getByRole("combobox", { name: /zona waktu/i })).toHaveValue(
+    "Asia/Makassar",
+  );
+  expect((await regionSaved).status()).toBe(200);
+  await expect(preview.locator('[data-section="event"]')).toContainText("WITA");
+
   // ---- Add a gift account from the panel.
   await page
     .getByRole("button", { name: /^Hadiah/ })
@@ -161,6 +179,12 @@ test("an event edited and a gift account added in the editor are stored, survive
   };
   expect(body.data.events[0]?.title).toBe("Akad Nikah Keluarga");
   expect(body.data.events[0]?.start_time).toBe("08:00");
+  expect(
+    (body.data.events[0] as unknown as { region_code: string }).region_code,
+  ).toBe("51");
+  expect(
+    (body.data.events[0] as unknown as { timezone: string }).timezone,
+  ).toBe("Asia/Makassar");
   expect(body.data.bank_accounts.map((a) => a.account_number)).toEqual([
     "8801 2345 6789",
   ]);

@@ -47,6 +47,7 @@ const EVENT = {
   "events.*.start_time": "Jam mulai acara",
   "events.*.end_time": "Jam selesai acara",
   "events.*.timezone": "Zona waktu acara",
+  "events.*.region_code": "Wilayah acara",
   "events.*.venue_name": "Nama tempat acara",
   "events.*.address": "Alamat acara",
   "events.*.latitude": "Lintang lokasi acara",

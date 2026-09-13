@@ -116,6 +116,7 @@ export {
   isEventTimezone,
   timezoneAbbreviation,
   timezoneForCoordinates,
+  timezoneForRegionCode,
   timezoneOffset,
   type EventTimezone,
 } from "./invitation/event-timezone.js";

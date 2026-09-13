@@ -21,6 +21,7 @@ import {
 
 import { users } from "./users.ts";
 import { templates, templateVersions, media } from "./templates.ts";
+import { regions } from "./regions.ts";
 
 /**
  * The invitation aggregate. `docs/DATABASE/04`, `05`, the invitation children of `06`,
@@ -288,6 +289,14 @@ export const invitationEvents = pgTable(
     timezone: varchar("timezone", { length: 40 })
       .notNull()
       .default("Asia/Jakarta"),
+    /**
+     * `P2-17` — the most specific administrative region the couple chose (province, regency,
+     * district or village). Its province decides `timezone` when no zone is sent explicitly.
+     */
+    regionCode: varchar("region_code", { length: 13 }).references(
+      () => regions.code,
+      { onDelete: "set null" },
+    ),
     venueName: varchar("venue_name", { length: 200 }).notNull(),
     address: text("address").notNull(),
     /**

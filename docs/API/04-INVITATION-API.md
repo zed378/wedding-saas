@@ -50,12 +50,14 @@ PATCH  /api/v1/invitations/:id/couple/bride       (same fields)
 ## Sub-resource: Events
 ```
 GET    /api/v1/invitations/:id/events
-POST   /api/v1/invitations/:id/events             { type, title, event_date, start_time, end_time, timezone?, venue_name, address, latitude, longitude, description }
+POST   /api/v1/invitations/:id/events             { type, title, event_date, start_time, end_time, timezone?, region_code?, venue_name, address, latitude, longitude, description }
 PATCH  /api/v1/invitations/:id/events/:event_id
 DELETE /api/v1/invitations/:id/events/:event_id
 ```
 
 - The body field is `event_date`, as the implementation has accepted since `P1-12`; this line said `date`, which is the **canonical** name (`PLAN/08`) the editor and the public payload use. The editor translates between the two in one place (`frontend/web-app/src/editor/transport.ts`). Corrected by `P2-15` (ADR-068).
+- `region_code` (`P2-17`, ADR-071): a Kemendagri code from API/10 at any level; `null` clears it; an unknown code is 400 `region_code`. Served on the owner detail, not in the public payload.
+- `timezone` (`P2-16`, ADR-070, extended by ADR-071): explicit value → the region's province → the province boundary containing the pin → the coordinate rule → WIB.
 - `timezone` (`P2-16`, ADR-070): `Asia/Jakarta` | `Asia/Makassar` | `Asia/Jayapura`, served on every event. Optional on write — absent, it is detected from the coordinates, else WIB; a coordinate change re-detects it unless `timezone` is sent in the same request. Any other value is a 400.
 - `start_time` and `end_time` are accepted and **served** as `HH:MM`. The column is a Postgres `time`, which reads back as `HH:MM:SS`; until `P2-15` it was served that way, so a time read from the API was refused when written back, and published invitations showed `08:00:00`.
 

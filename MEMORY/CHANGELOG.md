@@ -10,6 +10,15 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-13 — Every region of Indonesia
+
+**Added** — administrative regions ([P2-17](./records/2026-09-13-P2-17-regions.md))
+
+- **All of Indonesia's provinces, regencies and cities, districts and villages** — 38, 514, 7,285 and 83,762 — from the 2025 Ministry of Home Affairs decree.
+- **Choose where an event is**, province down to village, in the editor.
+- **The timezone follows the chosen province exactly**, and a map pin is checked against real province boundaries.
+- **A public regions API** (`/api/v1/regions`) for lists, a region's ancestors, and finding the region at a map point.
+
 ### 2026-09-13 — Events in WITA and WIT
 
 **Added** — event timezone ([P2-16](./records/2026-09-13-P2-16-event-timezone.md))

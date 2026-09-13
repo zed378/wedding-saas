@@ -525,7 +525,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — [record](../MEMORY/records/2026-09-13-P2-17-regions.md), [spec](../MEMORY/specs/P2-17-regions.md) |
 | **Depends on** | P2-16 |
 | **Spec refs** | Requested by the project owner 2026-09-13; Kemendagri region codes (`Kepmendagri` on kode dan data wilayah administrasi pemerintahan) |
 | **Spec required** | **Yes** — source, licence, data model and API are not in `docs/` |
@@ -541,8 +541,8 @@
 5. Keep `timezoneForCoordinates` as the fallback where no region is chosen.
 
 **Definition of Done**
-- [ ] Counts match the source: provinces, regencies/cities, districts, villages.
-- [ ] Every province maps to exactly one timezone, verified against the three zones' province lists.
-- [ ] The endpoints are public, cached, rate-limited, and in the IDOR inventory's exemption list with a reason.
-- [ ] Choosing a province in the editor sets the event's timezone.
+- [x] Counts match the source: provinces, regencies/cities, districts, villages. — 38 / 514 / 7,285 / 83,762, in the vendored files and the loaded tables.
+- [x] Every province maps to exactly one timezone, verified against the three zones' province lists. — `regions.itest.ts`.
+- [x] The endpoints are public, cached, rate-limited, and in the IDOR inventory's exemption list with a reason.
+- [x] Choosing a province in the editor sets the event's timezone. — `region-picker.spec.tsx`; full-stack `editor-collections.e2e.ts`.
 

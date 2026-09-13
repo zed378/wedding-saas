@@ -64,6 +64,13 @@
       "when": 1789309201482,
       "tag": "0008_event_timezone",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789310926058,
+      "tag": "0009_regions",
+      "breakpoints": true
     }
   ]
 }

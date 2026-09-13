@@ -27,3 +27,6 @@ export * from "./invitations.ts";
 
 // P0-10 — the commercial tables. docs/DATABASE/07, 08 and 10.
 export * from "./orders.ts";
+
+// P2-17 — Indonesia's administrative regions, province to village. MEMORY/specs/P2-17-regions.md.
+export * from "./regions.ts";
