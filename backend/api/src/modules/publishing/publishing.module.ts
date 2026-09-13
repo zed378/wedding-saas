@@ -2,7 +2,6 @@ import { Module } from "@nestjs/common";
 
 import { PublicInvitationController } from "./public-invitation.controller";
 import { PublicInvitationService } from "./public-invitation.service";
-import { PublicInvitationRepository } from "../../shared/tenancy/public-invitation-repository";
 
 /**
  * `P2-07` — publishing. `docs/ARCHITECTURE/01`: publish/unpublish and slug resolution.
@@ -13,7 +12,8 @@ import { PublicInvitationRepository } from "../../shared/tenancy/public-invitati
  */
 @Module({
   controllers: [PublicInvitationController],
-  providers: [PublicInvitationService, PublicInvitationRepository],
+  // The repository comes from the global `TenancyModule`.
+  providers: [PublicInvitationService],
   exports: [PublicInvitationService],
 })
 export class PublishingModule {}

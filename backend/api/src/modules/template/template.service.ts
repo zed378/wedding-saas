@@ -9,6 +9,12 @@ import {
   type TemplateSummaryDto,
 } from "./template.dto";
 import { TemplateRepository, type CatalogFilters } from "./template.repository";
+import { PublicInvitationRepository } from "../../shared/tenancy/public-invitation-repository";
+
+/** `P2-11`. The one thing the catalogue needs from the invitation tables. */
+export interface DemoLookup {
+  findDemoSlugForTemplate(templateId: string): Promise<string | null>;
+}
 
 /**
  * P2-01 — the catalog.
@@ -56,6 +62,7 @@ export class TemplateService {
   constructor(
     private readonly repository: TemplateRepository,
     @Inject(CACHE) private readonly cache: CachePort,
+    @Inject(PublicInvitationRepository) private readonly demos: DemoLookup,
   ) {}
 
   async list(
@@ -104,7 +111,11 @@ export class TemplateService {
     const found = await this.repository.findPublishedBySlug(slug);
     if (found === null) throw new NotFoundError();
 
-    const result = toDetail(found.template, found.version);
+    const result = toDetail(
+      found.template,
+      found.version,
+      await this.demos.findDemoSlugForTemplate(found.template.id),
+    );
     await this.cache.setJson(
       TEMPLATE_CACHE_NAMESPACE,
       key,

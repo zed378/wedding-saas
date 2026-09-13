@@ -299,6 +299,12 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3100"
+      # Server-side only (`P2-11`). The catalogue pages render on the server and reach the
+      # API over the compose network; the browser still uses NEXT_PUBLIC_API_BASE_URL above.
+      API_INTERNAL_BASE_URL: http://api:3000
+      PUBLIC_INVITE_ORIGIN: ${PUBLIC_INVITE_ORIGIN:?required}
+      # Absolute URLs for the sitemap, which the protocol requires.
+      APP_PUBLIC_ORIGIN: ${APP_ORIGIN:?required}
     ports: ["${STAGING_WEB_APP_PORT:-18100}:3100"]
 
   public-invite:
@@ -307,6 +313,12 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3200"
+      # `P2-08` read these and staging never set them, so the deployed page would have
+      # called http://localhost:3000 from inside its own container and failed every render.
+      # Found by `P2-11` while adding the same variables to the web app.
+      API_INTERNAL_BASE_URL: http://api:3000
+      PUBLIC_INVITE_ORIGIN: ${PUBLIC_INVITE_ORIGIN:?required}
+      SLUG_STRATEGY: path
     ports: ["${STAGING_PUBLIC_INVITE_PORT:-18200}:3200"]
 
   admin:

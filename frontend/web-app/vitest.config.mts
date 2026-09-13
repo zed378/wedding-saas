@@ -1,4 +1,6 @@
 import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "node:url";
+
 import { defineConfig } from "vitest/config";
 
 /**
@@ -25,6 +27,16 @@ export default defineConfig({
    * resolved tsconfig for files that have one.
    */
   plugins: [react()],
+  resolve: {
+    alias: {
+      // `P2-11`. Next's build-time guard that keeps `lib/catalog-api.ts` out of the browser
+      // bundle resolves through Next's bundler, not Node's, so Vitest cannot load it. The
+      // guard is the import existing; there is no runtime behaviour to emulate.
+      "server-only": fileURLToPath(
+        new URL("./test/server-only.ts", import.meta.url),
+      ),
+    },
+  },
   test: {
     globals: true,
     environment: "jsdom",

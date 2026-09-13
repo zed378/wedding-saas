@@ -1987,3 +1987,51 @@ what they would otherwise see.
 **Also decided here, and smaller**: `robots` sets `googleBot.noimageindex` when indexing is
 off. `index: false` on its own leaves an already-indexed page's cached image in results, and
 the image on a wedding invitation is the couple's faces.
+
+### ADR-065 — The template detail names its demo invitation, looked up by ownership
+
+**Date** 2026-09-13 · **Status** Accepted · **Task** `P2-11` · **Amends** `docs/API/03`
+
+**Context** — `docs/UI-UX/11` asks for a "View Live Demo" button that opens the demo
+*"rendered by the SAME renderer as production (not a separately mocked-up static page)"*.
+`docs/PLAN/07` § Demo Data had already decided what that demo is: a seeded invitation owned
+by a system account, served by the ordinary public API. `P0-21` seeds one, at
+`demo-elegant-rose`.
+
+The catalogue had no way to find it. `GET /templates/:slug` carries no reference to an
+invitation, and the only link between the two is that the seed happened to name the demo
+`demo-` plus the template's slug.
+
+**Decision** — `GET /templates/:slug` gains `demo_slug: string | null`, **looked up** rather
+than derived:
+
+- an invitation on this **template** (not version — a demo seeded on 1.0.0 still
+  demonstrates the template after 1.1.0 ships);
+- owned by **`SYSTEM_ACCOUNT_ID`**;
+- `published` and not soft-deleted.
+
+**Not a naming convention.** Deriving `demo-{slug}` in the frontend would have worked today
+and failed silently the day a second template's demo was seeded under any other name. No
+document defines the convention, and inventing one in the consumer would make the seed file's
+choice of name a contract nobody wrote down.
+
+**The owner predicate is the one that matters.** Without it the first published invitation
+on a popular template becomes the "demo" — a real couple's wedding page, handed to strangers
+from the catalogue. A mutation removing it fails *"never offers a customer's invitation on
+the same template as the demo"*.
+
+**Where the query lives**: `PublicInvitationRepository`, in `shared/tenancy/`, which is the
+only place allowed to touch `invitations` without an owner scope (`check-tenant-scope`). The
+repository moved into the global `TenancyModule` so `TemplateService` can depend on it
+through a one-method `DemoLookup` interface, rather than the template module growing its own
+invitation query.
+
+**Also decided in this task, smaller**:
+
+- **No "Most Popular" sort.** `docs/UI-UX/11` qualifies it — *"based on usage count, if data
+  is available"* — and it is not: the catalogue API is anonymous and has no count, and
+  computing one is a query over tenant invitations. Newest is the order, and the page says
+  so. Recorded as `DF-12`.
+- **Per-section previews are rendered, not screenshots.** There are no screenshots in the
+  data model; each slide is the real section drawn by the renderer in `demo` mode from the
+  demo's public payload, so it cannot drift from the product.

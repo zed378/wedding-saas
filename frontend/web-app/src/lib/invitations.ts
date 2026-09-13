@@ -62,6 +62,39 @@ export async function listInvitations(
   };
 }
 
+/** A template the create wizard can offer. `docs/API/03` § `GET /templates`. */
+export interface TemplateChoice {
+  readonly id: string;
+  readonly name: string;
+}
+
+/**
+ * `P2-11` — the templates a new invitation may choose, for the create wizard.
+ *
+ * `P1-21` left the wizard with `templates={[]}` and a comment saying the catalogue API did
+ * not exist yet. It does (`P2-01`), and an empty list meant a user arriving without
+ * `?template=` saw "Belum ada template yang tersedia" on a product that has templates.
+ *
+ * `anonymous`: the catalogue reads carry no session (ADR-059), and sending one would tie a
+ * public, cacheable call to a user for no reason.
+ */
+export async function listTemplateChoices(
+  api: ApiClient,
+): Promise<readonly TemplateChoice[]> {
+  const result = await api.request<{ id: string; name: string }[]>(
+    "/templates",
+    {
+      query: { per_page: 100 },
+      anonymous: true,
+    },
+  );
+
+  return result.data.map((template) => ({
+    id: template.id,
+    name: template.name,
+  }));
+}
+
 /** `GET /invitations/slug-available`. Advisory — see ADR-057. */
 export interface SlugAvailability {
   readonly available: boolean;

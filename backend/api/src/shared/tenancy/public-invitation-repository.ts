@@ -22,6 +22,7 @@ import type {
   GalleryEntry,
   MediaRow,
 } from "./invitation-repository";
+import { SYSTEM_ACCOUNT_ID } from "../demo/demo-account";
 
 /**
  * `P2-07` — the one read of invitation data with no owner in it.
@@ -216,6 +217,43 @@ export class PublicInvitationRepository {
       },
       watermark,
     };
+  }
+
+  /**
+   * `P2-11` — the public slug of a template's seeded demo invitation, or `null`.
+   *
+   * `docs/PLAN/07` § Demo Data: the catalogue's live demo is *"a seeded invitation owned by
+   * a system account … and the demo renders through the production renderer reading the
+   * production public API shape"*. So "View Live Demo" is a link to an ordinary published
+   * invitation, and the catalogue needs to know its address.
+   *
+   * Looked up rather than derived from a naming convention. `demo-elegant-rose` happens to
+   * be `demo-` plus the template's slug, but nothing in `docs/` says so, and a convention
+   * the frontend relied on would break silently the day a second template's demo was
+   * seeded under any other name.
+   *
+   * Three predicates, all of them doing work: **owned by the system account**, so a
+   * customer's invitation on the same template is never offered as somebody else's demo;
+   * **published and not deleted**, so the link cannot lead to the not-found page; and the
+   * **template**, not the version — a demo seeded on 1.0.0 still demonstrates the template
+   * after 1.1.0 is released.
+   */
+  async findDemoSlugForTemplate(templateId: string): Promise<string | null> {
+    const rows = await this.db
+      .select({ slug: invitations.slug })
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.templateId, templateId),
+          eq(invitations.ownerId, SYSTEM_ACCOUNT_ID),
+          eq(invitations.status, "published"),
+          isNull(invitations.deletedAt),
+        ),
+      )
+      .orderBy(desc(invitations.publishedAt))
+      .limit(1);
+
+    return rows[0]?.slug ?? null;
   }
 
   /**

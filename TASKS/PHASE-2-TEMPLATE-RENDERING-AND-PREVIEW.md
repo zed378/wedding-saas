@@ -351,7 +351,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** — 2026-09-13 ([record](../MEMORY/records/2026-09-13-P2-11-catalog-ui.md)) |
 | **Depends on** | P2-01, P2-03 |
 | **Spec refs** | `docs/UI-UX/11-TEMPLATE-UX.md`, `docs/PLAN/04` § F1, `docs/PLAN/15` § Marketing Pages |
 | **Spec required** | No |
@@ -367,10 +367,12 @@
 5. Make the marketing surfaces indexable and fast, per `docs/PLAN/15` § Marketing Pages — sitemap, meta tags, server rendering. Note the deliberate asymmetry: catalog pages are for search engines; invitation pages are not.
 
 **Definition of Done**
-- [ ] Filters, search and sort work against the API and are reflected in the URL.
-- [ ] The demo renders through the shared renderer with no separate mock page.
-- [ ] A logged-out user's template choice survives authentication.
-- [ ] Catalog and detail pages are indexable and carry a sitemap entry.
+- [x] Filters, search and sort work against the API and are reflected in the URL. — search, category, price and page, all in the query string, with a real GET form that works without JavaScript. The order is Newest, the only one the API has; "Most Popular" is `DF-12` under `docs/UI-UX/11`'s own "if data is available".
+- [x] The demo renders through the shared renderer with no separate mock page. — "View Live Demo" opens the seeded invitation on the public host (`demo_slug`, looked up by ownership — ADR-065), and the per-section previews render from its public payload through the production renderer. There is no demo route in the app to be a mock.
+- [x] A logged-out user's template choice survives authentication. — a test drives the detail page's href through the real `RequireAuth`/`safeNext` functions and gets the same template back.
+- [x] Catalog and detail pages are indexable and carry a sitemap entry. — `robots: index` overrides the app-wide `noindex`, `metadataBase` makes canonicals absolute, and `sitemap.ts`/`robots.ts` exist. No invitation is ever listed.
+
+**Also fixed**: the staging compose file never set `API_INTERNAL_BASE_URL` for `public-invite`, so the deployed invitation page could not have rendered at all; and the create wizard (`P1-21`) still passed `templates={[]}` although the catalogue API had existed since `P2-01`.
 
 ---
 
