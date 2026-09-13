@@ -20,7 +20,7 @@ GET    /api/v1/invitations/slug-available?slug=&exclude_invitation_id=   Is this
 
 ### `change-template` response
 
-The response is the source for the confirmation modal in UI-UX/05 § Change Template Flow, which lists the fields that will stop being displayed before the user commits:
+UI-UX/05 § Change Template Flow lists the sections that will stop being displayed **before** the user commits, which is before this response exists. The editor therefore applies the rule below to the target template it has already fetched (`frontend/web-app/src/editor/template-change.ts`, `P2-14`); this response is the server's confirmation of what it did:
 
 ```json
 {
@@ -36,6 +36,7 @@ The response is the source for the confirmation modal in UI-UX/05 § Change Temp
 
 - `enabled_sections` is recomputed by the server from `section_key` equality (PLAN/07 § Template Compatibility): what was enabled and the new template still defines, plus the new template's `enabled_by_default` sections the old template did not have, plus any section the new template marks non-configurable. The client does not send it — a client that could would be able to enable a section the template does not define.
 - `hidden_sections` is what was enabled and the new template does not define. The data behind those sections **is not deleted** (BR-4.1); switching back restores the display.
+- **How switching back restores it** (`P2-14`, ADR-069): the server remembers the couple's on/off choice for every section the current template does not define (`invitation_settings.section_memory`, never exposed). When a later template defines such a section again, the remembered choice wins over that template's `enabled_by_default`. Until `P2-14` nothing was remembered, so a section the couple had turned on came back in its template's default state — off, for the reference template's gift section — and one they had turned off came back on.
 - `dropped_theme_keys` is what was removed from `theme_override` because the new template does not list it in `customizable_theme_keys`. Unlike section data these are not retained: a theme key's meaning belongs to the template that defines it.
 - 422 `TEMPLATE_NOT_AVAILABLE` when the target template has no published version (BR-3.3); 422 `TEMPLATE_UNCHANGED` when the invitation is already on it; 404 when the template id is unknown, indistinguishable from an invitation that is not the caller's.
 - 422 `TEMPLATE_WOULD_LEAVE_PUBLISHED_INVITATION_INCOMPLETE`, with `details[]`, when the invitation is **published** and the target template requires a field the invitation has not filled. The BR-4.2 check re-runs here because a template change is the one way a live page could otherwise become incomplete, and a published page has guests holding its link. A **draft** is not checked; `POST /publish` is where BR-4.2 applies to it. Added by `P2-06` (`OQ-23`, ADR-061).

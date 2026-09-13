@@ -1,5 +1,5 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, openSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 
@@ -55,6 +55,7 @@ interface PgPool {
 interface RedisClient {
   keys(pattern: string): Promise<string[]>;
   del(...keys: string[]): Promise<number>;
+  incr(key: string): Promise<number>;
   quit(): Promise<unknown>;
 }
 
@@ -191,13 +192,26 @@ export async function startFullStack(): Promise<FullStack> {
   const redis = new Redis(redisUrl, { maxRetriesPerRequest: 2 });
   const stale = await redis.keys("rl:*");
   if (stale.length > 0) await redis.del(...stale);
+  /*
+   * And the catalogue cache, the way an admin publish invalidates it (`TemplateService`'s
+   * generation counter, `infra/cache/redis-cache.ts`). The integration suite truncates
+   * `templates`, so the templates written above can have new ids while a cached listing from
+   * an earlier run still names the old ones — the editor then offered a template id the
+   * database had never heard of, and `change-template` answered 404.
+   */
+  await redis.incr("cache:gen:tpl");
   await redis.quit();
 
   const children: ChildProcess[] = [];
   children.push(
     spawn(process.execPath, ["dist/main.js"], {
       cwd: API,
-      stdio: "ignore",
+      // `E2E_API_LOG=<file>` keeps the API's structured log, for a failure the browser only
+      // sees as a status code.
+      stdio:
+        process.env["E2E_API_LOG"] === undefined
+          ? "ignore"
+          : ["ignore", openSync(process.env["E2E_API_LOG"], "w"), "inherit"],
       env: {
         ...process.env,
         NODE_ENV: "development",

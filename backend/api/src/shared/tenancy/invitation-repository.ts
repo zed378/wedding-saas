@@ -1244,6 +1244,8 @@ export class InvitationRepository {
       readonly templateId: string;
       readonly templateVersionId: string;
       readonly enabledSections: readonly string[];
+      /** ADR-069: choices for sections the new template does not define. */
+      readonly sectionMemory: Record<string, boolean>;
       readonly themeOverride: Record<string, unknown>;
     },
     audit: (tx: Transaction) => Promise<void>,
@@ -1275,12 +1277,14 @@ export class InvitationRepository {
         .values({
           invitationId,
           enabledSections: [...next.enabledSections],
+          sectionMemory: next.sectionMemory,
           themeOverride: next.themeOverride,
         })
         .onConflictDoUpdate({
           target: invitationSettings.invitationId,
           set: {
             enabledSections: [...next.enabledSections],
+            sectionMemory: next.sectionMemory,
             themeOverride: next.themeOverride,
             updatedAt: new Date(),
           },

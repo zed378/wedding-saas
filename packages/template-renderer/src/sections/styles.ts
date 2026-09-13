@@ -65,6 +65,10 @@ export const SECTION_STYLES = `
 }
 .wi-hero-names { font-size: calc(2.25rem * var(--font-scale)); color: #fff; margin: 0; }
 .wi-hero-date { color: #fff; opacity: 0.92; }
+/* P2-14. No cover photo means no scrim: the text is on --color-secondary, so it takes the
+   theme's text colours rather than white (2.2:1 at best on the reference theme). */
+.wi-hero-plain .wi-hero-names { color: var(--color-primary); }
+.wi-hero-plain .wi-hero-date { color: var(--color-text); opacity: 1; }
 .wi-hero .wi-button { margin-top: var(--space); }
 
 .wi-button {

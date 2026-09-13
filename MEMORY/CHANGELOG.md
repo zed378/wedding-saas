@@ -10,6 +10,18 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-13 — Phase 2 complete: changing template, end to end
+
+**Added** — Phase 2 acceptance ([P2-14](./records/2026-09-13-P2-14-phase-2-acceptance.md), [summary](./records/2026-09-13-PHASE-2-SUMMARY.md))
+
+- **"Ganti template" in the editor.** Choose a template, see which sections will stop showing before anything changes, and switch. Content is never deleted.
+
+**Fixed**
+
+- **Switching back to a template restores the sections you had chosen.** Before, a section that template ships switched off (such as gifts) came back off, and one you had switched off came back on.
+- **An invitation with no cover photo has a readable cover.** Its text was white on a light background.
+- **Error messages are in Indonesian** where the server's generic English message used to appear.
+
 ### 2026-09-13 — The editor saves
 
 **Fixed** — editor against the real API ([P2-15](./records/2026-09-13-P2-15-editor-canonical-document.md))

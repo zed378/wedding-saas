@@ -78,7 +78,15 @@ export function HeroClassic({ data }: SectionProps) {
       : (text(cover["medium_url"]) ?? text(cover["url"]));
 
   return (
-    <div className="wi-section wi-hero">
+    <div
+      className={
+        // `P2-14`: without a photo there is no scrim, and white text on the theme's light
+        // background was all but invisible. The plain hero takes the theme's own colours.
+        sharp === undefined
+          ? "wi-section wi-hero wi-hero-plain"
+          : "wi-section wi-hero"
+      }
+    >
       {sharp !== undefined && (
         <>
           <Photo src={sharp} className="wi-hero-bg" priority />

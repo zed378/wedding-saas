@@ -402,6 +402,42 @@ describe("changing a template without losing data", () => {
       expect(await contentSnapshot(invitationId)).toEqual(before);
     });
 
+    it("the round trip restores a section whose template default is off (ADR-069)", async () => {
+      // The full-stack E2E's scenario, at the service: the couple turned on a section the
+      // template ships off, switched to a design without it, and switched back.
+      const user = await createTestUser(harness.pool);
+      const templateA = await templateWith(
+        SECTIONS_A.map((section) =>
+          section.section_key === "gift"
+            ? { ...section, enabled_by_default: false }
+            : section,
+        ),
+      );
+      const invitation = await createTestInvitation(harness.pool, {
+        owner: user,
+        template: templateA,
+      });
+      await harness.pool.query(
+        `INSERT INTO invitation_settings (invitation_id, enabled_sections) VALUES ($1, $2)`,
+        [invitation.id, ["hero", "gallery", "gift"]],
+      );
+      const templateB = await templateWith(SECTIONS_B);
+
+      await service.change(user.scope, invitation.id, templateB.templateId);
+      const { rows } = await harness.pool.query<{ section_memory: unknown }>(
+        "SELECT section_memory FROM invitation_settings WHERE invitation_id = $1",
+        [invitation.id],
+      );
+      expect(rows[0]!.section_memory).toEqual({ gallery: true, gift: true });
+
+      const back = await service.change(
+        user.scope,
+        invitation.id,
+        templateA.templateId,
+      );
+      expect(back.enabled_sections).toEqual(["hero", "gallery", "gift"]);
+    });
+
     it("the code path contains no delete statement at all", async () => {
       // The card's first DoD item, made mechanical. An absence cannot be read off a diff
       // six months from now, and "we would notice a DELETE in review" is exactly the kind
@@ -746,6 +782,7 @@ describe("changing a template without losing data", () => {
           templateId: templateB.templateId,
           templateVersionId: templateB.versionId,
           enabledSections: ["hero"],
+          sectionMemory: {},
           themeOverride: {},
         },
         async () => {
@@ -798,14 +835,82 @@ describe("changing a template without losing data", () => {
 
     it("tolerates a malformed sections column on either side", () => {
       // The column is jsonb and these rows may predate any version of P0-20's validator.
-      expect(recomputeSections(null, targets, ["hero"])).toEqual({
+      expect(recomputeSections(null, targets, ["hero"])).toMatchObject({
         enabled: ["hero", "quote"],
         hidden: [],
       });
-      expect(recomputeSections(SECTIONS_A, "not an array", ["hero"])).toEqual({
+      expect(
+        recomputeSections(SECTIONS_A, "not an array", ["hero"]),
+      ).toMatchObject({
         enabled: [],
         hidden: ["hero"],
       });
+    });
+
+    /*
+     * `P2-14`, ADR-069 — choices survive templates that lack the section.
+     *
+     * `P1-15`'s round trip passed because every section in its fixture was on by default, so
+     * re-applying defaults looked like restoring. The reference template ships `gift` OFF, and
+     * the full-stack E2E found a couple's gift section gone after A -> B -> A.
+     */
+    const withDefault = (key: string, on: boolean) =>
+      SECTIONS_A.map((section) =>
+        section.section_key === key
+          ? { ...section, enabled_by_default: on }
+          : section,
+      );
+
+    it("restores a section the user turned ON, even when its default is off", () => {
+      const a = withDefault("gift", false);
+      const toB = recomputeSections(a, SECTIONS_B, ["hero", "gallery", "gift"]);
+      expect(toB.memory).toEqual({ gallery: true, gift: true });
+
+      const back = recomputeSections(SECTIONS_B, a, toB.enabled, toB.memory);
+      expect(back.enabled).toContain("gift");
+      // And B's own choices are remembered in turn, including the section it had off.
+      expect(back.memory).toEqual({ quote: true, closing: false });
+    });
+
+    it("keeps a section the user turned OFF off, even when its default is on", () => {
+      const toB = recomputeSections(SECTIONS_A, SECTIONS_B, ["hero", "gift"]);
+      expect(toB.memory).toEqual({ gallery: false, gift: true });
+
+      const back = recomputeSections(
+        SECTIONS_B,
+        SECTIONS_A,
+        toB.enabled,
+        toB.memory,
+      );
+      expect(back.enabled).toEqual(["hero", "gift"]);
+    });
+
+    it("remembers across more than one template in between", () => {
+      const c = [SECTIONS_B[0]!, SECTIONS_B[2]!]; // hero and closing only
+      const toB = recomputeSections(withDefault("gift", false), SECTIONS_B, [
+        "hero",
+        "gift",
+      ]);
+      const toC = recomputeSections(SECTIONS_B, c, toB.enabled, toB.memory);
+      const back = recomputeSections(
+        c,
+        withDefault("gift", false),
+        toC.enabled,
+        toC.memory,
+      );
+
+      expect(back.enabled).toContain("gift");
+      expect(back.enabled).not.toContain("gallery");
+    });
+
+    it("lets the new template's default apply to a section this user has never had", () => {
+      const back = recomputeSections(
+        SECTIONS_B,
+        SECTIONS_A,
+        ["hero", "quote"],
+        {},
+      );
+      expect(back.enabled).toEqual(["hero", "gallery", "gift"]);
     });
 
     it("produces no duplicate even when a key is carried, new and structural at once", () => {

@@ -514,7 +514,7 @@ const record = (endpoint: string, patch: Partial<MatrixRow>): void => {
   matrix.set(endpoint, { ...(matrix.get(endpoint) ?? { endpoint }), ...patch });
 };
 
-describe("P1-25 — IDOR sweep over every Phase 1 :id endpoint", () => {
+describe("P1-25, P2-14 — IDOR sweep over every owner-scoped :id endpoint (completeness: idor-sweep-inventory.spec.ts)", () => {
   let owner: Pool;
   let app: INestApplication;
   let ctx: Ctx;

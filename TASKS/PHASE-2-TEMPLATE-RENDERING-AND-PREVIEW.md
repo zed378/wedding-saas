@@ -439,7 +439,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — [record](../MEMORY/records/2026-09-13-P2-14-phase-2-acceptance.md), [phase summary](../MEMORY/records/2026-09-13-PHASE-2-SUMMARY.md) |
 | **Depends on** | all Phase 2 tasks |
 | **Spec refs** | `docs/FRONTEND/10-TESTING.md`, `docs/TESTING/03-E2E-TESTING.md`, `docs/PLAN/17-ACCEPTANCE-CRITERIA.md` |
 | **Spec required** | No |
@@ -457,10 +457,12 @@
 7. Write the phase summary record.
 
 **Definition of Done**
-- [ ] Disabled sections are provably absent from the rendered DOM and from the API payload.
-- [ ] The template-switch E2E passes.
-- [ ] Both performance budgets pass in CI.
-- [ ] The phase summary exists in `MEMORY/records/`.
+- [x] Disabled sections are provably absent from the rendered DOM and from the API payload. — all 256 combinations of the reference template on both sides, mutation-verified.
+- [x] The template-switch E2E passes. — `template-switch.e2e.ts` against the real stack, locally; not in CI (needs database services). It found the switch-back bug fixed by ADR-069.
+- [~] Both performance budgets pass in CI. — editor preview yes; public page JS budget and Fast 4G LCP yes; **Slow 4G LCP no (`OQ-26`)**; the CI job exists but has not been observed running on GitHub.
+- [x] The phase summary exists in `MEMORY/records/`.
+
+**Not done**: step 4, real scrapers — needs `P3-09`.
 
 ---
 

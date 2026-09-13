@@ -12,7 +12,7 @@ Every entry names the task it blocks or affects, so nothing here is a note witho
 
 | | Total | Resolved | Open |
 |---|---|---|---|
-| Open Questions | 16 | 10 | 6 |
+| Open Questions | 17 | 10 | 7 |
 | Specification Gaps | 17 | 17 | 0 |
 | Deferred | 9 | — | 9 (by design) |
 
@@ -22,9 +22,22 @@ Nothing on the board is `BLOCKED`. The remaining questions shape work rather tha
 
 **2026-09-13**: `P2-13` raised `OQ-25` (theme web fonts are named but never loaded) and `OQ-26` (which "4G" the LCP target means). Six open questions; still none blocks a task.
 
+**2026-09-13**: `P2-14` raised `OQ-27` (how dates and times display, and which timezone an event is in). Seven open questions; none blocks a task, though `OQ-27` should be answered before launch.
+
 ---
 
 ## Open Questions — Remaining
+
+### OQ-27 — How are event dates and times shown, and in which timezone is an event?
+
+**Affects**: `P2-03` renderer sections, `P2-09` link-preview text, `P4-*` reminders — **not blocking**, but visible on every published invitation.
+
+Two gaps found in `P2-13`'s visual baselines and confirmed in `P2-14`:
+
+1. **Format.** The hero and the event cards print the stored ISO date — `2027-05-15` — and the link preview description does the same. `docs/UI-UX/14` asks for "the date" and nothing more. An Indonesian reader expects something like *Sabtu, 15 Mei 2027*; many Muslim invitations also print the Hijri date. Which, and whether the Hijri date is optional per invitation, is a product choice.
+2. **Timezone.** `docs/PLAN/08` § Entity: Event has no timezone. The renderer labels every time `WIB` and computes the countdown as `+07:00`, which is wrong by an hour for a wedding in Bali or Makassar (WITA) and by two in Papua (WIT) — the countdown would reach zero before or after the ceremony. Options: an `events.timezone` field (`Asia/Jakarta` | `Asia/Makassar` | `Asia/Jayapura`), a per-invitation timezone, or keeping WIB and saying so in the editor.
+
+Neither is decided in code. The renderer's date output is a single place (`EventCardDouble`, `HeroClassic`) once the answer exists.
 
 ### OQ-26 — Which "simulated 4G" does the public page's LCP target mean?
 

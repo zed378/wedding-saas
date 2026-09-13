@@ -2159,3 +2159,31 @@ template defaults rather than the couple's stored selection.
 **Consequences** — `P2-05`'s parity test was replaced by one that renders the editor document
 and the public payload for the same invitation. Any future owner-endpoint field must be added to
 `toEditorDocument`; the registry drift test fails otherwise.
+
+### ADR-069 — A template switch remembers section choices across templates; the migration snapshot chain is repaired
+
+**Date** 2026-09-13 · **Task** `P2-14` · **Status** Accepted · **Amends** `docs/DATABASE/04`, `docs/API/04`
+
+**Context** — `docs/API/04` promises that switching back to a template restores the sections a
+switch hid. `P1-15` implemented "keep what the new template defines, add its defaults for
+sections the old template lacked", with no record of anything else. Its round-trip test passed
+because every section in its fixture was on by default. The first full-stack template-switch
+E2E used the reference template, whose `gift` section ships off: after A → B → A the couple's
+gift section was gone, and a section switched off on A would equally have come back on.
+
+**Decisions**
+
+1. **`invitation_settings.section_memory JSONB NOT NULL DEFAULT '{}'`** — `{ section_key: boolean }`
+   for each section the current template does not define. Expand-only migration `0007`.
+2. **Recompute order per section of the target template:** defined by the current template →
+   keep its current state; else remembered → the remembered choice; else → the target's
+   `enabled_by_default`; non-configurable → on. The memory then drops keys the target defines
+   and records the current template's choices for sections the target lacks.
+3. **Never exposed** in any response. It is internal state of the switch rule.
+4. **The Drizzle snapshot chain is repaired.** Snapshots `0005` and `0006` were copies of `0004`
+   (same id, stale contents), so `drizzle-kit generate` refused to run and, forced, would have
+   re-emitted both migrations. `0007` was generated against the last true snapshot, cut down
+   to its one statement, and the ids re-chained; `generate` now reports no drift.
+
+**Consequences** — Existing rows start with `{}`: behaviour is unchanged for them until their
+next switch. A future "reset to template defaults" action must clear the memory as well.

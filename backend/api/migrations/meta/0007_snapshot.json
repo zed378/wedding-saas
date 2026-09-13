@@ -1,6 +1,6 @@
 {
-  "id": "a1c1b982-db7c-48e5-b34f-8892cf92c230",
-  "prevId": "138e06ec-e226-4686-a597-4e9e356ce13a",
+  "id": "9643e19b-3e16-4e78-8a4a-b1b2fa552ad5",
+  "prevId": "a1c1b982-db7c-48e5-b34f-8892cf92c230",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -719,6 +719,110 @@
         "media_status_check": {
           "name": "media_status_check",
           "value": "status IN ('processing', 'ready', 'failed')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.slug_blocklist": {
+      "name": "slug_blocklist",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "term": {
+          "name": "term",
+          "type": "varchar(60)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "match_type": {
+          "name": "match_type",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'exact'"
+        },
+        "category": {
+          "name": "category",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'reserved'"
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_slug_blocklist_term": {
+          "name": "idx_slug_blocklist_term",
+          "columns": [
+            {
+              "expression": "lower(\"term\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "match_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "slug_blocklist_created_by_users_id_fk": {
+          "name": "slug_blocklist_created_by_users_id_fk",
+          "tableFrom": "slug_blocklist",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "slug_blocklist_match_type_check": {
+          "name": "slug_blocklist_match_type_check",
+          "value": "match_type IN ('exact','substring')"
+        },
+        "slug_blocklist_category_check": {
+          "name": "slug_blocklist_category_check",
+          "value": "category IN ('reserved','profanity','brand','other')"
         }
       },
       "isRLSEnabled": false
@@ -1966,6 +2070,13 @@
         },
         "theme_override": {
           "name": "theme_override",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "section_memory": {
+          "name": "section_memory",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,

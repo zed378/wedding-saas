@@ -58,6 +58,27 @@ const BY_CODE: Readonly<Record<string, FriendlyError>> = {
     message: "Kata sandi belum memenuhi syarat.",
     field: "password",
   },
+  /*
+   * `P2-14`. The API's generic codes carry English default messages (`http/exception.filter.ts`),
+   * and without an entry here the server's text reached the screen verbatim — the
+   * change-template dialog showed "The requested resource was not found." to an Indonesian
+   * user. One wording for "does not exist" and "not yours", as the API intends (ADR-018).
+   */
+  NOT_FOUND: {
+    message: "Data yang Anda cari tidak ditemukan atau sudah tidak tersedia.",
+  },
+  FORBIDDEN: {
+    message: "Anda tidak memiliki izin untuk melakukan tindakan ini.",
+  },
+  CONFLICT: {
+    message: "Data ini baru saja berubah. Muat ulang halaman lalu coba lagi.",
+  },
+  PAYLOAD_TOO_LARGE: {
+    message: "Data yang dikirim terlalu besar.",
+  },
+  INTERNAL_ERROR: {
+    message: "Terjadi kesalahan di server kami. Coba lagi sebentar lagi.",
+  },
   FREE_DRAFT_LIMIT_REACHED: {
     message:
       "Anda masih memiliki undangan yang belum dibayar. Selesaikan undangan tersebut terlebih dahulu.",

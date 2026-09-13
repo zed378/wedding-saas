@@ -62,7 +62,10 @@ function toCanonical(seed: Record<string, unknown>): Record<string, unknown> {
     couple: { groom: byRole("groom"), bride: byRole("bride") },
     events: (seed["events"] ?? []) as unknown[],
     gallery: { photos: (seed["gallery"] ?? []) as unknown[] },
-    gift: { accounts: (seed["bank_accounts"] ?? []) as unknown[] },
+    // `gift_accounts`, the demo file's key. This read `bank_accounts` until `P2-14`'s
+    // combination test asked for a gift account to look for and found none: every render in
+    // this file had run with an empty gift section.
+    gift: { accounts: (seed["gift_accounts"] ?? []) as unknown[] },
     quote: (seed["quote"] ?? {}) as Record<string, unknown>,
   };
 }
@@ -317,4 +320,87 @@ describe("the reference template's photos, as the public API serves them", () =>
     );
     expect(photo?.getAttribute("sizes")).toContain("rem");
   });
+});
+
+/**
+ * `P2-14` step 1 — `docs/FRONTEND/10` § Integration Test: "render with dummy data across
+ * various `enabled_sections` combinations → verify inactive sections don't appear in the
+ * DOM".
+ *
+ * Not "various": **every** combination of the reference template's configurable sections,
+ * rendered with the demo invitation. The sections rendered must be exactly the
+ * non-configurable ones plus the chosen subset, in template order — and a disabled section's
+ * data must not be anywhere in the markup, not merely hidden.
+ */
+describe("every enabled_sections combination of the reference template", () => {
+  const sections = referenceTemplate.sections;
+  const configurable = sections
+    .filter((s) => s.configurable)
+    .map((s) => s.section_key);
+  const structural = sections
+    .filter((s) => !s.configurable)
+    .map((s) => s.section_key);
+
+  const canonical = toCanonical(demo);
+  /** A string only that section's data carries, to prove absence from the markup. */
+  const markers: Record<string, string | undefined> = {
+    gift: (canonical["gift"] as { accounts: { account_number?: string }[] })
+      .accounts[0]?.account_number,
+    quote: (canonical["quote"] as { text?: string }).text,
+  };
+
+  it("has something to combine", () => {
+    // Negative control: a template with no configurable sections would make the loop below
+    // assert nothing 1 time.
+    expect(configurable.length).toBeGreaterThanOrEqual(5);
+    expect(
+      markers["gift"],
+      "the demo has no gift account to look for",
+    ).toBeTruthy();
+    expect(markers["quote"], "the demo has no quote to look for").toBeTruthy();
+  });
+
+  it(`renders exactly the chosen sections for all ${String(2 ** configurable.length)} subsets`, () => {
+    const failures: string[] = [];
+
+    for (let mask = 0; mask < 2 ** configurable.length; mask += 1) {
+      const chosen = configurable.filter((_, index) => (mask >> index) & 1);
+      const { container, unmount } = render(
+        <TemplateRenderer
+          mode="public"
+          templateVersion={version}
+          invitationData={canonical}
+          enabledSections={chosen}
+        />,
+      );
+
+      const rendered = [...container.querySelectorAll("[data-section]")].map(
+        (el) => el.getAttribute("data-section"),
+      );
+      const expected = sections
+        .map((s) => s.section_key)
+        .filter((key) => structural.includes(key) || chosen.includes(key));
+
+      if (JSON.stringify(rendered) !== JSON.stringify(expected)) {
+        failures.push(`[${chosen.join(",")}] rendered [${rendered.join(",")}]`);
+      }
+      const html = container.innerHTML;
+      for (const [key, marker] of Object.entries(markers)) {
+        if (
+          !chosen.includes(key) &&
+          marker !== undefined &&
+          html.includes(marker)
+        ) {
+          failures.push(
+            `[${chosen.join(",")}] leaked ${key} data into the markup`,
+          );
+        }
+      }
+      unmount();
+    }
+
+    expect(failures).toEqual([]);
+    // 256 full renders: ~3.5s alone, 15s under `pnpm verify`'s parallel load, where the 5s
+    // default failed it once. The bound is generous on purpose; a hang still fails.
+  }, 60_000);
 });
