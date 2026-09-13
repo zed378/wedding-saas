@@ -24,6 +24,8 @@ export interface PublicInvitation {
     readonly sections: readonly SectionDefinition[];
     readonly theme: Record<string, unknown>;
     readonly customizable_theme_keys?: readonly string[];
+    /** `P2-09`'s `og:image` fallback for an invitation with no cover photo. */
+    readonly thumbnail_url?: string | null;
   };
   readonly display: { readonly watermark: boolean };
   readonly invitation: {

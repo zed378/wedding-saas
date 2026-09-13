@@ -288,7 +288,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** — 2026-09-13 ([record](../MEMORY/records/2026-09-13-P2-09-seo-metadata.md)); step 6 is an open operational item, see below |
 | **Depends on** | P2-08 |
 | **Spec refs** | `docs/PLAN/15-SEO.md`, `docs/FRONTEND/07` § SEO Meta Generation, `docs/SECURITY/09-PRIVACY-DATA-PROTECTION.md` |
 | **Spec required** | Yes — privacy |
@@ -305,10 +305,12 @@
 6. Verify with the real scrapers, not just a unit test: WhatsApp, Facebook and Telegram link previews on a staging invitation.
 
 **Definition of Done**
-- [ ] A shared link shows the cover photo and couple names in WhatsApp, Facebook and Telegram.
-- [ ] `noindex` is present unless the owner explicitly enabled indexing; a test asserts the default.
-- [ ] Structured data contains no bank account or guest information.
-- [ ] The fallback image path works for an invitation with no cover photo.
+- [x] A shared link shows the cover photo and couple names — **in the emitted document**, asserted from the real HTML a production server sends. The "in WhatsApp, Facebook and Telegram" half is step 6, below.
+- [x] `noindex` is present unless the owner explicitly enabled indexing; a test asserts the default. — five tests, and a mutation relaxing the check to `!== false` fails four of them by name. ADR-064 argues the asymmetry.
+- [x] Structured data contains no bank account or guest information. — asserted over the serialized object AND as an exact key set, so adding `offers` (which looks like the right property for a gift registry) fails two tests.
+- [x] The fallback image path works for an invitation with no cover photo. — the `is_cover` photo, then the first photo, then the template thumbnail, then no image at all rather than a broken one. `template.thumbnail_url` was added to the public payload for this (ADR-064).
+
+**Step 6 — the real scrapers — is NOT done and cannot be done from a test suite.** It needs a *published* invitation on staging, which needs `P3-09`'s publish endpoint, plus three external services fetching a public URL. Left as an operational item for the project owner rather than marked done, because WhatsApp, Facebook and Telegram genuinely disagree about image dimensions, redirects and caching, and a green unit test is not evidence about any of them.
 
 ---
 

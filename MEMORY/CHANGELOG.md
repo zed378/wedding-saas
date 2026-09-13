@@ -10,6 +10,17 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-13 — A shared invitation looks like an invitation
+
+**Added** — link previews, robots and structured data ([P2-09](./records/2026-09-13-P2-09-seo-metadata.md))
+
+- **A pasted invitation produces a real preview card** — the couple's names, the date, the venue and the cover photo, in the large-image format, because the photo *is* the preview. This is the product's whole distribution mechanism: an invitation reaches its guests by being pasted into WhatsApp.
+- **A search engine is told not to index it**, unless the couple explicitly asked. `docs/SECURITY/09` gives the reason: the page carries guest names and RSVP replies, published by somebody thinking about their wedding rather than about Google. The setting is read as **exactly `true`** — a missing field, a `null`, a string all mean "do not index" — because the two failure directions are not comparable (ADR-064). `noimageindex` goes with it, since `noindex` alone leaves an already-indexed page's cached photo in results.
+- **schema.org `Event` structured data**, carrying the ceremony's time and place and nothing else. No `offers`, no `attendee`, no `performer` — the couple are not performers, the guests are not public data, and an invitation is not ticketed. The exact key set is asserted, so adding one of those is a deliberate act that fails a test first.
+- **The `og:image` fallback chain** now works end to end: the cover photo, then the first photo, then the template's catalogue thumbnail, then no image rather than a broken one. The thumbnail joined the public payload for this — an invitation with no photos is exactly what a couple has while they are testing what their link looks like.
+
+**Not done, and honestly so** — the card asks for verification against the real WhatsApp, Facebook and Telegram scrapers. That needs a published invitation on staging, which needs `P3-09`, and three external services. It stays open rather than being marked done on the strength of a unit test: the three scrapers disagree with each other about dimensions, redirects and caching.
+
 ### 2026-09-13 — A guest can open an invitation
 
 **Added** — the public page, server-rendered ([P2-08](./records/2026-09-13-P2-08-public-ssr.md))

@@ -1949,3 +1949,41 @@ That test was itself thin at first — the event section's fixture declared only
 `events.*.title` and `events.*.venue_name`, so reverting `date` to `event_date` passed. The
 fixture now declares every path its sections could use. A guard driven by a fixture is only
 as good as the fixture.
+
+### ADR-064 — `seo_indexable` is read as "exactly true", and the payload carries the template thumbnail
+
+**Date** 2026-09-13 · **Status** Accepted · **Task** `P2-09` · **Amends** `docs/API/08`
+
+**Context** — `docs/PLAN/15` and `docs/SECURITY/09` both say the same thing: an invitation
+defaults to `noindex`, because the page carries guest names, RSVP replies and guestbook
+messages, and the couple who published it was thinking about their wedding rather than
+about Google. `invitation_settings.seo_indexable` defaults to `false` in the database.
+
+Two things about implementing that are decisions rather than transcription.
+
+**Decision 1 — the read fails closed.** `isIndexable()` is
+`settings.seo_indexable === true`, not `!== false`. A missing field, a `null`, a string
+`"true"` from some future serializer, or a payload that lost the setting all mean **do not
+index**.
+
+The asymmetry is deliberate and worth stating, because `=== true` looks needlessly strict
+next to a boolean column. The two failure directions are not comparable: indexing a page
+that should have been private publishes a stranger's name into a search index that caches
+it, and nobody notices until somebody searches for themselves. Failing to index a page the
+couple wanted indexed is visible to them and fixed by a redeploy. Four tests pin each
+malformed shape.
+
+**Decision 2 — `template.thumbnail_url` joins the public payload.**
+`docs/FRONTEND/07` § SEO Meta Generation already specifies the behaviour — the cover photo,
+*"falling back to the template thumbnail if there's no cover photo"* — and `P2-07` could not
+implement it because the thumbnail was not in the response. It is now, through a join to
+`templates` in the same query.
+
+Not new exposure: `docs/API/03` serves the same URL to anyone browsing the catalogue. The
+case it covers is not an edge either — an invitation with no photos is exactly what a couple
+has while they are testing what their link looks like, and a preview with no image at all is
+what they would otherwise see.
+
+**Also decided here, and smaller**: `robots` sets `googleBot.noimageindex` when indexing is
+off. `index: false` on its own leaves an already-indexed page's cached image in results, and
+the image on a wedding invitation is the couple's faces.

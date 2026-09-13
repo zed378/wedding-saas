@@ -8,6 +8,8 @@ import {
   fetchPublicInvitation,
   type PublicInvitation,
 } from "../../lib/public-invitation";
+import { safeJsonLd } from "../../lib/json-ld";
+import { buildEventJsonLd, buildMetadata } from "../../lib/metadata";
 import { resolveSlug } from "../../lib/slug";
 
 /**
@@ -59,11 +61,12 @@ async function load(
 }
 
 /**
- * The link preview.
+ * The link preview and the robots directive. `P2-09`, `docs/PLAN/15`.
  *
- * Deliberately the minimum `P2-08` needs to be true — a title, a description and the
- * cover image — rather than the full treatment. `P2-09` owns SEO metadata, robots and
- * structured data, and writing half of it here would mean writing it twice.
+ * The construction lives in `lib/metadata.ts`, which is a pure function of the payload —
+ * so what a scraper can be shown is a list somebody can read, and a test can assert over
+ * the whole serialized result that nothing else got in. A preview is cached by WhatsApp,
+ * Facebook and Telegram, which is a wider and longer-lived audience than the page.
  */
 export async function generateMetadata({
   params,
@@ -87,38 +90,39 @@ export async function generateMetadata({
   }
 
   const { slug, invitation } = loaded;
-  const names = coupleNames(invitation);
-  const title =
-    names === undefined
-      ? "Undangan Pernikahan"
-      : `Undangan Pernikahan ${names}`;
-  const url = `${readConfig().publicOrigin}/${slug}`;
-  const cover = coverPhoto(invitation);
 
-  return {
-    title,
-    description: firstEventLine(invitation),
-    alternates: { canonical: url },
-    openGraph: {
-      title,
-      ...(firstEventLine(invitation) === undefined
-        ? {}
-        : { description: firstEventLine(invitation) }),
-      url,
-      type: "website",
-      ...(cover === undefined ? {} : { images: [{ url: cover }] }),
-    },
-  };
+  return buildMetadata({
+    invitation,
+    slug,
+    origin: readConfig().publicOrigin,
+  });
 }
 
 export default async function InvitationPage({ params }: RouteParams) {
   const loaded = await load(params);
   if (loaded === undefined) notFound();
 
-  const { invitation } = loaded;
+  const { slug, invitation } = loaded;
+  const url = `${readConfig().publicOrigin}/${slug}`;
+  const jsonLd = buildEventJsonLd(invitation, url);
 
   return (
     <InvitationFrame>
+      {/*
+       * schema.org `Event`. `docs/PLAN/15` calls it optional and `docs/SECURITY/09`
+       * constrains its contents: the ceremony's name, when it starts and where, and
+       * nothing else. No guests, no account numbers.
+       *
+       * `JSON.stringify` of an object this module built, never interpolated text — the
+       * only way a `</script>` could reach the page is through a value, and stringify
+       * escapes nothing, so the serialized string is checked for the sequence instead.
+       */}
+      {jsonLd !== undefined && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
+        />
+      )}
       <Invitation
         sections={invitation.template.sections}
         theme={invitation.template.theme}
@@ -135,55 +139,4 @@ export default async function InvitationPage({ params }: RouteParams) {
       />
     </InvitationFrame>
   );
-}
-
-/** "Budi & Siti", from whichever of the two names the couple filled in. */
-function coupleNames(invitation: PublicInvitation): string | undefined {
-  const couple = invitation.invitation.couple;
-
-  const name = (role: string): string | undefined => {
-    const person = couple[role];
-    if (typeof person !== "object" || person === null) return undefined;
-    const record = person as Record<string, unknown>;
-    for (const key of ["nickname", "full_name"]) {
-      const value = record[key];
-      if (typeof value === "string" && value.trim().length > 0) {
-        return value.trim();
-      }
-    }
-    return undefined;
-  };
-
-  const both = [name("groom"), name("bride")].filter(
-    (value): value is string => value !== undefined,
-  );
-
-  return both.length === 0 ? undefined : both.join(" & ");
-}
-
-/** The date and venue of the first event, as a one-line description. */
-function firstEventLine(invitation: PublicInvitation): string | undefined {
-  const event = invitation.invitation.events[0];
-  if (event === undefined) return undefined;
-
-  const parts = [event["date"], event["venue_name"]].filter(
-    (value): value is string => typeof value === "string" && value.length > 0,
-  );
-
-  return parts.length === 0 ? undefined : parts.join(" · ");
-}
-
-/**
- * `docs/FRONTEND/07` § SEO Meta Generation: the photo with `is_cover`, falling back to
- * the template thumbnail. The thumbnail is not in this payload, so the fallback here is
- * the first photo — `P2-09` wires the template thumbnail when it adds the rest of the
- * metadata.
- */
-function coverPhoto(invitation: PublicInvitation): string | undefined {
-  const photos = invitation.invitation.gallery.photos;
-  const chosen =
-    photos.find((photo) => photo["is_cover"] === true) ?? photos[0];
-
-  const url = chosen?.["url"];
-  return typeof url === "string" ? url : undefined;
 }
