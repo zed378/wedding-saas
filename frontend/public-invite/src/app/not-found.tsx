@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { WebVitals } from "../components/WebVitals";
+
 /**
  * `P2-08` step 4 — the not-found page. `docs/UI-UX/14` § Special States.
  *
@@ -36,6 +38,7 @@ export const metadata: Metadata = {
 export default function NotFound() {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-neutral-100 px-6">
+      <WebVitals pageKind="not_found" />
       <div className="w-full max-w-sm rounded-xl bg-white px-6 py-10 text-center shadow-sm">
         <p aria-hidden="true" className="text-4xl">
           ✉️

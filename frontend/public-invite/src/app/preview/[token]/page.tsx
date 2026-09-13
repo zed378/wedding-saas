@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { Invitation } from "../../../components/Invitation";
 import { InvitationFrame } from "../../../components/InvitationFrame";
 import { PreviewWatermark } from "../../../components/PreviewWatermark";
+import { WebVitals } from "../../../components/WebVitals";
 import { readConfig } from "../../../lib/config";
 import { fetchPreviewInvitation } from "../../../lib/public-invitation";
 
@@ -48,11 +50,13 @@ export default async function PreviewPage({ params }: RouteParams) {
 
   const invitation = await fetchPreviewInvitation(token, {
     baseUrl: readConfig().apiBaseUrl,
+    forwardedFor: (await headers()).get("x-forwarded-for"),
   });
   if (invitation === null) notFound();
 
   return (
     <InvitationFrame>
+      <WebVitals pageKind="preview" />
       <PreviewWatermark />
       <Invitation
         sections={invitation.template.sections}

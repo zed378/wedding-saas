@@ -53,8 +53,8 @@ export interface PublicPersonDto {
   readonly child_order: string | null;
   /**
    * The canonical path is `couple.<role>.photo` and the renderer uses it directly as an
-   * image source, so this is a URL. Absent unless the media is `ready` and a CDN is
-   * configured.
+   * image source, so this is a URL — of the 300w thumbnail variant (`P2-13`, ADR-067).
+   * Absent unless the media is `ready` and a CDN is configured.
    */
   readonly photo?: string;
 }
@@ -81,6 +81,7 @@ export interface PublicGalleryDto {
   readonly width: number | null;
   readonly height: number | null;
   readonly url?: string;
+  readonly medium_url?: string;
   readonly thumbnail_url?: string;
 }
 
@@ -148,8 +149,8 @@ export interface PublicInvitationDto {
  *
  * **Not a section table.** The obvious version of this maps `bank_accounts -> "gift"` and
  * `gallery -> "gallery"`, and it is wrong in a way that only shows up on a real template:
- * the reference template's `hero` section lists `gallery.photos.*.media_id` among its
- * optional fields, because it draws a photo behind the couple's names. Under a section
+ * the reference template's `hero` section lists `gallery.photos` among its optional
+ * fields, because it draws the cover photo behind the couple's names. Under a section
  * table, a couple who turns the gallery section off loses the hero background too — the
  * payload would omit data a section that is still displayed needs.
  *
@@ -218,13 +219,15 @@ const byOrder = <T extends { displayOrder: number }>(rows: readonly T[]): T[] =>
 function mediaUrls(
   row: MediaRow,
   cdnBaseUrl: string | undefined,
-): { url?: string; thumbnail_url?: string } {
+): { url?: string; medium_url?: string; thumbnail_url?: string } {
   if (row.status !== "ready") return {};
   if (cdnBaseUrl === undefined) return {};
   if (row.invitationId === null) return {};
 
   return {
     url: `${cdnBaseUrl}/${mediaKey(row.invitationId, row.id, "large")}`,
+    // `P2-13`: the 800w variant, so a phone does not download the 1600w one for a 200px tile.
+    medium_url: `${cdnBaseUrl}/${mediaKey(row.invitationId, row.id, "medium")}`,
     thumbnail_url: `${cdnBaseUrl}/${mediaKey(row.invitationId, row.id, "thumbnail")}`,
   };
 }
@@ -298,11 +301,18 @@ export function toPublicInvitation(
       // A URL, never `photo_media_id`: an id a guest cannot resolve is useless to them
       // and is one more internal identifier on a public page. The canonical path is
       // `couple.<role>.photo`, and the renderer uses its value as an image source.
+      //
+      // The THUMBNAIL (300w), since `P2-13`. The portrait is drawn 140px square
+      // (`.wi-portrait`), and this used to be the 1600w file — two ~150KB downloads for two
+      // small squares, sharing a slow link with the cover photo that is the page's LCP
+      // element. 300px covers 140px at 2x density (ADR-067).
       ...(photo === undefined
         ? {}
         : (() => {
             const urls = mediaUrls(photo, cdnBaseUrl);
-            return urls.url === undefined ? {} : { photo: urls.url };
+            return urls.thumbnail_url === undefined
+              ? {}
+              : { photo: urls.thumbnail_url };
           })()),
     };
   };

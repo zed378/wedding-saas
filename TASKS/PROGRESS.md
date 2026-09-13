@@ -3,10 +3,10 @@
 Single source of truth for where the project stands. Updated in the same commit as the work it describes (`00-TASK-CONVENTIONS.md` global DoD item 11).
 
 **Last updated**: 2026-09-13
-**Current phase**: Phase 2 — Template Rendering and Preview (12 / 14 done). **Phase 1 is complete** (25 / 25, [summary](../MEMORY/records/2026-09-12-PHASE-1-SUMMARY.md)); Phase 0 is 26 / 27 done. **Staging is live**: `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
+**Current phase**: Phase 2 — Template Rendering and Preview (13 / 14 done). **Phase 1 is complete** (25 / 25, [summary](../MEMORY/records/2026-09-12-PHASE-1-SUMMARY.md)); Phase 0 is 26 / 27 done. **Staging is live**: `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
 
 The only task left is `P0-17` (CI/CD), deferred by ADR-028. Its **deployment** half was waived by the project owner on 2026-09-11; deploying is `git pull` plus a compose command. Its **verification** half was not waived and is the one Phase 0 exit criterion still unmet — see below. **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
-**Overall**: 63 / 136 tasks done
+**Overall**: 64 / 136 tasks done
 
 **No automated pipeline**: `P0-17` is deferred (ADR-028). Before merging to `main`, run `scripts/verify.sh`. The `:id`-endpoint gate blocks in `.githooks/pre-push`; integration tests, the coverage floor, SAST and dependency scanning are **not** running anywhere until `P0-17` is picked up — revisit before Phase 3 payment code.
 
@@ -25,7 +25,7 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 |---|---|---|---|---|
 | [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 27 | 26 | **ACTIVE** | — |
 | [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 25 | **COMPLETE** — 2026-09-12 | Phase 0 exit criteria |
-| [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 14 | 12 | **ACTIVE** | Phase 1 exit + `P1-25` — **met** |
+| [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 14 | 13 | **ACTIVE** | Phase 1 exit + `P1-25` — **met** |
 | [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 0 | Not started | Phase 2 exit |
 | [Phase 4 — Engagement](./PHASE-4-ENGAGEMENT.md) | 12 | 0 | Not started | Phase 3 exit |
 | [Phase 5 — Admin Panel](./PHASE-5-ADMIN-PANEL.md) | 14 | 0 | Not started | Phase 4 exit |
@@ -132,7 +132,7 @@ Roadmap: Week 6-7.
 | P2-10 | Public page interactions | public-invite | M | **DONE** — and it found two defects with passing tests over them: `P2-03`'s cover gate hid only its own button, and its copy button's “announcement” wrote to an element that did not exist. Step 6 (music) is **not applicable** — there is no music section. One DoD item needs a real device and goes to `P2-13` | P2-08 |
 | P2-11 | Catalog and detail UI, demo mode | web-app | L | **DONE** — server-rendered and indexable; the URL is the filter state; "View Live Demo" is the seeded invitation, found by ownership (ADR-065) so a customer's page can never be offered as a demo. Also found that **staging never gave the public invitation app its API address** and that the create wizard still offered no templates. "Most Popular" deferred as `DF-12` | P2-01, P2-03 |
 | P2-12 | Share-preview links | backend, public-invite | M | **DONE** — the token is a credential: 256 bits, SHA-256 at rest, 7-day expiry compared in SQL, revocable, and every dead token answers exactly like an invented one. Previews are forced watermarked, `noindex`, `no-store` and submission-off in the payload itself (ADR-066). A minimal editor dialog ships with it, because nothing else could create a link | P2-08 |
-| P2-13 | Performance budget and CWV baseline | public-invite | M | TODO | P2-10 |
+| P2-13 | Performance budget and CWV baseline | public-invite | M | **DONE** — first real-browser measurement was LCP 5.2s on Slow 4G; now 0.8–1.0s on Fast 4G and ~2.8–3.3s on Slow 4G, CLS 0 (ADR-067). Which "4G" the target means is raised as `OQ-26`, not decided. Found the reference template's cover had **never rendered publicly**, the scrim failed AA, portraits were 1600w files, and **every guest shared one rate-limit bucket** because the page's API fetch dropped their address. RUM, a CI budget job and 20 visual baselines added | P2-10 |
 | P2-14 | Phase 2 test suite and acceptance | all | M | TODO | all above |
 
 **Critical path**: `P2-02` → `P2-03` → everything. The renderer is the phase.
@@ -278,6 +278,9 @@ Six open questions remain and none of them stops work. Three were answered durin
 | `OQ-17` – `OQ-20` | `P0-20`, `P1-17`, Phase 2 | Schema and vocabulary questions, each decided provisionally with an ADR |
 | **`OQ-21`** | `P1-03` | **Should refresh rotation have a grace window?** Two legitimate concurrent refreshes are indistinguishable from theft and log the user out everywhere. Implemented strictly as `docs/SECURITY/03` states; a grace window weakens a control the document states without qualification |
 | **`OQ-22`** | `P1-07` | **Is the (email, IP) login key right against a distributed attacker?** It gives a botnet a fresh budget per IP. The obvious fix lets a stranger lock a victim out of their own account |
+| `OQ-24` | `P3-15` | Whether changing a published invitation's template needs a confirmation field |
+| **`OQ-25`** | `P2-14`, `P5-*` | **How are a template's web fonts delivered?** They are named as data and never loaded; Google Fonts sends guests' IPs to Google, self-hosting makes fonts something the platform licenses |
+| **`OQ-26`** | `P2-13`, `P2-14`, `P6-*` | **Which "simulated 4G" does the LCP target mean?** The page meets 2.5s on DevTools Fast 4G and misses it on Slow 4G (Lighthouse's default); closing the gap is framework-level |
 
 Answered during Phase 1, each needing confirmation rather than further work:
 

@@ -198,3 +198,123 @@ describe("the reference template renders the demo invitation", () => {
     }
   });
 });
+
+/**
+ * `P2-13` — the reference template's photographs, fed the shape the PUBLIC API serves.
+ *
+ * Every test above feeds `toCanonical(demo)`, whose gallery rows come from the seed and carry
+ * no URLs at all — so none of them could notice that the hero never received its cover photo.
+ * It did not: the hero declared `gallery.photos.*.media_id`, the resolver narrowed each photo
+ * to that one field, and the public payload deliberately carries no `media_id` (`P2-07`). The
+ * reference template's cover image had never rendered on a public page.
+ *
+ * These tests use a payload shaped exactly like `GET /public/i/:slug`'s gallery.
+ */
+describe("the reference template's photos, as the public API serves them", () => {
+  const photos = {
+    photos: [
+      {
+        url: "https://cdn.test/a-large.webp",
+        medium_url: "https://cdn.test/a-medium.webp",
+        thumbnail_url: "https://cdn.test/a-thumb.webp",
+        caption: "Lembang",
+        is_cover: false,
+        order: 0,
+      },
+      {
+        url: "https://cdn.test/cover-large.webp",
+        medium_url: "https://cdn.test/cover-medium.webp",
+        thumbnail_url: "https://cdn.test/cover-thumb.webp",
+        caption: "Sampul",
+        is_cover: true,
+        order: 1,
+      },
+    ],
+  };
+
+  const renderPublic = () =>
+    render(
+      <TemplateRenderer
+        mode="public"
+        templateVersion={version}
+        invitationData={{ ...toCanonical(demo), gallery: photos }}
+        enabledSections={["hero", "gallery"]}
+      />,
+    );
+
+  it("gives the hero its cover photo", () => {
+    renderPublic();
+
+    const cover = document.querySelector<HTMLImageElement>(
+      '[data-section="hero"] img',
+    );
+    expect(cover, "the hero rendered no image").not.toBeNull();
+    expect(cover?.getAttribute("src")).toBe(
+      "https://cdn.test/cover-medium.webp",
+    );
+  });
+
+  it("loads the cover eagerly at high priority, because it is the LCP element", () => {
+    renderPublic();
+
+    const cover = document.querySelector('[data-section="hero"] img');
+    expect(cover?.getAttribute("loading")).toBe("eager");
+    expect(cover?.getAttribute("fetchpriority")).toBe("high");
+    // What the browser suite measures the cover's paint by.
+    expect(cover?.getAttribute("elementtiming")).toBe("wi-lcp-image");
+  });
+
+  it("lazy-loads every other photo", () => {
+    renderPublic();
+
+    const gallery = [
+      ...document.querySelectorAll('[data-section="gallery"] img'),
+    ];
+    expect(gallery.length).toBeGreaterThan(0);
+    for (const image of gallery) {
+      expect(image.getAttribute("loading")).toBe("lazy");
+      expect(image.getAttribute("fetchpriority")).toBeNull();
+    }
+  });
+
+  it("serves the hero the 800w variant, never the 1600w file (ADR-067)", () => {
+    renderPublic();
+
+    const cover = document.querySelector('[data-section="hero"] img');
+    expect(cover?.getAttribute("src")).toBe(
+      "https://cdn.test/cover-medium.webp",
+    );
+    // No srcset: a dense phone would pick the large file from one, which is what cost 1.4s.
+    expect(cover?.getAttribute("srcset")).toBeNull();
+  });
+
+  it("falls back to the large file for a photo with no medium variant", () => {
+    render(
+      <TemplateRenderer
+        mode="public"
+        templateVersion={version}
+        invitationData={{
+          ...toCanonical(demo),
+          gallery: {
+            photos: [{ url: "https://cdn.test/only.webp", is_cover: true }],
+          },
+        }}
+        enabledSections={["hero"]}
+      />,
+    );
+
+    expect(
+      document.querySelector('[data-section="hero"] img')?.getAttribute("src"),
+    ).toBe("https://cdn.test/only.webp");
+  });
+
+  it("offers the gallery's photos the pre-generated variants as a srcset", () => {
+    renderPublic();
+
+    const photo = document.querySelector('[data-section="gallery"] img');
+    expect(photo?.getAttribute("srcset")).toBe(
+      "https://cdn.test/a-thumb.webp 300w, https://cdn.test/a-medium.webp 800w, https://cdn.test/a-large.webp 1600w",
+    );
+    expect(photo?.getAttribute("sizes")).toContain("rem");
+  });
+});

@@ -12,7 +12,7 @@ Every entry names the task it blocks or affects, so nothing here is a note witho
 
 | | Total | Resolved | Open |
 |---|---|---|---|
-| Open Questions | 14 | 10 | 4 |
+| Open Questions | 16 | 10 | 6 |
 | Specification Gaps | 17 | 17 | 0 |
 | Deferred | 9 | — | 9 (by design) |
 
@@ -20,9 +20,32 @@ Nothing on the board is `BLOCKED`. The remaining questions shape work rather tha
 
 **2026-09-13**: `OQ-23` is answered by ADR-061 (`P2-06`). Answering it raised `OQ-24` — the confirmation-step half it deliberately left to `P3-15` — so the open count is unchanged at four.
 
+**2026-09-13**: `P2-13` raised `OQ-25` (theme web fonts are named but never loaded) and `OQ-26` (which "4G" the LCP target means). Six open questions; still none blocks a task.
+
 ---
 
 ## Open Questions — Remaining
+
+### OQ-26 — Which "simulated 4G" does the public page's LCP target mean?
+
+**Affects**: `P2-13`, `P2-14` step 3, `P6-*` launch performance checks — **not blocking**.
+
+`docs/FRONTEND/09` and `docs/PLAN/17` require LCP under 2.5s "tested on a simulated 4G connection" and name no profile. Chrome DevTools ships two with that name, and Lighthouse's mobile default uses the slower one. `P2-13` measured the reference template, with representative photos and a 4x CPU slowdown, on both:
+
+| Profile | RTT / down / up | LCP measured |
+|---|---|---|
+| DevTools **Fast 4G** | 60ms / 9Mbps / 1.5Mbps | 0.78–1.01s (Playwright, 6 runs) |
+| DevTools / Lighthouse **Slow 4G** | 150ms / 1.6Mbps / 750Kbps | 2.9–3.3s (Playwright); 2.78–2.83s (Lighthouse simulated, 3 runs) |
+
+The suite asserts 2.5s on Fast 4G and a 4s regression ceiling on Slow 4G. The Slow 4G gap is the framework: ~120KB of React DOM and App Router runtime share the link with an 84KB cover photo (ADR-067). Closing it means one of: accept Fast 4G as the meaning; lower the cover's quality or size for the hero; or reduce framework JavaScript on the public page, which is an architecture decision (ADR-004 chose Next.js). Needs a product/engineering decision; the measurements are in `MEMORY/records/2026-09-13-P2-13-performance-budget.md`.
+
+### OQ-25 — How are a template's web fonts delivered?
+
+**Affects**: `P2-14`, `P5-*` template authoring — **not blocking**; pages render in fallback fonts today.
+
+Templates name fonts as data — the reference template sets `typography.heading_font: "Playfair Display"` and `body_font: "Lato"` — and the renderer emits them as `--typography-*-font` custom properties. **Nothing loads them.** A guest sees Playfair Display only if it happens to be installed on their phone; everyone else gets Georgia and the system sans-serif. `docs/FRONTEND/09` asks for "subset & preload critical fonts, `font-display: swap`" and says nothing about where fonts come from.
+
+The choice is not only technical. Google Fonts' CDN is the easy answer and sends every guest's IP address to Google on a page `docs/SECURITY/09` treats as personal data; self-hosting keeps it first-party but makes the font catalogue something the platform ships and licenses. It also decides whether a template may name any font or only fonts from a fixed list, which is a template-schema question (`P0-20`). Fonts would also spend part of the LCP budget `OQ-26` is already short of on Slow 4G.
 
 ### OQ-24 — Should changing the template of a published invitation require a confirmation field?
 

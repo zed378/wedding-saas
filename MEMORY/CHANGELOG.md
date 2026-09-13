@@ -10,6 +10,20 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-13 — The public invitation, measured on a slow phone
+
+**Fixed** — performance budget and Core Web Vitals ([P2-13](./records/2026-09-13-P2-13-performance-budget.md))
+
+- **The cover photo now appears on published invitations.** The reference template's hero asked for a field the public page never receives, so the cover had never shown.
+- **The first screen loads about four times faster on a slow connection** (5.2s → ~3s on Slow 4G, under 1s on Fast 4G): the cover loads first at a size that fits the screen, couple portraits are small files, and gallery photos wait until a guest scrolls to them.
+- **Text over the cover is readable over any photo** — the overlay is darker, and the contrast is now measured.
+- **A widely shared invitation no longer risks "temporarily unavailable"**: the public page passes each guest's address to the API, so the rate limit applies per guest instead of to all guests at once.
+
+**Added**
+
+- **Real-user monitoring**: guests' browsers report Core Web Vitals to `POST /public/rum`, with no page address in the report.
+- **A performance job in CI** for the public page's JavaScript budget, load speed, lazy loading and contrast, plus visual snapshots of every section.
+
 ### 2026-09-13 — Showing an invitation before publishing it
 
 **Added** — share-preview links ([P2-12](./records/2026-09-13-P2-12-share-preview.md))

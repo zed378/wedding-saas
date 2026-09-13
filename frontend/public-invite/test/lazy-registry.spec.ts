@@ -83,6 +83,9 @@ describe("this host serves invitations and nothing else", () => {
   const ALLOWED = new Set([
     "[slug]", // the invitation itself
     "preview", // `P2-12`'s share-preview links, per docs/API/08
+    // `P2-13`: `/public/rum`, the same-origin forward docs/API/08 describes for `/public/*`.
+    // `public` is on the slug blocklist, so no invitation can be published at it.
+    "public",
   ]);
 
   it("has no top-level route that could shadow a slug", () => {
