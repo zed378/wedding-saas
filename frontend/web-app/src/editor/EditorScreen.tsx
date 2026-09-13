@@ -53,6 +53,12 @@ export function EditorScreen({
 }) {
   const { api } = useAuth();
   const [state, setState] = useState<LoadState>({ kind: "loading" });
+  /**
+   * `P2-14`. Bumped after a template change: the invitation's version, sections and settings
+   * all moved on the server, and reloading both requests is the one way the store cannot end
+   * up holding a mix of the old template and the new.
+   */
+  const [reloads, setReloads] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -139,7 +145,7 @@ export function EditorScreen({
     return () => {
       controller.abort();
     };
-  }, [api, invitationId]);
+  }, [api, invitationId, reloads]);
 
   if (state.kind === "loading") {
     return (
@@ -178,6 +184,8 @@ export function EditorScreen({
 
   return (
     <EditorProvider
+      // A new provider per load, so the store and the autosave queue start from the server.
+      key={`${detail.template_version_id}:${String(reloads)}`}
       invitationId={invitationId}
       data={document}
       templateDefinition={definition}
@@ -186,6 +194,9 @@ export function EditorScreen({
       <EditorShell
         title={detail.internal_name ?? "Undangan tanpa nama"}
         dashboardHref="/dashboard"
+        onTemplateChanged={() => {
+          setReloads((count) => count + 1);
+        }}
         preview={<LivePreview />}
         properties={<PropertiesPanel />}
       />

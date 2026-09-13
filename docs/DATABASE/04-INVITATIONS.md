@@ -24,6 +24,7 @@ CREATE TABLE invitation_settings (
   invitation_id             UUID PRIMARY KEY REFERENCES invitations(id) ON DELETE CASCADE,
   enabled_sections            VARCHAR(40)[] NOT NULL DEFAULT '{}',
   theme_override               JSONB NOT NULL DEFAULT '{}',
+  section_memory               JSONB NOT NULL DEFAULT '{}',   -- P2-14, ADR-069: {section_key: on?} for sections the current template lacks
   rsvp_enabled                  BOOLEAN NOT NULL DEFAULT true,
   guestbook_enabled              BOOLEAN NOT NULL DEFAULT true,
   guestbook_moderation             BOOLEAN NOT NULL DEFAULT false,

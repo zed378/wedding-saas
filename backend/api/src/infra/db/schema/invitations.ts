@@ -105,6 +105,18 @@ export const invitationSettings = pgTable("invitation_settings", {
   themeOverride: jsonb("theme_override")
     .notNull()
     .default(sql`'{}'::jsonb`),
+  /**
+   * `P2-14`, ADR-069 — the couple's on/off choice for each section the CURRENT template does
+   * not define, as `{ section_key: boolean }`.
+   *
+   * A template change drops sections the new template lacks from `enabled_sections`, and
+   * without this nothing remembered them: switching back re-applied the template's defaults,
+   * so a gift section the couple had turned on came back off, and one they had turned off
+   * came back on. `docs/API/04` promises that switching back restores the display.
+   */
+  sectionMemory: jsonb("section_memory")
+    .notNull()
+    .default(sql`'{}'::jsonb`),
   rsvpEnabled: boolean("rsvp_enabled").notNull().default(true),
   guestbookEnabled: boolean("guestbook_enabled").notNull().default(true),
   /** Off by default; the service flips new entries to 'pending' when this is on. */

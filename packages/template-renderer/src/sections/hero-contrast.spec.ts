@@ -81,3 +81,56 @@ describe("the hero scrim guarantees WCAG AA over any photograph", () => {
     expect(opacity).toBeGreaterThanOrEqual(0.92);
   });
 });
+
+/**
+ * `P2-14` — the hero with no cover photo.
+ *
+ * The scrim only exists behind a photo, so a couple who had not uploaded one yet got white
+ * text on the theme's light background — found in a full-stack E2E screenshot, where "Kami
+ * akan menikah" was nearly invisible. The plain hero draws with the theme's own colours; this
+ * measures them for the reference theme, whose values are data rather than constants here.
+ */
+describe("the hero without a photo is legible on the reference theme", () => {
+  const hex = (value: string): number[] =>
+    [1, 3, 5].map((i) => parseInt(value.slice(i, i + 2), 16) / 255);
+  const luminanceOf = (value: string): number => {
+    const [r, g, b] = hex(value).map(linear) as [number, number, number];
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+
+  it("switches the text off white when there is no scrim", () => {
+    expect(SECTION_STYLES).toMatch(
+      /\.wi-hero-plain \.wi-hero-names\s*\{[^}]*color:\s*var\(--color-primary\)/,
+    );
+    expect(SECTION_STYLES).toMatch(
+      /\.wi-hero-plain \.wi-hero-date\s*\{[^}]*color:\s*var\(--color-text\)/,
+    );
+  });
+
+  it("clears 4.5:1 for the date and 3:1 for the large names", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    // `process.cwd()` is this package; `import.meta.url` is not a file URL under Vitest (P2-08).
+    const reference = JSON.parse(
+      readFileSync(
+        join(
+          process.cwd(),
+          "../../backend/api/src/infra/db/seed-data/reference-template.json",
+        ),
+        "utf8",
+      ),
+    ) as { theme: { colors: Record<string, string> } };
+    const { primary, secondary, text } = reference.theme.colors as {
+      primary: string;
+      secondary: string;
+      text: string;
+    };
+
+    expect(
+      contrast(luminanceOf(text), luminanceOf(secondary)),
+    ).toBeGreaterThanOrEqual(4.5);
+    expect(
+      contrast(luminanceOf(primary), luminanceOf(secondary)),
+    ).toBeGreaterThanOrEqual(3);
+  });
+});

@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { ConflictWarning, SaveStatusIndicator } from "./SaveStatus";
 import { SectionListPanel } from "./SectionListPanel";
 import { PublishCta } from "./PublishCta";
+import { ChangeTemplate } from "./ChangeTemplate";
 import { SharePreview } from "./SharePreview";
 import { PanelBoundary } from "../components/PanelBoundary";
 
@@ -35,6 +36,8 @@ export interface EditorShellProps {
   readonly properties: ReactNode;
   /** Back to the dashboard. */
   readonly dashboardHref: string;
+  /** `P2-14`. Reload the editor after the template changed underneath it. */
+  readonly onTemplateChanged?: () => void;
 }
 
 const TABS: readonly { readonly id: EditorTab; readonly label: string }[] = [
@@ -48,6 +51,7 @@ export function EditorShell({
   preview,
   properties,
   dashboardHref,
+  onTemplateChanged,
 }: EditorShellProps) {
   const [tab, setTab] = useState<EditorTab>("properties");
 
@@ -72,6 +76,12 @@ export function EditorShell({
             cannot publish, not that their invitation is incomplete. */}
         <div className="flex items-center gap-3">
           <SaveStatusIndicator />
+          {/* `P2-14`. `docs/UI-UX/12`: "a 'Change Template' button in the header". */}
+          <ChangeTemplate
+            {...(onTemplateChanged === undefined
+              ? {}
+              : { onChanged: onTemplateChanged })}
+          />
           {/* `P2-12`. Beside publish, because a preview is what a couple sends before it. */}
           <SharePreview />
           <PublishCta />

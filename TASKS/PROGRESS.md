@@ -3,10 +3,10 @@
 Single source of truth for where the project stands. Updated in the same commit as the work it describes (`00-TASK-CONVENTIONS.md` global DoD item 11).
 
 **Last updated**: 2026-09-13
-**Current phase**: Phase 2 — Template Rendering and Preview (14 / 15 done). **Phase 1 is complete** (25 / 25, [summary](../MEMORY/records/2026-09-12-PHASE-1-SUMMARY.md)); Phase 0 is 26 / 27 done. **Staging is live**: `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
+**Current phase**: Phase 3 — Order, Payment and Publishing (0 / 16 done). **Phase 2 is complete** (15 / 15, [summary](../MEMORY/records/2026-09-13-PHASE-2-SUMMARY.md)); **Phase 1 is complete** (25 / 25, [summary](../MEMORY/records/2026-09-12-PHASE-1-SUMMARY.md)); Phase 0 is 26 / 27 done. **Staging is live** but runs code from before Phase 2's fixes: redeploy, run migration `0007`, and reseed before showing it to anyone. `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
 
 The only task left is `P0-17` (CI/CD), deferred by ADR-028. Its **deployment** half was waived by the project owner on 2026-09-11; deploying is `git pull` plus a compose command. Its **verification** half was not waived and is the one Phase 0 exit criterion still unmet — see below. **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
-**Overall**: 65 / 137 tasks done
+**Overall**: 66 / 137 tasks done
 
 **No automated pipeline**: `P0-17` is deferred (ADR-028). Before merging to `main`, run `scripts/verify.sh`. The `:id`-endpoint gate blocks in `.githooks/pre-push`; integration tests, the coverage floor, SAST and dependency scanning are **not** running anywhere until `P0-17` is picked up — revisit before Phase 3 payment code.
 
@@ -25,8 +25,8 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 |---|---|---|---|---|
 | [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 27 | 26 | **ACTIVE** | — |
 | [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 25 | **COMPLETE** — 2026-09-12 | Phase 0 exit criteria |
-| [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 15 | 14 | **ACTIVE** | Phase 1 exit + `P1-25` — **met** |
-| [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 0 | Not started | Phase 2 exit |
+| [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 15 | 15 | **COMPLETE** | Phase 1 exit + `P1-25` — **met** |
+| [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 0 | **ACTIVE** | Phase 2 exit — **met** (LCP qualified by `OQ-26`) |
 | [Phase 4 — Engagement](./PHASE-4-ENGAGEMENT.md) | 12 | 0 | Not started | Phase 3 exit |
 | [Phase 5 — Admin Panel](./PHASE-5-ADMIN-PANEL.md) | 14 | 0 | Not started | Phase 4 exit |
 | [Phase 6 — Hardening and Launch](./PHASE-6-HARDENING-AND-LAUNCH.md) | 17 | 0 | Not started | Phase 5 exit |
@@ -134,7 +134,7 @@ Roadmap: Week 6-7.
 | P2-12 | Share-preview links | backend, public-invite | M | **DONE** — the token is a credential: 256 bits, SHA-256 at rest, 7-day expiry compared in SQL, revocable, and every dead token answers exactly like an invented one. Previews are forced watermarked, `noindex`, `no-store` and submission-off in the payload itself (ADR-066). A minimal editor dialog ships with it, because nothing else could create a link | P2-08 |
 | P2-13 | Performance budget and CWV baseline | public-invite | M | **DONE** — first real-browser measurement was LCP 5.2s on Slow 4G; now 0.8–1.0s on Fast 4G and ~2.8–3.3s on Slow 4G, CLS 0 (ADR-067). Which "4G" the target means is raised as `OQ-26`, not decided. Found the reference template's cover had **never rendered publicly**, the scrim failed AA, portraits were 1600w files, and **every guest shared one rate-limit bucket** because the page's API fetch dropped their address. RUM, a CI budget job and 20 visual baselines added | P2-10 |
 | P2-15 | Editor document in canonical shape; event and gift lists | backend, web-app | L | **DONE** — added during `P2-14`, whose full-stack E2E found the editor had **never saved anything in a real browser** (autosave called `setTimeout` unbound: Chrome throws, Node does not), that event and gift fields were bound to wildcard patterns no data has, that the preview drew no dates or accounts, that section toggles showed template defaults, and that times did not round-trip. The store now holds the canonical document, rows are addressed by id, and the full-stack E2E proves edits reach the database (ADR-068) | P2-05, P1-23 |
-| P2-14 | Phase 2 test suite and acceptance | all | M | IN PROGRESS — change-template UI built; waiting on `P2-15` | all above |
+| P2-14 | Phase 2 test suite and acceptance | all | M | **DONE** — driving the product end to end found: switching back to a template lost the couple's section choices (fixed with `section_memory`, ADR-069), no screen existed to change template (built), the no-photo hero was unreadable, and the migration snapshot chain had been broken since `P1-09` (repaired). All 256 `enabled_sections` combinations proven absent in DOM and payload; every parameterised route now mechanically required in the IDOR sweep. Real-scraper check waits on `P3-09`; raised `OQ-27` | all above |
 
 **Critical path**: `P2-02` → `P2-03` → everything. The renderer is the phase.
 

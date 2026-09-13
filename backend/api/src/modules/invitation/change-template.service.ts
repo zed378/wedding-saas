@@ -112,10 +112,11 @@ export class ChangeTemplateService {
     );
 
     const previous = settings?.enabledSections ?? [];
-    const { enabled, hidden } = recomputeSections(
+    const { enabled, hidden, memory } = recomputeSections(
       current.sections,
       target.sections,
       previous,
+      readSectionMemory(settings?.sectionMemory),
     );
 
     const { kept, dropped } = dropThemeKeys(
@@ -174,6 +175,7 @@ export class ChangeTemplateService {
         templateId,
         templateVersionId: target.id,
         enabledSections: enabled,
+        sectionMemory: memory,
         themeOverride: kept,
       },
       (tx) =>
@@ -305,7 +307,7 @@ export class ChangeTemplateService {
 }
 
 /**
- * The new section selection, and what stops being displayed.
+ * The new section selection, what stops being displayed, and what to remember.
  *
  * `docs/PLAN/07` § Template Compatibility gives the matching rule — `section_key` equality —
  * and the card gives the formula:
@@ -317,6 +319,15 @@ export class ChangeTemplateService {
  * offered and the user deliberately switched off must stay off; only a section that is new
  * to this user arrives in its template's default state. Those two readings differ on exactly
  * the case a user notices: turning the gallery off, changing template, and finding it back.
+ *
+ * ## "New to this user" includes templates before the last one (`P2-14`, ADR-069)
+ *
+ * `P1-15` judged newness against the previous template only, and kept no record of sections
+ * that template lacked. So A → B → A lost every choice about a section B did not have: a gift
+ * section the couple had turned on came back off (the reference template ships it off), and
+ * one they had turned off came back on. `docs/API/04` promises that switching back restores the
+ * display. `memory` is that record — the on/off choice for each section the current template
+ * does not define — and a remembered choice wins over the template's default.
  *
  * **A non-configurable section of the new template is forced on regardless.** `P1-14` refuses
  * to let anyone disable one, so a recomputed selection that omitted one would be a state the
@@ -331,30 +342,71 @@ export function recomputeSections(
   currentSections: unknown,
   targetSections: unknown,
   previouslyEnabled: readonly string[],
-): { enabled: string[]; hidden: string[] } {
+  previousMemory: Readonly<Record<string, boolean>> = {},
+): {
+  enabled: string[];
+  hidden: string[];
+  memory: Record<string, boolean>;
+} {
   const oldKeys = new Set(parseSections(currentSections).map((s) => s.key));
   const target = parseSections(targetSections);
   const targetKeys = new Set(target.map((s) => s.key));
+  const wasEnabled = new Set(previouslyEnabled);
 
   const carried = previouslyEnabled.filter((key) => targetKeys.has(key));
   const hidden = previouslyEnabled.filter((key) => !targetKeys.has(key));
 
+  // A choice made on an earlier template, for a section this one defines again.
+  const restored = target
+    .filter((s) => !oldKeys.has(s.key) && previousMemory[s.key] === true)
+    .map((s) => s.key);
+
   const arrivals = target
-    .filter((s) => s.enabledByDefault && !oldKeys.has(s.key))
+    .filter(
+      (s) =>
+        s.enabledByDefault &&
+        !oldKeys.has(s.key) &&
+        !Object.hasOwn(previousMemory, s.key),
+    )
     .map((s) => s.key);
 
   const structural = target.filter((s) => !s.configurable).map((s) => s.key);
 
-  // A Set, then an array: the three sources overlap, and `enabled_sections` is a set
-  // everywhere it is read.
-  const enabled = [...new Set([...carried, ...arrivals, ...structural])];
+  // A Set, then an array: the sources overlap, and `enabled_sections` is a set everywhere it
+  // is read.
+  const enabled = [
+    ...new Set([...carried, ...restored, ...arrivals, ...structural]),
+  ];
 
   // Ordered by the template's own section order, not by where a key came from. The array is
   // read by the renderer and by a human debugging a page; both expect template order.
   const order = new Map(target.map((s, index) => [s.key, index]));
   enabled.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
 
-  return { enabled, hidden: [...new Set(hidden)] };
+  // What to remember now: earlier choices the new template still lacks, plus the current
+  // template's choices for sections the new one lacks. Keys the new template defines leave
+  // the memory — `enabled_sections` holds them again.
+  const memory: Record<string, boolean> = {};
+  for (const [key, on] of Object.entries(previousMemory)) {
+    if (!targetKeys.has(key) && typeof on === "boolean") memory[key] = on;
+  }
+  for (const key of oldKeys) {
+    if (!targetKeys.has(key)) memory[key] = wasEnabled.has(key);
+  }
+
+  return { enabled, hidden: [...new Set(hidden)], memory };
+}
+
+/** The stored memory, tolerating a malformed value by forgetting rather than failing. */
+export function readSectionMemory(value: unknown): Record<string, boolean> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).filter(
+      (entry): entry is [string, boolean] => typeof entry[1] === "boolean",
+    ),
+  );
 }
 
 /**

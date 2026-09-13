@@ -50,6 +50,13 @@
       "when": 1789016414454,
       "tag": "0006_slug_blocklist",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789306752364,
+      "tag": "0007_section_memory",
+      "breakpoints": true
     }
   ]
 }
