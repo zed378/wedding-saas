@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { CoverGate } from "../../components/CoverGate";
+import { GuestGreeting } from "../../components/GuestGreeting";
 import { Invitation } from "../../components/Invitation";
+import { ShareBar } from "../../components/ShareBar";
 import { InvitationFrame } from "../../components/InvitationFrame";
 import { readConfig } from "../../lib/config";
 import {
@@ -9,7 +12,11 @@ import {
   type PublicInvitation,
 } from "../../lib/public-invitation";
 import { safeJsonLd } from "../../lib/json-ld";
-import { buildEventJsonLd, buildMetadata } from "../../lib/metadata";
+import {
+  buildEventJsonLd,
+  buildMetadata,
+  coupleNames,
+} from "../../lib/metadata";
 import { resolveSlug } from "../../lib/slug";
 
 /**
@@ -109,6 +116,14 @@ export default async function InvitationPage({ params }: RouteParams) {
   return (
     <InvitationFrame>
       {/*
+       * `P2-10` step 2. Above the cover, and rendered only after hydration — a
+       * server-rendered guest name would mean one cache entry per guest
+       * (`docs/ARCHITECTURE/06` § Cache Segmentation), which is four hundred distinct
+       * documents for one wedding.
+       */}
+      <GuestGreeting />
+
+      {/*
        * schema.org `Event`. `docs/PLAN/15` calls it optional and `docs/SECURITY/09`
        * constrains its contents: the ceremony's name, when it starts and where, and
        * nothing else. No guests, no account numbers.
@@ -123,20 +138,34 @@ export default async function InvitationPage({ params }: RouteParams) {
           dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
         />
       )}
-      <Invitation
-        sections={invitation.template.sections}
-        theme={invitation.template.theme}
-        customizableThemeKeys={
-          invitation.template.customizable_theme_keys ?? []
-        }
-        // The invitation as `docs/PLAN/08`'s canonical object, straight from the API
-        // (ADR-063). No reshaping here: a mapping in the consumer is a second place for
-        // the shape to be wrong, and the first place already has a test walking the
-        // template's declared paths against the payload.
-        data={invitation.invitation as unknown as Record<string, unknown>}
-        enabledSections={invitation.invitation.settings.enabled_sections}
-        themeOverride={invitation.invitation.settings.theme_override}
-      />
+      {/*
+       * `P2-10` step 5. The gate wraps the whole invitation because a gate has to be able
+       * to contain what it gates — `P2-03`'s version lived inside the hero and could only
+       * hide its own button.
+       */}
+      <CoverGate>
+        <Invitation
+          sections={invitation.template.sections}
+          theme={invitation.template.theme}
+          customizableThemeKeys={
+            invitation.template.customizable_theme_keys ?? []
+          }
+          // The invitation as `docs/PLAN/08`'s canonical object, straight from the API
+          // (ADR-063). No reshaping here: a mapping in the consumer is a second place for
+          // the shape to be wrong, and the first place already has a test walking the
+          // template's declared paths against the payload.
+          data={invitation.invitation as unknown as Record<string, unknown>}
+          enabledSections={invitation.invitation.settings.enabled_sections}
+          themeOverride={invitation.invitation.settings.theme_override}
+        />
+
+        {/*
+         * `P2-10` step 4, inside the gate so it is part of the invitation rather than
+         * chrome around it: a guest shares once they have read it, and a persistent
+         * overlay on a phone covers the one screen the couple designed.
+         */}
+        <ShareBar coupleNames={coupleNames(invitation)} url={url} />
+      </CoverGate>
     </InvitationFrame>
   );
 }

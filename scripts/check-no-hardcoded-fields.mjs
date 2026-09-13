@@ -175,7 +175,7 @@ for (const file of files) {
           .join("\\."),
       );
       if (pattern.test(source)) found.push(path);
-    } else if (source.includes(path)) {
+    } else if (wholeToken(path).test(source)) {
       found.push(path);
     }
   }
@@ -194,6 +194,23 @@ for (const file of files) {
 
 function escape(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * A path as a whole token, not as a substring.
+ *
+ * `P2-10` found the false positive this exists for: the shortest canonical path is the bare
+ * word `events`, and `substring`-matching it flags every file that uses Tailwind's
+ * `pointer-events-none`. The guard then demands an exemption for a file that hard-codes
+ * nothing, and an exemption granted to silence a false positive is how a guard stops being
+ * believed.
+ *
+ * The boundary rejects an adjacent word character, hyphen or `$`, so `pointer-events-none`
+ * and `myEventsList` do not match while `"events"`, `["events"]` and `events.length`
+ * still do.
+ */
+function wholeToken(path) {
+  return new RegExp(`(?<![\\w$-])${escape(path)}(?![\\w$-])`);
 }
 
 if (offenders.length === 0) {

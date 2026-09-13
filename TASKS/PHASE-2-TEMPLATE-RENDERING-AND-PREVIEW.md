@@ -318,7 +318,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** — 2026-09-13 ([record](../MEMORY/records/2026-09-13-P2-10-public-interactions.md)); step 6 not applicable, see below |
 | **Depends on** | P2-08 |
 | **Spec refs** | `docs/UI-UX/14-PUBLIC-INVITATION-UX.md` § Key Interactions, `docs/FRONTEND/07` § Personalization, `docs/ARCHITECTURE/06` § Cache Segmentation |
 | **Spec required** | No |
@@ -336,10 +336,14 @@
 7. Keep every interaction keyboard-accessible.
 
 **Definition of Done**
-- [ ] The countdown targets the nearest future event and survives a passed event.
-- [ ] Personalization never affects the server response or the cache key.
-- [ ] A `?to=` value containing markup renders as text, never as HTML.
-- [ ] Copy, share and the cover gate work on iOS Safari and Android Chrome.
+- [x] The countdown targets the nearest future event and survives a passed event. — covered completely by `P2-03`'s tests (nearest upcoming, WIB not the reader's timezone, nothing to count once every event has passed, never below zero). Re-asserting it here would be duplication.
+- [x] Personalization never affects the server response or the cache key. — the rendered markup is byte-identical with and without `?to=`, and the name appears nowhere in it or in the `<head>`. **Caveat in the deployment, not the code**: Next serializes the query string into its own RSC router payload whatever the page does, so a CDN must strip query parameters from the cache key. Carried to `P2-13` / `docs/DEVOPS/03`.
+- [x] A `?to=` value containing markup renders as text, never as HTML. — and the cleaner strips what escaping cannot help with: zero-width characters and the bidirectional overrides, which reverse the surrounding text without being markup at all.
+- [ ] **Copy, share and the cover gate work on iOS Safari and Android Chrome. — NOT VERIFIED.** jsdom is not a browser. The logic, the DOM contract and both real clipboard failure modes are tested; the device pass belongs with `P2-13` and `docs/TESTING/06`.
+
+**Step 6 — background music — is NOT APPLICABLE.** `docs/UI-UX/14` scopes it to "if the section is active", and there is no music section: `SECTION_KEYS` has ten entries and none is `music`. A mute control would require inventing the section (a schema key, a component, a template that names it), which is not this card's. The gesture such a section would need — a real click on a real button — is what the cover gate provides.
+
+**Two defects fixed, both with a passing test over them.** `P2-03`'s cover gate lived inside `HeroClassic` and hid **its own button** while every section below stayed scrollable — a section cannot contain its siblings, so the control moved to `public-invite`'s `CoverGate`. And the gift section's copy button wrote its confirmation to `nextElementSibling`, which did not exist; the test was named "announces the result" and only checked that `writeText` was called.
 
 ---
 

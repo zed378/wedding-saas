@@ -1,14 +1,12 @@
 "use client";
 
 /*
- * `P2-08`. The cover gate is `useState`: a guest taps "Buka Undangan" and the invitation opens.
- *
- * The directive is here rather than in the consuming application because it is a
- * property of THIS module: it needs the browser. `web-app` never noticed, since the
- * editor already wraps the renderer in a client tree -- `public-invite` renders from a
- * server component, where a hook without this directive is a build error.
+ * `P2-08`. This module is a client component because `P2-03` gated the cover with
+ * `useState`. `P2-10` moved the gate out (see below) and the hook went with it, but the
+ * directive stays: the file is imported by `public-invite`'s client boundary alongside
+ * its interactive siblings, and marking it server-only would split the section library
+ * across the boundary for no gain.
  */
-import { useState } from "react";
 
 import type { SectionProps } from "../types.js";
 import { Photo, When, rows, text } from "./primitives.js";
@@ -17,16 +15,16 @@ import { readPath } from "../resolve-data.js";
 /**
  * P2-03 — the cover. `docs/UI-UX/14` § Section Order 1.
  *
- * ## The cover gate, and why it is a real button
+ * ## The cover gate is NOT here, and used not to be a gate at all
  *
- * The document asks for an "Open Invitation" button "to trigger music autoplay with a
- * user gesture — a modern browser requirement". That is the functional reason, and it is
- * not the only one: the gate is also what makes the first paint a single readable screen
- * rather than a page mid-scroll.
+ * `P2-03` put an "Open Invitation" button in this component. It hid **itself** on click
+ * while every section below stayed rendered and scrollable — so it was a button that
+ * removed a button, and the "single readable first screen" the document asks for never
+ * happened.
  *
- * It is a `<button>`, not a styled `<div>` with a click handler. A guest using a keyboard
- * or a screen reader reaches the whole invitation through this one control, so it is the
- * single most important interactive element on the page to get right.
+ * A section cannot gate its siblings; it has no access to them. `P2-10` moved the control
+ * to `public-invite`'s `CoverGate`, which wraps the whole invitation and can actually
+ * contain it. This component is now just the cover, which is all a section can be.
  *
  * ## Contrast over a photograph
  *
@@ -40,12 +38,7 @@ import { readPath } from "../resolve-data.js";
  * one value is not themeable: letting a template author set it would let them break a
  * requirement `docs/UI-UX/17` does not make optional.
  */
-export function HeroClassic({ data, mode }: SectionProps) {
-  // `live` is the editor preview. A cover gate there would mean the couple sees a button
-  // instead of their invitation every time the preview re-renders, which is the opposite
-  // of a preview.
-  const [opened, setOpened] = useState(mode === "live");
-
+export function HeroClassic({ data }: SectionProps) {
   const groom = text(readPath(data, ["couple", "groom", "nickname"]));
   const bride = text(readPath(data, ["couple", "bride", "nickname"]));
   const cover = coverPhoto(data);
@@ -69,18 +62,6 @@ export function HeroClassic({ data, mode }: SectionProps) {
         <When value={date}>
           {(present) => <p className="wi-hero-date">{present}</p>}
         </When>
-
-        {!opened && (
-          <button
-            type="button"
-            className="wi-button"
-            onClick={() => {
-              setOpened(true);
-            }}
-          >
-            Buka Undangan
-          </button>
-        )}
       </div>
     </div>
   );
