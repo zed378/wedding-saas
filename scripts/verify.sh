@@ -103,6 +103,12 @@ fi
 if [ "$FAST" -eq 0 ]; then
   # Slow steps: skipped by pre-push, required before a merge to main.
   step "build" pnpm -w run build
+
+  # P2-08. The public invitation's claim -- that the whole page and its sharing meta tags
+  # are in the HTML before any JavaScript runs -- can only be checked against a running
+  # production server, so this has to come after the build. It also measures what a guest
+  # downloads against docs/FRONTEND/09's 150KB budget.
+  step "public invitation renders server-side"     pnpm --filter @wi/public-invite test:ssr
 fi
 
 # ---------------------------------------------------------------------------

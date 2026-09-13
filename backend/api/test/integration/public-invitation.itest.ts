@@ -50,16 +50,40 @@ const SECTIONS = [
     component: "CoupleProfile",
     enabled_by_default: true,
     configurable: true,
-    required_fields: ["couple.groom.full_name", "couple.bride.full_name"],
-    optional_fields: ["couple.groom.photo", "couple.bride.photo"],
+    required_fields: [
+      "couple.groom.full_name",
+      "couple.bride.full_name",
+      "couple.groom.nickname",
+      "couple.bride.nickname",
+    ],
+    optional_fields: [
+      "couple.groom.photo",
+      "couple.bride.photo",
+      "couple.groom.father_name",
+      "couple.groom.mother_name",
+      "couple.groom.child_order",
+      "couple.groom.instagram",
+    ],
   },
   {
     section_key: "event",
     component: "EventCardDouble",
     enabled_by_default: true,
     configurable: true,
-    required_fields: ["events.*.title", "events.*.venue_name"],
-    optional_fields: [],
+    /*
+     * Every path the section could use, not a token two. The canonical-path guard below
+     * only covers what a template declares, so a thin fixture makes it a thin test --
+     * which is how `events.*.date` went unnoticed while the payload served `event_date`.
+     */
+    required_fields: [
+      "events.*.type",
+      "events.*.title",
+      "events.*.date",
+      "events.*.start_time",
+      "events.*.venue_name",
+      "events.*.address",
+    ],
+    optional_fields: ["events.*.end_time", "events.*.description"],
   },
   {
     section_key: "gallery",
@@ -67,7 +91,11 @@ const SECTIONS = [
     enabled_by_default: true,
     configurable: true,
     required_fields: ["gallery.photos"],
-    optional_fields: [],
+    optional_fields: [
+      "gallery.photos.*.caption",
+      "gallery.photos.*.is_cover",
+      "gallery.photos.*.order",
+    ],
   },
   {
     section_key: "quote",
@@ -75,15 +103,19 @@ const SECTIONS = [
     enabled_by_default: true,
     configurable: true,
     required_fields: ["quote.text"],
-    optional_fields: [],
+    optional_fields: ["quote.source"],
   },
   {
     section_key: "gift",
     component: "GiftAccountList",
     enabled_by_default: true,
     configurable: true,
-    required_fields: ["gift.accounts.*.account_number"],
-    optional_fields: [],
+    required_fields: [
+      "gift.accounts.*.provider_name",
+      "gift.accounts.*.account_number",
+      "gift.accounts.*.account_holder",
+    ],
+    optional_fields: ["gift.accounts.*.type", "gift.accounts.*.order"],
   },
 ];
 
@@ -318,7 +350,7 @@ describe("P2-07 — GET /public/i/:slug", () => {
   // ------------------------------------------------------------------ DoD item 2
 
   describe("a disabled section's data is absent", () => {
-    it("omits bank_accounts entirely when the gift section is off", async () => {
+    it("omits the gift accounts entirely when the gift section is off", async () => {
       // `docs/API/08` calls this one out by name: "respect the user's toggle even if data
       // exists in the DB". The row IS in the database -- `publish()` always writes one --
       // so this asserts omission, not absence of data.
@@ -329,7 +361,7 @@ describe("P2-07 — GET /public/i/:slug", () => {
       const res = await get(slug);
       const data = expectSuccess<{ invitation: Record<string, unknown> }>(res);
 
-      expect(data.invitation).not.toHaveProperty("bank_accounts");
+      expect(data.invitation).not.toHaveProperty("gift");
       expect(JSON.stringify(res.body)).not.toContain("1234567890");
     });
 
@@ -382,10 +414,10 @@ describe("P2-07 — GET /public/i/:slug", () => {
 
       const res = await get(slug);
       const data = expectSuccess<{
-        invitation: { gallery: unknown[] };
+        invitation: { gallery: { photos: unknown[] } };
       }>(res);
 
-      expect(data.invitation.gallery).toHaveLength(1);
+      expect(data.invitation.gallery.photos).toHaveLength(1);
     });
 
     it("still serves a NON-configurable section the settings omit", async () => {
@@ -539,11 +571,15 @@ describe("P2-07 — GET /public/i/:slug", () => {
       const { slug } = await publish();
 
       const data = await expectSuccess<{
-        invitation: { gallery: { url?: string; thumbnail_url?: string }[] };
+        invitation: {
+          gallery: { photos: { url?: string; thumbnail_url?: string }[] };
+        };
       }>(await get(slug));
 
-      expect(data.invitation.gallery[0]?.url).toMatch(/^https:\/\/cdn\.test\//);
-      expect(data.invitation.gallery[0]?.thumbnail_url).toMatch(
+      expect(data.invitation.gallery.photos[0]?.url).toMatch(
+        /^https:\/\/cdn\.test\//,
+      );
+      expect(data.invitation.gallery.photos[0]?.thumbnail_url).toMatch(
         /^https:\/\/cdn\.test\//,
       );
     });
@@ -558,11 +594,74 @@ describe("P2-07 — GET /public/i/:slug", () => {
       );
 
       const data = await expectSuccess<{
-        invitation: { gallery: { url?: string }[] };
+        invitation: { gallery: { photos: { url?: string }[] } };
       }>(await get(invitation.slug));
 
-      expect(data.invitation.gallery[0]).toBeDefined();
-      expect(data.invitation.gallery[0]).not.toHaveProperty("url");
+      expect(data.invitation.gallery.photos[0]).toBeDefined();
+      expect(data.invitation.gallery.photos[0]).not.toHaveProperty("url");
+    });
+
+    it("answers every canonical path the template declares", async () => {
+      /*
+       * The regression guard for ADR-063.
+       *
+       * The first version of this endpoint served `docs/API/04`'s shape -- `event_date`,
+       * `gallery`, `bank_accounts` -- and the renderer resolves a section's props from
+       * the CANONICAL paths in `required_fields`. Every path missed, so `P2-08` rendered
+       * a page with the right sections and nothing in them, and every test in this file
+       * still passed: they assert that data is present, not that it is reachable by the
+       * name the template uses to ask for it.
+       *
+       * So this walks the template's own declared paths against the payload. It needs no
+       * list of its own, which is the point -- a path added to the registry and used by a
+       * template is covered the day it is used.
+       */
+      const { slug } = await publish();
+      const data = await expectSuccess<{
+        invitation: Record<string, unknown>;
+      }>(await get(slug));
+
+      const read = (root: unknown, path: readonly string[]): unknown => {
+        let node: unknown = root;
+        for (const segment of path) {
+          if (node === null || typeof node !== "object") return undefined;
+          node = (node as Record<string, unknown>)[segment];
+        }
+        return node;
+      };
+
+      const declared = SECTIONS.flatMap((section) => [
+        ...section.required_fields,
+        ...section.optional_fields,
+      ]);
+
+      // Only the paths whose data this fixture actually seeds. A photo the couple never
+      // uploaded is legitimately absent, and asserting otherwise would test the fixture.
+      const seeded = declared.filter(
+        (path) =>
+          !path.startsWith("couple.groom.photo") &&
+          !path.startsWith("couple.bride.photo"),
+      );
+
+      for (const path of seeded) {
+        const star = path.indexOf(".*.");
+        if (star === -1) {
+          expect(read(data.invitation, path.split(".")), path).toBeDefined();
+          continue;
+        }
+
+        const collection = read(
+          data.invitation,
+          path.slice(0, star).split("."),
+        );
+        expect(Array.isArray(collection), path).toBe(true);
+        for (const item of collection as unknown[]) {
+          expect(
+            read(item, path.slice(star + 3).split(".")),
+            path,
+          ).toBeDefined();
+        }
+      }
     });
 
     it("is deterministic — two requests produce identical bytes", async () => {

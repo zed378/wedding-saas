@@ -49,6 +49,7 @@ export function TemplateRenderer({
   onSectionIssue,
   onSectionError,
   sectionFallback,
+  resolve = resolveComponent,
 }: TemplateRendererProps) {
   const theme = mergeTheme(
     templateVersion.theme,
@@ -76,7 +77,7 @@ export function TemplateRenderer({
        */}
       <style>{SECTION_STYLES}</style>
       {visible.map((section: SectionDefinition, index: number) => {
-        const Component = resolveComponent(section.component);
+        const Component = resolve(section.component);
 
         if (Component === undefined) {
           // `docs/PLAN/18` R5: a stored version naming a component that no longer exists.

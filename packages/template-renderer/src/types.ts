@@ -113,4 +113,21 @@ export interface TemplateRendererProps {
    * couple IS the person who needs to know (`P2-05`).
    */
   readonly sectionFallback?: ReactNode;
+  /**
+   * Where a component name comes from. Defaults to the static registry.
+   *
+   * `P2-08` needs it: the public page resolves each name through `next/dynamic`, so a
+   * guest downloads the chunks for the sections their invitation actually uses rather
+   * than the whole section library — `docs/FRONTEND/09` § Budget asks for "section
+   * components loaded only for the active template, not bundling every possible
+   * template".
+   *
+   * A prop rather than a mutable registry: a module-level setter would make what a
+   * template renders depend on which application imported the package first, and the
+   * editor and the public page would then be able to disagree. `registry.spec.tsx` still
+   * pins the default against `@wi/schema`, and a resolver that returns `undefined`
+   * behaves exactly like an unregistered component.
+   */
+  readonly resolve?:
+    ((name: string) => SectionComponent | undefined) | undefined;
 }

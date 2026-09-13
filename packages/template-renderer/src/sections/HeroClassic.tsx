@@ -1,3 +1,13 @@
+"use client";
+
+/*
+ * `P2-08`. The cover gate is `useState`: a guest taps "Buka Undangan" and the invitation opens.
+ *
+ * The directive is here rather than in the consuming application because it is a
+ * property of THIS module: it needs the browser. `web-app` never noticed, since the
+ * editor already wraps the renderer in a client tree -- `public-invite` renders from a
+ * server component, where a hook without this directive is a build error.
+ */
 import { useState } from "react";
 
 import type { SectionProps } from "../types.js";

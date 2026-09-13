@@ -10,6 +10,23 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-13 — A guest can open an invitation
+
+**Added** — the public page, server-rendered ([P2-08](./records/2026-09-13-P2-08-public-ssr.md))
+
+- **`invitation.vizunicum.my.id/{slug}` renders a real invitation**, and the whole page — content, theme, and the `og:*` tags a WhatsApp preview is built from — is in the HTML the server sends. `docs/FRONTEND/07` requires it because sharing bots do not execute JavaScript, and it is checked by reading the raw bytes from a production server rather than by rendering in a test environment.
+- **Slug resolution is one implementation** behind a configured strategy, as `docs/BACKEND/06` asks: the MVP's path form and the eventual per-invitation subdomains are the same code and the same validation, so the two cannot drift into disagreeing about what a valid address is.
+- **An address with no invitation gets a friendly page**, which never says which of the five reasons applied. **An API outage does not**: a 404 and a 500 are deliberately different responses, because a page reading "this invitation does not exist" during an incident is a lie told on the one day it matters most.
+- **Desktop is letterboxed** — a phone-width view centred on a neutral surround (`docs/UI-UX/15`), because a template's sections are composed for a phone and stretching them to 1440px produces long lines rather than a desktop design.
+- **A new route on this host is now a failing test.** With invitations at the root, adding `app/about/` would take the address `about` away from whoever published an invitation there (`docs/PLAN/18` R15), and the diff that does it looks entirely reasonable.
+
+**Fixed** — the public payload was in a shape the renderer could not read (ADR-063)
+
+- `P2-07` served `docs/API/04`'s field names — `event_date`, `gallery`, `bank_accounts` — and a template declares the data it needs as the **canonical** paths from `docs/PLAN/08`'s registry. Every path missed, so the first page rendered had the right sections and nothing inside them. The payload now answers the registry's names, `docs/API/08` is amended, and a test walks the template's own declared paths against the response.
+- Twenty-eight tests passed against the broken payload, because they asserted data was *present* rather than *reachable under the name the consumer asks for*.
+
+**Known, measured and not fixed** — the section library ships as one 7.5KB gzip chunk rather than per template. `next/dynamic` is wired for the split and Turbopack merges the chunks anyway. The page uses 138.6KB of `docs/FRONTEND/09`'s 150KB budget; both numbers are pinned by tests and both belong to `P2-13`.
+
 ### 2026-09-13 — The public page has something to serve
 
 **Added** — `GET /public/i/:slug` ([P2-07](./records/2026-09-13-P2-07-public-invitation-api.md))
