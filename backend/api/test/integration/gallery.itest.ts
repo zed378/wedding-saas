@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { GalleryService } from "../../src/modules/invitation/gallery.service";
-import { MAX_PHOTOS_PER_INVITATION } from "../../src/modules/media/media.service";
+import { CatalogRepository } from "../../src/modules/order/catalog.repository";
+import { EntitlementsService } from "../../src/modules/order/entitlements.service";
 import { InvitationRepository } from "../../src/shared/tenancy/invitation-repository";
 import type { Env } from "../../src/config/env.schema";
 import { startHarness, type Harness } from "../support/harness";
@@ -12,7 +13,7 @@ import {
   type TestUser,
 } from "../support/factories";
 import { expectServiceIdorSafe } from "../support/idor";
-import { resetTenantData } from "./helpers.ts";
+import { resetTenantData, seededMaxPhotos } from "./helpers.ts";
 
 /**
  * P1-19 — the gallery. `docs/API/04` § Gallery, BR-8.1.
@@ -31,11 +32,18 @@ describe("the gallery", () => {
   let harness: Harness;
   let service: GalleryService;
   let repository: InvitationRepository;
+  let maxPhotos: number;
 
   beforeAll(async () => {
     harness = await startHarness();
     repository = new InvitationRepository(harness.db);
-    service = new GalleryService(repository, env);
+    service = new GalleryService(
+      repository,
+      env,
+      new EntitlementsService(new CatalogRepository(harness.db)),
+    );
+    // `P3-01`: the quota is the seeded package's, read from the row rather than restated.
+    maxPhotos = await seededMaxPhotos(harness);
   }, 120_000);
 
   afterAll(async () => {
@@ -445,7 +453,7 @@ describe("the gallery", () => {
 
     it("refuses the attach that would exceed it", async () => {
       const { user, invitationId } = await owned();
-      await fill(invitationId, MAX_PHOTOS_PER_INVITATION);
+      await fill(invitationId, maxPhotos);
 
       const mediaId = await mediaFor(invitationId);
       const error = await rejection(() =>
@@ -457,12 +465,12 @@ describe("the gallery", () => {
 
     it("allows the last one under the limit", async () => {
       const { user, invitationId } = await owned();
-      await fill(invitationId, MAX_PHOTOS_PER_INVITATION - 1);
+      await fill(invitationId, maxPhotos - 1);
 
       const photo = await service.attach(user.scope, invitationId, {
         mediaId: await mediaFor(invitationId),
       });
-      expect(photo.display_order).toBe(MAX_PHOTOS_PER_INVITATION - 1);
+      expect(photo.display_order).toBe(maxPhotos - 1);
     });
 
     it("the attach takes a conflicting row lock on the invitation", async () => {
@@ -502,7 +510,7 @@ describe("the gallery", () => {
 
     it("concurrent attaches at the boundary leave the cap intact", async () => {
       const { user, invitationId } = await owned();
-      await fill(invitationId, MAX_PHOTOS_PER_INVITATION - 1);
+      await fill(invitationId, maxPhotos - 1);
       const media = await Promise.all(
         Array.from({ length: 6 }, () => mediaFor(invitationId)),
       );
@@ -514,9 +522,7 @@ describe("the gallery", () => {
       );
 
       expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
-      expect(await galleryRows(invitationId)).toHaveLength(
-        MAX_PHOTOS_PER_INVITATION,
-      );
+      expect(await galleryRows(invitationId)).toHaveLength(maxPhotos);
     });
   });
 
@@ -562,7 +568,7 @@ describe("the gallery", () => {
           mallory.user.scope,
           {
             mediaId: await mediaFor(alice.invitationId),
-            maxPhotos: MAX_PHOTOS_PER_INVITATION,
+            maxPhotos: maxPhotos,
           },
         ),
       ).toEqual({ kind: "not_found" });

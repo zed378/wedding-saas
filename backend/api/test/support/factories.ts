@@ -194,18 +194,26 @@ export async function createTestOrder(
     user: TestUser | string;
     status?: string;
     amount?: bigint;
+    /** `P3-01`: a second tier's entitlements are tested against orders for it. */
+    packageId?: string;
+    addonIds?: string[];
+    /** Ordering among several orders for one invitation. */
+    createdAt?: Date;
   },
 ): Promise<{ id: string }> {
   const userId =
     typeof options.user === "string" ? options.user : options.user.id;
   const { rows } = await pool.query<{ id: string }>(
-    `INSERT INTO orders (invitation_id, user_id, package_id, amount_total, status, expired_at)
-     VALUES ($1, $2, 'standard', $3, $4, now() + interval '1 day') RETURNING id`,
+    `INSERT INTO orders (invitation_id, user_id, package_id, addon_ids, amount_total, status, expired_at, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, now() + interval '1 day', COALESCE($7, now())) RETURNING id`,
     [
       options.invitation.id,
       userId,
+      options.packageId ?? "standard",
+      options.addonIds ?? [],
       String(options.amount ?? 139000n),
       options.status ?? "pending",
+      options.createdAt ?? null,
     ],
   );
   return { id: rows[0]!.id };

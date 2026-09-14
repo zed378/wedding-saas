@@ -12,8 +12,6 @@ import {
   invitationBankAccounts,
   invitationPreviewTokens,
   media,
-  orders,
-  packages,
   templateVersions,
   templates,
 } from "../../infra/db/schema/index";
@@ -81,16 +79,6 @@ export interface PublishedInvitation {
      */
     readonly thumbnailUrl: string | null;
   };
-  /**
-   * `packages.has_watermark` of the package this invitation was paid for, or `true` when
-   * it has not been paid for.
-   *
-   * `true` is the fail-closed default in the direction that matters commercially: a
-   * failure to confirm payment must produce the watermarked page, never the premium one.
-   * BR-2.8's free trial publish lands here by design — a trial is a real publish of an
-   * unpaid invitation, and it is watermarked.
-   */
-  readonly watermark: boolean;
 }
 
 @Injectable()
@@ -210,44 +198,36 @@ export class PublicInvitationRepository {
   }): Promise<PublishedInvitation> {
     const invitationId = found.invitation.id;
 
-    const [
-      people,
-      events,
-      galleryRows,
-      bankAccounts,
-      settings,
-      quote,
-      watermark,
-    ] = await Promise.all([
-      this.db
-        .select()
-        .from(invitationPeople)
-        .where(eq(invitationPeople.invitationId, invitationId)),
-      this.db
-        .select()
-        .from(invitationEvents)
-        .where(eq(invitationEvents.invitationId, invitationId)),
-      this.db
-        .select({ photo: invitationGallery, media })
-        .from(invitationGallery)
-        .innerJoin(media, eq(invitationGallery.mediaId, media.id))
-        .where(eq(invitationGallery.invitationId, invitationId)),
-      this.db
-        .select()
-        .from(invitationBankAccounts)
-        .where(eq(invitationBankAccounts.invitationId, invitationId)),
-      this.db
-        .select()
-        .from(invitationSettings)
-        .where(eq(invitationSettings.invitationId, invitationId))
-        .limit(1),
-      this.db
-        .select()
-        .from(invitationQuote)
-        .where(eq(invitationQuote.invitationId, invitationId))
-        .limit(1),
-      this.watermarkFor(invitationId),
-    ]);
+    const [people, events, galleryRows, bankAccounts, settings, quote] =
+      await Promise.all([
+        this.db
+          .select()
+          .from(invitationPeople)
+          .where(eq(invitationPeople.invitationId, invitationId)),
+        this.db
+          .select()
+          .from(invitationEvents)
+          .where(eq(invitationEvents.invitationId, invitationId)),
+        this.db
+          .select({ photo: invitationGallery, media })
+          .from(invitationGallery)
+          .innerJoin(media, eq(invitationGallery.mediaId, media.id))
+          .where(eq(invitationGallery.invitationId, invitationId)),
+        this.db
+          .select()
+          .from(invitationBankAccounts)
+          .where(eq(invitationBankAccounts.invitationId, invitationId)),
+        this.db
+          .select()
+          .from(invitationSettings)
+          .where(eq(invitationSettings.invitationId, invitationId))
+          .limit(1),
+        this.db
+          .select()
+          .from(invitationQuote)
+          .where(eq(invitationQuote.invitationId, invitationId))
+          .limit(1),
+      ]);
 
     /*
      * The children are addressed by `invitation_id` alone, with no join back to
@@ -292,7 +272,6 @@ export class PublicInvitationRepository {
         customizableThemeKeys: found.version.customizableThemeKeys,
         thumbnailUrl: found.thumbnailUrl,
       },
-      watermark,
     };
   }
 
@@ -331,31 +310,5 @@ export class PublicInvitationRepository {
       .limit(1);
 
     return rows[0]?.slug ?? null;
-  }
-
-  /**
-   * `packages.has_watermark` of the most recent **paid** order, or `true`.
-   *
-   * `docs/API/08`: *"derived server-side from the package the invitation was paid for …
-   * it must never be influenced by a client hint"*. There is no client hint to ignore
-   * here because the endpoint reads no input beyond the slug — the control is that this
-   * value has exactly one source.
-   *
-   * `status = 'paid'` and nothing else. A `pending` order is somebody who opened a
-   * payment page; treating it as paid would make the watermark removable by starting a
-   * checkout and abandoning it.
-   */
-  private async watermarkFor(invitationId: string): Promise<boolean> {
-    const rows = await this.db
-      .select({ hasWatermark: packages.hasWatermark })
-      .from(orders)
-      .innerJoin(packages, eq(orders.packageId, packages.id))
-      .where(
-        and(eq(orders.invitationId, invitationId), eq(orders.status, "paid")),
-      )
-      .orderBy(desc(orders.createdAt))
-      .limit(1);
-
-    return rows[0]?.hasWatermark ?? true;
   }
 }

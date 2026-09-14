@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common";
 
+import { PricingModule } from "../order/pricing.module";
+
 import { AuthModule } from "../auth/auth.module";
 import { TenancyModule } from "../../shared/tenancy/tenancy.module";
 import { MediaController } from "./media.controller";
@@ -13,7 +15,7 @@ import { MediaService } from "./media.service";
  * need one.
  */
 @Module({
-  imports: [AuthModule, TenancyModule],
+  imports: [PricingModule, AuthModule, TenancyModule],
   controllers: [MediaController],
   providers: [MediaService],
   exports: [MediaService],

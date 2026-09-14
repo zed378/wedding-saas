@@ -23,7 +23,7 @@ export interface InteractiveCardProps extends CardProps {
  * A real `<button>`, so it is focusable, has a role, and responds to Enter and Space
  * without a key handler. The visible content is `aria-hidden` from the accessible name
  * computation only insofar as `label` overrides it -- a template card whose name would
- * otherwise be read as "Elegant Rose modern floral Rp 139.000 Pilih" gets a name that
+ * otherwise be read as "Elegant Rose modern floral Rp 99.999 Pilih" gets a name that
  * says what activating it does.
  */
 export function InteractiveCard({

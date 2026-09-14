@@ -134,7 +134,7 @@ export class MediaController {
    * `POST /invitations/:id/media`.
    *
    * Rate limited on `media-upload` — 60 an hour per user, from `docs/SECURITY/10`'s table.
-   * The quota (200 per invitation) is a resource control and this is an abuse control; they
+   * The quota (the invitation's `maxPhotos` entitlement, `P3-01`) is a resource control and this is an abuse control; they
    * are different rules and would not necessarily move together.
    */
   @Post("invitations/:id/media")

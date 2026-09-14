@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common";
 
+import { PricingModule } from "../order/pricing.module";
+
 import { PublicInvitationController } from "./public-invitation.controller";
 import { PublicPreviewController } from "./public-preview.controller";
 import { PublicRumController } from "./public-rum.controller";
@@ -13,6 +15,7 @@ import { PublicInvitationService } from "./public-invitation.service";
  * of `docs/BACKEND/06` is what this controller already is.
  */
 @Module({
+  imports: [PricingModule],
   controllers: [
     PublicInvitationController,
     PublicPreviewController,

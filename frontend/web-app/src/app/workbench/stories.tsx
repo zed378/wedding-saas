@@ -282,7 +282,7 @@ export function CardStory() {
             description="Modern, floral"
             actions={<Badge tone="premium">Premium</Badge>}
           />
-          <p className="text-body">Rp 139.000 · 12 bulan</p>
+          <p className="text-body">Rp 99.999 · 12 bulan (contoh)</p>
         </Card>
 
         <InteractiveCard label="Pilih template Elegant Rose" onClick={() => {}}>

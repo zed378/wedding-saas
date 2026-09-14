@@ -10,6 +10,7 @@ import {
 import { STORAGE } from "../../infra/storage/storage.module";
 import { JOB_QUEUE, type JobQueue } from "../../infra/queue/queue.module";
 import { ENV } from "../../config/config.module";
+import { EntitlementsService } from "../order/entitlements.service";
 import type { Env } from "../../config/env.schema";
 import { NotFoundError, ValidationError } from "../../http/errors";
 import { logger } from "../../shared/logging/logger";
@@ -57,9 +58,8 @@ import {
  * it `failed` rather than leaving it `processing` forever.
  */
 
-/** BR-8.1 and `docs/PLAN/11` § Limits per Package. Uniform: there is one package (ADR-023). */
+/** BR-8.1 and `docs/PLAN/11` § Limits per Package: 10 MB for every package. */
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
-export const MAX_PHOTOS_PER_INVITATION = 200;
 
 /** `docs/API/05`: `purpose: cover|gallery|profile`. */
 export type MediaPurpose = "cover" | "gallery" | "profile";
@@ -99,6 +99,7 @@ export class MediaService {
     @Inject(STORAGE) private readonly storage: StoragePort,
     @Inject(JOB_QUEUE) private readonly queue: JobQueue,
     @Inject(ENV) private readonly env: Env,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async upload(
@@ -116,6 +117,11 @@ export class MediaService {
     const mediaId = randomUUID();
     const key = stagingKey(mediaId);
 
+    // `P3-01`: the quota is the invitation's entitlement, not a constant. Read before the
+    // quota transaction; the ownership check still happens inside it, and a non-owner still
+    // gets the same 404 below.
+    const { maxPhotos } = await this.entitlements.forInvitation(invitationId);
+
     const row = await this.repository.insertMediaWithinQuota(
       invitationId,
       scope,
@@ -125,7 +131,7 @@ export class MediaService {
         storagePath: key,
         mimeType: canonicalMimeType(format),
         sizeBytes: file.size,
-        maxPhotos: MAX_PHOTOS_PER_INVITATION,
+        maxPhotos,
       },
     );
 
@@ -141,10 +147,10 @@ export class MediaService {
         [
           {
             field: "file",
-            message: `Undangan ini sudah memiliki ${String(MAX_PHOTOS_PER_INVITATION)} foto.`,
+            message: `Undangan ini sudah memiliki ${String(maxPhotos)} foto.`,
           },
         ],
-        `Undangan ini sudah memiliki ${String(MAX_PHOTOS_PER_INVITATION)} foto. Hapus salah satu sebelum menambah yang baru.`,
+        `Undangan ini sudah memiliki ${String(maxPhotos)} foto. Hapus salah satu sebelum menambah yang baru.`,
         "QUOTA_EXCEEDED",
       );
     }

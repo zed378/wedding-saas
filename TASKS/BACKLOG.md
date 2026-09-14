@@ -12,7 +12,7 @@ Every entry names the task it blocks or affects, so nothing here is a note witho
 
 | | Total | Resolved | Open |
 |---|---|---|---|
-| Open Questions | 17 | 10 | 7 |
+| Open Questions | 18 | 10 | 8 |
 | Specification Gaps | 17 | 17 | 0 |
 | Deferred | 9 | — | 9 (by design) |
 
@@ -24,9 +24,27 @@ Nothing on the board is `BLOCKED`. The remaining questions shape work rather tha
 
 **2026-09-13**: `P2-14` raised `OQ-27` (how dates and times display, and which timezone an event is in). Seven open questions; none blocks a task, though `OQ-27` should be answered before launch.
 
+**2026-09-14**: `P3-01` raised `OQ-28` (no endpoint tells checkout what a package costs). Eight open questions; `OQ-28` must be answered before `P3-14`.
+
 ---
 
 ## Open Questions — Remaining
+
+### OQ-28 — Where does the checkout read a package's price?
+
+**Affects**: `P3-14` — **blocks it** unless answered; nothing before it.
+
+`docs/API/06` defines order creation and order reads, and `docs/API/03` the template catalogue. **No
+endpoint returns the packages and their prices.** `P3-14`'s checkout must show "Rp 139.000 · 12
+bulan" before an order exists, and `P3-01` made a price literal in application code a `pnpm verify`
+failure (ADR-073, `scripts/check-price-literals.mjs`) — so the web app has no permitted way to
+display the price.
+
+Candidate answer (not adopted): `GET /api/v1/packages` — public, cached briefly, returning active
+packages with `id`, `name`, `price`, `duration_months`, `max_photos`, `has_watermark`, plus active
+addons. Read from the same `CatalogRepository` as pricing, so the displayed and charged prices share
+one source. It is a new API contract, so it needs `docs/API/06` amended rather than invented while
+coding.
 
 ### OQ-27 — How are event dates and times shown, and in which timezone is an event? *(answered — ADR-070, ADR-072)*
 

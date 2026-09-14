@@ -69,6 +69,10 @@ step "no hard-coded section or field" node scripts/check-no-hardcoded-fields.mjs
 step "the renderer knows no template" node scripts/check-renderer-is-generic.mjs
 step "every request text field is sanitized or exempt" node scripts/check-sanitized-fields.mjs
 
+# docs/SECURITY/07 § Pricing: the amount comes from the packages and addons rows. A price typed
+# into a page shows a number the server may no longer charge (P3-01).
+step "no price literal in application code" node scripts/check-price-literals.mjs
+
 # docs/DATABASE/03: sections and theme are validated in application code before the
 # write, because the columns are JSONB and Postgres will accept any well-formed JSON --
 # including a component no renderer provides.

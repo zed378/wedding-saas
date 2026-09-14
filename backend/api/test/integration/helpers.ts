@@ -112,3 +112,18 @@ export function applicationPool(): Pool {
   );
   return new Pool({ connectionString: url, max: 2 });
 }
+
+/**
+ * `P3-01` — the seeded package's photo quota, read from its row.
+ *
+ * Quota tests used to import a `200` constant from the media service. The quota is now the
+ * invitation's entitlement, and restating the number here would be a second source of it.
+ */
+export async function seededMaxPhotos(harness: {
+  readonly pool: Pool;
+}): Promise<number> {
+  const { rows } = await harness.pool.query<{ max_photos: number }>(
+    "SELECT max_photos FROM packages WHERE id = 'standard'",
+  );
+  return rows[0]!.max_photos;
+}

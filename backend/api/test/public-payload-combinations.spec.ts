@@ -41,7 +41,9 @@ const person = (role: string, name: string) => ({
   photoMediaId: null,
 });
 
-function found(enabledSections: string[]): PublishedInvitation {
+function found(
+  enabledSections: string[],
+): PublishedInvitation & { watermark: boolean } {
   return {
     invitation: { id: "inv-1", slug: "uji", status: "published" },
     aggregate: {
@@ -104,7 +106,7 @@ function found(enabledSections: string[]): PublishedInvitation {
       thumbnailUrl: null,
     },
     watermark: false,
-  } as unknown as PublishedInvitation;
+  } as unknown as PublishedInvitation & { watermark: boolean };
 }
 
 describe("every enabled_sections combination of the reference template, in the public payload", () => {
