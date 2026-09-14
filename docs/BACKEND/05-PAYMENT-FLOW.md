@@ -8,7 +8,7 @@ POST /orders/:orderId/payment
   → OrderService.getOwnedOrder(orderId, currentUser)   // authorization
   → guard: order.status === 'pending', order.expired_at > now()
   → PaymentGatewayPort.createTransaction({
-       order_id, amount: order.amount_total,   // from the DB, not the request body
+       providerReferenceId, amount: order.amount_total,   // from the DB, not the request body
        customer: { name: user.full_name, email: user.email }
      })
   → save a Payment record { status:'pending', provider_reference_id }
@@ -18,8 +18,8 @@ POST /orders/:orderId/payment
 ## Webhook Handler (Critical)
 ```
 POST /webhooks/payment/:provider
-  1. Read the raw body + the signature header
-  2. verifySignature(rawBody, signatureHeader, providerSecretKey)
+  1. Read the body (and, for a provider that uses one, the signature header)
+  2. PaymentGatewayPort.verifyNotification(body)   // provider-specific: Midtrans signs a body field with the server key (P3-03, ADR-075)
      → if invalid: log a security event, respond 401, STOP (don't process anything)
   3. Parse the payload → find the Payment by (provider, provider_reference_id)
      → if not found: log the anomaly, respond 200 (so the provider doesn't retry forever for an unrecognized case), investigate manually

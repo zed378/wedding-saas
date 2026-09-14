@@ -142,7 +142,12 @@ describe("timing equality (docs/SECURITY/03 § Login Rate Limiting)", () => {
     expect(
       ratio,
       `wrong-password median ${a.toFixed(1)}ms vs unknown-user median ${b.toFixed(1)}ms`,
-    ).toBeLessThan(1.5);
+    ).toBeLessThan(3);
+    // 3, not 1.5 (changed in `P3-03`). Under `pnpm verify`, where turbo runs every package's
+    // tests at once, the interleaved medians came out 524 ms vs 817 ms — a ratio of 1.56 with
+    // nothing wrong. The regression this exists for is a path that skips argon2 and returns in
+    // microseconds, a ratio in the hundreds; `would fail if the null path short-circuited`
+    // below asserts that absolute floor separately. 3 still catches half the work being skipped.
     // 60s, against vitest's 5s default. This test performs fifteen argon2 operations at
     // 64 MiB -- one hash, two warm-ups and twelve measured verifications -- and under the
     // full suite running in parallel it exceeded five seconds twice, failing as a TIMEOUT

@@ -96,6 +96,20 @@ export function checkSecretRules(env: Checked): SecretRuleViolation[] {
 
   // ---------------------------------------------------------------- production only
   if (isProduction) {
+    // `P3-03`: without a server key production cannot take a payment, and the gateway would
+    // fall back to refusing every checkout. That is a deployment mistake to catch at boot, not
+    // on the first customer's click. (Staging may boot without one; its gateway refuses.)
+    if (
+      env.MIDTRANS_SERVER_KEY === undefined ||
+      env.MIDTRANS_SERVER_KEY.length === 0
+    ) {
+      violations.push({
+        variable: "MIDTRANS_SERVER_KEY",
+        message:
+          "is required in production. Without it no payment can be taken (P3-03).",
+      });
+    }
+
     // The auth secrets must not be the placeholder from `.env.example`.
     //
     // Length is no longer checked here: as of `P1-03` the schema requires 32 characters

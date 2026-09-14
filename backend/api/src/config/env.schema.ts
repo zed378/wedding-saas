@@ -138,12 +138,17 @@ export const envSchema = z
      * Payment provider (P3-03, P3-05).
      *
      * Optional here and CROSS-CHECKED in `secret-rules.ts`: a live key outside production
-     * refuses to start, and so does a sandbox key inside it. Both are values that pass
-     * every per-field check and are still catastrophically wrong.
+     * refuses to start, and so does a sandbox key inside it, and production refuses to start
+     * without a server key. All are values that pass every per-field check and are still
+     * catastrophically wrong.
+     *
+     * No webhook secret: Midtrans signs notifications with the SERVER key, in a body field
+     * (`P3-03`, ADR-075). `MIDTRANS_WEBHOOK_SECRET` existed from `P0-18` for a mechanism
+     * Midtrans does not have, and a variable nobody reads is one somebody rotates in an
+     * incident believing it matters.
      */
     MIDTRANS_SERVER_KEY: z.string().min(1).optional(),
     MIDTRANS_CLIENT_KEY: z.string().min(1).optional(),
-    MIDTRANS_WEBHOOK_SECRET: z.string().min(1).optional(),
 
     /**
      * Google Sign-In (P1-04). Optional, and checked at the point of use rather than at
