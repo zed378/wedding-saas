@@ -15,6 +15,7 @@ import {
   type OrderRow,
 } from "../../shared/tenancy/order-repository";
 import type { TenantScope } from "../../shared/tenancy/tenant-scope";
+import type { Transaction } from "../../shared/db/transaction";
 import { requireVerifiedEmail } from "../auth/require-verified-email";
 import { CatalogRepository } from "./catalog.repository";
 import { PricingService, type OrderType } from "./pricing.service";
@@ -201,6 +202,54 @@ export class OrderService {
     }
 
     return toDto(created.order);
+  }
+
+  /**
+   * `P3-04` — the order module's answer to "may this order be paid now", for the payment module.
+   *
+   * `docs/BACKEND/01`: payment reaches orders through this service, never through the table. The
+   * order is locked for the duration of `work`, which must be short and must not call the provider
+   * (`PaymentService.initiate` commits before it does).
+   *
+   * 404 for somebody else's, nonexistent or malformed id; 422 `ORDER_NOT_PAYABLE` unless `pending`
+   * and before `expired_at` (`docs/BACKEND/05` § Payment Initiation).
+   */
+  async withPayableOrder<R>(
+    scope: TenantScope,
+    orderId: string,
+    work: (payable: {
+      readonly tx: Transaction;
+      readonly orderId: string;
+      readonly amountTotal: bigint;
+      readonly expiredAt: Date;
+    }) => Promise<R>,
+  ): Promise<R> {
+    if (!UUID.test(orderId)) throw new NotFoundError();
+
+    const result = await this.repository.withLockedOwnedOrder(
+      orderId,
+      scope,
+      async ({ tx, order, stillOpen }) => {
+        if (order.status !== "pending" || !stillOpen) {
+          throw new BusinessRuleError(
+            "ORDER_NOT_PAYABLE",
+            order.status === "paid"
+              ? "Pesanan ini sudah dibayar."
+              : "Pesanan ini sudah tidak bisa dibayar. Buat pesanan baru untuk melanjutkan.",
+          );
+        }
+        return {
+          value: await work({
+            tx,
+            orderId: order.id,
+            amountTotal: order.amountTotal,
+            expiredAt: order.expiredAt,
+          }),
+        };
+      },
+    );
+    if (result === null) throw new NotFoundError();
+    return result.value;
   }
 
   /** The order a previous request with this key created, if it still exists. */

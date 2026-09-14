@@ -60,6 +60,11 @@ export interface PhaseOneTenant extends TenantInvitation {
   readonly otherTemplate: TestTemplateVersion;
   /** The same user's OTHER wedding. Same owner, different invitation. */
   readonly second: TenantInvitation;
+  /**
+   * `P3-04`. A `pending` order, on the SECOND invitation: the first must stay free of orders so the
+   * `POST /invitations/:id/orders` owner control can create one without a 409.
+   */
+  readonly orderId: string;
 }
 
 export async function createPhaseOneTenant(
@@ -96,7 +101,22 @@ export async function createPhaseOneTenant(
     emailVerified: true,
   });
 
-  return { user, token, template, otherTemplate, second, ...first };
+  const { rows: orders } = await pool.query<{ id: string }>(
+    `INSERT INTO orders (invitation_id, user_id, package_id, amount_total, status, expired_at)
+     SELECT $1, $2, id, price, 'pending', now() + interval '1 day' FROM packages WHERE id = 'standard'
+     RETURNING id`,
+    [second.invitation.id, user.id],
+  );
+
+  return {
+    user,
+    token,
+    template,
+    otherTemplate,
+    second,
+    orderId: orders[0]!.id,
+    ...first,
+  };
 }
 
 const unique = (): string =>

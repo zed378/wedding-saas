@@ -13,6 +13,8 @@ CREATE TABLE payments (
   raw_callback_payload                    JSONB,
   signature_valid                            BOOLEAN,
   verified_at                                  TIMESTAMPTZ,
+  checkout_url                                   TEXT,          -- P3-04, ADR-076: the provider's payment page for this attempt
+  checkout_token                                 VARCHAR(255),  -- P3-04: the widget token for the same page
   created_at                                     TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at                                       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -24,3 +26,4 @@ CREATE INDEX idx_payments_order ON payments(order_id);
 - `UNIQUE (provider, provider_reference_id)` is the primary idempotency mechanism at the DB level: a webhook received multiple times (a provider retry is normal) will not create a duplicate row — the service layer does an upsert/`ON CONFLICT DO NOTHING` then checks the existing status (see API/07-PAYMENT-API.md, BACKEND/05-PAYMENT-FLOW.md).
 - `raw_callback_payload` is stored in full for audit/debugging purposes, BUT fields that potentially contain card data/extensive financial PII from the provider must be reviewed to avoid violating PCI-DSS compliance — ideally the provider already sends tokenized data, not raw card data (see SECURITY/07-PAYMENT-SECURITY.md). It is **not** column-encrypted (MEMORY ADR-025): it is retained precisely so a signature can be re-verified during an investigation, which redaction or encryption-in-place would work against. Access is restricted to a narrower role and every access is logged (API/09).
 - `signature_valid` is explicitly recorded so that fake callback attempts (invalid signature) remain logged for security investigation, even though they are not processed as valid payments.
+- `checkout_url` / `checkout_token` (ADR-076) let a repeated initiation return the **same** payment page while the payment is `pending` and the order is still payable, instead of opening a second provider transaction for one order — two live pages is how a customer pays twice. Null until the provider answers; a `pending` row with no checkout older than 30 seconds is an initiation that died mid-call and is marked `failed`.

@@ -346,6 +346,13 @@ const CASES: readonly SweepCase[] = [
       ).send({ package_id: "standard" }),
   },
   {
+    // P3-04. Opening a payment page for somebody else's order would put their name and email in
+    // front of the provider on the attacker's behalf.
+    label: "POST /orders/:order_id/payment",
+    send: (c, token, t) =>
+      auth(api(c).post(`/api/v1/orders/${t.orderId}/payment`), token),
+  },
+  {
     label: "GET /invitations/:id/preview-links",
     send: (c, token, t) =>
       auth(

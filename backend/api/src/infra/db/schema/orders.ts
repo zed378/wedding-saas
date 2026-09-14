@@ -165,6 +165,13 @@ export const payments = pgTable(
      */
     signatureValid: boolean("signature_valid"),
     verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    /**
+     * `P3-04`, ADR-076: where this payment attempt is paid, as the gateway returned it. Kept so a
+     * second click or a refresh reopens the SAME payment page instead of opening another — two live
+     * pages for one order is how a customer pays twice. Null until the gateway answers.
+     */
+    checkoutUrl: text("checkout_url"),
+    checkoutToken: varchar("checkout_token", { length: 255 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
