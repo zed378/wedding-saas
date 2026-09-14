@@ -103,6 +103,17 @@ export const orders = pgTable(
   },
   (t) => [
     index("idx_orders_invitation").on(t.invitationId),
+    /**
+     * `P3-02`, ADR-074 (answers `OQ-18`): at most one `pending` order per invitation.
+     *
+     * The service still checks first and holds a row lock, because `docs/API/06` names the
+     * error (`ACTIVE_ORDER_EXISTS`) and a bare 23505 names nothing. This index is what holds
+     * when that check is bypassed — a second writer, a hand-written script, a future bug —
+     * and two pending orders would be two payment pages for one invitation.
+     */
+    uniqueIndex("idx_orders_one_pending")
+      .on(t.invitationId)
+      .where(sql`status = 'pending'`),
     index("idx_orders_user").on(t.userId),
     index("idx_orders_status").on(t.status),
     check(

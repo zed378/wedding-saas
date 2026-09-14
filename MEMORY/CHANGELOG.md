@@ -10,6 +10,17 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-14 — Checkout creates an order
+
+**Added** — order creation ([P3-02](./records/2026-09-14-P3-02-order-creation.md))
+
+- `POST /invitations/:id/orders`: one pending order per invitation, priced by the server, with idempotent retries. Migration `0010` must run before deploy.
+
+**Fixed**
+
+- A malformed id in an invitation URL answers 404 instead of 500.
+- Status-change log lines show the destination status instead of a masked value.
+
 ### 2026-09-14 — Prices and entitlements have one source
 
 **Added** — pricing and entitlements services ([P3-01](./records/2026-09-14-P3-01-pricing-and-entitlements.md))

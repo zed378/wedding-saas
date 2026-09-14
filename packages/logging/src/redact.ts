@@ -88,6 +88,18 @@ const EMAIL_KEYS = new Set([
   "to",
 ]);
 
+/**
+ * Email keys whose name is also an ordinary word, so their value is masked only when it is an
+ * address.
+ *
+ * `to` is an email recipient in a mail job and a destination status in every
+ * `invitation status changed` line (`{ from: "draft", to: "pending_payment" }`). Masking it
+ * unconditionally turned those lines into `to: "*************nt"` from `P0-14` until `P3-02`
+ * noticed — an audit-relevant field nobody could read, in the one log that says why an
+ * invitation changed state. An address is still masked wherever it appears under these keys.
+ */
+const AMBIGUOUS_EMAIL_KEYS = new Set(["to", "recipient"]);
+
 function normalise(key: string): string {
   return key.replace(/[_\-\s]/g, "").toLowerCase();
 }
@@ -193,7 +205,14 @@ export function redact(
       continue;
     }
 
-    if (EMAIL_KEYS.has(k)) {
+    if (
+      EMAIL_KEYS.has(k) &&
+      !(
+        AMBIGUOUS_EMAIL_KEYS.has(k) &&
+        typeof value === "string" &&
+        !value.includes("@")
+      )
+    ) {
       out[key] =
         typeof value === "string"
           ? maskEmail(value)

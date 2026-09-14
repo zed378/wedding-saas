@@ -71,6 +71,13 @@
       "when": 1789310926058,
       "tag": "0009_regions",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789362332572,
+      "tag": "0010_one_pending_order",
+      "breakpoints": true
     }
   ]
 }

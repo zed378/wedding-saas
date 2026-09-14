@@ -19,6 +19,7 @@ import { MediaModule } from "./modules/media/media.module";
 import { TemplateModule } from "./modules/template/template.module";
 import { RegionsModule } from "./modules/regions/regions.module";
 import { PublishingModule } from "./modules/publishing/publishing.module";
+import { OrderModule } from "./modules/order/order.module";
 import { RateLimitModule } from "./shared/rate-limit/rate-limit.module";
 
 /**
@@ -64,6 +65,7 @@ import { RateLimitModule } from "./shared/rate-limit/rate-limit.module";
     TemplateModule,
     RegionsModule,
     PublishingModule,
+    OrderModule,
     // Scaffolding, not a feature. Removed once a real module exists on each surface.
     ...(process.env["NODE_ENV"] === "production" ? [] : [ReferenceModule]),
   ],

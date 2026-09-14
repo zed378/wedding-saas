@@ -152,49 +152,69 @@ export class InvitationStatusService {
     actor: Actor,
     reason?: string,
   ): Promise<{ from: InvitationStatus; to: InvitationStatus }> {
-    return this.db.transaction(async (tx) => {
-      // Locked for the length of the transaction. Without this, two concurrent
-      // requests both read `paid`, both decide the transition is legal, and both
-      // write -- producing two history rows describing incompatible journeys.
-      const [current] = await tx
-        .select({ status: invitations.status })
-        .from(invitations)
-        .where(eq(invitations.id, invitationId))
-        .for("update")
-        .limit(1);
+    return this.db.transaction((tx) =>
+      this.transitionWithin(tx, invitationId, to, actor, reason),
+    );
+  }
 
-      if (current === undefined) throw new NotFoundError();
+  /**
+   * The same transition, inside a transaction the caller already holds.
+   *
+   * `P3-02`: ADR-022 puts `draft → pending_payment` **inside the order-creation transaction**,
+   * so an order and the status it implies commit together or not at all. A second transaction
+   * here would let the order commit and the transition fail — an order for an invitation that
+   * still says `draft`.
+   *
+   * Same ownership assumption as `transition`: the caller has proven the id is the actor's.
+   */
+  async transitionWithin(
+    tx: Transaction,
+    invitationId: string,
+    to: InvitationStatus,
+    actor: Actor,
+    reason?: string,
+  ): Promise<{ from: InvitationStatus; to: InvitationStatus }> {
+    // Locked for the length of the transaction. Without this, two concurrent
+    // requests both read `paid`, both decide the transition is legal, and both
+    // write -- producing two history rows describing incompatible journeys.
+    const [current] = await tx
+      .select({ status: invitations.status })
+      .from(invitations)
+      .where(eq(invitations.id, invitationId))
+      .for("update")
+      .limit(1);
 
-      const from = current.status as InvitationStatus;
-      assertAllowed(from, to, actor, reason);
+    if (current === undefined) throw new NotFoundError();
 
-      await tx
-        .update(invitations)
-        .set({ status: to })
-        // The `from` in the WHERE is a second guard: if anything changed the status
-        // between the lock and here, this updates nothing and the check below throws
-        // rather than writing a history row describing a transition that did not occur.
-        .where(
-          and(eq(invitations.id, invitationId), eq(invitations.status, from)),
-        );
+    const from = current.status as InvitationStatus;
+    assertAllowed(from, to, actor, reason);
 
-      await this.writeHistory(tx, invitationId, from, to, actor, reason);
-
-      logger.info(
-        {
-          context: {
-            invitation_id: invitationId,
-            from,
-            to,
-            actor: actor.kind,
-            ...(reason !== undefined ? { reason } : {}),
-          },
-        },
-        "invitation status changed",
+    await tx
+      .update(invitations)
+      .set({ status: to })
+      // The `from` in the WHERE is a second guard: if anything changed the status
+      // between the lock and here, this updates nothing and the check below throws
+      // rather than writing a history row describing a transition that did not occur.
+      .where(
+        and(eq(invitations.id, invitationId), eq(invitations.status, from)),
       );
 
-      return { from, to };
-    });
+    await this.writeHistory(tx, invitationId, from, to, actor, reason);
+
+    logger.info(
+      {
+        context: {
+          invitation_id: invitationId,
+          from,
+          to,
+          actor: actor.kind,
+          ...(reason !== undefined ? { reason } : {}),
+        },
+      },
+      "invitation status changed",
+    );
+
+    return { from, to };
   }
 
   /**

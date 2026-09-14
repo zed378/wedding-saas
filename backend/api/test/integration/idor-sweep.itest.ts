@@ -336,6 +336,16 @@ const CASES: readonly SweepCase[] = [
       ),
   },
   {
+    // P3-02. Checkout on somebody else's invitation would move it to `pending_payment` and
+    // put an order on it — a denial of their own checkout, since only one can be pending.
+    label: "POST /invitations/:id/orders",
+    send: (c, token, t) =>
+      auth(
+        api(c).post(`/api/v1/invitations/${t.invitation.id}/orders`),
+        token,
+      ).send({ package_id: "standard" }),
+  },
+  {
     label: "GET /invitations/:id/preview-links",
     send: (c, token, t) =>
       auth(
@@ -707,6 +717,32 @@ describe("P1-25, P2-14 — IDOR sweep over every owner-scoped :id endpoint (comp
     },
     30_000,
   );
+
+  /**
+   * `P3-02` found `GET /invitations/not-a-uuid` answering **500**: the path id went to Postgres
+   * as a string and failed the uuid cast. Not a leak, but an error-level log line per junk
+   * request, and a different answer from an unknown id. Every case, with a malformed invitation
+   * id, must give the ordinary 404.
+   */
+  it("answers a malformed invitation id with 404 on every endpoint, never 500", async () => {
+    const malformed = {
+      ...ctx.mallory,
+      invitation: { ...ctx.mallory.invitation, id: "not-a-uuid" },
+    };
+    // Only the routes addressed by an invitation id; `/media/:mediaId` would still name the
+    // caller's own real photo here.
+    const invitationRoutes = CASES.filter((c) =>
+      c.label.includes("/invitations/:id"),
+    );
+    expect(invitationRoutes.length).toBeGreaterThan(20);
+    const statuses = await Promise.all(
+      invitationRoutes.map(async (sweepCase) => {
+        const res = await sweepCase.send(ctx, ctx.mallory.token, malformed);
+        return { label: sweepCase.label, status: res.status };
+      }),
+    );
+    expect(statuses.filter((s) => s.status !== 404)).toEqual([]);
+  });
 
   it("refuses every one of them without a token", async () => {
     const statuses = await Promise.all(

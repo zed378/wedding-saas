@@ -79,7 +79,20 @@ function translate(exception: unknown): Translated {
     };
   }
 
-  // 3. Everything else. A Postgres error, a TypeError, a library throwing a string.
+  // 3. A malformed UUID that reached Postgres. `P3-02` found `GET /invitations/not-a-uuid`
+  //    answering 500 and logging an error: path ids are plain strings until the query, and
+  //    Postgres refuses the cast (22P02). A path that names no resource is a 404 — the same
+  //    body as any other, so a malformed id and an unknown one stay indistinguishable. Only
+  //    the uuid cast is mapped; any other 22P02 is still a bug and still a 500.
+  if (isMalformedUuid(exception)) {
+    return {
+      status: 404,
+      body: failure("NOT_FOUND", "The requested resource was not found."),
+      logAs: "warn",
+    };
+  }
+
+  // 4. Everything else. A Postgres error, a TypeError, a library throwing a string.
   //    NOTHING from it reaches the client -- not the message, not the name, not the
   //    code. The request_id in the response header is how a user's report gets
   //    connected to the logged detail.
@@ -177,4 +190,20 @@ function messageForStatus(status: number): string {
         ? "Something went wrong. Please try again."
         : "The request could not be processed.";
   }
+}
+
+/** Postgres `invalid_text_representation` for a uuid, on the error or on Drizzle's wrapper. */
+function isMalformedUuid(exception: unknown): boolean {
+  const candidates = [
+    exception,
+    (exception as { cause?: unknown } | null)?.cause,
+  ];
+  return candidates.some((candidate) => {
+    const error = candidate as { code?: unknown; message?: unknown } | null;
+    return (
+      error?.code === "22P02" &&
+      typeof error.message === "string" &&
+      error.message.startsWith("invalid input syntax for type uuid")
+    );
+  });
 }

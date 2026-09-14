@@ -61,7 +61,15 @@ export interface PriceQuote {
 export class PricingService {
   constructor(@Inject(CATALOG) private readonly catalog: CatalogReader) {}
 
-  async calculate(request: PriceRequest): Promise<PriceQuote> {
+  /**
+   * `catalog` defaults to the pooled reader. `P3-02` passes one bound to its transaction: pricing
+   * on a second pooled connection while the order transaction holds the first starved the pool
+   * under ten concurrent checkouts, each waiting for a connection another was holding.
+   */
+  async calculate(
+    request: PriceRequest,
+    catalog: CatalogReader = this.catalog,
+  ): Promise<PriceQuote> {
     // Copied field by field: whatever else the caller's object carries — an `amountTotal`,
     // an `amount_total`, a `price` — never reaches anything below this line.
     const packageId = request.packageId;
@@ -79,7 +87,7 @@ export class PricingService {
       );
     }
 
-    const pkg = await this.catalog.packageById(packageId);
+    const pkg = await catalog.packageById(packageId);
     if (pkg === null || !pkg.isActive) {
       // Unknown and inactive are one answer: neither gives the client anything to act on
       // except choosing a package that is for sale.
@@ -90,7 +98,7 @@ export class PricingService {
       );
     }
 
-    const found = await this.catalog.addonsByIds(addonIds);
+    const found = await catalog.addonsByIds(addonIds);
     const byId = new Map(found.map((addon) => [addon.id, addon]));
     const unavailable = addonIds.filter(
       (id) => byId.get(id)?.isActive !== true,

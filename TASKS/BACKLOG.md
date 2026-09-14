@@ -12,7 +12,7 @@ Every entry names the task it blocks or affects, so nothing here is a note witho
 
 | | Total | Resolved | Open |
 |---|---|---|---|
-| Open Questions | 18 | 10 | 8 |
+| Open Questions | 18 | 11 | 7 |
 | Specification Gaps | 17 | 17 | 0 |
 | Deferred | 9 | — | 9 (by design) |
 
@@ -24,7 +24,7 @@ Nothing on the board is `BLOCKED`. The remaining questions shape work rather tha
 
 **2026-09-13**: `P2-14` raised `OQ-27` (how dates and times display, and which timezone an event is in). Seven open questions; none blocks a task, though `OQ-27` should be answered before launch.
 
-**2026-09-14**: `P3-01` raised `OQ-28` (no endpoint tells checkout what a package costs). Eight open questions; `OQ-28` must be answered before `P3-14`.
+**2026-09-14**: `P3-02` answered `OQ-18` (ADR-074). **2026-09-14**: `P3-01` raised `OQ-28` (no endpoint tells checkout what a package costs). Eight open questions; `OQ-28` must be answered before `P3-14`.
 
 ---
 
@@ -134,7 +134,9 @@ The usual mitigation is a short grace window — for perhaps 10-30 seconds after
 
 **Who decides**: whoever owns the design system (`docs/UI-UX/06`–`09`). If the answer differs from ADR-038, the change is two `z.enum` calls plus a data fix, and `docs/PLAN/07` should gain the vocabularies so the next reader does not have to find the ADR.
 
-### OQ-18 — Should "one pending order per invitation" be a database constraint?
+### ~~OQ-18 — Should "one pending order per invitation" be a database constraint?~~ — ANSWERED 2026-09-14
+
+**Answer**: both — the service check under a row lock for the named error, and the partial unique index for the guarantee (`P3-02`, ADR-074, migration `0010`).
 
 **Affects**: `P3-01` — not blocking; the schema ships exactly as documented.
 

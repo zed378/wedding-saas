@@ -127,8 +127,10 @@ export class ConflictError extends AppError {
   constructor(
     code = "CONFLICT",
     message = "The request conflicts with the current state.",
+    /** `P3-02`: `ACTIVE_ORDER_EXISTS` names the order to resume (`docs/API/06`). */
+    details?: readonly ErrorDetail[],
   ) {
-    super(message);
+    super(message, details);
     this.code = code;
   }
 }

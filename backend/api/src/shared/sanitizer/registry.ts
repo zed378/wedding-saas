@@ -92,6 +92,10 @@ export const NOT_USER_TEXT: Readonly<Record<string, string>> = {
   event_id: "a UUID, validated by `z.uuid()`; not rendered as text",
   photo_media_id:
     "a UUID, and additionally checked for tenancy per docs/SECURITY/05 § 6",
+  package_id:
+    "a catalogue identifier (max 30), matched against `packages.id` by PricingService before any use; never rendered as text (P3-02)",
+  addon_ids:
+    "a list of catalogue identifiers (max 30 each), each matched against an active `addons.id`; never rendered as text (P3-02)",
 
   // Enumerations and structured scalars. Each is constrained to a shape no tag fits in.
   type: "a closed `z.enum`; an unlisted value is rejected before storage",

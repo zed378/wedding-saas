@@ -151,6 +151,24 @@ describe("redact — masking rather than removal", () => {
     expect(out[key]).not.toContain("someone");
     expect(out[key]).toContain("@example.com");
   });
+
+  it("leaves a status transition's `to` readable, and still masks an address under it", () => {
+    // `P3-02` found every `invitation status changed` line logging `to: "*************nt"`.
+    const out = redact({
+      from: "draft",
+      to: "pending_payment",
+      recipient: "welcome-email",
+      mail: { to: "someone@example.com" },
+    }) as { to: string; recipient: string; mail: { to: string } };
+    expect(out.to).toBe("pending_payment");
+    expect(out.recipient).toBe("welcome-email");
+    expect(out.mail.to).toBe("s*****e@example.com");
+  });
+
+  it("still masks any value under an unambiguous email key", () => {
+    const out = redact({ email: "not-an-address" }) as { email: string };
+    expect(out.email).not.toBe("not-an-address");
+  });
 });
 
 describe("redact — values that are secret regardless of their key", () => {

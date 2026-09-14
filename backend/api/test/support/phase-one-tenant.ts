@@ -72,6 +72,13 @@ export async function createPhaseOneTenant(
     email: `${name.toLowerCase()}-${unique()}@example.test`,
   });
 
+  // Verified, matching the token below. The session reads `email_verified` from the row, not
+  // the claim, and from `P3-02` checkout refuses an unverified user — so a tenant whose token
+  // said verified while its row did not would be refused as its own owner.
+  await pool.query("UPDATE users SET email_verified = true WHERE id = $1", [
+    user.id,
+  ]);
+
   const template = await createTestTemplateVersion(pool);
   const otherTemplate = await createTestTemplateVersion(pool);
 
