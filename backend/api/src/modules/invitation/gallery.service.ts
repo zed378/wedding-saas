@@ -14,7 +14,7 @@ import {
   type GalleryEntry,
 } from "../../shared/tenancy/invitation-repository";
 import type { TenantScope } from "../../shared/tenancy/tenant-scope";
-import { MAX_PHOTOS_PER_INVITATION } from "../media/media.service";
+import { EntitlementsService } from "../order/entitlements.service";
 import { mediaKey } from "@wi/storage";
 
 /**
@@ -55,6 +55,7 @@ export class GalleryService {
   constructor(
     private readonly repository: InvitationRepository,
     @Inject(ENV) private readonly env: Env,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async list(
@@ -79,10 +80,12 @@ export class GalleryService {
       readonly isCover?: boolean | undefined;
     },
   ): Promise<GalleryPhotoDto> {
+    // `P3-01`: the invitation's entitlement. Ownership is still decided inside the attach.
+    const { maxPhotos } = await this.entitlements.forInvitation(invitationId);
     const result = await this.repository.attachGalleryPhoto(
       invitationId,
       scope,
-      { ...input, maxPhotos: MAX_PHOTOS_PER_INVITATION },
+      { ...input, maxPhotos },
     );
 
     switch (result.kind) {
@@ -118,10 +121,10 @@ export class GalleryService {
           [
             {
               field: "media_id",
-              message: `Galeri sudah berisi ${String(MAX_PHOTOS_PER_INVITATION)} foto.`,
+              message: `Galeri sudah berisi ${String(maxPhotos)} foto.`,
             },
           ],
-          `Galeri sudah berisi ${String(MAX_PHOTOS_PER_INVITATION)} foto. Hapus salah satu sebelum menambah yang baru.`,
+          `Galeri sudah berisi ${String(maxPhotos)} foto. Hapus salah satu sebelum menambah yang baru.`,
           "QUOTA_EXCEEDED",
         );
 

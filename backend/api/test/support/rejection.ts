@@ -23,4 +23,5 @@ export async function rejection<E = ThrownAppError>(
 export interface ThrownAppError extends Error {
   readonly status: number;
   readonly code: string;
+  readonly details?: readonly { field: string; message: string }[];
 }

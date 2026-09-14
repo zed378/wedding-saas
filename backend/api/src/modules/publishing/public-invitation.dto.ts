@@ -235,7 +235,13 @@ function mediaUrls(
 }
 
 export function toPublicInvitation(
-  found: PublishedInvitation,
+  found: PublishedInvitation & {
+    /**
+     * `docs/API/08` `display.watermark`: from `EntitlementsService` (`P3-01`), the one source of
+     * it — the package this invitation was paid for, or `true` when it has not been paid for.
+     */
+    readonly watermark: boolean;
+  },
   cdnBaseUrl: string | undefined,
 ): PublicInvitationDto {
   const settings = found.aggregate.settings;

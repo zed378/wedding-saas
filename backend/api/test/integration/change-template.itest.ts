@@ -687,9 +687,9 @@ describe("changing a template without losing data", () => {
       );
 
       expect(error).toMatchObject({ status: 422 });
-      expect(
-        (error as { details?: { message: string }[] }).details?.[0]?.message,
-      ).toContain("Nama panggilan mempelai pria");
+      expect(error.details?.[0]?.message).toContain(
+        "Nama panggilan mempelai pria",
+      );
     });
 
     it("leaves the invitation on its original template when it refuses", async () => {

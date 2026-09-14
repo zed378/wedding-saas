@@ -4,6 +4,7 @@ import { PublicInvitationService } from "../src/modules/publishing/public-invita
 import type { PublicInvitationRepository } from "../src/shared/tenancy/public-invitation-repository";
 import type { Env } from "../src/config/env.schema";
 import { rejection } from "./support/rejection";
+import type { EntitlementsService } from "../src/modules/order/entitlements.service";
 
 /**
  * `P2-07` — the half of the service that HTTP cannot see.
@@ -23,6 +24,15 @@ import { rejection } from "./support/rejection";
 
 const env = { CDN_BASE_URL: "https://cdn.test" } as Env;
 
+/** Nothing in these tests reaches an entitlement lookup; one that did would throw. */
+const entitlements = {
+  forInvitation: () => {
+    throw new Error(
+      "no invitation was found, so no entitlement should be read",
+    );
+  },
+} as unknown as EntitlementsService;
+
 function serviceThatMustNotQuery(): PublicInvitationService {
   const repository = {
     findPublishedBySlug: () => {
@@ -37,7 +47,7 @@ function serviceThatMustNotQuery(): PublicInvitationService {
     },
   } as unknown as PublicInvitationRepository;
 
-  return new PublicInvitationService(repository, env);
+  return new PublicInvitationService(repository, env, entitlements);
 }
 
 describe("the slug is validated before anything is queried", () => {
@@ -74,7 +84,7 @@ describe("the slug is validated before anything is queried", () => {
       },
     } as unknown as PublicInvitationRepository;
 
-    const service = new PublicInvitationService(repository, env);
+    const service = new PublicInvitationService(repository, env, entitlements);
 
     await expect(service.bySlug("  ANDI-SARAH  ")).rejects.toMatchObject({
       status: 404,
@@ -91,7 +101,9 @@ describe("the slug is validated before anything is queried", () => {
     } as unknown as PublicInvitationRepository;
 
     const fromMissing = await rejection(() =>
-      new PublicInvitationService(missing, env).bySlug("andi-sarah"),
+      new PublicInvitationService(missing, env, entitlements).bySlug(
+        "andi-sarah",
+      ),
     );
     const fromInvalid = await rejection(() =>
       serviceThatMustNotQuery().bySlug("A"),
@@ -124,7 +136,9 @@ describe("P2-12 — a preview token is validated before anything is hashed or qu
     } as unknown as PublicInvitationRepository;
 
     const fromSlug = await rejection(() =>
-      new PublicInvitationService(missing, env).bySlug("andi-sarah"),
+      new PublicInvitationService(missing, env, entitlements).bySlug(
+        "andi-sarah",
+      ),
     );
     const fromToken = await rejection(() =>
       serviceThatMustNotQuery().byPreviewToken("nope"),

@@ -3,6 +3,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { ENV } from "../../config/config.module";
 import type { Env } from "../../config/env.schema";
 import { NotFoundError } from "../../http/errors";
+import { EntitlementsService } from "../order/entitlements.service";
 import { PublicInvitationRepository } from "../../shared/tenancy/public-invitation-repository";
 import {
   toPublicInvitation,
@@ -41,6 +42,7 @@ export class PublicInvitationService {
   constructor(
     private readonly repository: PublicInvitationRepository,
     @Inject(ENV) private readonly env: Env,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async bySlug(rawSlug: string): Promise<PublicInvitationDto> {
@@ -54,7 +56,12 @@ export class PublicInvitationService {
     const found = await this.repository.findPublishedBySlug(slug);
     if (found === null) throw notFound();
 
-    return toPublicInvitation(found, this.env.CDN_BASE_URL);
+    // `P3-01`: the watermark is the invitation's entitlement — its paid package's flag, or
+    // `true` when nobody has paid (BR-2.8's trial publish included). Never a client hint.
+    const { watermark } = await this.entitlements.forInvitation(
+      found.invitation.id,
+    );
+    return toPublicInvitation({ ...found, watermark }, this.env.CDN_BASE_URL);
   }
 
   /**
@@ -88,7 +95,11 @@ export class PublicInvitationService {
     );
     if (found === null) throw notFound();
 
-    const payload = toPublicInvitation(found, this.env.CDN_BASE_URL);
+    // Always watermarked (`docs/DATABASE/04`), so no entitlement lookup is needed.
+    const payload = toPublicInvitation(
+      { ...found, watermark: true },
+      this.env.CDN_BASE_URL,
+    );
 
     return {
       ...payload,

@@ -2,11 +2,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { InMemoryStorage, parseStoredKey } from "@wi/storage";
 
 import {
-  MAX_PHOTOS_PER_INVITATION,
   MediaService,
   type UploadedFilePart,
 } from "../../src/modules/media/media.service";
 import { InvitationRepository } from "../../src/shared/tenancy/invitation-repository";
+import { CatalogRepository } from "../../src/modules/order/catalog.repository";
+import { EntitlementsService } from "../../src/modules/order/entitlements.service";
 import type { Env } from "../../src/config/env.schema";
 import type { JobQueue } from "../../src/infra/queue/queue.module";
 import { startHarness, type Harness } from "../support/harness";
@@ -17,7 +18,7 @@ import {
   type TestUser,
 } from "../support/factories";
 import { expectServiceIdorSafe } from "../support/idor";
-import { resetTenantData } from "./helpers.ts";
+import { resetTenantData, seededMaxPhotos } from "./helpers.ts";
 
 /**
  * P1-17 — the synchronous upload stage. `docs/SECURITY/06` layers 1-5, 8, 9.
@@ -54,6 +55,8 @@ describe("media upload, synchronous stage", () => {
   let harness: Harness;
   let service: MediaService;
   let repository: InvitationRepository;
+  let entitlements: EntitlementsService;
+  let maxPhotos: number;
   let storage: InMemoryStorage;
   let enqueued: { pool: string; name: string; data: unknown }[];
 
@@ -69,6 +72,9 @@ describe("media upload, synchronous stage", () => {
   beforeAll(async () => {
     harness = await startHarness();
     repository = new InvitationRepository(harness.db);
+    entitlements = new EntitlementsService(new CatalogRepository(harness.db));
+    // `P3-01`: the quota is the seeded package's, read from the row rather than restated.
+    maxPhotos = await seededMaxPhotos(harness);
   }, 120_000);
 
   afterAll(async () => {
@@ -79,7 +85,7 @@ describe("media upload, synchronous stage", () => {
     await resetTenantData(harness.pool);
     storage = new InMemoryStorage();
     enqueued = [];
-    service = new MediaService(repository, storage, queue, env);
+    service = new MediaService(repository, storage, queue, env, entitlements);
   });
 
   const owned = async (): Promise<{
@@ -353,7 +359,7 @@ describe("media upload, synchronous stage", () => {
 
     it("refuses the upload that would exceed it", async () => {
       const { user, invitationId } = await owned();
-      await fill(invitationId, MAX_PHOTOS_PER_INVITATION);
+      await fill(invitationId, maxPhotos);
 
       const error = await rejection(() =>
         service.upload(user.scope, invitationId, "gallery", part()),
@@ -365,7 +371,7 @@ describe("media upload, synchronous stage", () => {
 
     it("allows the last one under the limit", async () => {
       const { user, invitationId } = await owned();
-      await fill(invitationId, MAX_PHOTOS_PER_INVITATION - 1);
+      await fill(invitationId, maxPhotos - 1);
 
       const result = await service.upload(
         user.scope,
@@ -381,7 +387,7 @@ describe("media upload, synchronous stage", () => {
       // `docs/BACKEND/04` Stage 2 step 9 deletes the file when it sets 'failed', so the row
       // holds no storage. Counting it would shrink a quota for photos that do not exist.
       const { user, invitationId } = await owned();
-      await fill(invitationId, MAX_PHOTOS_PER_INVITATION, "failed");
+      await fill(invitationId, maxPhotos, "failed");
 
       const result = await service.upload(
         user.scope,
@@ -395,7 +401,7 @@ describe("media upload, synchronous stage", () => {
 
     it("a soft-deleted photo does not occupy a slot", async () => {
       const { user, invitationId } = await owned();
-      await fill(invitationId, MAX_PHOTOS_PER_INVITATION);
+      await fill(invitationId, maxPhotos);
       await harness.pool.query(
         "UPDATE media SET deleted_at = now() WHERE invitation_id = $1",
         [invitationId],
@@ -423,7 +429,7 @@ describe("media upload, synchronous stage", () => {
       // about: 200 means 200.
       const parallel = 8;
       const { user, invitationId } = await owned();
-      await fill(invitationId, MAX_PHOTOS_PER_INVITATION - 1);
+      await fill(invitationId, maxPhotos - 1);
 
       const results = await Promise.allSettled(
         Array.from({ length: parallel }, () =>
@@ -448,7 +454,7 @@ describe("media upload, synchronous stage", () => {
         "SELECT count(*) AS total FROM media WHERE invitation_id = $1 AND status <> 'failed'",
         [invitationId],
       );
-      expect(Number(rows[0]!.total)).toBe(MAX_PHOTOS_PER_INVITATION);
+      expect(Number(rows[0]!.total)).toBe(maxPhotos);
     });
 
     it("the upload takes a conflicting row lock on the invitation", async () => {
@@ -501,7 +507,13 @@ describe("media upload, synchronous stage", () => {
           throw new Error("bucket unreachable");
         },
       } as unknown as InMemoryStorage;
-      const brittle = new MediaService(repository, failing, queue, env);
+      const brittle = new MediaService(
+        repository,
+        failing,
+        queue,
+        env,
+        entitlements,
+      );
 
       await rejection(() =>
         brittle.upload(user.scope, invitationId, "gallery", part()),
@@ -566,7 +578,13 @@ describe("media upload, synchronous stage", () => {
       // second-best source to fall back to. Emitting a link against a host that does not
       // serve it would be worse than omitting the field.
       const { user, invitationId } = await owned();
-      const noCdn = new MediaService(repository, storage, queue, {} as Env);
+      const noCdn = new MediaService(
+        repository,
+        storage,
+        queue,
+        {} as Env,
+        entitlements,
+      );
       const created = await noCdn.upload(
         user.scope,
         invitationId,
@@ -668,7 +686,7 @@ describe("media upload, synchronous stage", () => {
           storagePath: "uploads/11111111-1111-4111-8111-111111111111",
           mimeType: "image/jpeg",
           sizeBytes: 6,
-          maxPhotos: MAX_PHOTOS_PER_INVITATION,
+          maxPhotos: maxPhotos,
         },
       );
 

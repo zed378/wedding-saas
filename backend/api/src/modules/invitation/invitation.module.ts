@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common";
 
+import { PricingModule } from "../order/pricing.module";
+
 import { AuthModule } from "../auth/auth.module";
 import { TenancyModule } from "../../shared/tenancy/tenancy.module";
 import { InvitationController } from "./invitation.controller";
@@ -20,7 +22,13 @@ import { RegionsModule } from "../regions/regions.module";
 
 /** P1-09 and P1-10. The sub-resources are `P1-11` onwards. */
 @Module({
-  imports: [AuthModule, TenancyModule, AuditModule, RegionsModule],
+  imports: [
+    PricingModule,
+    AuthModule,
+    TenancyModule,
+    AuditModule,
+    RegionsModule,
+  ],
   controllers: [InvitationController],
   providers: [
     InvitationCreateService,

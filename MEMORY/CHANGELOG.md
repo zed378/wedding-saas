@@ -10,6 +10,13 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-14 — Prices and entitlements have one source
+
+**Added** — pricing and entitlements services ([P3-01](./records/2026-09-14-P3-01-pricing-and-entitlements.md))
+
+- Order totals are computed only from the `packages` and `addons` rows; a price typed into application code now fails `pnpm verify`.
+- Photo quota and the public watermark follow the invitation's paid package; adding a package tier is a seed row.
+
 ### 2026-09-13 — Dates read 15 Mei 2027
 
 **Changed** — event date format ([P2-18](./records/2026-09-13-P2-18-date-format.md))

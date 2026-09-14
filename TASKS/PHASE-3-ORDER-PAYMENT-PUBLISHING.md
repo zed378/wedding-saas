@@ -39,7 +39,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO — pricing decided (ADR-023); addon availability decided (ADR-022) |
+| **Status** | DONE — [record](../MEMORY/records/2026-09-14-P3-01-pricing-and-entitlements.md), [spec](../MEMORY/specs/P3-01-pricing-and-entitlements.md) |
 | **Depends on** | P0-10 |
 | **Spec refs** | `docs/DATABASE/07-ORDERS.md`, `docs/PLAN/09-ORDER-PAYMENT.md` § Packages, `docs/SECURITY/07` § Pricing, `docs/PLAN/11` § Limits per Package |
 | **Spec required** | Yes — payment |
@@ -56,12 +56,12 @@
 6. Unit test every package-plus-addon combination against expected totals, and test that a price supplied in the request body is ignored entirely.
 
 **Definition of Done**
-- [ ] No price literal exists anywhere in application code.
-- [ ] A client-supplied amount has no effect, proven by an explicit test.
-- [ ] Inactive packages and addons cannot be ordered.
-- [ ] Entitlement lookups (quota, watermark, duration) go through this one service.
-- [ ] A renewal order prices at the same Rp 139,000 for another 12 months.
-- [ ] Nothing in the codebase assumes exactly one package exists — adding a second tier is seed data plus checkout UI.
+- [x] No price literal exists anywhere in application code. — `scripts/check-price-literals.mjs` in `pnpm verify` (two literals removed).
+- [x] A client-supplied amount has no effect, proven by an explicit test. — `pricing.service.spec.ts` › "ignores any amount smuggled into the input". The HTTP half (a body field) is `P3-02`'s abuse case.
+- [x] Inactive packages and addons cannot be ordered. — `pricing.itest.ts` › "refuses the seeded inactive addons", "refuses an inactive package"; unit cases for unknown ids.
+- [x] Entitlement lookups (quota, watermark, duration) go through this one service. — `EntitlementsService`; `MediaService`, `GalleryService` and `PublicInvitationService` use it; `pricing.itest.ts` › "refuses the fourth photo for an invitation paid on a three-photo tier".
+- [x] A renewal order prices at the same Rp 139,000 for another 12 months. — `pricing.itest.ts` › "prices a renewal at Rp 139,000 for another 12 months (ADR-023)".
+- [x] Nothing in the codebase assumes exactly one package exists — adding a second tier is seed data plus checkout UI. — `pricing.itest.ts` › "prices a second tier that is only a row", "follows the latest paid order when there are several"; checkout UI blocked on `OQ-28`.
 
 ---
 

@@ -2269,3 +2269,46 @@ answered on 2026-09-13: "only use 15 Mei 2027"**.
    never through `Date`, so no timezone can shift the day.
 4. **Machine-readable forms stay ISO**: `<time datetime="2027-05-15">` and the JSON-LD `startDate`.
 5. **An invalid value is shown unchanged**, not hidden or replaced.
+
+### ADR-073 — One entitlements service; an unpaid invitation gets the smallest active tier's quota
+
+**Date** 2026-09-14 · **Task** `P3-01` · **Status** Accepted · **Deciders** Claude (autonomous run), flagged for the project owner when a second tier is proposed
+
+**Context** — `P3-01` step 4 asks for one place that answers what a package allows. Before it,
+three places answered on their own: a `MAX_PHOTOS_PER_INVITATION = 200` constant in
+`MediaService`, the same constant imported by `GalleryService`, and a private `watermarkFor` query
+in `PublicInvitationRepository`. They agreed only because there is one package.
+
+No document says what an **unpaid** invitation is entitled to once a second tier exists.
+`docs/PLAN/11` gives the free draft "200" — the one package's number — and `docs/API/08` makes it
+watermarked.
+
+**Decisions**
+
+1. **`EntitlementsService.forInvitation(invitationId)`** is the one source of photo quota,
+   watermark, validity months and custom-domain permission. Media upload, gallery attach and the
+   public payload's `display.watermark` all read it. The constant and the repository query are gone.
+2. **A paid invitation** gets the package of its **latest `paid` order**. `pending`, `failed`,
+   `expired` and `refunded` grant nothing (the watermark rule of `docs/API/08`, BR-5.4). A package
+   deactivated later still governs the invitations that bought it.
+3. **An unpaid invitation** gets the **smallest `max_photos` among active packages**, a watermark, no
+   validity months (BR-2.8's three days are not a package attribute) and no custom domain. Smallest,
+   so a draft can never hold more photos than the cheapest purchase allows and paying never strands
+   an upload. Today this is exactly `docs/PLAN/11`'s 200.
+4. **No active package** is a broken seed: the service throws and logs
+   `entitlements.no_active_package` rather than inventing a number.
+5. **No seeded price may appear in application code**, enforced by `scripts/check-price-literals.mjs`
+   in `pnpm verify`. Two literals existed (a workbench story, a doc comment) and were replaced.
+
+**Alternatives considered**
+
+- *A free-tier row in `packages`* (`id = 'free'`, price 0, inactive): rejected because `is_active`
+  would then mean two things, and an order for a price-0 package is one mistake away.
+- *The largest tier's quota for drafts*: rejected — a draft filled to 500 photos that buys a
+  200-photo tier would have to lose photos, or the quota would not really be the package's.
+- *Constants in `EntitlementsService` for the unpaid case*: rejected — a second number to keep in
+  step with `docs/PLAN/11` and the seed.
+
+**Consequences** — Behaviour today is unchanged (proven by the existing quota and watermark suites,
+which now read the number from the row). A second tier is a seed row: pricing, quota and watermark
+follow it with no code change, proven by `pricing.itest.ts` with a test-only tier.
