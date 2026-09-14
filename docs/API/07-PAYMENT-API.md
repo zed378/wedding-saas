@@ -12,9 +12,16 @@ POST   /api/webhooks/payment/:provider            A dedicated endpoint that rece
 ```
 
 ## Initiation Flow
-1. `POST /orders/:order_id/payment` → the backend calls the provider's API (Midtrans/Xendit) with `order_id`, `amount`, `customer_detail` → receives a `redirect_url` or `snap_token`.
-2. A `Payment` record is stored with status `pending`, and the `provider_reference_id` from the provider.
-3. The client response contains only the info needed to redirect/render the widget — there is NO "success" status in this response.
+1. `POST /orders/:order_id/payment` (no body) → the backend locks the caller's order, checks it is `pending` and before `expired_at`, and commits a `Payment` row with status `pending`, the order's `amount_total` and a fresh `provider_reference_id` — **before** calling the provider, so a notification can never arrive for a payment the database does not know.
+2. With nothing locked, the backend calls the provider with that reference, the amount from the order row, and the customer's name and email only → receives a checkout URL and token, stored on the row.
+3. The client response contains only the info needed to redirect/render the widget — there is NO "success" status in this response:
+   ```json
+   { "success": true, "data": { "redirect_url": "https://…", "token": "…", "expires_at": "2026-06-10T10:00:00Z" } }
+   ```
+   `token` (not `snap_token`): the response does not name the provider (ADR-075). `expires_at` is the order's payment deadline.
+4. **Repeating the request returns the same payment page** while that payment is `pending` and the order is payable (ADR-076). Two live pages for one order is how a customer pays twice.
+
+Errors: 404 `NOT_FOUND` (not the caller's order); 422 `ORDER_NOT_PAYABLE` (not `pending`, or past `expired_at`); 409 `PAYMENT_IN_PROGRESS` (another request is mid-call to the provider for this order); 503 `PAYMENT_UNAVAILABLE` (provider down or unconfigured — order and invitation are untouched; try again).
 
 ## Webhook Flow (Critical — see SECURITY/07-PAYMENT-SECURITY.md)
 1. The provider POSTs to `/api/webhooks/payment/:provider` with a signed payload. **Where the signature lives is provider-specific**: Midtrans puts it in the JSON body as `signature_key`, computed with the merchant **server key** — there is no signature header and no separate webhook secret (P3-03, ADR-075).

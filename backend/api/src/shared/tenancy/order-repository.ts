@@ -126,6 +126,36 @@ export class OrderRepository {
     }
   }
 
+  /**
+   * `P3-04` — run `work` in a short transaction holding one of the caller's orders locked.
+   *
+   * `stillOpen` is `expired_at > now()` by the **database** clock, the same clock that set the
+   * deadline. `null` when the order is not the caller's or does not exist.
+   */
+  async withLockedOwnedOrder<R>(
+    orderId: string,
+    scope: TenantScope,
+    work: (locked: {
+      readonly tx: Transaction;
+      readonly order: OrderRow;
+      readonly stillOpen: boolean;
+    }) => Promise<R>,
+  ): Promise<R | null> {
+    return this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .select({
+          order: orders,
+          stillOpen: sql<boolean>`${orders.expiredAt} > now()`,
+        })
+        .from(orders)
+        .where(and(eq(orders.id, orderId), eq(orders.userId, scope)))
+        .for("update")
+        .limit(1);
+      if (row === undefined) return null;
+      return work({ tx, order: row.order, stillOpen: row.stillOpen });
+    });
+  }
+
   /** One of the caller's orders, or `null`. `user_id` in the `WHERE`, never checked after. */
   async findOwnedOrder(
     orderId: string,

@@ -10,6 +10,12 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-14 — Paying for an order
+
+**Added** — payment initiation ([P3-04](./records/2026-09-14-P3-04-payment-initiation.md))
+
+- `POST /orders/:order_id/payment` opens the payment page; repeating it reopens the same page. Migration `0011` must run before deploy.
+
 ### 2026-09-14 — Payment gateway
 
 **Added** — payment gateway port, Midtrans adapter and fake ([P3-03](./records/2026-09-14-P3-03-payment-gateway-port.md))

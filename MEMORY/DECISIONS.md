@@ -2386,3 +2386,31 @@ key**. Card step 2 says the provider's documentation wins over the specification
 **Consequences** — The Midtrans name and payload shape exist only under `modules/payment/midtrans/`,
 the composition root and configuration, enforced by `payment-gateway-fake.spec.ts`. Switching
 provider is a new adapter folder and a selection line.
+
+### ADR-076 — One payment page per order at a time; the provider is called outside the lock
+
+**Date** 2026-09-14 · **Task** `P3-04` · **Status** Accepted · **Amends** `docs/API/07`, `docs/DATABASE/08`
+
+**Context** — `docs/API/07` and `docs/BACKEND/05` describe one initiation. They do not say what a
+second click, a refresh or a second tab does. Creating a provider transaction each time would leave
+several live payment pages for one order, and a customer who pays on two of them pays twice. Reusing a
+page needs its URL, and `payments` had nowhere to keep one.
+
+**Decisions**
+
+1. **Migration `0011`**: `payments.checkout_url` and `payments.checkout_token`, nullable.
+2. **Initiation reuses** the order's newest `pending` payment that has a checkout, while the order is
+   `pending` and before its deadline. No second provider transaction.
+3. **Two steps, the provider outside the transaction**: (a) lock the order owner-scoped, decide, commit
+   a `pending` row with a fresh reference `<order id>-<8 hex>`; (b) call the provider unlocked; store the
+   checkout, or mark the row `failed` on error. A slow provider holds no database connection.
+4. **In flight**: a `pending` row without a checkout younger than 30 s → 409 `PAYMENT_IN_PROGRESS`;
+   older → it died mid-call, is marked `failed`, and a new attempt starts.
+5. **`failed` from initiation** only for a still-`pending` row with no checkout — a payment page that
+   never existed. Never `success`, and never a row that already has a page.
+6. **Response** `{ redirect_url, token, expires_at }`, no status, no provider name.
+
+**Alternatives considered** — a new provider transaction per click (double-payment exposure); holding
+the order lock across the provider call (the `P3-02` pool-starvation shape); a partial unique index on
+one pending payment per order (would make the dead-initiation recovery an error path rather than a
+rule).

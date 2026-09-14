@@ -176,9 +176,14 @@ export class RateLimitedError extends AppError {
  */
 export class ServiceUnavailableError extends AppError {
   readonly status = 503;
-  readonly code = "SERVICE_UNAVAILABLE";
+  readonly code: "SERVICE_UNAVAILABLE" | "PAYMENT_UNAVAILABLE";
 
-  constructor(message = "A required service is temporarily unavailable.") {
+  constructor(
+    message = "A required service is temporarily unavailable.",
+    /** `P3-04`: the checkout names its own, so the client can offer "try again". */
+    code: "SERVICE_UNAVAILABLE" | "PAYMENT_UNAVAILABLE" = "SERVICE_UNAVAILABLE",
+  ) {
     super(message);
+    this.code = code;
   }
 }

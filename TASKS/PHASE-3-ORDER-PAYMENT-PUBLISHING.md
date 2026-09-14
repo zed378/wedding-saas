@@ -135,7 +135,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — [record](../MEMORY/records/2026-09-14-P3-04-payment-initiation.md), [spec](../MEMORY/specs/P3-04-payment-initiation.md) |
 | **Depends on** | P3-03 |
 | **Spec refs** | `docs/API/07-PAYMENT-API.md` § Initiation Flow, `docs/BACKEND/05-PAYMENT-FLOW.md` § Payment Initiation |
 | **Spec required** | Yes — payment |
@@ -152,10 +152,10 @@
 6. Handle provider failure with a friendly retryable error and no state change (`docs/UI-UX/13` § Error Handling UX).
 
 **Definition of Done**
-- [ ] The amount sent to the provider comes from the database row.
-- [ ] A payments row exists before the response is returned.
-- [ ] The response contains no status field that a client could misread as confirmation.
-- [ ] A provider outage leaves order and invitation status untouched.
+- [x] The amount sent to the provider comes from the database row. — `payment-initiation.itest.ts` › "records a pending payment for the order's amount and returns only the checkout" (asserts the gateway's received amount); the body is refused (`payment-http.spec.ts`).
+- [x] A payments row exists before the response is returned. — `payment-initiation.itest.ts` › "has the payment row committed before the provider is even called".
+- [x] The response contains no status field that a client could misread as confirmation. — `payment-http.spec.ts` › "201 with the checkout and no status field anywhere"; the itest asserts the exact key set.
+- [x] A provider outage leaves order and invitation status untouched. — `payment-initiation.itest.ts` › "a retryable/refused provider failure answers 503 and leaves the order and invitation untouched".
 
 ---
 
