@@ -17,8 +17,8 @@ POST   /api/webhooks/payment/:provider            A dedicated endpoint that rece
 3. The client response contains only the info needed to redirect/render the widget — there is NO "success" status in this response.
 
 ## Webhook Flow (Critical — see SECURITY/07-PAYMENT-SECURITY.md)
-1. The provider POSTs to `/api/webhooks/payment/:provider` with a payload + signature header.
-2. The backend **MUST verify the signature** using the secret key before processing anything.
+1. The provider POSTs to `/api/webhooks/payment/:provider` with a signed payload. **Where the signature lives is provider-specific**: Midtrans puts it in the JSON body as `signature_key`, computed with the merchant **server key** — there is no signature header and no separate webhook secret (P3-03, ADR-075).
+2. The backend **MUST verify the signature** with the provider's documented algorithm before processing anything.
 3. The backend looks up the `Payment` record by `provider_reference_id` (idempotency: if the status is already `success`, return 200 with no further effect).
 4. If the signature is valid & the new status is `success`: in a SINGLE DB transaction — update `Payment.status`, `Order.status = paid`, `Invitation.status = paid`; enqueue an invoice notification.
 5. Response to the provider: 200 OK quickly (< 5 seconds) — heavy processing (email, etc.) is offloaded to a queue, not processed synchronously inside the webhook handler.

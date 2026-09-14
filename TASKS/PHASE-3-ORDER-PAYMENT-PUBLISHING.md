@@ -107,7 +107,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO — provider decided (ADR-012: Midtrans); commercial terms still to be confirmed |
+| **Status** | DONE — [record](../MEMORY/records/2026-09-14-P3-03-payment-gateway-port.md), [spec](../MEMORY/specs/P3-03-payment-gateway-port.md); commercial terms (ADR-012) still to be confirmed |
 | **Depends on** | P3-02, P0-18 |
 | **Spec refs** | `docs/BACKEND/01-DOMAIN-MODULES.md` § order & payment, `docs/BACKEND/05-PAYMENT-FLOW.md`, `docs/PLAN/18` R9 |
 | **Spec required** | Yes — payment |
@@ -124,10 +124,10 @@
 6. Log provider interactions with redaction, and record `raw_callback_payload` only in the database, never in application logs (`docs/DEVOPS/06`).
 
 **Definition of Done**
-- [ ] Nothing outside the adapter knows the provider's name or payload shape.
-- [ ] Signature verification is implemented from the provider's official documentation and unit tested against known vectors.
-- [ ] The fake adapter can produce every abuse-case payload the next task needs.
-- [ ] The `payment` module contains no reference to invitations.
+- [x] Nothing outside the adapter knows the provider's name or payload shape. — `payment-gateway-fake.spec.ts` › "nothing outside the adapter names the provider" (adapter folder, composition root and config allowed).
+- [x] Signature verification is implemented from the provider's official documentation and unit tested against known vectors. — `midtrans-gateway.spec.ts` › "matches the vector computed independently from the documented inputs" (Midtrans's documented inputs; hash computed with Python `hashlib`), plus tamper, key, exactness and malformed cases.
+- [x] The fake adapter can produce every abuse-case payload the next task needs. — `payment-gateway-fake.spec.ts` › genuine, forged, tampered (4 fields), duplicate, out-of-order, malformed, outage.
+- [x] The `payment` module contains no reference to invitations. — `payment-gateway-fake.spec.ts` › "the payment module contains no reference to invitations".
 
 ---
 

@@ -115,9 +115,16 @@ describe("payment keys cannot cross environments", () => {
     expect(violations.map((v) => v.variable)).toContain("MIDTRANS_CLIENT_KEY");
   });
 
-  it("says nothing when no payment key is configured", () => {
-    // Absent is fine -- payment arrives in P3-03. Only a present, wrong key is an error.
-    expect(checkSecretRules({ ...base, APP_ENV: "development" })).toEqual([]);
+  it("says nothing when no payment key is configured outside production", () => {
+    // Development and test run the fake gateway; staging boots and refuses checkout (P3-03).
+    for (const APP_ENV of ["development", "test", "staging"]) {
+      expect(checkSecretRules({ ...base, APP_ENV })).toEqual([]);
+    }
+  });
+
+  it("refuses production without a server key (P3-03)", () => {
+    const violations = checkSecretRules({ ...base });
+    expect(violations.map((v) => v.variable)).toEqual(["MIDTRANS_SERVER_KEY"]);
   });
 });
 
@@ -137,7 +144,11 @@ describe("production-only rules", () => {
 
   it("accepts a generated signing key", () => {
     expect(
-      checkSecretRules({ ...base, JWT_SIGNING_KEY: "a".repeat(48) }),
+      checkSecretRules({
+        ...base,
+        MIDTRANS_SERVER_KEY: LIVE_KEY,
+        JWT_SIGNING_KEY: "a".repeat(48),
+      }),
     ).toEqual([]);
   });
 
@@ -155,7 +166,13 @@ describe("production-only rules", () => {
   it("length is enforced by the schema, in every environment, not by this file", () => {
     // P1-03 moved it. checkSecretRules no longer sees a short key as its business --
     // loadEnv refuses one before these rules run, in development too.
-    expect(checkSecretRules({ ...base, JWT_SIGNING_KEY: "short" })).toEqual([]);
+    expect(
+      checkSecretRules({
+        ...base,
+        MIDTRANS_SERVER_KEY: LIVE_KEY,
+        JWT_SIGNING_KEY: "short",
+      }),
+    ).toEqual([]);
     expect(() =>
       loadEnv({
         ...developmentEnv,

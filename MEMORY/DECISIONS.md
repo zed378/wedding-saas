@@ -2350,3 +2350,39 @@ since no table exists for one.
 amendment for a 24-hour convenience the lock already makes safe); `SELECT … FOR UPDATE SKIP LOCKED`
 (would turn the second click into a silent success path); accepting `order_type` and validating it
 (two sources for one fact).
+
+### ADR-075 — The payment port verifies a parsed body; Midtrans has no webhook secret
+
+**Date** 2026-09-14 · **Task** `P3-03` · **Status** Accepted · **Amends** `docs/API/07`, `docs/BACKEND/05`, `deploy/SECRETS.md`, `.env.example`
+
+**Context** — `docs/BACKEND/05` and `docs/API/07` describe webhook verification as
+`verifySignature(rawBody, signatureHeader, providerSecretKey)`, and `P0-18` added
+`MIDTRANS_WEBHOOK_SECRET` for it. Midtrans's documentation (fetched 2026-09-14; pages listed in
+`MEMORY/specs/P3-03-payment-gateway-port.md` § 14) has neither: `signature_key` is a **field in the
+JSON body**, `SHA512(order_id + status_code + gross_amount + ServerKey)`, signed with the **server
+key**. Card step 2 says the provider's documentation wins over the specification's illustration.
+
+**Decisions**
+
+1. **`PaymentGatewayPort.verifyNotification(body)`** takes the parsed body and returns either
+   `valid: false` with a reason, or a verified event. There is no unverified event type, so no
+   handler can read a status it forgot to verify.
+2. **`MIDTRANS_WEBHOOK_SECRET` is removed** from the env schema, `.env.example` and the rotation
+   table. A variable nobody reads is one somebody rotates during an incident believing it matters.
+3. **A fourth outcome, `ignored`**, beside the card's `pending | success | failed`: refunds, partial
+   refunds, chargebacks, card pre-authorisations and unknown statuses. They must not move payment
+   state automatically (BR-5.4 makes refunds an admin action); `P3-05` records and flags them.
+4. **The endpoint follows the key**: an `SB-` key talks to `*.sandbox.midtrans.com`, any other key to
+   production. With `P0-18`'s environment rules, a sandbox key can never reach the live API.
+5. **Gateway selection**: a configured server key → Midtrans; development or test without one → a
+   fake with a random per-process signing key; any deployed environment without one → a gateway
+   that refuses every call. **Production refuses to boot without a server key** (`secret-rules.ts`).
+6. **`provider_reference_id` is the `order_id` we send Midtrans** — the Snap response carries no
+   transaction id, and every notification carries `order_id`.
+7. **A status-query response is verified with the same signature rule**. Midtrans documents that the
+   status response has the notification's shape including `signature_key`; if sandbox shows the
+   field computed differently, `queryStatus` fails closed (throws) rather than trusting it.
+
+**Consequences** — The Midtrans name and payload shape exist only under `modules/payment/midtrans/`,
+the composition root and configuration, enforced by `payment-gateway-fake.spec.ts`. Switching
+provider is a new adapter folder and a selection line.

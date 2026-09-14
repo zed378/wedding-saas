@@ -10,6 +10,12 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-14 — Payment gateway
+
+**Added** — payment gateway port, Midtrans adapter and fake ([P3-03](./records/2026-09-14-P3-03-payment-gateway-port.md))
+
+- Production now refuses to boot without `MIDTRANS_SERVER_KEY`. `MIDTRANS_WEBHOOK_SECRET` is gone: Midtrans signs notifications with the server key.
+
 ### 2026-09-14 — Checkout creates an order
 
 **Added** — order creation ([P3-02](./records/2026-09-14-P3-02-order-creation.md))
