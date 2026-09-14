@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { DB, type Database } from "../../infra/db/client";
 import { addons, orders, packages } from "../../infra/db/schema";
+import type { Transaction } from "../../shared/db/transaction";
 
 export type PackageRow = typeof packages.$inferSelect;
 export type AddonRow = typeof addons.$inferSelect;
@@ -29,7 +30,12 @@ export interface CatalogReader {
 
 @Injectable()
 export class CatalogRepository implements CatalogReader {
-  constructor(@Inject(DB) private readonly db: Database) {}
+  constructor(@Inject(DB) private readonly db: Database | Transaction) {}
+
+  /** The same reads on a transaction's connection (`P3-02`; see `PricingService.calculate`). */
+  static within(tx: Transaction): CatalogReader {
+    return new CatalogRepository(tx);
+  }
 
   async packageById(id: string): Promise<PackageRow | null> {
     const rows = await this.db

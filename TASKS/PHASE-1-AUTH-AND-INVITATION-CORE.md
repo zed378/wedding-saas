@@ -110,7 +110,7 @@
 **Definition of Done**
 - [x] SHA-256 of a 256-bit random value, 24-hour expiry, and single use enforced by a conditional `UPDATE ... WHERE used_at IS NULL` rather than a read-then-write — so two simultaneous clicks race in the database. A test runs both redemptions concurrently and asserts exactly one wins.
 - [x] Proven with a queue that throws: the user still exists, because the enqueue happens after the transaction commits.
-- [ ] **Partially met.** `requireVerifiedEmail` exists and is tested, but `POST /publish` (`P3-06`) and `POST /orders` (`P3-01`) do not exist yet, so there is nothing to test against. **Obligation recorded on both cards.**
+- [ ] **Partially met.** `requireVerifiedEmail` exists and is tested. **Checkout half met by `P3-02` (2026-09-14)**: `order-create.itest.ts` › "refuses an unverified user with 403 EMAIL_NOT_VERIFIED, writing nothing" and `order-http.spec.ts` › "answers an unverified user 403 EMAIL_NOT_VERIFIED". The publish half is owed by `P3-09` (the card originally named `P3-06` and `P3-01`; the endpoints are `P3-09` and `P3-02`).
 - [x] A duplicate returns the identical `201`. The password policy and the argon2 hash both run *before* the existence check, so the two paths cost the same 277 ms — otherwise the response time would say what the status code was careful not to.
 
 **The real owner still gets an email** when someone tries to register with their address. Without it the attacker learns nothing and neither does the one person entitled to know.

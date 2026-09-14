@@ -69,7 +69,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — [record](../MEMORY/records/2026-09-14-P3-02-order-creation.md), [spec](../MEMORY/specs/P3-02-order-creation.md) |
 | **Depends on** | P3-01, P1-06 |
 | **Spec refs** | `docs/API/06-ORDER-API.md`, `docs/DATABASE/07-ORDERS.md` § Notes, `docs/PLAN/02` § BR-5, `docs/PLAN/06-INVITATION-LIFECYCLE.md` |
 | **Spec required** | Yes — payment |
@@ -88,18 +88,18 @@
 8. Support the optional `Idempotency-Key` header from `docs/API/00`, so a double-clicked checkout does not create two orders.
 
 **Definition of Done**
-- [ ] `amount_total` always comes from `PricingService`, never from the request.
-- [ ] Two concurrent order creations for one invitation produce one order and one 409.
-- [ ] An unverified user is refused with 403 `EMAIL_NOT_VERIFIED`.
-- [ ] The invitation moves to `pending_payment` with a history row.
-- [ ] A repeated request with the same idempotency key returns the same order.
+- [x] `amount_total` always comes from `PricingService`, never from the request. — `order-create.itest.ts` › "creates a pending new_publish order priced from the row…"; the body cannot carry one (`order-http.spec.ts`).
+- [x] Two concurrent order creations for one invitation produce one order and one 409. — `order-create.itest.ts` › "two concurrent checkouts make one order and one 409", "ten concurrent checkouts still make exactly one order".
+- [x] An unverified user is refused with 403 `EMAIL_NOT_VERIFIED`. — `order-create.itest.ts` › "refuses an unverified user…"; `order-http.spec.ts`.
+- [x] The invitation moves to `pending_payment` with a history row. — `order-create.itest.ts` › "creates a pending new_publish order…" (asserts the history row and its actor).
+- [x] A repeated request with the same idempotency key returns the same order. — `order-create.itest.ts` › "a repeated Idempotency-Key returns the same order", "two concurrent requests with one key both get the one order".
 
 **Abuse cases to test**
 | Abuse case | Source | Expectation |
 |---|---|---|
-| `amount_total` in the request body | `docs/SECURITY/07` § Pricing | Ignored, server value used |
-| Order against another user's invitation | `docs/SECURITY/05` | 404 |
-| Parallel double checkout | `docs/DATABASE/07` § Notes | One order, one 409 |
+| `amount_total` in the request body | `docs/SECURITY/07` § Pricing | ~~Ignored, server value used~~ **Refused with 400** (stricter; ADR-074) — `order-http.spec.ts` › "refuses an amount in the body without calling the service" |
+| Order against another user's invitation | `docs/SECURITY/05` | 404 — `order-create.itest.ts` › "answers another user's invitation with 404, and changes nothing"; `idor-sweep.itest.ts` › `POST /invitations/:id/orders` |
+| Parallel double checkout | `docs/DATABASE/07` § Notes | One order, one 409 — `order-create.itest.ts` › "two concurrent checkouts make one order and one 409" |
 
 ---
 

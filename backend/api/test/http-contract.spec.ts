@@ -98,6 +98,29 @@ class ProbeController {
     throw new RateLimitedError();
   }
 
+  /** `P3-02`: pg's error for `WHERE id = 'not-a-uuid'`, wrapped the way Drizzle wraps it. */
+  @Get("pg-bad-uuid")
+  pgBadUuid(): never {
+    throw Object.assign(
+      new Error("Failed query: select ... from invitations"),
+      {
+        cause: Object.assign(
+          new Error('invalid input syntax for type uuid: "not-a-uuid"'),
+          { code: "22P02" },
+        ),
+      },
+    );
+  }
+
+  /** The same code for a different type is a bug in our code, not a bad path. */
+  @Get("pg-bad-integer")
+  pgBadInteger(): never {
+    throw Object.assign(
+      new Error('invalid input syntax for type integer: "x"'),
+      { code: "22P02" },
+    );
+  }
+
   /** A driver error, shaped like the ones pg actually throws. */
   @Get("pg-error")
   pgError(): never {
@@ -307,6 +330,22 @@ describe("errors leak nothing internal (docs/SECURITY/08)", () => {
     expect(JSON.stringify(res.body)).not.toContain("invitations");
     expect(JSON.stringify(res.body)).not.toContain("23503");
     expect(JSON.stringify(res.body)).not.toContain("foreign key");
+  });
+
+  it("answers a malformed uuid that reached the database with the ordinary 404", async () => {
+    const res = await request(app.getHttpServer()).get("/probe/pg-bad-uuid");
+
+    expectError(res, 404, "NOT_FOUND");
+    expect(res.body.error.message).toBe(
+      "The requested resource was not found.",
+    );
+    expect(JSON.stringify(res.body)).not.toContain("not-a-uuid");
+    expect(JSON.stringify(res.body)).not.toContain("22P02");
+  });
+
+  it("still answers any other invalid-representation error with a 500", async () => {
+    const res = await request(app.getHttpServer()).get("/probe/pg-bad-integer");
+    expectError(res, 500, "INTERNAL_ERROR");
   });
 
   it("turns a TypeError into a generic 500 with no stack or file path", async () => {

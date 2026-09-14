@@ -2312,3 +2312,41 @@ watermarked.
 **Consequences** — Behaviour today is unchanged (proven by the existing quota and watermark suites,
 which now read the number from the row). A second tier is a seed row: pricing, quota and watermark
 follow it with no code change, proven by `pricing.itest.ts` with a test-only tier.
+
+### ADR-074 — Order creation: lock plus partial unique index, server-derived order type, idempotency in Redis
+
+**Date** 2026-09-14 · **Task** `P3-02` · **Status** Accepted · **Answers** `OQ-18` · **Amends** `docs/API/06`, `docs/DATABASE/07`
+
+**Context** — `P3-02` had four choices the documents leave open: whether "one pending order per
+invitation" is also a database constraint (`OQ-18`, which said "decide when the checkout race is
+real — probably both"); who decides `order_type`; what the card's "`amount_total` in the body is
+ignored" means beside every controller's `.strict()` convention; and where an `Idempotency-Key` lives,
+since no table exists for one.
+
+**Decisions**
+
+1. **Both, as `OQ-18` proposed.** The service locks the invitation row (`FOR UPDATE`, owner-scoped),
+   reads the pending order after the lock, and answers 409 `ACTIVE_ORDER_EXISTS` naming it. Migration
+   `0010` adds `idx_orders_one_pending ON orders(invitation_id) WHERE status = 'pending'`, so any path
+   that skips the service still cannot create a second pending order. A 23505 from it is mapped to the
+   same 409.
+2. **`order_type` is derived from the invitation's status**, never accepted: `draft` → `new_publish`
+   with `draft → pending_payment`; `pending_payment` with no pending order → `new_publish`, no
+   transition; `published`/`expired` → `renewal`, no transition; `paid` → 422 `ORDER_NOT_ALLOWED`. A
+   client that could send `renewal` for a draft would skip the checkout transition. A BR-2.8 trial's
+   first payment is therefore a `renewal` order — mechanically right; `P3-08`'s invoice wording should
+   not call it a renewal.
+3. **Extra body fields are a 400**, not ignored. The card's intent — the client's amount is never used
+   — holds more strongly, and the codebase's mass-assignment convention stays uniform.
+4. **Idempotency records in Redis** (`CachePort`, `idem:orders`, 24 h, keyed by user id + SHA-256 of
+   the key, holding the order id and a fingerprint of invitation + package + sorted addons). Written
+   **inside** the transaction while the lock is held, so a concurrent replay waiting on the lock finds
+   it. Redis unavailable degrades a replay to the 409 naming the same order — never a duplicate. No
+   new table, so no schema change beyond the index.
+5. **Pricing reads on the order transaction's connection.** Pricing through the pool while the
+   transaction held a connection starved a 5-connection pool at ten concurrent checkouts.
+
+**Alternatives considered** — an `idempotency_keys` table (durable, but a new table and a doc
+amendment for a 24-hour convenience the lock already makes safe); `SELECT … FOR UPDATE SKIP LOCKED`
+(would turn the second click into a silent success path); accepting `order_type` and validating it
+(two sources for one fact).

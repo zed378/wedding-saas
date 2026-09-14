@@ -33,6 +33,7 @@ CREATE TABLE orders (
   updated_at                                TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_orders_invitation ON orders(invitation_id);
+CREATE UNIQUE INDEX idx_orders_one_pending ON orders(invitation_id) WHERE status = 'pending';  -- ADR-074
 CREATE INDEX idx_orders_user ON orders(user_id);
 CREATE INDEX idx_orders_status ON orders(status);
 ```
@@ -42,4 +43,4 @@ CREATE INDEX idx_orders_status ON orders(status);
 - `order_type` distinguishes a first-time publish order from a renewal order (PLAN/09).
 - `addons.is_active` gates availability. At MVP **no addon is active**: `custom_domain` waits for the Phase 2 feature and `extended_validity` is redundant beside a 12-month package (PLAN/09 § Add-on Availability at MVP). The order service refuses an inactive addon.
 - `packages` is seeded with exactly one active row at MVP: `standard`, Rp 139,000, `duration_months = 12`, `max_photos = 200`, `has_watermark = false` (PLAN/09, ADR-023). Seed data, not a migration — prices change without a schema change, and `amount_total` on existing orders is a snapshot that a later price change must not rewrite.
-- Application-level constraint (not DB-level): only 1 order with `status='pending'` may be active per invitation at a time (checked in the service layer before insert, see API/06-ORDER-API.md error `ACTIVE_ORDER_EXISTS`).
+- Only 1 order with `status='pending'` may be active per invitation at a time. Checked in the service layer before insert, under a lock on the invitation row, so the API can answer `ACTIVE_ORDER_EXISTS` (API/06-ORDER-API.md) — **and** guaranteed by the partial unique index `idx_orders_one_pending`, which holds when anything bypasses that service (ADR-074, answers `OQ-18`).
