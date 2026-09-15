@@ -10,6 +10,12 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-15 — Orders expire
+
+**Added** — order expiry ([P3-07](./records/2026-09-15-P3-07-order-expiry.md))
+
+- Unpaid orders expire after 24 hours and the invitation returns to draft; a customer whose order lapsed can check out again at once.
+
 ### 2026-09-15 — Payment status and reconciliation
 
 **Added** — payment status polling and reconciliation ([P3-06](./records/2026-09-15-P3-06-payment-status.md))

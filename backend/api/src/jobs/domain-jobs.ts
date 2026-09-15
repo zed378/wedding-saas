@@ -1,5 +1,6 @@
 import type { INestApplicationContext } from "@nestjs/common";
 
+import { OrderService } from "../modules/order/order.service";
 import { PaymentReconciliationService } from "../modules/payment/payment-reconciliation.service";
 
 /**
@@ -16,6 +17,8 @@ import { PaymentReconciliationService } from "../modules/payment/payment-reconci
 export type DomainJob = (app: INestApplicationContext) => Promise<unknown>;
 
 export const DOMAIN_JOBS: Readonly<Record<string, DomainJob>> = {
+  // docs/BACKEND/08: `order_expire_check`, every 15 minutes (P3-07).
+  order_expire_check: (app) => app.get(OrderService).expireOverdueOrders(),
   // docs/BACKEND/08: `payment_reconciliation`, daily 03:00 WIB.
   payment_reconciliation: (app) => app.get(PaymentReconciliationService).run(),
 };

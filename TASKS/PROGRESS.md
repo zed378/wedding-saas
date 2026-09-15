@@ -3,10 +3,10 @@
 Single source of truth for where the project stands. Updated in the same commit as the work it describes (`00-TASK-CONVENTIONS.md` global DoD item 11).
 
 **Last updated**: 2026-09-13
-**Current phase**: Phase 3 — Order, Payment and Publishing (6 / 16 done). **Phase 2 is complete** (18 / 18 including the owner-requested `P2-16`, `P2-17` and `P2-18`; [summary](../MEMORY/records/2026-09-13-PHASE-2-SUMMARY.md)); **Phase 1 is complete** (25 / 25, [summary](../MEMORY/records/2026-09-12-PHASE-1-SUMMARY.md)); Phase 0 is 26 / 27 done. **Staging is live** but runs code from before Phase 2's fixes: redeploy, run migrations `0007`–`0013`, start the new `api-jobs` service, `db:seed:regions`, and reseed before showing it to anyone. `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
+**Current phase**: Phase 3 — Order, Payment and Publishing (7 / 16 done). **Phase 2 is complete** (18 / 18 including the owner-requested `P2-16`, `P2-17` and `P2-18`; [summary](../MEMORY/records/2026-09-13-PHASE-2-SUMMARY.md)); **Phase 1 is complete** (25 / 25, [summary](../MEMORY/records/2026-09-12-PHASE-1-SUMMARY.md)); Phase 0 is 26 / 27 done. **Staging is live** but runs code from before Phase 2's fixes: redeploy, run migrations `0007`–`0013`, start the new `api-jobs` service, `db:seed:regions`, and reseed before showing it to anyone. `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
 
 The only task left is `P0-17` (CI/CD), deferred by ADR-028. Its **deployment** half was waived by the project owner on 2026-09-11; deploying is `git pull` plus a compose command. Its **verification** half was not waived and is the one Phase 0 exit criterion still unmet — see below. **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
-**Overall**: 75 / 140 tasks done
+**Overall**: 76 / 140 tasks done
 
 **No automated pipeline**: `P0-17` is deferred (ADR-028). Before merging to `main`, run `scripts/verify.sh`. The `:id`-endpoint gate blocks in `.githooks/pre-push`; integration tests, the coverage floor, SAST and dependency scanning are **not** running anywhere until `P0-17` is picked up — revisit before Phase 3 payment code.
 
@@ -26,7 +26,7 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 | [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 27 | 26 | **ACTIVE** | — |
 | [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 25 | **COMPLETE** — 2026-09-12 | Phase 0 exit criteria |
 | [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 18 | 18 | **COMPLETE** — including three owner-requested cards added after the phase summary | Phase 1 exit + `P1-25` — **met** |
-| [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 6 | **ACTIVE** | Phase 2 exit — **met** (LCP qualified by `OQ-26`) | Phase 2 exit — **met** (LCP qualified by `OQ-26`) |
+| [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 7 | **ACTIVE** | Phase 2 exit — **met** (LCP qualified by `OQ-26`) | Phase 2 exit — **met** (LCP qualified by `OQ-26`) |
 | [Phase 4 — Engagement](./PHASE-4-ENGAGEMENT.md) | 12 | 0 | Not started | Phase 3 exit |
 | [Phase 5 — Admin Panel](./PHASE-5-ADMIN-PANEL.md) | 14 | 0 | Not started | Phase 4 exit |
 | [Phase 6 — Hardening and Launch](./PHASE-6-HARDENING-AND-LAUNCH.md) | 17 | 0 | Not started | Phase 5 exit |
@@ -155,7 +155,7 @@ Roadmap: Week 8-9. **Entry needs `OQ-02` and `OQ-05` answered.**
 | P3-04 | Payment initiation | backend | M | **DONE** — payment row committed before the provider call; provider called unlocked; repeated initiation reuses the page (migration `0011`); 503 leaves order and invitation untouched (ADR-076) | P3-03 |
 | P3-05 | Payment webhook | backend | L | **DONE** — every arrival logged in `payment_notifications` (migration `0012`); one transaction for payment, order, invitation; three idempotency guards; late payment applied and flagged; metrics + alert rules; fixed a rate-limit exemption for a path that did not exist (ADR-077) | P3-04, P0-14 |
 | P3-06 | Status polling and reconciliation | backend | M | **DONE** — display-only status endpoint with a throttled provider query through the webhook's transition path; daily reconciliation flags disagreements; domain jobs run in a new API jobs process scheduled by worker-cron; empty env vars treated as unset (ADR-078) | P3-05 |
-| P3-07 | Order expiry and late payment | worker | M | TODO | P3-05, P0-15 |
+| P3-07 | Order expiry and late payment | worker | M | **DONE** — `order_expire_check` in the API jobs process (order → invitation lock order, `SKIP LOCKED`); checkout expires an overdue order inline instead of 409; late success proven against the real sweep | P3-05, P0-15 |
 | P3-08 | Invoice and order history | backend | M | TODO | P3-05 |
 | P3-09 | Publish endpoint | backend | L | TODO | P2-06, P3-05 |
 | P3-10 | Unpublish, republish, slug change | backend | M | TODO | P3-09 |

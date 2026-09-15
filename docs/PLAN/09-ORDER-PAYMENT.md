@@ -64,7 +64,7 @@ At Rp 139,000, roughly US$8.50: payment gateway fees run about Rp 1,000-4,000 de
 > Payment status is NEVER decided based on redirect URL parameters or client input. It always comes from a validated webhook OR the server polling the provider's API for status.
 
 ## Order Expiry
-- A scheduled job marks `Order.status = expired` if `expired_at` has passed and no successful payment has occurred (see BACKEND/08-JOBS-WORKERS.md).
+- A scheduled job marks `Order.status = expired` if `expired_at` has passed and no successful payment has occurred (see BACKEND/08-JOBS-WORKERS.md). It returns a `new_publish` order's invitation from `pending_payment` to `draft` with a history row (BR-5.3). Checkout does the same immediately for an overdue order it finds, so the user never waits for the schedule (P3-07).
 - Users can create a new order anytime after the old one expires/fails.
 
 ## Refund
