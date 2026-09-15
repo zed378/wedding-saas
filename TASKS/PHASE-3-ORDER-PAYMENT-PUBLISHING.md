@@ -260,7 +260,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — [record](../MEMORY/records/2026-09-15-P3-08-invoice-and-history.md); seller identity pending `OQ-29` |
 | **Depends on** | P3-05 |
 | **Spec refs** | `docs/API/06-ORDER-API.md`, `docs/PLAN/09` § Invoice, `docs/PLAN/04` § F12 |
 | **Spec required** | No |
@@ -276,10 +276,10 @@
 5. Attach or link the invoice from the payment confirmation email (`P4-07`).
 
 **Definition of Done**
-- [ ] Invoices generate only for paid orders.
-- [ ] Another user's invoice returns 404.
-- [ ] The list always reflects current status, including orders expired by the job.
-- [ ] Invoice generation failure does not affect payment state.
+- [x] Invoices generate only for paid orders. — `order-history-invoice.itest.ts` › "refuses an invoice for a pending/expired/failed/refunded order, and generates none".
+- [x] Another user's invoice returns 404. — "answers another user's invoice with 404"; `idor-sweep.itest.ts` › `GET /orders/:order_id/invoice`.
+- [x] The list always reflects current status, including orders expired by the job. — "lists the caller's orders newest first with current status, including one the sweep expired".
+- [x] Invoice generation failure does not affect payment state. — "a failing invoice job leaves the payment exactly as it was" (generation runs after the payment commits, ADR-079).
 
 ---
 

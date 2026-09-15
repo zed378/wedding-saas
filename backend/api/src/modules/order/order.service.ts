@@ -14,6 +14,7 @@ import { metrics } from "../../shared/metrics/metrics";
 import {
   OrderRepository,
   type OrderRow,
+  type OwnedOrder,
 } from "../../shared/tenancy/order-repository";
 import type { TenantScope } from "../../shared/tenancy/tenant-scope";
 import type { Transaction } from "../../shared/db/transaction";
@@ -42,6 +43,13 @@ export interface Settlement {
   /** Whether THIS call moved the order to `paid` — the only case that emits `order.paid`. */
   readonly becamePaid: boolean;
   readonly needsReview: boolean;
+}
+
+/** `P3-08` — an order in its owner's history: the creation shape plus what happened since. */
+export interface OrderHistoryDto extends OrderDto {
+  readonly created_at: string;
+  readonly paid_at: string | null;
+  readonly invoice_available: boolean;
 }
 
 export interface CheckoutUser {
@@ -469,6 +477,23 @@ export class OrderService {
     }
   }
 
+  /** `P3-08` — `GET /orders`: the caller's orders with their current status. */
+  async list(
+    scope: TenantScope,
+    page: { readonly limit: number; readonly offset: number },
+  ): Promise<{ items: OrderHistoryDto[]; total: number }> {
+    const { items, total } = await this.repository.listOwnedOrders(scope, page);
+    return { items: items.map(toHistoryDto), total };
+  }
+
+  /** `P3-08` — `GET /orders/:order_id`. 404 for anyone else's, unknown or malformed. */
+  async detail(scope: TenantScope, orderId: string): Promise<OrderHistoryDto> {
+    if (!UUID.test(orderId)) throw new NotFoundError();
+    const order = await this.repository.findOwnedOrderDetail(orderId, scope);
+    if (order === null) throw new NotFoundError();
+    return toHistoryDto(order);
+  }
+
   /** The order a previous request with this key created, if it still exists. */
   private async replay(
     scope: TenantScope,
@@ -569,5 +594,14 @@ function toDto(order: OrderRow): OrderDto {
     order_type: order.orderType,
     status: order.status,
     expired_at: order.expiredAt.toISOString(),
+  };
+}
+
+function toHistoryDto(order: OwnedOrder): OrderHistoryDto {
+  return {
+    ...toDto(order),
+    created_at: order.createdAt.toISOString(),
+    paid_at: order.paidAt?.toISOString() ?? null,
+    invoice_available: order.status === "paid",
   };
 }

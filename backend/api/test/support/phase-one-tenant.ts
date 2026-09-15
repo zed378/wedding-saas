@@ -65,6 +65,11 @@ export interface PhaseOneTenant extends TenantInvitation {
    * `POST /invitations/:id/orders` owner control can create one without a 409.
    */
   readonly orderId: string;
+  /**
+   * `P3-08`. A PAID order with a verified payment, on the first invitation — a paid order does not block
+   * `POST /invitations/:id/orders` (only a pending one does), and the invoice owner control needs one.
+   */
+  readonly paidOrderId: string;
 }
 
 export async function createPhaseOneTenant(
@@ -108,9 +113,22 @@ export async function createPhaseOneTenant(
     [second.invitation.id, user.id],
   );
 
+  const { rows: paidOrders } = await pool.query<{ id: string }>(
+    `INSERT INTO orders (invitation_id, user_id, package_id, amount_total, status, expired_at)
+     SELECT $1, $2, id, price, 'paid', now() + interval '1 day' FROM packages WHERE id = 'standard'
+     RETURNING id`,
+    [first.invitation.id, user.id],
+  );
+  await pool.query(
+    `INSERT INTO payments (order_id, provider, provider_reference_id, amount, status, verified_at)
+     SELECT id, 'fake', id::text || '-paid0000', amount_total, 'success', now() FROM orders WHERE id = $1`,
+    [paidOrders[0]!.id],
+  );
+
   return {
     user,
     token,
+    paidOrderId: paidOrders[0]!.id,
     template,
     otherTemplate,
     second,

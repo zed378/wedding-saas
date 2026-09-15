@@ -50,3 +50,17 @@ GET    /api/v1/orders/:order_id/invoice          Download the invoice PDF (after
 - 422 `PACKAGE_NOT_AVAILABLE` / `ADDON_NOT_AVAILABLE` — unknown or inactive catalogue ids (P3-01).
 - 404 `NOT_FOUND` — not the caller's invitation, deleted, nonexistent, or not a UUID.
 - 422 `INVITATION_NOT_READY` — if the invitation's data prerequisites are incomplete (optional; this can also be checked only at publish time, an implementation decision).
+
+## Order History and Invoice (P3-08, ADR-079)
+
+```
+GET /api/v1/orders?page=&per_page=      The caller's orders, newest first, current status
+GET /api/v1/orders/:order_id            One of them
+GET /api/v1/orders/:order_id/invoice    The invoice PDF — owner only, paid orders only
+```
+
+Each order: the creation shape above plus `created_at`, `paid_at` (when its successful payment was verified, or `null`) and `invoice_available` (`status = paid`). The list uses the standard pagination `meta` (API/00). Status is read when the request arrives, so an order the expiry job changed shows `expired`.
+
+The invoice is `application/pdf`, `Content-Disposition: attachment; filename="INV-YYYYMMDD-XXXXXXXX.pdf"`, `Cache-Control: private, no-store`. 404 for another user's or an unknown order; 422 `INVOICE_NOT_AVAILABLE` unless the order is `paid`. It is generated after payment by a job and, if that job has not run, on the first download — the same document either way.
+
+Contents: invoice number, date (payment day, WIB), order id, publication or renewal, payment method, buyer name and email, seller name (and address when configured), one line at the order's `amount_total`, total. Nothing about the invitation's content. The seller's legal identity is `OQ-29`.

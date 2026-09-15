@@ -186,6 +186,14 @@ export const envSchema = z
      */
     METRICS_TOKEN: z.string().min(32).optional(),
 
+    /**
+     * `P3-08` — who issues the invoice. `OQ-29`: the seller's legal name, address and tax identity are
+     * not in `docs/`. Until the project owner answers, the invoice names the product's domain (ADR-042),
+     * which is a fact rather than an invented company.
+     */
+    INVOICE_SELLER_NAME: z.string().min(1).max(120).default("vizunicum.my.id"),
+    INVOICE_SELLER_ADDRESS: z.string().min(1).max(200).optional(),
+
     /** Email (P4-06), CAPTCHA (P4-05), maps (P1-14). */
     RESEND_API_KEY: z.string().min(1).optional(),
     TURNSTILE_SECRET_KEY: z.string().min(1).optional(),

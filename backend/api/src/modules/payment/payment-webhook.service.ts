@@ -205,6 +205,17 @@ export class PaymentWebhookService {
           relatedId: outcome.orderId,
         },
       );
+      // `P3-08`: the invoice, rendered by the jobs process — never inside this transaction, so a
+      // rendering failure cannot touch the payment. The owner's download generates it if this is lost.
+      await this.queue.enqueue(
+        "general",
+        "invoice.generate",
+        { orderId: outcome.orderId },
+        {
+          idempotencyKey: `invoice.generate:${outcome.orderId}`,
+          relatedId: outcome.orderId,
+        },
+      );
     }
 
     return outcome.result;

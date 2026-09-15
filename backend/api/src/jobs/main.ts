@@ -40,14 +40,18 @@ async function main(): Promise<void> {
   });
 
   const workers = Object.entries(DOMAIN_JOBS).map(
-    ([name, job]) =>
+    ([name, run]) =>
       new Worker(
         name,
-        async () => {
+        async (job) => {
           const started = Date.now();
           logger.info({ context: { job_name: name } }, "job started");
           try {
-            const result = await job(app);
+            // The worker's envelope (`JobEnvelope`): the payload is under `data`.
+            const envelope = job.data as {
+              data?: Record<string, unknown>;
+            } | null;
+            const result = await run(app, envelope?.data ?? {});
             logger.info(
               {
                 context: {

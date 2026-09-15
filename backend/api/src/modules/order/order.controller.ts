@@ -1,12 +1,16 @@
 import {
   Body,
   Controller,
+  Get,
   Headers,
   HttpCode,
   Param,
   Post,
+  Query,
+  Res,
   UseGuards,
 } from "@nestjs/common";
+import type { Response } from "express";
 import { z } from "zod";
 
 import { ok } from "../../http/envelope";
@@ -17,6 +21,8 @@ import {
   type CurrentUser,
 } from "../../shared/auth-middleware";
 import { rateLimit } from "../../shared/rate-limit";
+import { pageMeta, parsePagination } from "../../http/pagination";
+import { InvoiceService } from "./invoice/invoice.service";
 import { OrderService } from "./order.service";
 
 /**
@@ -42,6 +48,13 @@ const createOrderSchema = z
   })
   .strict();
 
+const listQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).optional(),
+    per_page: z.coerce.number().int().min(1).max(100).optional(),
+  })
+  .strict();
+
 /** `docs/API/00` § Idempotency. Visible ASCII, bounded, so it can be hashed and logged safely. */
 const idempotencyKeySchema = z
   .string()
@@ -50,7 +63,62 @@ const idempotencyKeySchema = z
 @Controller("api/v1")
 @UseGuards(requireAuth())
 export class OrderController {
-  constructor(private readonly orders: OrderService) {}
+  constructor(
+    private readonly orders: OrderService,
+    private readonly invoices: InvoiceService,
+  ) {}
+
+  /** `P3-08` — `GET /orders`, `docs/API/06`. Current status, newest first. */
+  @Get("orders")
+  @UseGuards(rateLimit("general-authenticated"))
+  async list(
+    @CurrentUserParam() user: CurrentUser,
+    @Query() query: Record<string, unknown>,
+  ) {
+    const parsed = parse(listQuerySchema, query);
+    const pagination = parsePagination({
+      ...(parsed.page !== undefined ? { page: parsed.page } : {}),
+      ...(parsed.per_page !== undefined ? { per_page: parsed.per_page } : {}),
+    });
+    const { items, total } = await this.orders.list(user.scope, {
+      limit: pagination.perPage,
+      offset: pagination.offset,
+    });
+    return ok(items, pageMeta(pagination, total));
+  }
+
+  /** `P3-08` — `GET /orders/:order_id`. */
+  @Get("orders/:order_id")
+  @UseGuards(rateLimit("general-authenticated"))
+  async detail(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("order_id") orderId: string,
+  ) {
+    return ok(await this.orders.detail(user.scope, orderId));
+  }
+
+  /**
+   * `P3-08` — `GET /orders/:order_id/invoice`: the PDF, to its owner, for a paid order only. Never cached
+   * by anything in between: it carries a name and an email.
+   */
+  @Get("orders/:order_id/invoice")
+  @UseGuards(rateLimit("general-authenticated"))
+  async invoice(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("order_id") orderId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const issued = await this.invoices.ownedInvoice(user.scope, orderId);
+    res
+      .status(200)
+      .set({
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${issued.number}.pdf"`,
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+      })
+      .send(issued.pdf);
+  }
 
   @Post("invitations/:id/orders")
   @HttpCode(201)

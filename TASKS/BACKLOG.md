@@ -12,7 +12,7 @@ Every entry names the task it blocks or affects, so nothing here is a note witho
 
 | | Total | Resolved | Open |
 |---|---|---|---|
-| Open Questions | 18 | 11 | 7 |
+| Open Questions | 19 | 11 | 8 |
 | Specification Gaps | 17 | 17 | 0 |
 | Deferred | 9 | — | 9 (by design) |
 
@@ -26,9 +26,21 @@ Nothing on the board is `BLOCKED`. The remaining questions shape work rather tha
 
 **2026-09-14**: `P3-02` answered `OQ-18` (ADR-074). **2026-09-14**: `P3-01` raised `OQ-28` (no endpoint tells checkout what a package costs). Eight open questions; `OQ-28` must be answered before `P3-14`.
 
+**2026-09-15**: `P3-08` raised `OQ-29` (who the invoice names as seller, and what an Indonesian invoice must carry). Eight open questions.
+
 ---
 
 ## Open Questions — Remaining
+
+### OQ-29 — Who issues the invoice, and what must it carry?
+
+**Affects**: `P3-08` (built with a placeholder), `P6` launch — **not blocking development; blocking launch**.
+
+`docs/PLAN/09` says an invoice is generated and downloadable; nothing names the seller. An invoice needs the issuing business's legal name and address, and — if the business is a VAT-registered entity (PKP) — its NPWP and the tax treatment, which change what the document must show and may make a plain receipt insufficient.
+
+What exists now: `INVOICE_SELLER_NAME` (default `vizunicum.my.id`, the product's domain from ADR-042 — a fact, not an invented company) and optional `INVOICE_SELLER_ADDRESS`. The document says "INVOICE / KUITANSI", "LUNAS", and "generated automatically", and deliberately makes **no** claim about legal validity or tax.
+
+**Who decides**: the project owner, with whoever handles the business's tax registration. The answer is configuration plus, possibly, a few lines on the document.
 
 ### OQ-28 — Where does the checkout read a package's price?
 
