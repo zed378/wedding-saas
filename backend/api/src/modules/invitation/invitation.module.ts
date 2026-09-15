@@ -56,6 +56,9 @@ import { RegionsModule } from "../regions/regions.module";
     ChangeTemplateService,
     GalleryService,
     SlugService,
+    // `P3-09`: the publishing module's publish gate uses these.
+    PublishCheckService,
+    InvitationStatusService,
   ],
 })
 export class InvitationModule {}

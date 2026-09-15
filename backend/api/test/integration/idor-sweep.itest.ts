@@ -370,6 +370,15 @@ const CASES: readonly SweepCase[] = [
       auth(api(c).get(`/api/v1/orders/${t.paidOrderId}/invoice`), token),
   },
   {
+    // P3-09. Publishing somebody else's draft would put their unfinished wedding page on the internet.
+    label: "POST /invitations/:id/publish",
+    send: (c, token, t) =>
+      auth(
+        api(c).post(`/api/v1/invitations/${t.invitation.id}/publish`),
+        token,
+      ),
+  },
+  {
     label: "GET /invitations/:id/preview-links",
     send: (c, token, t) =>
       auth(

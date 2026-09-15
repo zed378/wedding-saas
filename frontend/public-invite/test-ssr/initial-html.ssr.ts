@@ -132,8 +132,14 @@ let app: ChildProcess;
  */
 const received: { url: string; forwardedFor: string | undefined }[] = [];
 /** Which slugs the stub answers. Mutated per test to produce a 404 or an outage. */
-let mode: "ok" | "missing" | "broken" | "hero-only" | "private" | "no-photos" =
-  "ok";
+let mode:
+  | "ok"
+  | "missing"
+  | "broken"
+  | "hero-only"
+  | "private"
+  | "no-photos"
+  | "trial" = "ok";
 
 const html = async (
   path: string,
@@ -238,7 +244,9 @@ beforeAll(async () => {
                   },
                 },
               }
-            : PAYLOAD;
+            : mode === "trial"
+              ? { ...PAYLOAD, display: { watermark: true } }
+              : PAYLOAD;
 
     response
       .writeHead(200, { "content-type": "application/json" })
@@ -703,6 +711,27 @@ describe("the cover gate does not hide the invitation from anything that cannot 
  * reader who never runs JavaScript: a crawler that must see `noindex`, a screenshot that must
  * carry the watermark, and a head that must not leak the credential.
  */
+/**
+ * `P3-09` — a published invitation nobody has paid for (BR-2.8's trial) says so, in the HTML a guest's
+ * browser and a screenshot both get. A paid one does not.
+ */
+describe("a trial publish", () => {
+  it("carries the trial notice when the API marks the invitation watermarked", async () => {
+    mode = "trial";
+    const { status, body } = await html(`/${SLUG}`);
+    expect(status).toBe(200);
+    expect(body).toContain('data-trial-watermark="true"');
+    expect(body).toContain("Undangan versi uji coba");
+    expect(body).not.toContain('data-preview-watermark="true"');
+  });
+
+  it("carries no notice on a paid invitation", async () => {
+    mode = "ok";
+    const { body } = await html(`/${SLUG}`);
+    expect(body).not.toContain("data-trial-watermark");
+  });
+});
+
 describe("a share preview", () => {
   it("renders the invitation with the watermark in the HTML", async () => {
     mode = "ok";

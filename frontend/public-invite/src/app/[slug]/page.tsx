@@ -7,6 +7,7 @@ import { CoverGate } from "../../components/CoverGate";
 import { GuestGreeting } from "../../components/GuestGreeting";
 import { Invitation } from "../../components/Invitation";
 import { ShareBar } from "../../components/ShareBar";
+import { TrialWatermark } from "../../components/TrialWatermark";
 import { WebVitals } from "../../components/WebVitals";
 import { InvitationFrame } from "../../components/InvitationFrame";
 import { readConfig } from "../../lib/config";
@@ -149,6 +150,12 @@ export default async function InvitationPage({ params }: RouteParams) {
        * documents for one wedding.
        */}
       <GuestGreeting />
+
+      {/*
+       * `P3-09`: an invitation nobody has paid for — a BR-2.8 trial — says so. The flag is decided by the
+       * API from the paid package and nothing the page or the guest can influence (`docs/API/08`).
+       */}
+      {invitation.display.watermark && <TrialWatermark />}
 
       {/*
        * schema.org `Event`. `docs/PLAN/15` calls it optional and `docs/SECURITY/09`

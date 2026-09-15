@@ -1934,6 +1934,89 @@ export class InvitationRepository {
    * one there and start another. That mutation passed every test until `P1-09` added the
    * case for it.
    */
+  /**
+   * `P3-09` — run `work` holding one of the caller's invitations locked (`FOR UPDATE`, owner-scoped,
+   * not deleted). `null` when it is not the caller's.
+   */
+  async withLockedOwned<R>(
+    invitationId: string,
+    scope: TenantScope,
+    work: (locked: {
+      readonly tx: Transaction;
+      readonly invitation: InvitationRow;
+    }) => Promise<R>,
+  ): Promise<R | null> {
+    return this.db.transaction(async (tx) => {
+      const [invitation] = await tx
+        .select()
+        .from(invitations)
+        .where(
+          and(
+            eq(invitations.id, invitationId),
+            eq(invitations.ownerId, scope),
+            isNull(invitations.deletedAt),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      if (invitation === undefined) return null;
+      return work({ tx, invitation });
+    });
+  }
+
+  /**
+   * `P3-09` — whether this invitation's history ever reached any of `statuses`. BR-2.8's trial
+   * eligibility, and the same history `findUnpaidInvitation` reads for BR-1.4. The id comes from a row the
+   * caller already locked under their scope.
+   */
+  async everReached(
+    tx: Transaction,
+    invitationId: string,
+    statuses: readonly string[],
+  ): Promise<boolean> {
+    const rows = await tx
+      .select({ id: invitationStatusHistory.id })
+      .from(invitationStatusHistory)
+      .where(
+        and(
+          eq(invitationStatusHistory.invitationId, invitationId),
+          inArray(invitationStatusHistory.toStatus, [...statuses]),
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
+  }
+
+  /**
+   * `P3-09` — the publication dates, set beside the status transition in the same transaction.
+   * `expiry_date` is a calendar date in WIB (the business's day, `docs/PLAN/10`), counted from today there.
+   */
+  async recordPublication(
+    tx: Transaction,
+    invitationId: string,
+    scope: TenantScope,
+    validity: { readonly months: number } | { readonly days: number },
+  ): Promise<{ publishedAt: Date; expiryDate: string }> {
+    const interval =
+      "months" in validity
+        ? sql`make_interval(months => ${validity.months})`
+        : sql`make_interval(days => ${validity.days})`;
+    const [row] = await tx
+      .update(invitations)
+      .set({
+        publishedAt: sql`now()`,
+        expiryDate: sql`((now() AT TIME ZONE 'Asia/Jakarta')::date + ${interval})::date`,
+      })
+      .where(
+        and(eq(invitations.id, invitationId), eq(invitations.ownerId, scope)),
+      )
+      .returning({
+        publishedAt: invitations.publishedAt,
+        expiryDate: invitations.expiryDate,
+      });
+    return { publishedAt: row!.publishedAt!, expiryDate: row!.expiryDate! };
+  }
+
   async findUnpaidInvitation(
     scope: TenantScope,
   ): Promise<{ id: string; internalName: string | null } | undefined> {

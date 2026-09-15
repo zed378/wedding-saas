@@ -117,6 +117,25 @@ POST   /api/v1/invitations/:id/unpublish
 GET    /api/v1/invitations/:id/publish-check         Check missing fields without actually publishing (used for a UI checklist indicator)
 ```
 
+### What `POST /publish` does (P3-09, ADR-080)
+
+No body. Order: verified email (403 `EMAIL_NOT_VERIFIED`) → ownership (404) → required fields (422 `INCOMPLETE_INVITATION` with the same `details[]` as `publish-check`) → slug (422 `SLUG_REQUIRED` / `SLUG_INVALID` / `SLUG_BLOCKED`, 409 `SLUG_TAKEN`) → under the invitation's lock, the status decides:
+
+| Status | Result |
+|---|---|
+| `paid` | published; `expiry_date` = today (WIB) + the paid package's months |
+| `draft`, never paid and never published | published as the **BR-2.8 trial**; `expiry_date` = today (WIB) + 3 days |
+| `draft` or `expired`, never paid, published before | 422 `TRIAL_ALREADY_USED` (the message names paying as the way on) |
+| `expired`, paid before | 422 `RENEWAL_REQUIRED` |
+| `published` | 422 `INVITATION_ALREADY_PUBLISHED` |
+| `pending_payment` | 422 `PAYMENT_PENDING` |
+
+```json
+{ "success": true, "data": { "status": "published", "slug": "andi-sarah", "url": "https://invitation.vizunicum.my.id/andi-sarah", "published_at": "…", "expiry_date": "2027-05-18", "trial": true } }
+```
+
+Required fields are resolved against the **canonical** document (`events.*.date`, `gift.accounts.*`, `gallery.photos`, PLAN/08) — both here and in `publish-check` and `change-template`. Until P3-09 the checks used this API's detail shape (`event_date`, `bank_accounts`) and reported those paths missing for every invitation.
+
 ### What `publish-check` answers
 
 ```json

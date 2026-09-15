@@ -150,6 +150,8 @@ async function createInvitationWithChildren(
     owner: user,
     template,
     internalName: `${name}'s wedding`,
+    // `P3-09`: publishable, so the publish owner-control succeeds (a slug is required to publish).
+    slug: `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${unique()}`,
   });
 
   const venue = `${name} Grand Ballroom`;

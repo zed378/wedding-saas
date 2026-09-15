@@ -32,9 +32,12 @@ import { join } from "node:path";
 const ROOT = join(__dirname, "..", "..");
 const API = join(ROOT, "backend", "api");
 const WEB_APP = join(ROOT, "frontend", "web-app");
+const PUBLIC_INVITE = join(ROOT, "frontend", "public-invite");
 
 export const API_ORIGIN = "http://localhost:3000";
 export const WEB_APP_ORIGIN = "http://localhost:3100";
+/** `P3-09` — started only when a test asks for it (`startFullStack({ publicInvite: true })`). */
+export const PUBLIC_INVITE_ORIGIN = "http://localhost:3200";
 
 export const MINIMAL_TEMPLATE = {
   slug: "e2e-minimal",
@@ -69,21 +72,40 @@ export function fullStackConfigured(): boolean {
 export interface FullStack {
   readonly referenceTemplateId: string;
   readonly minimalTemplateId: string;
+  /**
+   * `P3-09` — mark an account's email verified, the way clicking the link would. Publishing and
+   * checkout refuse an unverified user, and a test run has no inbox.
+   */
+  verifyEmail(email: string): Promise<void>;
   stop(): Promise<void>;
 }
 
-export async function startFullStack(): Promise<FullStack> {
+export async function startFullStack(
+  options: { readonly publicInvite?: boolean } = {},
+): Promise<FullStack> {
   const migrationUrl = process.env["MIGRATION_DATABASE_URL"]!;
   const redisUrl = process.env["TEST_REDIS_URL"] ?? "redis://localhost:56279";
 
   for (const [what, path] of [
     ["the API", join(API, "dist", "main.js")],
     ["the web app", join(WEB_APP, ".next", "BUILD_ID")],
+    ...(options.publicInvite === true
+      ? ([
+          [
+            "the public invitation app",
+            join(PUBLIC_INVITE, ".next", "BUILD_ID"),
+          ],
+        ] as const)
+      : []),
   ] as const) {
     if (!existsSync(path)) throw new Error(`no build of ${what} at ${path}`);
   }
 
-  for (const origin of [API_ORIGIN, WEB_APP_ORIGIN]) {
+  for (const origin of [
+    API_ORIGIN,
+    WEB_APP_ORIGIN,
+    ...(options.publicInvite === true ? [PUBLIC_INVITE_ORIGIN] : []),
+  ]) {
     const busy = await fetch(origin).then(
       () => true,
       () => false,
@@ -251,6 +273,26 @@ export async function startFullStack(): Promise<FullStack> {
     ),
   );
 
+  if (options.publicInvite === true) {
+    children.push(
+      spawn(
+        process.platform === "win32" ? "npx.cmd" : "npx",
+        ["next", "start", "--port", "3200"],
+        {
+          cwd: PUBLIC_INVITE,
+          stdio: "ignore",
+          shell: process.platform === "win32",
+          env: {
+            ...process.env,
+            API_INTERNAL_BASE_URL: API_ORIGIN,
+            PUBLIC_INVITE_ORIGIN,
+            NODE_ENV: "production",
+          },
+        },
+      ),
+    );
+  }
+
   const stop = async () => {
     for (const child of children) {
       if (child.pid === undefined) continue;
@@ -266,7 +308,11 @@ export async function startFullStack(): Promise<FullStack> {
   };
 
   const deadline = Date.now() + 90_000;
-  for (const url of [`${API_ORIGIN}/health`, `${WEB_APP_ORIGIN}/login`]) {
+  for (const url of [
+    `${API_ORIGIN}/health`,
+    `${WEB_APP_ORIGIN}/login`,
+    ...(options.publicInvite === true ? [`${PUBLIC_INVITE_ORIGIN}/`] : []),
+  ]) {
     for (;;) {
       const up = await fetch(url).then(
         (response) => response.status < 500,
@@ -281,5 +327,17 @@ export async function startFullStack(): Promise<FullStack> {
     }
   }
 
-  return { referenceTemplateId, minimalTemplateId, stop };
+  const verifyEmail = async (email: string): Promise<void> => {
+    const verifier = new Pool({ connectionString: migrationUrl });
+    try {
+      await verifier.query(
+        "UPDATE users SET email_verified = true WHERE email = $1",
+        [email],
+      );
+    } finally {
+      await verifier.end();
+    }
+  };
+
+  return { referenceTemplateId, minimalTemplateId, verifyEmail, stop };
 }
