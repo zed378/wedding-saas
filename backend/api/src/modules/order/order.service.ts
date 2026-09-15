@@ -29,6 +29,20 @@ const IDEMPOTENCY_NAMESPACE = "idem:orders";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export type SettlementResult =
+  | "applied"
+  | "late_payment"
+  | "duplicate_charge"
+  | "refunded_order"
+  | "applied_entitlement_skipped";
+
+export interface Settlement {
+  readonly result: SettlementResult;
+  /** Whether THIS call moved the order to `paid` — the only case that emits `order.paid`. */
+  readonly becamePaid: boolean;
+  readonly needsReview: boolean;
+}
+
 export interface CheckoutUser {
   readonly scope: TenantScope;
   readonly emailVerified: boolean;
@@ -250,6 +264,111 @@ export class OrderService {
     );
     if (result === null) throw new NotFoundError();
     return result.value;
+  }
+
+  /**
+   * `P3-05` — apply a verified payment success to its order, inside the webhook's transaction.
+   * `MEMORY/specs/P3-05-payment-webhook.md` § 8.
+   *
+   * The only caller is `PaymentWebhookService`, after the gateway verified the notification and the
+   * payment row matched. SYSTEM actor: `docs/PLAN/06` allows `pending_payment → paid` only here.
+   */
+  async settlePaid(tx: Transaction, orderId: string): Promise<Settlement> {
+    const order = await this.repository.lockForSettlement(tx, orderId);
+    if (order === null)
+      throw new Error(`payment references missing order ${orderId}`);
+
+    let result: SettlementResult;
+    switch (order.status) {
+      case "pending":
+        result = "applied";
+        break;
+      case "expired":
+      case "failed":
+        // `docs/SECURITY/07` § Timeout & Expiry: processed as valid, flagged for review.
+        result = "late_payment";
+        break;
+      case "paid":
+        // A second payment for one order. The product was granted once; the money needs a human.
+        return {
+          result: "duplicate_charge",
+          becamePaid: false,
+          needsReview: true,
+        };
+      default:
+        return {
+          result: "refunded_order",
+          becamePaid: false,
+          needsReview: true,
+        };
+    }
+
+    const changed = await this.repository.setOrderStatus(
+      tx,
+      order.id,
+      order.status,
+      "paid",
+    );
+    if (!changed) throw new Error(`order ${order.id} changed under its lock`);
+
+    let needsReview = result === "late_payment";
+    if (order.orderType === "new_publish") {
+      try {
+        await this.status.transitionWithin(
+          tx,
+          order.invitationId,
+          "paid",
+          { kind: "SYSTEM", userId: null },
+          result === "late_payment"
+            ? "payment webhook: late payment confirmed after the order expired (review)"
+            : "payment webhook confirmed",
+        );
+      } catch (error) {
+        if (
+          !(error instanceof BusinessRuleError) ||
+          error.code !== "INVALID_STATUS_TRANSITION"
+        ) {
+          throw error;
+        }
+        // The invitation is somewhere the machine does not allow `paid` from (deleted, or already
+        // published). The order is paid and the money is real; a human decides the rest.
+        result = "applied_entitlement_skipped";
+        needsReview = true;
+      }
+    }
+    // `renewal`: extending `expiry_date` and `expired → published` belong to `P3-13`, which reads paid
+    // renewal orders. Nothing about the invitation changes here.
+
+    return { result, becamePaid: true, needsReview };
+  }
+
+  /**
+   * `P3-05` — BR-5.3: a failed payment leaves the order `failed` and the invitation `draft`. Called only
+   * when the order has no other pending or successful payment.
+   */
+  async settleFailed(tx: Transaction, orderId: string): Promise<boolean> {
+    const order = await this.repository.lockForSettlement(tx, orderId);
+    if (order === null || order.status !== "pending") return false;
+    await this.repository.setOrderStatus(tx, order.id, "pending", "failed");
+    if (order.orderType === "new_publish") {
+      try {
+        await this.status.transitionWithin(
+          tx,
+          order.invitationId,
+          "draft",
+          { kind: "SYSTEM", userId: null },
+          "payment webhook: payment failed",
+        );
+      } catch (error) {
+        if (
+          !(error instanceof BusinessRuleError) ||
+          error.code !== "INVALID_STATUS_TRANSITION"
+        ) {
+          throw error;
+        }
+      }
+    }
+    return true;
   }
 
   /** The order a previous request with this key created, if it still exists. */

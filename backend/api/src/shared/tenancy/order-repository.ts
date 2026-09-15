@@ -156,6 +156,42 @@ export class OrderRepository {
     });
   }
 
+  /**
+   * `P3-05` — the order a **verified** payment notification settles, locked, with no owner filter.
+   *
+   * The one unscoped order read, and deliberately so: a provider notification has no user. It is safe
+   * because the id comes only from a `payments` row that a signature-verified notification matched —
+   * never from a request — which is why it takes a transaction rather than a scope and lives next to
+   * this paragraph.
+   */
+  async lockForSettlement(
+    tx: Transaction,
+    orderId: string,
+  ): Promise<OrderRow | null> {
+    const [row] = await tx
+      .select()
+      .from(orders)
+      .where(eq(orders.id, orderId))
+      .for("update")
+      .limit(1);
+    return row ?? null;
+  }
+
+  /** Conditional: only from `from`. Returns whether a row changed. */
+  async setOrderStatus(
+    tx: Transaction,
+    orderId: string,
+    from: string,
+    to: string,
+  ): Promise<boolean> {
+    const rows = await tx
+      .update(orders)
+      .set({ status: to, updatedAt: new Date() })
+      .where(and(eq(orders.id, orderId), eq(orders.status, from)))
+      .returning({ id: orders.id });
+    return rows.length === 1;
+  }
+
   /** One of the caller's orders, or `null`. `user_id` in the `WHERE`, never checked after. */
   async findOwnedOrder(
     orderId: string,

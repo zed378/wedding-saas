@@ -405,8 +405,12 @@ describe("rate limiting", () => {
       // docs/SECURITY/02 boundary 5. A provider retry storm is legitimate traffic, and
       // throttling it into failure loses a payment notification -- which
       // docs/SECURITY/07 makes the only source of truth for payment status.
-      expect(isExemptPath("/api/v1/webhooks/midtrans")).toBe(true);
-      expect(isExemptPath("/api/v1/webhooks/anything/else")).toBe(true);
+      //
+      // `P3-05`: this test used to assert `/api/v1/webhooks/midtrans` — a path that never existed.
+      // The route is `docs/API/07`'s `/api/webhooks/payment/:provider`, and it was NOT exempt, which
+      // a test of an invented path could not notice. It now names the route the controller declares.
+      expect(isExemptPath("/api/webhooks/payment/midtrans")).toBe(true);
+      expect(isExemptPath("/api/webhooks/payment/fake")).toBe(true);
     });
 
     it("health checks are exempt", async () => {

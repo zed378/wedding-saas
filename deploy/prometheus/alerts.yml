@@ -1,0 +1,32 @@
+# Prometheus alert rules. docs/DEVOPS/07 § Key Alerts.
+#
+# Scraped from the API's GET /metrics with `Authorization: Bearer $METRICS_TOKEN` (P3-05). Each rule
+# names a metric the API registers in backend/api/src/shared/metrics/metrics.ts; a spec checks that
+# every metric referenced here exists, so a renamed counter cannot silently leave an alert watching
+# nothing.
+
+groups:
+  - name: payments
+    rules:
+      # docs/DEVOPS/07: "Payment webhook signature invalid above a threshold within a short period —
+      # High (indicates a possible fraud attempt) — Slack security channel". Five in ten minutes: a
+      # misconfigured or rotated key produces a burst; one stray probe does not page anyone.
+      - alert: PaymentWebhookInvalidSignatures
+        expr: sum by (provider) (increase(wi_payment_webhook_signature_invalid_total[10m])) > 5
+        labels:
+          severity: high
+          channel: security
+        annotations:
+          summary: "More than 5 payment notifications failed signature verification in 10 minutes ({{ $labels.provider }})"
+          runbook: "docs/SECURITY/12-INCIDENT-RESPONSE.md (payment fraud); payment_notifications WHERE NOT signature_valid"
+
+      # Every verified notification a human must look at: a late payment, a second charge, an amount
+      # mismatch, an unknown payment, a refund notification. Any one is actionable.
+      - alert: PaymentNeedsReview
+        expr: sum by (provider, result) (increase(wi_payment_needs_review_total[15m])) > 0
+        labels:
+          severity: high
+          channel: payments
+        annotations:
+          summary: "A payment notification needs manual review ({{ $labels.result }})"
+          runbook: "payment_notifications WHERE needs_review ORDER BY received_at DESC"

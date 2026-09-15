@@ -201,6 +201,60 @@ export const payments = pgTable(
 );
 
 /**
+ * `P3-05`, ADR-077 — every payment notification received, genuine or not.
+ *
+ * `docs/DATABASE/08` wants forged callbacks kept for investigation (`signature_valid`). A forged
+ * callback has no payment of its own, and writing its claim onto the real payment it names would let a
+ * forger overwrite a genuine record — so each arrival is its own row here, and
+ * `payments.signature_valid` is set only from a verified one.
+ *
+ * Append-mostly: the application role may insert and read, and may update only the four processing
+ * columns (migration `0012`). No delete.
+ */
+export const paymentNotifications = pgTable(
+  "payment_notifications",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    provider: varchar("provider", { length: 30 }).notNull(),
+    /** The reference the payload names. Unverified when `signature_valid` is false: text, not a key. */
+    claimedReference: varchar("claimed_reference", { length: 150 }),
+    /** Set only for a verified notification that matched a payment. */
+    paymentId: uuid("payment_id").references(() => payments.id, {
+      onDelete: "restrict",
+    }),
+    signatureValid: boolean("signature_valid").notNull(),
+    /** `malformed` | `signature_mismatch`, for an invalid one. */
+    rejectionReason: varchar("rejection_reason", { length: 30 }),
+    /** `pending` | `success` | `failed` | `ignored`, for a verified one. */
+    outcome: varchar("outcome", { length: 20 }),
+    providerStatus: varchar("provider_status", { length: 40 }),
+    amount: bigint("amount", { mode: "bigint" }),
+    /** What processing did (`applied`, `duplicate`, `unknown_reference`, …). Null until processed. */
+    result: varchar("result", { length: 40 }),
+    /** A human must look: a late payment, a second charge, a mismatch, an unknown reference. */
+    needsReview: boolean("needs_review").notNull().default(false),
+    /** The payload as received. For an invalid notification, only a JSON object of at most 8 KB. */
+    rawPayload: jsonb("raw_payload"),
+    receivedAt: timestamp("received_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("idx_payment_notifications_reference").on(
+      t.provider,
+      t.claimedReference,
+    ),
+    index("idx_payment_notifications_received").on(t.receivedAt),
+    index("idx_payment_notifications_review")
+      .on(t.receivedAt)
+      .where(sql`needs_review`),
+  ],
+);
+
+/**
  * Admin action audit trail. Append-only.
  *
  * "Append-only" is enforced by REVOKEing UPDATE and DELETE from the application role

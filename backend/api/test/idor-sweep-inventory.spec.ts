@@ -31,6 +31,8 @@ const EXEMPT: Readonly<Record<string, string>> = {
     "the public catalogue (ADR-059) — template-catalog.itest.ts",
   "GET /api/v1/templates/:slug/versions/:version":
     "the public catalogue (ADR-059) — template-catalog.itest.ts",
+  "POST /api/webhooks/payment/:provider":
+    "server-to-server; `:provider` names the configured gateway, not a resource, and authenticity is the notification's signature (P3-05) — payment-webhook.itest.ts › 'a forged success changes nothing, answers 401, is recorded and counted' and 'answers a provider that is not configured with 404, recording nothing'",
   "GET /api/v1/regions/:code":
     "public reference data with no tenant: Indonesia's administrative regions (P2-17) — regions.itest.ts › 'returns a village with its province, regency and district'",
 };

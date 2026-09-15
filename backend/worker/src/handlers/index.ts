@@ -73,7 +73,9 @@ export function registerHandlers(
     }
 
     case "general":
-      // P3-05: payment.webhook_process
+      // `payment.webhook_process` has no producer: P3-05 processes the webhook synchronously in the
+      // API (docs/BACKEND/08 allows it "if it's fast enough"; ADR-077), so the provider gets its
+      // answer only after the transaction committed or rolled back.
       // P4-06: notification.send
       // P2-*:  cache.invalidate
       break;

@@ -163,7 +163,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — [record](../MEMORY/records/2026-09-14-P3-05-payment-webhook.md), [spec](../MEMORY/specs/P3-05-payment-webhook.md) |
 | **Depends on** | P3-04, P0-14 |
 | **Spec refs** | `docs/API/07-PAYMENT-API.md` § Webhook Flow, `docs/BACKEND/05-PAYMENT-FLOW.md` § Webhook Handler, `docs/SECURITY/07-PAYMENT-SECURITY.md`, `docs/DATABASE/08-PAYMENTS.md` |
 | **Spec required** | Yes — payment, the most security-critical task in the project |
@@ -184,21 +184,21 @@
 10. Add the metric `docs/DEVOPS/07` alerts on: invalid signature rate, which is the fraud-attempt indicator.
 
 **Definition of Done**
-- [ ] A payload with an invalid or absent signature changes nothing and returns 401, recorded with `signature_valid = false`.
-- [ ] The same webhook delivered five times produces exactly one state change and one `order.paid` event.
-- [ ] A simulated failure mid-transaction rolls back all three tables together — no order paid with an unpaid invitation.
-- [ ] The handler responds under five seconds with email and other side effects queued.
-- [ ] Invalid-signature attempts increment a metric with an alert rule attached.
+- [x] A payload with an invalid or absent signature changes nothing and returns 401, recorded with `signature_valid = false`. — `payment-webhook.itest.ts` › "a forged success changes nothing, answers 401, is recorded and counted", "a notification without a signature is refused the same way" (recorded in `payment_notifications`, ADR-077).
+- [x] The same webhook delivered five times produces exactly one state change and one `order.paid` event. — "the same success delivered five times makes one state change and one order.paid", "five concurrent deliveries still make exactly one change".
+- [x] A simulated failure mid-transaction rolls back all three tables together — no order paid with an unpaid invitation. — "a failure mid-transaction rolls back payment, order and invitation together".
+- [x] The handler responds under five seconds with email and other side effects queued. — "answers well under five seconds, with the email queued rather than sent".
+- [x] Invalid-signature attempts increment a metric with an alert rule attached. — the forged-success test asserts `wi_payment_webhook_signature_invalid_total` +1; `metrics.spec.ts` › "alerts on invalid payment signatures", "references only metrics the API registers".
 
 **Abuse cases to test**
 | Abuse case | Source | Expectation |
 |---|---|---|
-| Forged success payload, no signature | `docs/SECURITY/07` | 401, no state change |
-| Forged payload with a wrong signature | `docs/SECURITY/07` | 401, recorded, no state change |
-| Replayed valid webhook | `docs/SECURITY/07` § Idempotency | One effect only |
-| Webhook for an unknown reference | `docs/BACKEND/05` step 3 | 200, logged, no state change |
-| Amount in the payload differs from the order | `docs/SECURITY/07` | Mismatch flagged, entitlement not granted |
-| Webhook arriving after order expiry | `docs/SECURITY/07` § Timeout & Expiry | Processed as valid, flagged for review |
+| Forged success payload, no signature | `docs/SECURITY/07` | 401, no state change — "a notification without a signature is refused the same way" |
+| Forged payload with a wrong signature | `docs/SECURITY/07` | 401, recorded, no state change — "a forged success changes nothing, answers 401, is recorded and counted"; "a forged notification naming a real payment does not touch it" |
+| Replayed valid webhook | `docs/SECURITY/07` § Idempotency | One effect only — "the same success delivered five times…", "five concurrent deliveries…" |
+| Webhook for an unknown reference | `docs/BACKEND/05` step 3 | 200, logged, no state change — "a verified notification for an unknown payment answers normally, changes nothing, is flagged" |
+| Amount in the payload differs from the order | `docs/SECURITY/07` | Mismatch flagged, entitlement not granted — "a success for a different amount grants nothing" |
+| Webhook arriving after order expiry | `docs/SECURITY/07` § Timeout & Expiry | Processed as valid, flagged for review — "a success after the order expired is applied and flagged" |
 
 ---
 
@@ -419,6 +419,8 @@
 | **Surface** | worker, backend |
 
 **Goal** — Invitations expire on a schedule rather than mid-request, and a renewal payment brings them back.
+
+**Obligation from `P3-05`** (ADR-077): the webhook marks a `renewal` order `paid` and does not touch the invitation. This task must apply paid renewal orders — extend `expiry_date` by the package's months and move `expired → published` — and must be idempotent against the order already being `paid`.
 
 **Steps**
 1. Implement `invitation_expiry_check` daily at 00:05 WIB per `docs/BACKEND/08`, transitioning `published` invitations past `expiry_date` to `expired`, writing history, invalidating cache, and emitting the notification event.

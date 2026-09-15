@@ -10,6 +10,17 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-14 — Payment webhook
+
+**Added** — payment webhook ([P3-05](./records/2026-09-14-P3-05-payment-webhook.md))
+
+- `POST /api/webhooks/payment/:provider` confirms payments exactly once; every notification, including forged ones, is kept. Migration `0012` must run before deploy.
+- `GET /metrics` (set `METRICS_TOKEN`) and Prometheus alert rules for payment fraud signals and payments needing review.
+
+**Fixed**
+
+- The payment webhook is exempt from rate limiting at its real path.
+
 ### 2026-09-14 — Paying for an order
 
 **Added** — payment initiation ([P3-04](./records/2026-09-14-P3-04-payment-initiation.md))

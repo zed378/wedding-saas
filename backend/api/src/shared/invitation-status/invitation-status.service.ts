@@ -72,7 +72,17 @@ interface Rule {
  * cannot happen by accident.
  */
 const TRANSITIONS: Record<InvitationStatus, readonly Rule[]> = {
-  draft: [{ to: "pending_payment", by: ["USER"], note: "checkout" }],
+  draft: [
+    { to: "pending_payment", by: ["USER"], note: "checkout" },
+    // `P3-05`, ADR-077. `docs/SECURITY/07` § Timeout & Expiry: a verified success that arrives after
+    // the order expired "should still be processed as valid" — and by then the expiry returned the
+    // invitation to `draft`. SYSTEM only, and the webhook flags every use for manual review.
+    {
+      to: "paid",
+      by: ["SYSTEM"],
+      note: "late payment confirmed after the order expired",
+    },
+  ],
 
   pending_payment: [
     // SYSTEM only. Not an admin, not a user: docs/PLAN/06 says this happens solely
