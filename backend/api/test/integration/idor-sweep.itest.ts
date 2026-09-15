@@ -359,6 +359,17 @@ const CASES: readonly SweepCase[] = [
       auth(api(c).get(`/api/v1/orders/${t.orderId}/payment/status`), token),
   },
   {
+    // P3-08. Order history carries amounts and dates; the invoice carries a name and an email.
+    label: "GET /orders/:order_id",
+    send: (c, token, t) =>
+      auth(api(c).get(`/api/v1/orders/${t.orderId}`), token),
+  },
+  {
+    label: "GET /orders/:order_id/invoice",
+    send: (c, token, t) =>
+      auth(api(c).get(`/api/v1/orders/${t.paidOrderId}/invoice`), token),
+  },
+  {
     label: "GET /invitations/:id/preview-links",
     send: (c, token, t) =>
       auth(

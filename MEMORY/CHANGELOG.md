@@ -10,6 +10,12 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-15 — Order history and invoices
+
+**Added** — order history and invoice ([P3-08](./records/2026-09-15-P3-08-invoice-and-history.md))
+
+- Customers can list their orders and download a PDF invoice for a paid one. Migration `0014` must run before deploy. The seller named on the invoice is configurable and awaits `OQ-29`.
+
 ### 2026-09-15 — Orders expire
 
 **Added** — order expiry ([P3-07](./records/2026-09-15-P3-07-order-expiry.md))

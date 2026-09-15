@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  customType,
   pgTable,
   uuid,
   varchar,
@@ -17,6 +18,11 @@ import {
 
 import { users } from "./users.ts";
 import { invitations } from "./invitations.ts";
+
+/** `bytea` as a Node `Buffer`. Drizzle has no built-in for it in pg-core. */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
 
 /**
  * The commercial tables. `docs/DATABASE/07`, `08` and `10`.
@@ -199,6 +205,26 @@ export const payments = pgTable(
     ),
   ],
 );
+
+/**
+ * `P3-08`, ADR-079 — one invoice per paid order, stored as the PDF that was issued.
+ *
+ * In the database rather than object storage: a few kilobytes per paid order, private by default (no
+ * bucket or CDN path to misconfigure), and deleted with nothing. Immutable once written — an invoice is
+ * a document that gets forwarded, and a re-rendered one could differ from the one already sent. The
+ * application role may insert and read only (migration `0014`).
+ */
+export const invoices = pgTable("invoices", {
+  orderId: uuid("order_id")
+    .primaryKey()
+    .references(() => orders.id, { onDelete: "restrict" }),
+  /** `INV-YYYYMMDD-XXXXXXXX`: the payment date (WIB) and the order id's first eight characters. */
+  number: varchar("number", { length: 40 }).notNull().unique(),
+  pdf: bytea("pdf").notNull(),
+  generatedAt: timestamp("generated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
 
 /**
  * `P3-05`, ADR-077 — every payment notification received, genuine or not.

@@ -44,3 +44,18 @@ CREATE INDEX idx_orders_status ON orders(status);
 - `addons.is_active` gates availability. At MVP **no addon is active**: `custom_domain` waits for the Phase 2 feature and `extended_validity` is redundant beside a 12-month package (PLAN/09 § Add-on Availability at MVP). The order service refuses an inactive addon.
 - `packages` is seeded with exactly one active row at MVP: `standard`, Rp 139,000, `duration_months = 12`, `max_photos = 200`, `has_watermark = false` (PLAN/09, ADR-023). Seed data, not a migration — prices change without a schema change, and `amount_total` on existing orders is a snapshot that a later price change must not rewrite.
 - Only 1 order with `status='pending'` may be active per invitation at a time. Checked in the service layer before insert, under a lock on the invitation row, so the API can answer `ACTIVE_ORDER_EXISTS` (API/06-ORDER-API.md) — **and** guaranteed by the partial unique index `idx_orders_one_pending`, which holds when anything bypasses that service (ADR-074, answers `OQ-18`).
+
+## Table: invoices (P3-08, ADR-079)
+
+```sql
+CREATE TABLE invoices (
+  order_id      UUID PRIMARY KEY REFERENCES orders(id) ON DELETE RESTRICT,
+  number        VARCHAR(40) NOT NULL UNIQUE,     -- INV-YYYYMMDD-XXXXXXXX (payment day in WIB, order id prefix)
+  pdf           BYTEA NOT NULL,                  -- the document as issued
+  generated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+- One per paid order, inserted once (`ON CONFLICT DO NOTHING`) and never rewritten: the application role has INSERT and SELECT only. An invoice is forwarded to other people; a re-rendered one could differ from what they already have.
+- Stored in the database rather than object storage: a few kilobytes, private without a bucket policy to get right.
+- A single line at the order's `amount_total`: prices per item at purchase time are not stored, and today's catalogue prices could disagree with what was paid.

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 import { DB, type Database } from "../../infra/db/client";
 import { invitations, orders } from "../../infra/db/schema/index";
@@ -7,6 +7,26 @@ import type { Transaction } from "../db/transaction";
 import type { TenantScope } from "./tenant-scope";
 
 export type OrderRow = typeof orders.$inferSelect;
+
+/** `P3-08` — an order as its owner's history shows it. */
+export type OwnedOrder = OrderRow & { readonly paidAt: Date | null };
+
+/**
+ * When the order's successful payment was verified, if it has one.
+ *
+ * Written with explicit aliases rather than Drizzle column interpolation: inside a single-table select
+ * Drizzle renders `${payments.orderId} = ${orders.id}` unqualified, as `"order_id" = "id"`, which the
+ * subquery resolves against `payments` on both sides — always false, so every order looked unpaid. The
+ * first history test caught it.
+ */
+const PAID_AT = sql<Date | string | null>`(
+  SELECT max(p.verified_at) FROM payments p
+   WHERE p.order_id = "orders"."id" AND p.status = 'success'
+)`;
+
+function toDate(value: Date | string | null): Date | null {
+  return value === null ? null : new Date(value);
+}
 
 /** What the order service decides with, while the invitation row is locked. */
 export interface LockedCheckout {
@@ -239,6 +259,48 @@ export class OrderRepository {
       .where(and(eq(orders.id, orderId), eq(orders.status, from)))
       .returning({ id: orders.id });
     return rows.length === 1;
+  }
+
+  /**
+   * `P3-08` — the caller's orders, newest first, with the moment each was paid. Current status, read now:
+   * an order the expiry sweep changed shows `expired` (`docs/API/06` § Critical Rules).
+   */
+  async listOwnedOrders(
+    scope: TenantScope,
+    page: { readonly limit: number; readonly offset: number },
+  ): Promise<{ items: OwnedOrder[]; total: number }> {
+    const [rows, counted] = await Promise.all([
+      this.db
+        .select({ order: orders, paidAt: PAID_AT })
+        .from(orders)
+        .where(eq(orders.userId, scope))
+        .orderBy(desc(orders.createdAt))
+        .limit(page.limit)
+        .offset(page.offset),
+      this.db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(orders)
+        .where(eq(orders.userId, scope)),
+    ]);
+    return {
+      items: rows.map((row) => ({ ...row.order, paidAt: toDate(row.paidAt) })),
+      total: counted[0]?.total ?? 0,
+    };
+  }
+
+  /** `P3-08` — one of the caller's orders with its paid moment, or `null`. */
+  async findOwnedOrderDetail(
+    orderId: string,
+    scope: TenantScope,
+  ): Promise<OwnedOrder | null> {
+    const [row] = await this.db
+      .select({ order: orders, paidAt: PAID_AT })
+      .from(orders)
+      .where(and(eq(orders.id, orderId), eq(orders.userId, scope)))
+      .limit(1);
+    return row === undefined
+      ? null
+      : { ...row.order, paidAt: toDate(row.paidAt) };
   }
 
   /** One of the caller's orders, or `null`. `user_id` in the `WHERE`, never checked after. */

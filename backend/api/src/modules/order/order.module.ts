@@ -5,6 +5,8 @@ import { AuditModule } from "../../shared/audit/audit.module";
 import { OrderRepository } from "../../shared/tenancy/order-repository";
 import { OrderController } from "./order.controller";
 import { OrderService } from "./order.service";
+import { InvoiceRepository } from "./invoice/invoice.repository";
+import { InvoiceService } from "./invoice/invoice.service";
 import { PricingModule } from "./pricing.module";
 
 /**
@@ -16,7 +18,7 @@ import { PricingModule } from "./pricing.module";
 @Module({
   imports: [AuthModule, AuditModule, PricingModule],
   controllers: [OrderController],
-  providers: [OrderService, OrderRepository],
-  exports: [OrderService],
+  providers: [OrderService, OrderRepository, InvoiceService, InvoiceRepository],
+  exports: [OrderService, InvoiceService],
 })
 export class OrderModule {}

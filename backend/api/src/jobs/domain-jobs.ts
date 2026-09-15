@@ -1,5 +1,6 @@
 import type { INestApplicationContext } from "@nestjs/common";
 
+import { InvoiceService } from "../modules/order/invoice/invoice.service";
 import { OrderService } from "../modules/order/order.service";
 import { PaymentReconciliationService } from "../modules/payment/payment-reconciliation.service";
 
@@ -14,10 +15,21 @@ import { PaymentReconciliationService } from "../modules/payment/payment-reconci
  *
  * `backend/worker` registers no handler for these names, so nothing consumes them twice.
  */
-export type DomainJob = (app: INestApplicationContext) => Promise<unknown>;
+export type DomainJob = (
+  app: INestApplicationContext,
+  data: Readonly<Record<string, unknown>>,
+) => Promise<unknown>;
 
 export const DOMAIN_JOBS: Readonly<Record<string, DomainJob>> = {
   // docs/BACKEND/08: `order_expire_check`, every 15 minutes (P3-07).
+  // P3-08: queued by the payment webhook after it commits a paid order.
+  "invoice.generate": (app, data) => {
+    const orderId = data["orderId"];
+    if (typeof orderId !== "string") {
+      throw new Error("invoice.generate needs an orderId");
+    }
+    return app.get(InvoiceService).generate(orderId);
+  },
   order_expire_check: (app) => app.get(OrderService).expireOverdueOrders(),
   // docs/BACKEND/08: `payment_reconciliation`, daily 03:00 WIB.
   payment_reconciliation: (app) => app.get(PaymentReconciliationService).run(),

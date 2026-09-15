@@ -50,6 +50,19 @@ export const JOBS = {
     deadLetter: true,
     description: "Process a verified payment webhook",
   },
+  /**
+   * `P3-08`, ADR-079. Queued by the API's payment webhook after a paid order commits; CONSUMED by the API's
+   * jobs process (`backend/api/src/jobs/domain-jobs.ts`). Idempotent: an invoice is inserted once.
+   */
+  "invoice.generate": {
+    name: "invoice.generate",
+    pool: "general",
+    priority: "medium",
+    attempts: 3,
+    backoff: { type: "exponential", delay: 10_000 },
+    deadLetter: true,
+    description: "Render and store the invoice PDF for a paid order",
+  },
   "media.process": {
     name: "media.process",
     pool: "media",

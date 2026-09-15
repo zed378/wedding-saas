@@ -36,8 +36,11 @@ describe("the API jobs process (ADR-078)", () => {
   });
 
   it("resolves and runs every domain job against the real modules", async () => {
+    // Triggered jobs get a payload naming an order that does not exist: they must resolve (nothing to do),
+    // not crash on wiring.
+    const payload = { orderId: "00000000-0000-4000-8000-000000000000" };
     for (const [name, job] of Object.entries(DOMAIN_JOBS)) {
-      await expect(job(app), name).resolves.toBeDefined();
+      await expect(job(app, payload), name).resolves.not.toThrow();
     }
   });
 });

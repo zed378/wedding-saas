@@ -13,6 +13,7 @@ import {
   type CheckoutUser,
   type CreateOrderInput,
 } from "../src/modules/order/order.service";
+import { InvoiceService } from "../src/modules/order/invoice/invoice.service";
 import { PolicyRegistry } from "../src/shared/rate-limit/config";
 import {
   POLICY_REGISTRY,
@@ -39,6 +40,8 @@ const calls: {
 let verified = true;
 
 const orderStub = {
+  list: async () => ({ items: [{ id: "o1" }, { id: "o2" }], total: 7 }),
+  detail: async (_scope: unknown, orderId: string) => ({ id: orderId }),
   create: async (
     user: CheckoutUser,
     invitationId: string,
@@ -57,6 +60,12 @@ const orderStub = {
       expired_at: "2027-01-02T00:00:00.000Z",
     };
   },
+};
+
+const PDF = Buffer.from("%PDF-1.4 fake %%EOF", "latin1");
+
+const invoiceStub = {
+  ownedInvoice: async () => ({ number: "INV-20270515-44444444", pdf: PDF }),
 };
 
 const sessionStub = {
@@ -92,6 +101,7 @@ describe("POST /api/v1/invitations/:id/orders over HTTP", () => {
       providers: [
         { provide: APP_FILTER, useClass: AppExceptionFilter },
         { provide: OrderService, useValue: orderStub },
+        { provide: InvoiceService, useValue: invoiceStub },
         { provide: SessionService, useValue: sessionStub },
         { provide: RATE_LIMITER, useValue: limiterStub },
         {
@@ -215,6 +225,41 @@ describe("POST /api/v1/invitations/:id/orders over HTTP", () => {
     const res = await post({ package_id: "standard" });
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe("EMAIL_NOT_VERIFIED");
+  });
+
+  it("GET /orders paginates with the standard meta (P3-08)", async () => {
+    const res = await request(app.getHttpServer())
+      .get("/api/v1/orders?page=2&per_page=2")
+      .set("Authorization", "Bearer good");
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([{ id: "o1" }, { id: "o2" }]);
+    expect(res.body.meta).toMatchObject({ page: 2, per_page: 2, total: 7 });
+  });
+
+  it("GET /orders refuses unknown query parameters", async () => {
+    const res = await request(app.getHttpServer())
+      .get("/api/v1/orders?status=paid")
+      .set("Authorization", "Bearer good");
+    expect(res.status).toBe(400);
+  });
+
+  it("GET /orders/:order_id/invoice sends the PDF as a private, uncached attachment", async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/orders/${INVITATION_ID}/invoice`)
+      .set("Authorization", "Bearer good")
+      .buffer(true)
+      .parse((response, done) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk: Buffer) => chunks.push(chunk));
+        response.on("end", () => done(null, Buffer.concat(chunks)));
+      });
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("application/pdf");
+    expect(res.headers["content-disposition"]).toBe(
+      'attachment; filename="INV-20270515-44444444.pdf"',
+    );
+    expect(res.headers["cache-control"]).toBe("private, no-store");
+    expect((res.body as Buffer).equals(PDF)).toBe(true);
   });
 
   it("requires authentication", async () => {
