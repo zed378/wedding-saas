@@ -6,6 +6,10 @@ import { PublicInvitationController } from "./public-invitation.controller";
 import { PublicPreviewController } from "./public-preview.controller";
 import { PublicRumController } from "./public-rum.controller";
 import { PublicInvitationService } from "./public-invitation.service";
+import { PublishController } from "./publish.controller";
+import { PublishService } from "./publish.service";
+import { AuthModule } from "../auth/auth.module";
+import { InvitationModule } from "../invitation/invitation.module";
 
 /**
  * `P2-07` — publishing. `docs/ARCHITECTURE/01`: publish/unpublish and slug resolution.
@@ -15,14 +19,15 @@ import { PublicInvitationService } from "./public-invitation.service";
  * of `docs/BACKEND/06` is what this controller already is.
  */
 @Module({
-  imports: [PricingModule],
+  imports: [PricingModule, AuthModule, InvitationModule],
   controllers: [
+    PublishController,
     PublicInvitationController,
     PublicPreviewController,
     PublicRumController,
   ],
   // The repository comes from the global `TenancyModule`.
-  providers: [PublicInvitationService],
+  providers: [PublicInvitationService, PublishService],
   exports: [PublicInvitationService],
 })
 export class PublishingModule {}

@@ -1,3 +1,4 @@
+import { ServiceUnavailableError } from "../../http/errors";
 import { Injectable } from "@nestjs/common";
 import {
   collectMissingRequiredFields,
@@ -9,7 +10,7 @@ import type { ErrorDetail } from "../../http/envelope";
 import { requireOwnership } from "../../shared/auth-middleware";
 import { InvitationRepository } from "../../shared/tenancy/invitation-repository";
 import type { TenantScope } from "../../shared/tenancy/tenant-scope";
-import { toInvitationDetail } from "./invitation.dto";
+import { toCompletenessDocument } from "./completeness-document";
 
 /**
  * P2-06 — what is still missing before this invitation can be published. BR-4.2.
@@ -48,6 +49,11 @@ export class PublishCheckService {
   async check(
     scope: TenantScope,
     invitationId: string,
+    /**
+     * `P3-09`: the publish gate is authoritative, so it may not answer "ready" for a definition it could
+     * not read — the advisory checklist may (it publishes nothing), the gate throws instead.
+     */
+    options: { readonly strict?: boolean } = {},
   ): Promise<PublishCheckResult> {
     const invitation = await requireOwnership(
       () => this.repository.findOwned(invitationId, scope),
@@ -59,6 +65,11 @@ export class PublishCheckService {
       this.repository.findTemplateVersionFor(invitationId, scope),
     ]);
 
+    if (definition === null && options.strict === true) {
+      throw new ServiceUnavailableError(
+        "Template undangan tidak dapat dibaca. Coba terbitkan lagi sebentar.",
+      );
+    }
     if (definition === null) {
       // No definition means nothing declares a requirement. Ready rather than blocked:
       // refusing to publish because the server could not read the template would be a
@@ -66,17 +77,14 @@ export class PublishCheckService {
       return { ready: true, details: [], incomplete_sections: [] };
     }
 
-    const detail = toInvitationDetail(invitation, aggregate, {
-      slug: "",
-      name: "",
-      version: "",
-    });
+    // The canonical document, not the editor API's DTO: required fields are canonical paths (`P3-09`).
+    const document = toCompletenessDocument(invitation, aggregate);
 
     return summarise(
       collectMissingRequiredFields(
         definition.sections as readonly SectionDefinition[],
-        detail.settings.enabled_sections,
-        detail,
+        aggregate.settings?.enabledSections ?? [],
+        document,
       ),
     );
   }

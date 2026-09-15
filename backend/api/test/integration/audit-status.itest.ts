@@ -111,12 +111,16 @@ describe("status transitions — the state machine (docs/PLAN/06)", () => {
   });
 
   it("rejects a transition the state machine does not allow", async () => {
-    // draft -> published skips checkout and payment entirely. An allowlist means a
-    // transition nobody designed cannot happen by accident.
+    // draft -> expired: nothing publishes, nothing expires. An allowlist means a transition
+    // nobody designed cannot happen by accident.
+    //
+    // This test used `draft -> published` until `P3-09`: BR-2.8 (ADR-052) made that edge real
+    // for the free trial, and `PublishService` decides whether a given draft may take it —
+    // never paid and never published — because the machine cannot see history. ADR-080.
     const { invitationId, userId } = await seedInvitation("draft");
 
     await expect(
-      status.transition(invitationId, "published", USER(userId)),
+      status.transition(invitationId, "expired", USER(userId)),
     ).rejects.toThrow(BusinessRuleError);
     expect(await statusOf(invitationId)).toBe("draft");
     expect(await historyOf(invitationId)).toHaveLength(0);

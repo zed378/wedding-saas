@@ -15,7 +15,7 @@ import { AuditLogService } from "../../shared/audit/audit-log.service";
 import { InvitationRepository } from "../../shared/tenancy/invitation-repository";
 import type { TenantScope } from "../../shared/tenancy/tenant-scope";
 import { parseSections } from "./settings.service";
-import { toInvitationDetail } from "./invitation.dto";
+import { toCompletenessDocument } from "./completeness-document";
 import { summarise } from "./publish-check.service";
 
 /**
@@ -145,16 +145,11 @@ export class ChangeTemplateService {
         invitationId,
         scope,
       );
-      const detail = toInvitationDetail(invitation, aggregate, {
-        slug: "",
-        name: "",
-        version: "",
-      });
-
+      // Canonical paths against the canonical document (`P3-09`), as the publish check does.
       const missing = collectMissingRequiredFields(
         target.sections as readonly SectionDefinition[],
         enabled,
-        detail,
+        toCompletenessDocument(invitation, aggregate),
       );
 
       if (missing.length > 0) {

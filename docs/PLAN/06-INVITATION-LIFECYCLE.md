@@ -53,6 +53,7 @@
 ## Transition Rules
 - All transitions are logged in `invitation_status_history` (audit trail) — see DATABASE/10-AUDIT-LOGS.md.
 - The `pending_payment → paid` transition ONLY occurs through the validated payment webhook processing job (see BACKEND/05-PAYMENT-FLOW.md).
+- `draft → published` is the BR-2.8 free trial only: a USER transition that the publish service allows solely for an invitation whose history never reached `paid` or `published`, with `expiry_date` three days out (P3-09, ADR-080).
 - `draft → paid` exists for one case only: a verified payment success that arrives **after** the order expired and the invitation was returned to `draft` (SECURITY/07 § Timeout & Expiry). SYSTEM only, through the same webhook, and every use is flagged for manual review (P3-05, ADR-077).
 - The `published → expired` transition is run by a scheduled daily job (see BACKEND/08-JOBS-WORKERS.md), not on-the-fly during a request.
 - Backward transitions are only performed by admins (refund cases) and must include a reason. A refund sets the invitation to `draft` from whatever state it held, including directly from `published` — the public page stops being served immediately and the cache is invalidated rather than left to expire (BR-5.4, BACKEND/05 § Refund).

@@ -2526,3 +2526,36 @@ a generation failure cannot affect payment state. No document names the seller.
 **Alternatives considered** — `@react-pdf/renderer` as specified (cost above); `pdfkit` (smaller, still a
 dependency and font handling for the same output); rendering on every download without storing (a later
 catalogue or template change could alter a document already sent).
+
+### ADR-080 — Publish: the trial edge, completeness against the canonical document, and a trial notice
+
+**Date** 2026-09-15 · **Task** `P3-09` · **Status** Accepted · **Amends** `docs/API/04`, `docs/API/08`, `docs/PLAN/06`
+
+**Context** — Publishing needed three things the code did not have, and turned up one defect that made
+publishing impossible:
+
+1. The state machine allowed `published` only from `paid`; BR-2.8's trial needs `draft → published`.
+2. The public page ignored `display.watermark`, so a trial looked like a paid invitation to guests.
+3. `P3-09` must be live within five seconds; there is no public cache yet (`P3-12`).
+4. **Defect**: the publish check and the change-template check resolved canonical `required_fields`
+   (`events.*.date`, `gift.accounts.*`, `gallery.photos`) against the editor API's detail DTO, which names
+   that data `event_date`, `bank_accounts` and a flat `gallery`. Those paths were missing for every
+   invitation: nothing on the reference template could pass `publish-check` or be published. Found by the
+   publish E2E; the `P2-06` suite had only tested those paths while empty.
+
+**Decisions**
+
+1. **`draft → published` (USER)** in the machine, with eligibility — never reached `paid` or `published` in
+   `invitation_status_history` — enforced by `PublishService` under the invitation lock. The machine cannot
+   see history; `PublishService` is the only caller of that edge (`check-status-writes` confines status
+   writes to the status service, and no other service asks for it).
+2. **`toCompletenessDocument`**: one canonical document for BR-4.2, used by `publish-check`, the publish gate
+   and `change-template`. Tested against every requirement of the real reference template.
+3. **Strict mode** for the gate: an unreadable template definition refuses to publish (503-shaped) instead
+   of the checklist's "ready".
+4. **`expiry_date`** is a WIB calendar date: today in Asia/Jakarta plus the paid package's months, or 3 days.
+5. **A small trial notice** ("Undangan versi uji coba", `role="note"`, not themeable) when
+   `display.watermark` is true. Deliberately minimal pending `OQ-13`.
+6. **No cache warming here**: the public fetch is `no-store`, so the page is live as soon as the transaction
+   commits (E2E-measured). `P3-12` adds caching and must invalidate on publish.
+7. The owner's confirmation is queued as `notification.send` `invitation_published` for `P4-06`.

@@ -287,7 +287,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — [record](../MEMORY/records/2026-09-15-P3-09-publish.md), [spec](../MEMORY/specs/P3-09-publish.md) |
 | **Depends on** | P2-06, P3-05 |
 | **Spec refs** | `docs/BACKEND/02-SERVICE-LAYER.md` § publish example, `docs/PLAN/10-DOMAIN-PUBLISHING.md` § Publish Flow, `docs/BACKEND/06-PUBLISHING.md`, `docs/PLAN/02` § BR-2, BR-4.2, BR-6 |
 | **Spec required** | Yes — business rule |
@@ -307,13 +307,13 @@
 8. Meet the acceptance criterion from `docs/PLAN/17`: the public page is reachable within five seconds of publishing.
 
 **Definition of Done**
-- [ ] Publishing an unpaid invitation that has **already used its trial** is refused with a business-rule error naming the upgrade path (BR-2.8).
-- [ ] A first publish of an unpaid invitation succeeds with `expiry_date = today + 3 days`, and a test proves the second attempt after that trial lapses is refused.
-- [ ] Missing required fields produce 422 with the exact field list, matching `publish-check`.
-- [ ] A slug taken concurrently produces 409, not a 500 or a duplicate.
-- [ ] `expiry_date` derives from the purchased package.
-- [ ] The public page is live within five seconds, measured in an E2E test.
-- [ ] The watermark flag reaches the renderer and `docs/API/08` is amended.
+- [x] Publishing an unpaid invitation that has **already used its trial** is refused with a business-rule error naming the upgrade path (BR-2.8). — `publish.itest.ts` › "refuses a second trial after the first lapsed" (asserts the message names payment), "refuses a trial for a draft that was ever published before".
+- [x] A first publish of an unpaid invitation succeeds with `expiry_date = today + 3 days`, and a test proves the second attempt after that trial lapses is refused. — "publishes a never-paid draft once, for three days"; "refuses a second trial after the first lapsed".
+- [x] Missing required fields produce 422 with the exact field list, matching `publish-check`. — "names every missing field with the publish-check's own details".
+- [x] A slug taken concurrently produces 409, not a 500 or a duplicate. — the slug is held by the invitation row under the partial unique index since `P1-21` (`settings.itest.ts` › "a concurrent claim is 409, not a 500 (DoD 5)"); publish re-checks it and maps `taken` to 409 `SLUG_TAKEN`. A concurrent double publish is "a double click publishes once". **Stated honestly: no test races two invitations for one slug at the moment of publish, because two live invitations cannot hold one slug.**
+- [x] `expiry_date` derives from the purchased package. — "publishes a paid invitation until its package's validity ends" (months read from the package row).
+- [x] The public page is live within five seconds, measured in an E2E test. — `e2e/tests/publish-live.e2e.ts`.
+- [x] The watermark flag reaches the renderer and `docs/API/08` is amended. — `initial-html.ssr.ts` › "carries the trial notice when the API marks the invitation watermarked" and "carries no notice on a paid invitation"; the E2E asserts the notice on a real trial; `docs/API/08` amended.
 
 ---
 
@@ -419,6 +419,8 @@
 | **Surface** | worker, backend |
 
 **Goal** — Invitations expire on a schedule rather than mid-request, and a renewal payment brings them back.
+
+**Obligation from `P3-09`** (ADR-080): the public fetch is still `no-store`. Caching added here must be invalidated on publish, unpublish, expiry, refund and every content edit of a published invitation.
 
 **Obligation from `P3-05`** (ADR-077): the webhook marks a `renewal` order `paid` and does not touch the invitation. This task must apply paid renewal orders — extend `expiry_date` by the package's months and move `expired → published` — and must be idempotent against the order already being `paid`.
 

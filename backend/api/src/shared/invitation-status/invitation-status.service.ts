@@ -82,6 +82,9 @@ const TRANSITIONS: Record<InvitationStatus, readonly Rule[]> = {
       by: ["SYSTEM"],
       note: "late payment confirmed after the order expired",
     },
+    // `P3-09`, BR-2.8, ADR-080: the free trial publish. The machine cannot see history, so WHETHER this
+    // draft may take it — never paid, never published — is `PublishService`'s check, under the lock.
+    { to: "published", by: ["USER"], note: "free trial publish (BR-2.8)" },
   ],
 
   pending_payment: [

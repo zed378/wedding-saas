@@ -10,6 +10,16 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-15 — Publishing
+
+**Added** — publish endpoint ([P3-09](./records/2026-09-15-P3-09-publish.md))
+
+- Couples can publish a paid invitation, or publish once for a three-day free trial; trial pages say so.
+
+**Fixed**
+
+- The publish checklist reported event dates, gift accounts and gallery photos as missing even when filled in, which would have blocked every publish.
+
 ### 2026-09-15 — Order history and invoices
 
 **Added** — order history and invoice ([P3-08](./records/2026-09-15-P3-08-invoice-and-history.md))
