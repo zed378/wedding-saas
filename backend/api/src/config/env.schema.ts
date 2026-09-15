@@ -180,6 +180,12 @@ export const envSchema = z
      */
     TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(1),
 
+    /**
+     * `P3-05` — bearer token for `GET /metrics`. Unset means the endpoint does not exist (404):
+     * metrics name internal event rates and must not be readable by anyone on the internet.
+     */
+    METRICS_TOKEN: z.string().min(32).optional(),
+
     /** Email (P4-06), CAPTCHA (P4-05), maps (P1-14). */
     RESEND_API_KEY: z.string().min(1).optional(),
     TURNSTILE_SECRET_KEY: z.string().min(1).optional(),

@@ -134,7 +134,10 @@ export const DEFAULT_POLICIES: readonly RateLimitPolicy[] = [
  * declaring it unhealthy.
  */
 export const EXEMPT_PATH_PREFIXES: readonly string[] = [
-  "/api/v1/webhooks/",
+  // `docs/API/07`: the webhook is `/api/webhooks/payment/:provider` — unversioned, because the
+  // provider holds the URL. This entry said `/api/v1/webhooks/` until `P3-05`, a path that does not
+  // exist, so the real webhook would have been limited like any public endpoint.
+  "/api/webhooks/",
   "/health",
   "/healthz",
   "/readyz",

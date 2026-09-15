@@ -11,7 +11,8 @@
 | Database connection pool > 90% used | High | Slack + investigate |
 | Database backup job failed | Critical | Page on-call |
 | Dead-letter queue grows (payment/media job permanently failed) | High | Slack + investigate |
-| Payment webhook signature invalid above a threshold within a short period | High (indicates a possible fraud attempt) | Slack security channel |
+| Payment webhook signature invalid above a threshold within a short period (`deploy/prometheus/alerts.yml` › `PaymentWebhookInvalidSignatures`: > 5 in 10 min) | High (indicates a possible fraud attempt) | Slack security channel |
+| A verified payment notification flagged for manual review — late payment, second charge, amount mismatch, unknown payment, refund notification (`PaymentNeedsReview`) | High | Slack payments channel |
 | Consecutive failed logins from the same IP well above a threshold | Medium | Slack security channel |
 | Storage disk usage > 85% | Medium | Slack |
 | SSL certificate nearing expiry (< 14 days) | Medium | Slack + email |

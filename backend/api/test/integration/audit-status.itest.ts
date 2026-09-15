@@ -169,6 +169,23 @@ describe("status transitions — the state machine (docs/PLAN/06)", () => {
     expect(history[0]!.reason).toContain("system");
   });
 
+  it("allows draft -> paid only from SYSTEM: a late payment after the order expired (P3-05, ADR-077)", async () => {
+    // docs/SECURITY/07 § Timeout & Expiry: a verified success after expiry is processed as valid.
+    // By then the expiry returned the invitation to `draft`. A user or an admin must still not be
+    // able to take this edge — it is the same free-product path as pending_payment -> paid.
+    const { invitationId, userId } = await seedInvitation("draft");
+    await expect(
+      status.transition(invitationId, "paid", USER(userId)),
+    ).rejects.toThrow(BusinessRuleError);
+    await expect(
+      status.transition(invitationId, "paid", ADMIN(userId), "they paid late"),
+    ).rejects.toThrow(BusinessRuleError);
+    expect(await statusOf(invitationId)).toBe("draft");
+
+    await status.transition(invitationId, "paid", SYSTEM);
+    expect(await statusOf(invitationId)).toBe("paid");
+  });
+
   it("refuses published -> expired from a user, because a job owns it", async () => {
     const { invitationId, userId } = await seedInvitation("published");
     await expect(

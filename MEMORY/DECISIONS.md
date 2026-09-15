@@ -2414,3 +2414,52 @@ page needs its URL, and `payments` had nowhere to keep one.
 the order lock across the provider call (the `P3-02` pool-starvation shape); a partial unique index on
 one pending payment per order (would make the dead-initiation recovery an error path rather than a
 rule).
+
+### ADR-077 — Payment webhook: a notification log, synchronous processing, a late-payment edge, and a metrics endpoint
+
+**Date** 2026-09-14 · **Task** `P3-05` · **Status** Accepted · **Amends** `docs/API/07`, `docs/DATABASE/08`, `docs/PLAN/06`, `docs/DEVOPS/07`
+
+**Context** — The webhook is the most security-critical path in the project. Implementing it found four
+places the documents did not close:
+
+1. `docs/DATABASE/08` keeps forged callbacks through `payments.signature_valid`, but a forged callback
+   has no payment row of its own, and the unique `(provider, reference)` index forbids a second row.
+   Writing the forged claim onto the real payment it names would let a forger overwrite a genuine record.
+2. `docs/SECURITY/07` requires a success after expiry to be processed, but by then the invitation is
+   `draft`, and the state machine has no `draft → paid`.
+3. `P3-05` DoD 5 requires a metric with an alert rule; the API exposed no metrics at all.
+4. The rate-limit exemption named `/api/v1/webhooks/`, while `docs/API/07` puts the route at
+   `/api/webhooks/payment/:provider` — so the real webhook would have been rate limited, and the test of
+   the exemption asserted an invented path.
+
+**Decisions**
+
+1. **`payment_notifications`** (migration `0012`): one row per arrival, genuine or forged, written before
+   processing in its own statement. Append-mostly by permission (INSERT/SELECT; UPDATE only the four
+   processing columns; no DELETE). `payments.signature_valid` is set only from a verified notification.
+2. **Synchronous processing in the API**, in one transaction: lock the payment by `(provider, reference)`,
+   check the amount, apply the outcome, mark the notification processed. `docs/BACKEND/08` allows it; the
+   provider's 200 then means "committed". `payment.webhook_process` stays in the job catalogue with no
+   producer.
+3. **Three independent idempotency guards**: the row lock, the early `status = 'success'` check, and an
+   update conditional on `status <> 'success'` whose result is checked. Mutation runs showed each of the
+   first two alone was not what the tests proved; removing all three fails them.
+4. **`draft → paid`, SYSTEM only**, "late payment confirmed after the order expired", flagged for review.
+   Order `expired` or `failed` → `paid`. A second success for a paid order is flagged `duplicate_charge`,
+   never granted twice. A refunded order is flagged and untouched.
+5. **A verified failure** sets the order `failed` and the invitation `draft` (BR-5.3) only if the order has
+   no other pending or successful payment; a success is never downgraded.
+6. **200 for every verified notification** (the provider has nothing to retry), 401 for invalid, 404 for a
+   provider that is not configured, 500 only when processing rolled back.
+7. **Metrics**: a dependency-free counter registry, `GET /metrics` behind `METRICS_TOKEN` (404 without
+   it), `wi_payment_webhook_signature_invalid_total`, `wi_payment_webhook_processed_total`,
+   `wi_payment_needs_review_total`; rules in `deploy/prometheus/alerts.yml`, checked by a spec against
+   the registry.
+8. **Rate-limit exemption corrected** to `/api/webhooks/`.
+9. **Renewal orders** are marked paid without touching the invitation; `P3-13` must extend `expiry_date`
+   and move `expired → published` for paid renewal orders.
+
+**Alternatives considered** — recording forged callbacks only in logs (no queryable evidence, log
+retention is shorter); async processing through the job (the provider's 200 would no longer mean the
+payment is recorded); a client library for metrics (a dependency for three counters); rejecting a late
+success (contradicts `docs/SECURITY/07`, and the customer's money is real).

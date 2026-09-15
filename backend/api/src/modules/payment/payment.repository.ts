@@ -1,8 +1,8 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 
 import { DB, type Database } from "../../infra/db/client";
-import { payments } from "../../infra/db/schema";
+import { paymentNotifications, payments } from "../../infra/db/schema";
 import type { Transaction } from "../../shared/db/transaction";
 
 export type PaymentRow = typeof payments.$inferSelect;
@@ -92,5 +92,139 @@ export class PaymentRepository {
         updatedAt: new Date(),
       })
       .where(eq(payments.id, paymentId));
+  }
+
+  // ------------------------------------------------------------------ P3-05 webhook
+
+  /** One transaction for everything a webhook changes, so it commits together or not at all. */
+  async transaction<R>(work: (tx: Transaction) => Promise<R>): Promise<R> {
+    return this.db.transaction(work);
+  }
+
+  /** Record an arrival. Its own statement: it survives a processing failure that rolls back. */
+  async recordNotification(values: {
+    readonly provider: string;
+    readonly claimedReference: string | null;
+    readonly signatureValid: boolean;
+    readonly rejectionReason?: string;
+    readonly outcome?: string;
+    readonly providerStatus?: string;
+    readonly amount?: bigint;
+    readonly rawPayload: unknown;
+  }): Promise<string> {
+    const rows = await this.db
+      .insert(paymentNotifications)
+      .values({
+        provider: values.provider,
+        claimedReference: values.claimedReference,
+        signatureValid: values.signatureValid,
+        rejectionReason: values.rejectionReason ?? null,
+        outcome: values.outcome ?? null,
+        providerStatus: values.providerStatus ?? null,
+        amount: values.amount ?? null,
+        rawPayload: values.rawPayload ?? null,
+      })
+      .returning({ id: paymentNotifications.id });
+    return rows[0]!.id;
+  }
+
+  async completeNotification(
+    tx: Transaction,
+    notificationId: string,
+    values: {
+      readonly paymentId: string | null;
+      readonly result: string;
+      readonly needsReview: boolean;
+    },
+  ): Promise<void> {
+    await tx
+      .update(paymentNotifications)
+      .set({
+        paymentId: values.paymentId,
+        result: values.result,
+        needsReview: values.needsReview,
+        processedAt: new Date(),
+      })
+      .where(eq(paymentNotifications.id, notificationId));
+  }
+
+  /**
+   * The payment a verified notification names, locked. The unique `(provider, provider_reference_id)`
+   * index guarantees at most one; the lock makes concurrent deliveries of one notification run one
+   * after another.
+   */
+  async lockByReference(
+    tx: Transaction,
+    provider: string,
+    providerReferenceId: string,
+  ): Promise<PaymentRow | null> {
+    const [row] = await tx
+      .select()
+      .from(payments)
+      .where(
+        and(
+          eq(payments.provider, provider),
+          eq(payments.providerReferenceId, providerReferenceId),
+        ),
+      )
+      .for("update")
+      .limit(1);
+    return row ?? null;
+  }
+
+  /** From a verified notification only. Never from `success` (idempotency), never to anything else. */
+  async recordVerifiedOutcome(
+    tx: Transaction,
+    paymentId: string,
+    values: {
+      readonly status: "success" | "failed";
+      readonly method: string | null;
+      readonly rawPayload: unknown;
+    },
+  ): Promise<boolean> {
+    const rows = await tx
+      .update(payments)
+      .set({
+        status: values.status,
+        method: values.method,
+        rawCallbackPayload: values.rawPayload,
+        signatureValid: true,
+        verifiedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(payments.id, paymentId), ne(payments.status, "success")))
+      .returning({ id: payments.id });
+    return rows.length === 1;
+  }
+
+  async recordMethod(
+    tx: Transaction,
+    paymentId: string,
+    method: string,
+  ): Promise<void> {
+    await tx
+      .update(payments)
+      .set({ method, updatedAt: new Date() })
+      .where(eq(payments.id, paymentId));
+  }
+
+  /** Whether the order has a `pending` or `success` payment other than this one. */
+  async hasOtherLivePayment(
+    tx: Transaction,
+    orderId: string,
+    exceptPaymentId: string,
+  ): Promise<boolean> {
+    const rows = await tx
+      .select({ id: payments.id })
+      .from(payments)
+      .where(
+        and(
+          eq(payments.orderId, orderId),
+          ne(payments.id, exceptPaymentId),
+          inArray(payments.status, ["pending", "success"]),
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
   }
 }

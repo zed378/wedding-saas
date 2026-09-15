@@ -31,6 +31,13 @@ Errors: 404 `NOT_FOUND` (not the caller's order); 422 `ORDER_NOT_PAYABLE` (not `
 5. Response to the provider: 200 OK quickly (< 5 seconds) — heavy processing (email, etc.) is offloaded to a queue, not processed synchronously inside the webhook handler.
 6. If the signature is INVALID → 401, logged as a potential fraud attempt (SECURITY/12).
 
+**As implemented (P3-05, ADR-077):**
+- **Every arrival is recorded** in `payment_notifications` (DATABASE/08) before processing, forged ones with `signature_valid = false`. A forged notification never touches the payment row it claims.
+- **200 for every verified notification**, whatever it did — applied, duplicate, unknown reference, amount mismatch, late payment, refund notification — so the provider stops retrying. The ones a human must look at are flagged `needs_review` and alerted on.
+- **401** for a forged, tampered, unsigned or malformed one. **404** when `:provider` is not the configured gateway. **500** only when processing failed and rolled back, so the provider retries.
+- A verified **failure** sets the order `failed` and the invitation back to `draft` (BR-5.3) unless another payment attempt for that order is still live. A verified success **after the order expired** is applied and flagged (SECURITY/07 § Timeout & Expiry).
+- Not rate limited and not behind user authentication; the signature is the authentication.
+
 ## Status Polling
 ```json
 GET /api/v1/orders/:order_id/payment/status

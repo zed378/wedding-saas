@@ -5,6 +5,8 @@ import { OrderModule } from "../order/order.module";
 import { paymentGatewayProvider } from "./payment-gateway.provider";
 import { PAYMENT_GATEWAY } from "./payment-gateway.port";
 import { PaymentController } from "./payment.controller";
+import { PaymentWebhookController } from "./payment-webhook.controller";
+import { PaymentWebhookService } from "./payment-webhook.service";
 import { PaymentRepository } from "./payment.repository";
 import { PaymentService } from "./payment.service";
 
@@ -14,8 +16,13 @@ import { PaymentService } from "./payment.service";
  */
 @Module({
   imports: [AuthModule, OrderModule],
-  controllers: [PaymentController],
-  providers: [paymentGatewayProvider, PaymentRepository, PaymentService],
+  controllers: [PaymentController, PaymentWebhookController],
+  providers: [
+    paymentGatewayProvider,
+    PaymentRepository,
+    PaymentService,
+    PaymentWebhookService,
+  ],
   exports: [PAYMENT_GATEWAY, PaymentService],
 })
 export class PaymentModule {}
