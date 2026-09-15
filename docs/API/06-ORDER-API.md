@@ -44,6 +44,7 @@ GET    /api/v1/orders/:order_id/invoice          Download the invoice PDF (after
 - A `pending` order whose `expired_at` has passed automatically becomes `expired` via a job (BACKEND/08-JOBS-WORKERS.md); the GET endpoint always returns the current status (not the status at creation time). The same job returns the invitation from `pending_payment` to `draft` (BR-5.3).
 
 ## Error Cases
+- A `pending` order already past its `expired_at` is **not** active: checkout expires it on the spot (order `expired`, invitation `pending_payment → draft` with a history row, the same code as the 15-minute sweep) and creates the new order, rather than making the user wait for the sweep (P3-07).
 - 409 `ACTIVE_ORDER_EXISTS` — if there is already an active `pending` order for the same invitation (direct the user to continue the old order rather than creating a new one). `error.details[0]` is `{ "field": "order_id", "message": "<existing order id>" }`. Guaranteed by a row lock and the partial unique index `idx_orders_one_pending` (DATABASE/07, ADR-074).
 - 422 `ORDER_NOT_ALLOWED` — the invitation is `paid` and not yet published: there is nothing to buy; publish it.
 - 422 `PACKAGE_NOT_AVAILABLE` / `ADDON_NOT_AVAILABLE` — unknown or inactive catalogue ids (P3-01).

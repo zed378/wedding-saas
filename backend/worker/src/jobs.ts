@@ -99,6 +99,11 @@ export const CRON_JOBS = {
     description: "Delete orphaned staging files older than an hour",
     pattern: "0 * * * *",
   },
+  /**
+   * `P3-07`, ADR-078. Scheduled here; CONSUMED by the API's jobs process
+   * (`backend/api/src/jobs/domain-jobs.ts`), because it moves order and invitation status through the
+   * API's status service. This package registers no handler for it.
+   */
   order_expire_check: {
     name: "order_expire_check",
     pool: "cron",

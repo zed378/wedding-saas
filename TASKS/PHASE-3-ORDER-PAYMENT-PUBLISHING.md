@@ -233,7 +233,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — [record](../MEMORY/records/2026-09-15-P3-07-order-expiry.md), [spec](../MEMORY/specs/P3-07-order-expiry.md) |
 | **Depends on** | P3-05, P0-15 |
 | **Spec refs** | `docs/BACKEND/08-JOBS-WORKERS.md`, `docs/PLAN/09` § Order Expiry, `docs/SECURITY/07` § Timeout & Expiry, `docs/PLAN/02` § BR-5.3 |
 | **Spec required** | Yes — payment |
@@ -249,10 +249,10 @@
 5. Emit a metric for expired orders, since a rising rate is a checkout-funnel signal, not just an operational one.
 
 **Definition of Done**
-- [ ] Expiry moves both order and invitation status, with history rows.
-- [ ] A late success webhook still grants entitlement and raises a review flag.
-- [ ] The job is idempotent under repeated runs.
-- [ ] A user can create a new order immediately after expiry.
+- [x] Expiry moves both order and invitation status, with history rows. — `order-expiry.itest.ts` › "expires an overdue order and returns its invitation to draft, with a history row".
+- [x] A late success webhook still grants entitlement and raises a review flag. — `order-expiry.itest.ts` › "a late success after the job ran is honoured and flagged".
+- [x] The job is idempotent under repeated runs. — "is idempotent: a second run changes nothing", "two concurrent runs expire each order once".
+- [x] A user can create a new order immediately after expiry. — "lets the user check out again immediately after the deadline, without waiting for the sweep" (inline expiry at checkout).
 
 ---
 

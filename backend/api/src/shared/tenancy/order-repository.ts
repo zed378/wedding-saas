@@ -14,6 +14,8 @@ export interface LockedCheckout {
   readonly invitationStatus: string;
   /** The invitation's `pending` order, if one exists. At most one can (ADR-074). */
   readonly pendingOrder: OrderRow | null;
+  /** `P3-07` — the pending order is already past its `expired_at` (database clock). */
+  readonly pendingOverdue: boolean;
 }
 
 export interface NewOrder {
@@ -71,7 +73,10 @@ export class OrderRepository {
       if (invitation === undefined) return null;
 
       const [pending] = await tx
-        .select()
+        .select({
+          order: orders,
+          overdue: sql<boolean>`${orders.expiredAt} <= now()`,
+        })
         .from(orders)
         .where(
           and(
@@ -84,7 +89,8 @@ export class OrderRepository {
       return work({
         tx,
         invitationStatus: invitation.status,
-        pendingOrder: pending ?? null,
+        pendingOrder: pending?.order ?? null,
+        pendingOverdue: pending?.overdue ?? false,
       });
     });
   }
@@ -173,6 +179,49 @@ export class OrderRepository {
       .from(orders)
       .where(eq(orders.id, orderId))
       .for("update")
+      .limit(1);
+    return row ?? null;
+  }
+
+  /** `P3-07` — one transaction for the expiry sweep's per-order work. */
+  async transaction<R>(work: (tx: Transaction) => Promise<R>): Promise<R> {
+    return this.db.transaction(work);
+  }
+
+  /** `P3-07` — ids of pending orders past their deadline, oldest first. Unlocked: a candidate list. */
+  async overdueOrderIds(limit: number): Promise<string[]> {
+    const rows = await this.db
+      .select({ id: orders.id })
+      .from(orders)
+      .where(
+        and(eq(orders.status, "pending"), sql`${orders.expiredAt} <= now()`),
+      )
+      .orderBy(orders.expiredAt)
+      .limit(limit);
+    return rows.map((row) => row.id);
+  }
+
+  /**
+   * `P3-07` — lock an order only if it is still pending and overdue, **skipping it if another
+   * transaction holds it**. A webhook settling this order right now holds that lock; waiting would
+   * risk a deadlock against callers that lock in the other order, and there is nothing to gain — the
+   * next sweep, or the payment, decides it. System path: no owner filter (spec § 6).
+   */
+  async lockOverdueOrder(
+    tx: Transaction,
+    orderId: string,
+  ): Promise<OrderRow | null> {
+    const [row] = await tx
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.id, orderId),
+          eq(orders.status, "pending"),
+          sql`${orders.expiredAt} <= now()`,
+        ),
+      )
+      .for("update", { skipLocked: true })
       .limit(1);
     return row ?? null;
   }

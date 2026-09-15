@@ -79,6 +79,11 @@ export const metrics = {
     "Verified payment notifications flagged for a human: late payment, second charge, mismatch, unknown payment.",
     ["provider", "result"],
   ),
+  ordersExpired: new Counter(
+    "wi_orders_expired_total",
+    "Pending orders expired unpaid, by order type — a checkout-funnel signal (P3-07).",
+    ["order_type"],
+  ),
 } as const;
 
 export function renderMetrics(): string {

@@ -10,6 +10,7 @@ import {
 } from "../../http/errors";
 import { InvitationStatusService } from "../../shared/invitation-status/invitation-status.service";
 import { logger } from "../../shared/logging/logger";
+import { metrics } from "../../shared/metrics/metrics";
 import {
   OrderRepository,
   type OrderRow,
@@ -133,8 +134,23 @@ export class OrderService {
     const created = await this.repository.withLockedInvitation(
       invitationId,
       user.scope,
-      async ({ tx, invitationStatus, pendingOrder }) => {
-        if (pendingOrder !== null) {
+      async ({
+        tx,
+        invitationStatus: statusAtLock,
+        pendingOrder,
+        pendingOverdue,
+      }) => {
+        let invitationStatus = statusAtLock;
+
+        // `P3-07`: an order past its deadline can no longer be paid; it must not block a new checkout
+        // for up to fifteen minutes waiting for the sweep. Expire it here, through the sweep's code.
+        if (pendingOrder !== null && pendingOverdue) {
+          const expired = await this.expireIfOverdue(tx, pendingOrder.id);
+          if (expired === null) throw activeOrderExists(pendingOrder.id);
+          if (expired.invitationStatus !== null) {
+            invitationStatus = expired.invitationStatus;
+          }
+        } else if (pendingOrder !== null) {
           // A replay that waited on the lock for the request that created this order.
           if (cacheKey !== undefined) {
             const record = await this.cache.getJson<IdempotencyRecord>(
@@ -383,6 +399,74 @@ export class OrderService {
     const order = await this.repository.findOwnedOrder(orderId, scope);
     if (order === null) throw new NotFoundError();
     return { id: order.id, status: order.status };
+  }
+
+  /**
+   * `P3-07` — `order_expire_check`, every 15 minutes (`docs/BACKEND/08`). `MEMORY/specs/P3-07-order-expiry.md`.
+   *
+   * Each overdue order in its own short transaction. Idempotent by construction: only a still-pending,
+   * still-overdue order is touched, so a second run — or two at once — changes nothing more.
+   */
+  async expireOverdueOrders(
+    limit = 500,
+  ): Promise<{ expired: number; skipped: number }> {
+    const ids = await this.repository.overdueOrderIds(limit);
+    let expired = 0;
+    for (const id of ids) {
+      const done = await this.repository.transaction((tx) =>
+        this.expireIfOverdue(tx, id),
+      );
+      if (done !== null) expired += 1;
+    }
+    return { expired, skipped: ids.length - expired };
+  }
+
+  /**
+   * Expire one order if it is still pending and overdue and nobody else holds it. BR-5.3: the order
+   * becomes `expired`, and a `new_publish` invitation returns `pending_payment → draft` with a history row
+   * (SYSTEM). `null` when there was nothing to do. Lock order: order, then invitation — the webhook's.
+   */
+  private async expireIfOverdue(
+    tx: Transaction,
+    orderId: string,
+  ): Promise<{ readonly invitationStatus: string | null } | null> {
+    const order = await this.repository.lockOverdueOrder(tx, orderId);
+    if (order === null) return null;
+
+    await this.repository.setOrderStatus(tx, order.id, "pending", "expired");
+    metrics.ordersExpired.inc({ order_type: order.orderType });
+    logger.info(
+      {
+        context: {
+          event: "order.expired",
+          order_id: order.id,
+          invitation_id: order.invitationId,
+          order_type: order.orderType,
+        },
+      },
+      "order expired unpaid",
+    );
+
+    if (order.orderType !== "new_publish") return { invitationStatus: null };
+    try {
+      await this.status.transitionWithin(
+        tx,
+        order.invitationId,
+        "draft",
+        { kind: "SYSTEM", userId: null },
+        "order expired unpaid",
+      );
+      return { invitationStatus: "draft" };
+    } catch (error) {
+      if (
+        !(error instanceof BusinessRuleError) ||
+        error.code !== "INVALID_STATUS_TRANSITION"
+      ) {
+        throw error;
+      }
+      // The invitation is not `pending_payment` (already draft, deleted, …): nothing to return.
+      return { invitationStatus: null };
+    }
   }
 
   /** The order a previous request with this key created, if it still exists. */
