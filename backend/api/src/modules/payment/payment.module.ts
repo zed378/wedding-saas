@@ -9,6 +9,8 @@ import { PaymentWebhookController } from "./payment-webhook.controller";
 import { PaymentWebhookService } from "./payment-webhook.service";
 import { PaymentRepository } from "./payment.repository";
 import { PaymentService } from "./payment.service";
+import { PaymentStatusService } from "./payment-status.service";
+import { PaymentReconciliationService } from "./payment-reconciliation.service";
 
 /**
  * `P3-03`, `P3-04` — payment. `docs/BACKEND/01` § order & payment: this module knows orders, never
@@ -22,7 +24,9 @@ import { PaymentService } from "./payment.service";
     PaymentRepository,
     PaymentService,
     PaymentWebhookService,
+    PaymentStatusService,
+    PaymentReconciliationService,
   ],
-  exports: [PAYMENT_GATEWAY, PaymentService],
+  exports: [PAYMENT_GATEWAY, PaymentService, PaymentReconciliationService],
 })
 export class PaymentModule {}

@@ -353,6 +353,12 @@ const CASES: readonly SweepCase[] = [
       auth(api(c).post(`/api/v1/orders/${t.orderId}/payment`), token),
   },
   {
+    // P3-06. Another user's payment status, and — for a stale payment — a provider query on their behalf.
+    label: "GET /orders/:order_id/payment/status",
+    send: (c, token, t) =>
+      auth(api(c).get(`/api/v1/orders/${t.orderId}/payment/status`), token),
+  },
+  {
     label: "GET /invitations/:id/preview-links",
     send: (c, token, t) =>
       auth(

@@ -229,7 +229,15 @@ export class ConfigValidationError extends Error {
  * restart per mistake, which is how people end up commenting out validation.
  */
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
-  const result = envSchema.safeParse(source);
+  // `P3-06`: an empty string is an unset variable. Compose writes `${MIDTRANS_SERVER_KEY:-}` as ""
+  // when the host has no value, and `z.string().min(1).optional()` would refuse "" and stop the API
+  // booting on staging over a key it is allowed not to have. A REQUIRED variable set to "" still
+  // fails — as missing, which is what it is.
+  const result = envSchema.safeParse(
+    Object.fromEntries(
+      Object.entries(source).filter(([, value]) => value !== ""),
+    ),
+  );
   if (!result.success) {
     const issues = result.error.issues.map((issue) => {
       const name = issue.path.join(".") || "(root)";

@@ -217,6 +217,11 @@ export const paymentNotifications = pgTable(
     id: uuid("id")
       .primaryKey()
       .default(sql`gen_random_uuid()`),
+    /**
+     * `P3-06` — what brought it: the provider's `webhook`, a server-initiated status `query` from the
+     * polling endpoint, or the daily `reconciliation`. One transition path, three sources.
+     */
+    source: varchar("source", { length: 15 }).notNull().default("webhook"),
     provider: varchar("provider", { length: 30 }).notNull(),
     /** The reference the payload names. Unverified when `signature_valid` is false: text, not a key. */
     claimedReference: varchar("claimed_reference", { length: 150 }),
@@ -248,6 +253,10 @@ export const paymentNotifications = pgTable(
       t.claimedReference,
     ),
     index("idx_payment_notifications_received").on(t.receivedAt),
+    check(
+      "payment_notifications_source_check",
+      sql`source IN ('webhook', 'query', 'reconciliation')`,
+    ),
     index("idx_payment_notifications_review")
       .on(t.receivedAt)
       .where(sql`needs_review`),

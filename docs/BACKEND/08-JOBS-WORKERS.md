@@ -14,6 +14,12 @@ custom_domain_dns_check (Phase 2)  every 10 minutes — verifies pending DNS sta
 payment_reconciliation (optional)   daily 03:00 WIB — cross-checks transactions against the provider
 ```
 
+**Who consumes what (ADR-078).** `worker-cron` schedules every job above. Jobs whose work is payment or
+order domain logic — `payment_reconciliation`, and `order_expire_check` from `P3-07` — are consumed by the
+API's jobs process (`backend/api/dist/jobs/main.js`, compose service `api-jobs`): same modules and
+transaction boundaries as a request, no HTTP server. `backend/worker` registers no handler for them, so no
+job has two consumers or two implementations.
+
 ## Event-Driven (Triggered) Job List
 ```
 media.process                 from a received media upload

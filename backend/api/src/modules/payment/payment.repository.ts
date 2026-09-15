@@ -103,6 +103,7 @@ export class PaymentRepository {
 
   /** Record an arrival. Its own statement: it survives a processing failure that rolls back. */
   async recordNotification(values: {
+    readonly source: "webhook" | "query" | "reconciliation";
     readonly provider: string;
     readonly claimedReference: string | null;
     readonly signatureValid: boolean;
@@ -115,6 +116,7 @@ export class PaymentRepository {
     const rows = await this.db
       .insert(paymentNotifications)
       .values({
+        source: values.source,
         provider: values.provider,
         claimedReference: values.claimedReference,
         signatureValid: values.signatureValid,
@@ -126,6 +128,14 @@ export class PaymentRepository {
       })
       .returning({ id: paymentNotifications.id });
     return rows[0]!.id;
+  }
+
+  /** `P3-06` — reconciliation marks a routine-looking outcome for review. */
+  async flagForReview(notificationId: string): Promise<void> {
+    await this.db
+      .update(paymentNotifications)
+      .set({ needsReview: true })
+      .where(eq(paymentNotifications.id, notificationId));
   }
 
   async completeNotification(
@@ -226,5 +236,89 @@ export class PaymentRepository {
       )
       .limit(1);
     return rows.length > 0;
+  }
+
+  // ------------------------------------------------------------------ P3-06 status
+
+  /**
+   * The order's most relevant payment for display: a `success` if one exists, otherwise the newest.
+   * `stale` is whether a still-pending one is older than `staleSeconds` by the database clock.
+   */
+  async displayPayment(
+    orderId: string,
+    staleSeconds: number,
+  ): Promise<{ payment: PaymentRow; stale: boolean } | null> {
+    const [row] = await this.db
+      .select({
+        payment: payments,
+        stale: sql<boolean>`${payments.createdAt} < now() - make_interval(secs => ${staleSeconds})`,
+      })
+      .from(payments)
+      .where(eq(payments.orderId, orderId))
+      .orderBy(
+        sql`CASE WHEN ${payments.status} = 'success' THEN 0 ELSE 1 END`,
+        desc(payments.createdAt),
+      )
+      .limit(1);
+    return row ?? null;
+  }
+
+  /**
+   * `P3-06` — payments reconciliation re-checks with the provider: still `pending` between
+   * `minPendingAgeMinutes` and `lookbackHours` old (a webhook may never have come), and `success`
+   * verified within `lookbackHours` (the provider may not agree).
+   */
+  async reconciliationCandidates(
+    provider: string,
+    options: {
+      readonly minPendingAgeMinutes: number;
+      readonly lookbackHours: number;
+      readonly limit: number;
+    },
+  ): Promise<PaymentRow[]> {
+    return this.db
+      .select()
+      .from(payments)
+      .where(
+        and(
+          eq(payments.provider, provider),
+          sql`(
+            (${payments.status} = 'pending'
+              AND ${payments.createdAt} < now() - make_interval(mins => ${options.minPendingAgeMinutes})
+              AND ${payments.createdAt} > now() - make_interval(hours => ${options.lookbackHours}))
+            OR
+            (${payments.status} = 'success'
+              AND ${payments.verifiedAt} > now() - make_interval(hours => ${options.lookbackHours}))
+          )`,
+        ),
+      )
+      .orderBy(payments.createdAt)
+      .limit(options.limit);
+  }
+
+  /** A reconciliation finding that changes nothing but needs a person. */
+  async recordReconciliationFinding(values: {
+    readonly provider: string;
+    readonly payment: PaymentRow;
+    readonly result: string;
+    readonly providerStatus: string | null;
+    readonly outcome: string | null;
+    readonly amount: bigint | null;
+    readonly rawPayload: unknown;
+  }): Promise<void> {
+    await this.db.insert(paymentNotifications).values({
+      source: "reconciliation",
+      provider: values.provider,
+      claimedReference: values.payment.providerReferenceId,
+      paymentId: values.payment.id,
+      signatureValid: true,
+      outcome: values.outcome,
+      providerStatus: values.providerStatus,
+      amount: values.amount,
+      result: values.result,
+      needsReview: true,
+      rawPayload: values.rawPayload ?? null,
+      processedAt: new Date(),
+    });
   }
 }

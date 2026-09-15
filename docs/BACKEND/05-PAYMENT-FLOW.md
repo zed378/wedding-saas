@@ -45,6 +45,7 @@ GET /orders/:orderId/payment/status
 ## Supporting Jobs
 - `order.expire_check` (daily/hourly cron): sets `status='expired'` for `pending` orders whose `expired_at` has passed.
 - `payment.reconciliation` (optional, daily cron): compare the transaction list from the Payment Gateway API vs. local data, flag mismatches for manual review (additional mitigation in case a webhook ever fails).
+  - **As implemented (P3-06, ADR-078):** Midtrans has no transaction listing, so the job queries each local payment that could be wrong — `pending` 10 minutes to 48 hours old, and `success` verified in the last 48 hours. A pending payment the provider reports settled is applied through the webhook path and flagged; a success the provider disagrees with or does not know is flagged (`reconciliation_mismatch` / `reconciliation_missing`) and never undone. Scheduled by `worker-cron`, consumed by the API jobs process.
 
 ## Refund
 ```

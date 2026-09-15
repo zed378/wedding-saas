@@ -206,7 +206,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — [record](../MEMORY/records/2026-09-15-P3-06-payment-status.md), [spec](../MEMORY/specs/P3-06-payment-status.md) |
 | **Depends on** | P3-05 |
 | **Spec refs** | `docs/API/07-PAYMENT-API.md` § Status Polling, `docs/BACKEND/05` § Status Polling, `docs/SECURITY/07` |
 | **Spec required** | Yes — payment |
@@ -222,10 +222,10 @@
 5. Never accept a status from a query parameter. The endpoint is display-only by construction.
 
 **Definition of Done**
-- [ ] The status endpoint reads state and never writes it directly.
-- [ ] The provider-query fallback shares one code path with the webhook for state transitions.
-- [ ] The reconciliation job flags an injected mismatch in a test.
-- [ ] Polling for another user's order returns 404.
+- [x] The status endpoint reads state and never writes it directly. — `PaymentStatusService` has no write; `payment-status.itest.ts` › "reports a pending order and payment, and asks the provider nothing while the payment is fresh" (no notification row); `payment-http.spec.ts` › "ignores any status a client tries to supply".
+- [x] The provider-query fallback shares one code path with the webhook for state transitions. — `payment-status.itest.ts` › "asks the provider about a stale pending payment and applies the answer through the webhook's path" (identical history reason, `source = query`).
+- [x] The reconciliation job flags an injected mismatch in a test. — `payment-status.itest.ts` › "flags an injected mismatch: paid locally, failed at the provider — and changes nothing".
+- [x] Polling for another user's order returns 404. — `payment-status.itest.ts` › "answers another user's order with 404, and asks the provider nothing"; `idor-sweep.itest.ts` › `GET /orders/:order_id/payment/status`.
 
 ---
 

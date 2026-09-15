@@ -19,6 +19,7 @@
 - All jobs MUST be idempotent (safe to run more than once with the same payload) — crucial for payment webhooks & media processing.
 - Permanently failed jobs go into a **dead-letter queue**, which is monitored & alerted on (see DEVOPS/07-ALERTING.md) and must never be silently dropped for "High"/"Medium" category jobs.
 - Workers run separately from the main API process (independent scaling) — workers can scale up during heavy upload/webhook periods without affecting API latency.
+- Domain jobs that change payments, orders or invitations run in a separate **API jobs process** built from the API image (`api-jobs`), so they use the API's services and status machine rather than a second copy of those rules in the worker package (ADR-078). Media, notification and cache jobs stay in `backend/worker`.
 
 ## Scheduling (Cron Jobs)
 - Invitation expiry check: daily at 00:05 WIB.

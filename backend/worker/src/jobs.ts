@@ -139,6 +139,24 @@ export const CRON_JOBS = {
     description: "Send H-7 and H-1 expiry reminders",
     pattern: "0 8 * * *",
   },
+  /**
+   * `P3-06`, ADR-078. Scheduled here with every other cron job; CONSUMED by the API's jobs process
+   * (`backend/api/src/jobs/domain-jobs.ts`), because it applies payment outcomes through the API's
+   * payment and order services. This package registers no handler for it.
+   */
+  payment_reconciliation: {
+    name: "payment_reconciliation",
+    pool: "cron",
+    // Low and droppable: every run looks back 48 hours, so a failed run is covered by the next one,
+    // and a disagreement it finds is written to `payment_notifications` rather than kept in a queue.
+    priority: "low",
+    attempts: 1,
+    backoff: { type: "fixed", delay: 0 },
+    deadLetter: false,
+    description:
+      "Ask the payment provider about pending and recently paid payments; flag disagreements",
+    pattern: "0 3 * * *",
+  },
   analytics_counter_flush: {
     name: "analytics_counter_flush",
     pool: "cron",

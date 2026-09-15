@@ -371,6 +371,20 @@ export class OrderService {
     return true;
   }
 
+  /**
+   * `P3-06` — one of the caller's orders, for the payment status endpoint. Read only. 404 for
+   * somebody else's, nonexistent or malformed id.
+   */
+  async ownedOrderStatus(
+    scope: TenantScope,
+    orderId: string,
+  ): Promise<{ readonly id: string; readonly status: string }> {
+    if (!UUID.test(orderId)) throw new NotFoundError();
+    const order = await this.repository.findOwnedOrder(orderId, scope);
+    if (order === null) throw new NotFoundError();
+    return { id: order.id, status: order.status };
+  }
+
   /** The order a previous request with this key created, if it still exists. */
   private async replay(
     scope: TenantScope,

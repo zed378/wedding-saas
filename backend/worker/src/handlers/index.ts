@@ -81,6 +81,9 @@ export function registerHandlers(
       break;
 
     case "cron": {
+      // `order_expire_check` and `payment_reconciliation` are consumed by the API's jobs process
+      // (ADR-078): they change orders and payments through the API's services. Never register them
+      // here — two consumers would run two different implementations of one rule.
       if (deps === undefined) break;
       runner.register(
         "media_cleanup_staging",

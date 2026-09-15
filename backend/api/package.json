@@ -6,6 +6,7 @@
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json --watch",
     "start": "node dist/main.js",
+    "start:jobs": "node dist/jobs/main.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node src/infra/db/migrate.mts",
     "db:rollback": "node src/infra/db/rollback.mts",

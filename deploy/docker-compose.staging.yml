@@ -199,11 +199,45 @@ services:
       # signs every user out, and a new REFRESH_TOKEN_PEPPER ends every session.
       JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:?required}
       REFRESH_TOKEN_PEPPER: ${REFRESH_TOKEN_PEPPER:?required}
+      # P3-03: a Midtrans SANDBOX key ("SB-" prefix) on staging; empty means checkout answers 503.
+      # P3-05: Prometheus scrape token; empty means GET /metrics answers 404.
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
     ports: ["${STAGING_API_PORT:-18000}:3000"]
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
       minio-init: { condition: service_completed_successfully }
+
+  # P3-06, ADR-078. The API image without an HTTP server: consumes the cron queues whose work is
+  # payment/order domain logic (payment_reconciliation, order_expire_check). worker-cron still does
+  # the scheduling. Same environment as `api`, because it runs the same modules.
+  api-jobs:
+    build:
+      context: ..
+      dockerfile: backend/api/Dockerfile
+    restart: unless-stopped
+    command: ["node", "dist/jobs/main.js"]
+    healthcheck: { disable: true }
+    environment:
+      NODE_ENV: production
+      APP_ENV: ${APP_ENV:?required}
+      SERVICE_NAME: api-jobs
+      APP_ORIGIN: ${APP_ORIGIN:?required}
+      PUBLIC_INVITE_ORIGIN: ${PUBLIC_INVITE_ORIGIN:?required}
+      ADMIN_ORIGIN: ${ADMIN_ORIGIN:?required}
+      DATABASE_URL: ${DATABASE_URL:?required}
+      REDIS_URL: redis://redis:6379
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:?required}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:?required}
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:?required}
+      REFRESH_TOKEN_PEPPER: ${REFRESH_TOKEN_PEPPER:?required}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
+      TZ: Asia/Jakarta
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
 
   # docs/SECURITY/06 layer 10, and a dependency of worker-media rather than an optional
   # extra: that worker refuses to start without it (P1-18). `start_period` is long because
