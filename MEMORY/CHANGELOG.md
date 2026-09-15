@@ -10,6 +10,17 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-09-15 — Payment status and reconciliation
+
+**Added** — payment status polling and reconciliation ([P3-06](./records/2026-09-15-P3-06-payment-status.md))
+
+- `GET /orders/:order_id/payment/status`; a payment stuck pending is checked with the provider.
+- Daily `payment_reconciliation`, run by the new `api-jobs` service. Migration `0013` must run before deploy.
+
+**Fixed**
+
+- An empty optional environment variable no longer stops the API from starting; staging passes the payment and metrics keys to the API.
+
 ### 2026-09-14 — Payment webhook
 
 **Added** — payment webhook ([P3-05](./records/2026-09-14-P3-05-payment-webhook.md))

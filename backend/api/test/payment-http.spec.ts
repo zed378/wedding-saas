@@ -15,6 +15,7 @@ import {
   PaymentService,
   type PayingUser,
 } from "../src/modules/payment/payment.service";
+import { PaymentStatusService } from "../src/modules/payment/payment-status.service";
 import { PolicyRegistry } from "../src/shared/rate-limit/config";
 import {
   POLICY_REGISTRY,
@@ -49,6 +50,18 @@ const paymentStub = {
   },
 };
 
+const statusCalls: { scope: string; orderId: string }[] = [];
+const statusStub = {
+  status: async (scope: string, orderId: string) => {
+    statusCalls.push({ scope, orderId });
+    return {
+      order_status: "pending",
+      payment_status: "pending",
+      paid_at: null,
+    };
+  },
+};
+
 describe("POST /api/v1/orders/:order_id/payment over HTTP", () => {
   let app: INestApplication;
 
@@ -58,6 +71,7 @@ describe("POST /api/v1/orders/:order_id/payment over HTTP", () => {
       providers: [
         { provide: APP_FILTER, useClass: AppExceptionFilter },
         { provide: PaymentService, useValue: paymentStub },
+        { provide: PaymentStatusService, useValue: statusStub },
         {
           provide: SessionService,
           useValue: {
@@ -154,6 +168,36 @@ describe("POST /api/v1/orders/:order_id/payment over HTTP", () => {
       message:
         "Pembayaran sedang tidak dapat diproses. Silakan coba lagi dalam beberapa saat.",
     });
+  });
+
+  it("GET …/payment/status reads through the service, privately cacheable for two seconds (P3-06)", async () => {
+    statusCalls.length = 0;
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/orders/${ORDER_ID}/payment/status`)
+      .set("Authorization", "Bearer good");
+    expect(res.status).toBe(200);
+    expect(res.headers["cache-control"]).toBe("private, max-age=2");
+    expect(res.body).toEqual({
+      success: true,
+      data: {
+        order_status: "pending",
+        payment_status: "pending",
+        paid_at: null,
+      },
+    });
+    expect(statusCalls).toEqual([{ scope: USER_ID, orderId: ORDER_ID }]);
+  });
+
+  it("GET …/payment/status ignores any status a client tries to supply", async () => {
+    // Display only by construction: there is no parameter to carry one.
+    statusCalls.length = 0;
+    const res = await request(app.getHttpServer())
+      .get(
+        `/api/v1/orders/${ORDER_ID}/payment/status?status=paid&transaction_status=settlement`,
+      )
+      .set("Authorization", "Bearer good");
+    expect(res.body.data.order_status).toBe("pending");
+    expect(statusCalls).toEqual([{ scope: USER_ID, orderId: ORDER_ID }]);
   });
 
   it("requires authentication", async () => {

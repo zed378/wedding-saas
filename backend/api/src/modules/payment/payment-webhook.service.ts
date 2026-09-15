@@ -15,6 +15,9 @@ import { PaymentRepository } from "./payment.repository";
 /** An invalid notification's payload is kept only if it is a JSON object this small. */
 const MAX_INVALID_PAYLOAD_BYTES = 8 * 1024;
 
+/** Where a verified event came from (`payment_notifications.source`, migration `0013`). */
+export type NotificationSource = "webhook" | "query" | "reconciliation";
+
 export type WebhookResult =
   | "applied"
   | "late_payment"
@@ -87,8 +90,27 @@ export class PaymentWebhookService {
       throw new UnauthenticatedError("Notification signature is not valid.");
     }
 
-    const event = verdict.event;
+    return this.applyVerified(verdict.event, "webhook");
+  }
+
+  /**
+   * `P3-06` — THE state transition path for a verified provider event, whatever brought it: the
+   * webhook, a status query from the polling endpoint, or the reconciliation job. `docs/BACKEND/05`
+   * § Status Polling: a query result "ALSO goes through the same verification process before
+   * changing state" — here it goes through the same transitions too, so a provider query is a second
+   * source, not a second rulebook.
+   *
+   * `forceReview`: reconciliation finding a success the webhook never delivered is itself worth a
+   * human's attention, even when applying it is routine.
+   */
+  async applyVerified(
+    event: VerifiedPaymentEvent,
+    source: NotificationSource,
+    options: { readonly forceReview?: boolean } = {},
+  ): Promise<WebhookResult> {
+    const provider = this.gateway.provider;
     const notificationId = await this.repository.recordNotification({
+      source,
       provider,
       claimedReference: event.providerReferenceId.slice(0, 150),
       signatureValid: true,
@@ -137,6 +159,11 @@ export class PaymentWebhookService {
       return this.apply(tx, event, payment, finish);
     });
 
+    if (options.forceReview === true && !outcome.needsReview) {
+      await this.repository.flagForReview(notificationId);
+      outcome.needsReview = true;
+    }
+
     metrics.paymentWebhookProcessed.inc({ provider, result: outcome.result });
     if (outcome.needsReview) {
       metrics.paymentNeedsReview.inc({ provider, result: outcome.result });
@@ -149,6 +176,7 @@ export class PaymentWebhookService {
             provider_reference_id: event.providerReferenceId,
             order_id: outcome.orderId,
             notification_id: notificationId,
+            source,
           },
         },
         "payment notification needs manual review",
@@ -269,6 +297,7 @@ export class PaymentWebhookService {
   ): Promise<void> {
     try {
       await this.repository.recordNotification({
+        source: "webhook",
         provider,
         claimedReference: claimedReference?.slice(0, 150) ?? null,
         signatureValid: false,

@@ -2463,3 +2463,36 @@ places the documents did not close:
 retention is shorter); async processing through the job (the provider's 200 would no longer mean the
 payment is recorded); a client library for metrics (a dependency for three counters); rejecting a late
 success (contradicts `docs/SECURITY/07`, and the customer's money is real).
+
+### ADR-078 — Domain jobs run in an API jobs process; provider queries share the webhook's transition path
+
+**Date** 2026-09-15 · **Task** `P3-06` · **Status** Accepted · **Amends** `docs/API/07`, `docs/BACKEND/05`, `docs/BACKEND/08`, `docs/ARCHITECTURE/07`, `docs/DATABASE/08`
+
+**Context** — `P3-06` adds two new sources of a verified payment outcome (the status endpoint's provider
+query, and daily reconciliation), and the first scheduled job whose work is payment domain logic. The
+card requires one code path for transitions. `docs/ARCHITECTURE/07` requires workers to run separately
+from the API process — but `backend/worker` has none of the payment, order or status-machine code, and
+copying it there would create a second rulebook for the most sensitive state in the product.
+
+**Decisions**
+
+1. **`PaymentWebhookService.applyVerified(event, source)`** is the single transition path; the webhook,
+   the polling query and reconciliation all call it. `payment_notifications.source` (migration `0013`)
+   records which.
+2. **Domain jobs are consumed by an API jobs process** — `node dist/jobs/main.js`, the API image without
+   an HTTP server, compose service `api-jobs` — which boots `AppModule` as an application context.
+   **Scheduling stays in `worker-cron`** (leader election, one schedule per job). `DOMAIN_JOBS` lists what
+   the API consumes; `backend/worker` registers no handler for those names, checked by
+   `domain-jobs.spec.ts` against the worker's source.
+3. **Polling query**: only for a pending payment older than 120 s, at most once per 30 s per reference,
+   failures ignored. The response is always the database's state after any applied answer.
+4. **Reconciliation** queries candidates individually (no provider listing): pending 10 min–48 h, success
+   in the last 48 h. It never downgrades a success; disagreements are flagged findings. Scheduled daily,
+   `low` priority and droppable because each run's 48-hour lookback covers a failed run.
+5. **Empty environment variables are unset** in `loadEnv`, so compose's `${VAR:-}` for an optional key
+   (Midtrans, metrics) no longer stops the API booting; a required variable set to `""` still fails.
+
+**Alternatives considered** — a shared `@wi/domain` package imported by the worker (a large extraction of
+Nest-wired services for one job today); running the job inside the HTTP API process (a cron sweep
+competing with request latency, and duplicated per API replica); an internal HTTP endpoint the worker
+calls (a new authenticated surface for server-to-server traffic).

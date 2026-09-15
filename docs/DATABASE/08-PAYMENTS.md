@@ -33,6 +33,8 @@ CREATE INDEX idx_payments_order ON payments(order_id);
 ```sql
 CREATE TABLE payment_notifications (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source             VARCHAR(15) NOT NULL DEFAULT 'webhook'  -- 'webhook' | 'query' | 'reconciliation' (P3-06)
+                     CHECK (source IN ('webhook','query','reconciliation')),
   provider           VARCHAR(30) NOT NULL,
   claimed_reference  VARCHAR(150),                 -- what the payload names; unverified when signature_valid is false
   payment_id         UUID REFERENCES payments(id) ON DELETE RESTRICT,  -- only for a verified one that matched
@@ -54,4 +56,5 @@ CREATE INDEX idx_payment_notifications_review ON payment_notifications(received_
 
 - One row per notification received, genuine or forged, written before processing in its own statement — so it survives a processing failure that rolls back.
 - **Append-mostly by permission**: the application role may INSERT and SELECT, may UPDATE only `payment_id`, `result`, `needs_review`, `processed_at`, and may not DELETE. It is evidence in a fraud investigation (SECURITY/12).
-- `result` values: `applied`, `late_payment`, `duplicate_charge`, `refunded_order`, `applied_entitlement_skipped`, `duplicate`, `failed`, `failed_other_payment_live`, `no_change`, `ignored`, `unknown_reference`, `amount_mismatch`.
+- `source` (P3-06): a verified event arrives from the provider's webhook, from the status endpoint's server-initiated query, or from the daily reconciliation. All three go through one transition path.
+- `result` values: `reconciliation_mismatch`, `reconciliation_missing` (reconciliation findings, always `needs_review`), `applied`, `late_payment`, `duplicate_charge`, `refunded_order`, `applied_entitlement_skipped`, `duplicate`, `failed`, `failed_other_payment_live`, `no_change`, `ignored`, `unknown_reference`, `amount_mismatch`.

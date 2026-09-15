@@ -1,6 +1,8 @@
 import {
   Body,
   Controller,
+  Get,
+  Header,
   HttpCode,
   Param,
   Post,
@@ -17,6 +19,7 @@ import {
 } from "../../shared/auth-middleware";
 import { rateLimit } from "../../shared/rate-limit";
 import { PaymentService } from "./payment.service";
+import { PaymentStatusService } from "./payment-status.service";
 
 /**
  * `P3-04` — payment initiation. `docs/API/07`.
@@ -29,7 +32,25 @@ const emptyBody = z.object({}).strict();
 @Controller("api/v1")
 @UseGuards(requireAuth())
 export class PaymentController {
-  constructor(private readonly payments: PaymentService) {}
+  constructor(
+    private readonly payments: PaymentService,
+    private readonly statuses: PaymentStatusService,
+  ) {}
+
+  /**
+   * `P3-06` — `docs/API/07` § Status Polling. Display only: no body, no query, nothing that could carry
+   * a status in. Private and cacheable for two seconds, so the page that polls after returning from the
+   * payment page costs almost nothing.
+   */
+  @Get("orders/:order_id/payment/status")
+  @Header("Cache-Control", "private, max-age=2")
+  @UseGuards(rateLimit("general-authenticated"))
+  async status(
+    @CurrentUserParam() user: CurrentUser,
+    @Param("order_id") orderId: string,
+  ) {
+    return ok(await this.statuses.status(user.scope, orderId));
+  }
 
   @Post("orders/:order_id/payment")
   @HttpCode(201)

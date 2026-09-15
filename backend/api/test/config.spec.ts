@@ -40,6 +40,19 @@ describe("configuration", () => {
     }
   });
 
+  it("treats an empty optional variable as unset, and an empty required one as missing (P3-06)", () => {
+    // Compose renders `${MIDTRANS_SERVER_KEY:-}` as "" on a host without the value.
+    const env = loadEnv({
+      ...valid,
+      MIDTRANS_SERVER_KEY: "",
+      METRICS_TOKEN: "",
+    });
+    expect(env.MIDTRANS_SERVER_KEY).toBeUndefined();
+    expect(env.METRICS_TOKEN).toBeUndefined();
+
+    expect(() => loadEnv({ ...valid, APP_ORIGIN: "" })).toThrow(/APP_ORIGIN/);
+  });
+
   it("reports every offending variable at once, not one per restart", () => {
     const broken = { NODE_ENV: "test" } as NodeJS.ProcessEnv;
     try {

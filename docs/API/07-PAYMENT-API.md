@@ -48,5 +48,7 @@ GET /api/v1/orders/:order_id/payment/status
 ```
 This endpoint is safe to call repeatedly by the frontend after redirecting back from the gateway (to show the "Payment Successful" page) — BUT it is never the source of the DECISION about status (only displaying a result that has already been decided by the webhook flow).
 
+**As implemented (P3-06, ADR-078):** `payment_status` is `null` before any payment attempt; `paid_at` is set only for a `success`. Responses are `Cache-Control: private, max-age=2`. Query parameters are ignored. When the order is `pending` and its payment has been `pending` for more than 2 minutes, the server asks the provider (at most once per 30 s per payment) and applies a verified answer through the **same** transition path as the webhook, recorded in `payment_notifications` with `source = 'query'`.
+
 ## Explicit Prohibition
 > It is STRICTLY FORBIDDEN to change the Order/Invitation status based on a browser redirect query parameter (`?status=success`). The redirect URL is only for UX (display purposes), not a source of truth for data.
