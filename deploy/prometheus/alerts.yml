@@ -6,6 +6,30 @@
 # nothing.
 
 groups:
+  - name: tls
+    rules:
+      # docs/DEVOPS/07: TLS certificate expiry alert. Fires when a certificate for any of
+      # the three fixed hostnames expires in less than 14 days. Caddy renews automatically,
+      # but a renewal failure (DNS problem, ACME rate-limit, expired account email) must
+      # be caught well before the certificate expires.
+      #
+      # Requires the Prometheus blackbox exporter scraping each hostname, configured with:
+      #   targets:
+      #     - https://app.vizunicum.my.id
+      #     - https://invitation.vizunicum.my.id
+      #     - https://admin.vizunicum.my.id
+      #
+      # P3-11: three fixed certificates, automatic ACME renewal (ADR-024).
+      - alert: CertificateExpiresInFourteenDays
+        expr: (probe_ssl_earliest_cert_expiry - time()) / 86400 < 14
+        for: 1h
+        labels:
+          severity: high
+          channel: ops
+        annotations:
+          summary: "TLS certificate for {{ $labels.instance }} expires in less than 14 days"
+          runbook: "Check Caddy ACME logs (`docker compose logs caddy | grep acme`); verify DNS resolves for {{ $labels.instance }}; check Let's Encrypt account email is reachable"
+
   - name: payments
     rules:
       # docs/DEVOPS/07: "Payment webhook signature invalid above a threshold within a short period —

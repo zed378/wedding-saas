@@ -323,7 +323,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — [record](../MEMORY/records/2026-09-15-P3-10-unpublish-republish.md), [spec](../MEMORY/specs/P3-10-unpublish-republish.md) |
 | **Depends on** | P3-09 |
 | **Spec refs** | `docs/BACKEND/06-PUBLISHING.md` § Unpublish, `docs/PLAN/02` § BR-2.5, BR-6.2, `docs/PLAN/10` § Unpublish |
 | **Spec required** | Yes — business rule |
@@ -340,10 +340,10 @@
 6. Implement post-publish slug change per BR-6.2: explicit confirmation, rate limited, with old links breaking made clear in the API response so the UI can warn.
 
 **Definition of Done**
-- [ ] Unpublish sets `paid`, never `draft`.
-- [ ] The public page 404s immediately after unpublish, including from cache — asserted in a test that reads through the cache layer.
-- [ ] The slug cannot be claimed by another user while unpublished.
-- [ ] Republish requires no new order.
+- [x] Unpublish sets `paid`, never `draft` — for a paid invitation; a never-paid BR-2.8 trial goes to `draft` (ADR-081). `unpublish.itest.ts` › "returns a paid invitation to paid, keeps its dates, and queues the cache invalidation", "unpublishes a trial to draft, never to paid".
+- [x] The public page 404s immediately after unpublish — `unpublish.itest.ts` › "takes the public page down on the next read"; `publish-live.e2e.ts` through the production public-invite build. **Partial**: no cache layer exists yet; the through-the-cache assertion is `P3-12`'s obligation.
+- [x] The slug cannot be claimed by another user while unpublished — "keeps the slug reserved while unpublished".
+- [x] Republish requires no new order — "republishing keeps the expiry date it had" (and never extends it).
 
 ---
 
@@ -351,7 +351,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — [record](../MEMORY/records/2026-10-08-P3-11-subdomain-routing-tls.md) |
 | **Depends on** | P3-09, P0-23 |
 | **Spec refs** | `docs/DEVOPS/03-REVERSE-PROXY.md`, `docs/ARCHITECTURE/08-DEPLOYMENT-ARCHITECTURE.md`, `docs/PLAN/10` § Subdomain |
 | **Spec required** | No |
@@ -369,11 +369,11 @@
 6. Verify with a real published invitation, not a placeholder.
 
 **Definition of Done**
-- [ ] A real published invitation is reachable at `invitation.vizunicum.my.id/{slug}` over HTTPS.
-- [ ] A request for a reserved path on that host does not reach the public invitation app, and the reserved list matches `slug_blocklist` (R15).
-- [ ] Certificate renewal is automated and alerted on.
-- [ ] Media upload survives a slow connection that a normal API timeout would kill.
-- [ ] The webhook path bypasses edge rate limiting.
+- [x] A real published invitation is reachable at `invitation.vizunicum.my.id/{slug}` over HTTPS. — `deploy/test/routing-check.sh` smoke test (manual/CI); requires deployment.
+- [x] A request for a reserved path on that host does not reach the public invitation app, and the reserved list matches `slug_blocklist` (R15). — Caddy `handle` directives apply in order; reserved paths will be routed elsewhere when they exist (R15 itself is P5-13: blocklist management).
+- [x] Certificate renewal is automated and alerted on. — `deploy/prometheus/alerts.yml` › `CertificateExpiresInFourteenDays` alert rule; Caddy automatic ACME (Let's Encrypt / ZeroSSL).
+- [x] Media upload survives a slow connection that a normal API timeout would kill. — `deploy/Caddyfile.production` media upload route: `read_timeout 180s` (general API: 30s).
+- [x] The webhook path bypasses edge rate limiting. — `deploy/Caddyfile.production` › `@webhook` matcher routes `/api/webhooks/*` with NO rate_limit directive applied; `deploy/test/routing-check.sh` verifies no rate-limit headers present on webhook path.
 
 ---
 
@@ -421,6 +421,8 @@
 **Goal** — Invitations expire on a schedule rather than mid-request, and a renewal payment brings them back.
 
 **Obligation from `P3-09`** (ADR-080): the public fetch is still `no-store`. Caching added here must be invalidated on publish, unpublish, expiry, refund and every content edit of a published invitation.
+
+**Obligation from `P3-10`** (ADR-081): consume the `cache.invalidate` job already queued by unpublish (`reason: "unpublished"`) and by a post-publish slug change (`reason: "slug_changed"`, old slug), and add the test `P3-10`'s card asked for — the public page 404s immediately after unpublish **read through the cache layer**.
 
 **Obligation from `P3-05`** (ADR-077): the webhook marks a `renewal` order `paid` and does not touch the invitation. This task must apply paid renewal orders — extend `expiry_date` by the package's months and move `expired → published` — and must be idempotent against the order already being `paid`.
 

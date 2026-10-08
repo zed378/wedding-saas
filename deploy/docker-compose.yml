@@ -229,8 +229,35 @@ services:
       postgres:
         condition: service_healthy
 
+  # Caddy reverse proxy — origin proxy for the three production hostnames.
+  # In local development this is NOT started by default because TLS termination
+  # is handled by Cloudflare (P0-23) and running ACME against localhost is pointless.
+  #
+  # To exercise Caddy routing locally (without TLS), run:
+  #   docker compose -f deploy/docker-compose.yml --profile proxy up -d
+  #
+  # Set TLS_EMAIL in .env before using with real hostnames.
+  caddy:
+    profiles: ["proxy"]
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"    # HTTP (ACME HTTP-01 challenge)
+      - "443:443"  # HTTPS
+    volumes:
+      - ./Caddyfile.production:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      TLS_EMAIL: ${TLS_EMAIL:-admin@vizunicum.my.id}
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   postgres-data:
   redis-data:
   minio-data:
   clamav-data:
+  caddy-data:
+  caddy-config:

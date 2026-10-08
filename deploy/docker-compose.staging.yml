@@ -420,8 +420,46 @@ services:
     depends_on:
       api: { condition: service_healthy }
 
+  # Caddy reverse proxy — origin proxy for the three production hostnames.
+  #
+  # Caddy terminates TLS with automatic ACME (Let's Encrypt or ZeroSSL).
+  # It sits BEHIND the Cloudflare Tunnel when `--profile tunnel` is used:
+  # cloudflared connects to the service names on the compose network, and those
+  # already include Caddy's HTTP/HTTPS ports.
+  #
+  # Note: the Cloudflare Tunnel terminates TLS at the edge, so Caddy's ACME
+  # cert is the origin cert (Cloudflare to origin). In a setup without the
+  # tunnel, Caddy's cert faces users directly.
+  #
+  # Requires the caddy-ratelimit module. Use the custom image or enable it via
+  # the official xcaddy build. The Dockerfile target `caddy-builder` in this
+  # repo produces it (deploy/caddy/Dockerfile if it exists).
+  #
+  # Set TLS_EMAIL in .env to the Let's Encrypt account email.
+  caddy:
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"    # HTTP + ACME HTTP-01 challenge
+      - "443:443"  # HTTPS
+    volumes:
+      - ./Caddyfile.production:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      TLS_EMAIL: ${TLS_EMAIL:?required}
+    depends_on:
+      api:
+        condition: service_healthy
+      web-app:
+        condition: service_started
+      public-invite:
+        condition: service_started
+
 volumes:
   clamav-data:
   postgres-data:
   redis-data:
   minio-data:
+  caddy-data:
+  caddy-config:

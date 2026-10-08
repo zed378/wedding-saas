@@ -8,7 +8,9 @@
 
 ## Chosen Implementation
 
-The origin reverse proxy is **Caddy** (MEMORY ADR-015), with Cloudflare in front for CDN, WAF and the wildcard certificate at the edge. Caddy was chosen over Nginx for automatic certificate management, and specifically for **on-demand TLS**, which turns the Phase 2 per-domain custom-domain certificate requirement (PLAN/10) into configuration rather than a project. The routing rules below are expressed Nginx-style because they read clearly as rules; the Caddyfile implements the same host matching.
+The origin reverse proxy is **Caddy** (MEMORY ADR-015), with Cloudflare in front for CDN, WAF and the wildcard certificate at the edge. Caddy was chosen over Nginx for automatic certificate management, and specifically for **on-demand TLS**, which turns the Phase 2 per-domain custom-domain certificate requirement (PLAN/10) into configuration rather than a project.
+
+**The implemented configuration is `deploy/Caddyfile.production`** (added in P3-11). That file is the authoritative source. The Nginx-style rules below are retained for readability; they describe the same routing logic in a format easier to read as rules.
 
 ## Example Routing Configuration (Nginx-style, indicative)
 At MVP there is **no wildcard host** — invitations are addressed by path on a fixed hostname (PLAN/10, MEMORY ADR-024). Three hostnames, each with its own certificate, all issued and renewed automatically by Caddy:

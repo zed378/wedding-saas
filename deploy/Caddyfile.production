@@ -1,0 +1,214 @@
+# Production Caddy configuration — P3-11
+#
+# Three fixed hostnames, automatic ACME certificates (Let's Encrypt / ZeroSSL).
+# No wildcard DNS (ADR-024). Each hostname has its own certificate.
+#
+# Rate limiting requires the caddy-ratelimit module:
+#   https://github.com/mholt/caddy-ratelimit
+#
+# The rate_limit directive below uses that module's syntax.
+#
+# Environment variables expected at runtime:
+#   TLS_EMAIL        — Let's Encrypt account email address
+#   ACME_CA          — optional; defaults to Let's Encrypt. Set to
+#                      https://acme.zerossl.com/v2/DV90 for ZeroSSL.
+#
+# Services on the compose network:
+#   api              :3000   — NestJS REST API
+#   web-app          :3100   — authenticated Next.js app
+#   public-invite    :3200   — public invitation Next.js SSR app
+#
+# Timeouts:
+#   General API:     30 s
+#   Media upload:    180 s  (slow phone connection, 10 MB photo)
+
+# ---------------------------------------------------------------------------
+# Shared snippets — imported by each host block with `import`
+# ---------------------------------------------------------------------------
+
+# Common security headers applied on all three hosts.
+# Referrer-Policy and HSTS are on every response.
+# X-Frame-Options is NOT here — it is set per-host because invitation.vizunicum.my.id
+# allows framing (embed use), while the other two set DENY.
+(security_headers_common) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options   "nosniff"
+		Referrer-Policy          "strict-origin-when-cross-origin"
+		# Remove any server-identification the upstream may emit
+		-Server
+	}
+}
+
+# Security headers for authenticated and admin surfaces: no framing allowed.
+(security_headers_app) {
+	import security_headers_common
+	header {
+		X-Frame-Options "DENY"
+	}
+}
+
+# Security headers for the public invitation surface: framing IS allowed
+# so third-party embed widgets can display the invitation in an iframe.
+# We deliberately omit X-Frame-Options (absence = allow); do NOT add it here.
+(security_headers_invitation) {
+	import security_headers_common
+}
+
+# ---------------------------------------------------------------------------
+# app.vizunicum.my.id — authenticated application + API
+# ---------------------------------------------------------------------------
+app.vizunicum.my.id {
+	tls {env.TLS_EMAIL}
+
+	import security_headers_app
+
+	# Webhook path — NOT rate-limited.
+	# A payment provider retry storm is legitimate traffic (docs/DEVOPS/03 § Webhook).
+	# This matcher must appear BEFORE the general /api/* matcher.
+	@webhook {
+		path /api/webhooks/*
+	}
+	handle @webhook {
+		reverse_proxy http://api:3000 {
+			transport http {
+				read_timeout  30s
+				write_timeout 30s
+			}
+		}
+	}
+
+	# Media upload route — body cap + extended timeout.
+	# Cap is 11 MB: just above the 10 MB app limit from P1-17 so the proxy rejects
+	# oversized uploads before the bytes reach NestJS (docs/SECURITY/06 layer 4).
+	@media_upload {
+		path /api/media/*
+	}
+	handle @media_upload {
+		request_body {
+			max_size 11MB
+		}
+		rate_limit {
+			zone api_authenticated {
+				key    {remote_host}
+				events 50
+				window 1s
+			}
+		}
+		reverse_proxy http://api:3000 {
+			transport http {
+				read_timeout  180s
+				write_timeout 180s
+			}
+		}
+	}
+
+	# All other API routes — rate limited, general timeout.
+	@api_other {
+		path /api/*
+	}
+	handle @api_other {
+		rate_limit {
+			zone api_authenticated {
+				key    {remote_host}
+				events 50
+				window 1s
+			}
+		}
+		reverse_proxy http://api:3000 {
+			transport http {
+				read_timeout  30s
+				write_timeout 30s
+			}
+		}
+	}
+
+	# Everything else → authenticated Next.js app
+	handle {
+		reverse_proxy http://web-app:3100
+	}
+}
+
+# ---------------------------------------------------------------------------
+# invitation.vizunicum.my.id — public invitation renderer
+# ---------------------------------------------------------------------------
+invitation.vizunicum.my.id {
+	tls {env.TLS_EMAIL}
+
+	import security_headers_invitation
+
+	# Public API paths (guest RSVP and guestbook submissions) — rate limited.
+	@public_api {
+		path /public/*
+	}
+	handle @public_api {
+		rate_limit {
+			zone invitation_public_api {
+				key    {remote_host}
+				events 20
+				window 1s
+			}
+		}
+		reverse_proxy http://api:3000 {
+			transport http {
+				read_timeout  30s
+				write_timeout 30s
+			}
+		}
+	}
+
+	# Preview routes → public-invite app (no rate limit — preview tokens are short-lived)
+	@preview {
+		path /preview/*
+	}
+	handle @preview {
+		reverse_proxy http://public-invite:3200
+	}
+
+	# /{slug} and everything else → public invitation SSR app — rate limited.
+	handle {
+		rate_limit {
+			zone invitation_public_page {
+				key    {remote_host}
+				events 50
+				window 1s
+			}
+		}
+		reverse_proxy http://public-invite:3200 {
+			transport http {
+				read_timeout  30s
+				write_timeout 30s
+			}
+		}
+	}
+}
+
+# ---------------------------------------------------------------------------
+# admin.vizunicum.my.id — admin panel stub (P5-01)
+# ---------------------------------------------------------------------------
+admin.vizunicum.my.id {
+	tls {env.TLS_EMAIL}
+
+	import security_headers_app
+
+	# Rate limit the (future) admin API surface.
+	@admin_api {
+		path /api/*
+	}
+	handle @admin_api {
+		rate_limit {
+			zone admin_api {
+				key    {remote_host}
+				events 30
+				window 1s
+			}
+		}
+		# When P5-01 lands, replace this respond with a reverse_proxy to the admin app.
+		respond "Admin panel not yet available (P5-01)" 503
+	}
+
+	# Admin panel UI — stub 503 until P5-01
+	handle {
+		respond "Admin panel not yet available (P5-01)" 503
+	}
+}
