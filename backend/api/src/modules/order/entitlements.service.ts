@@ -24,6 +24,8 @@ export interface Entitlements {
   readonly durationMonths: number | null;
   /** Whether a custom domain may be attached (`P7-01`). */
   readonly customDomain: boolean;
+  /** When the purchase these come from was made; `null` when unpaid. `P3-10`. */
+  readonly purchasedAt: Date | null;
 }
 
 /**
@@ -60,6 +62,7 @@ export class EntitlementsService {
       return {
         ...fromPackage(purchase.package),
         customDomain: purchase.addonIds.includes(CUSTOM_DOMAIN_ADDON),
+        purchasedAt: purchase.purchasedAt,
       };
     }
     return this.unpaid();
@@ -67,7 +70,7 @@ export class EntitlementsService {
 
   /** What a purchase of this package would grant — for checkout copy and `P3-09`. */
   forPackage(pkg: PackageRow): Entitlements {
-    return { ...fromPackage(pkg), customDomain: false };
+    return { ...fromPackage(pkg), customDomain: false, purchasedAt: null };
   }
 
   async unpaid(): Promise<Entitlements> {
@@ -88,11 +91,14 @@ export class EntitlementsService {
       watermark: true,
       durationMonths: null,
       customDomain: false,
+      purchasedAt: null,
     };
   }
 }
 
-function fromPackage(pkg: PackageRow): Omit<Entitlements, "customDomain"> {
+function fromPackage(
+  pkg: PackageRow,
+): Omit<Entitlements, "customDomain" | "purchasedAt"> {
   return {
     packageId: pkg.id,
     maxPhotos: pkg.maxPhotos,

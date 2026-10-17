@@ -6,6 +6,7 @@ import {
   assertThemeKeysValid,
   parseSections,
 } from "../../src/modules/invitation/settings.service";
+import type { JobQueue } from "../../src/infra/queue/queue.module";
 import { SlugService } from "../../src/modules/invitation/slug.service";
 import { InvitationRepository } from "../../src/shared/tenancy/invitation-repository";
 import { invitations } from "../../src/infra/db/schema/invitations";
@@ -72,6 +73,13 @@ describe("settings and slug rules", () => {
   let harness: Harness;
   let service: SettingsService;
   let repository: InvitationRepository;
+  let enqueued: { name: string; data: Record<string, unknown> }[] = [];
+  const queue: JobQueue = {
+    enqueue: async (_pool, name, data) => {
+      enqueued.push({ name, data });
+    },
+    close: async () => {},
+  };
 
   beforeAll(async () => {
     harness = await startHarness();
@@ -79,6 +87,7 @@ describe("settings and slug rules", () => {
     service = new SettingsService(
       repository,
       new SlugService(harness.db, repository),
+      queue,
     );
   }, 120_000);
 
@@ -89,6 +98,7 @@ describe("settings and slug rules", () => {
   beforeEach(async () => {
     await resetTenantData(harness.pool);
     await harness.pool.query("DELETE FROM slug_blocklist");
+    enqueued = [];
   });
 
   /** An invitation on a template with a known section set and theme boundary. */
@@ -446,6 +456,8 @@ describe("settings and slug rules", () => {
         slug: "budi-dan-ani",
       });
       expect(result.slug).toBe("budi-dan-ani");
+      expect(result.slug_change).toBeUndefined();
+      expect(enqueued).toEqual([]);
     });
 
     it("requires confirmation after publishing", async () => {
@@ -470,11 +482,27 @@ describe("settings and slug rules", () => {
         publishedAt: new Date(),
       });
 
+      await harness.db
+        .update(invitations)
+        .set({ slug: "old-address" })
+        .where(eq(invitations.id, invitationId));
+
       const result = await service.update(user.scope, invitationId, {
         slug: "new-address",
         confirmSlugChange: true,
       });
       expect(result.slug).toBe("new-address");
+      // `P3-10`: the response says the old links broke, and the old address leaves the cache.
+      expect(result.slug_change).toEqual({
+        previous_slug: "old-address",
+        links_broken: true,
+      });
+      expect(enqueued).toEqual([
+        {
+          name: "cache.invalidate",
+          data: { slug: "old-address", invitationId, reason: "slug_changed" },
+        },
+      ]);
     });
 
     it("an UNPUBLISHED invitation that was once published still needs confirmation", async () => {

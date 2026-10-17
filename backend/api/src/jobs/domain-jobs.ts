@@ -3,6 +3,8 @@ import type { INestApplicationContext } from "@nestjs/common";
 import { InvoiceService } from "../modules/order/invoice/invoice.service";
 import { OrderService } from "../modules/order/order.service";
 import { PaymentReconciliationService } from "../modules/payment/payment-reconciliation.service";
+import { InvitationExpiryService } from "../modules/publishing/invitation-expiry.service";
+import { InvitationRetentionService } from "../modules/invitation/invitation-retention.service";
 
 /**
  * `P3-06`, ADR-078 — scheduled jobs whose work is domain logic the API owns.
@@ -33,4 +35,10 @@ export const DOMAIN_JOBS: Readonly<Record<string, DomainJob>> = {
   order_expire_check: (app) => app.get(OrderService).expireOverdueOrders(),
   // docs/BACKEND/08: `payment_reconciliation`, daily 03:00 WIB.
   payment_reconciliation: (app) => app.get(PaymentReconciliationService).run(),
+  // docs/BACKEND/08: `invitation_expiry_check`, daily 00:05 WIB (P3-13).
+  invitation_expiry_check: (app) =>
+    app.get(InvitationExpiryService).expireOverdueInvitations(),
+  // docs/BACKEND/08: `invitation_soft_delete_cleanup`, daily 01:00 WIB (P3-13, BR-9.1).
+  invitation_soft_delete_cleanup: (app) =>
+    app.get(InvitationRetentionService).sweep(),
 };

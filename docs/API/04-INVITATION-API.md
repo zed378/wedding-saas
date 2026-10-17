@@ -123,9 +123,12 @@ No body. Order: verified email (403 `EMAIL_NOT_VERIFIED`) → ownership (404) �
 
 | Status | Result |
 |---|---|
-| `paid` | published; `expiry_date` = today (WIB) + the paid package's months |
+| `paid`, never published, or a paid order newer than the last publish | published; `expiry_date` = today (WIB) + the paid package's months |
+| `paid`, republished (unpublished earlier, no newer paid order) | published; `expiry_date` **kept** (P3-10, ADR-081); 422 `RENEWAL_REQUIRED` if it has passed |
 | `draft`, never paid and never published | published as the **BR-2.8 trial**; `expiry_date` = today (WIB) + 3 days |
-| `draft` or `expired`, never paid, published before | 422 `TRIAL_ALREADY_USED` (the message names paying as the way on) |
+| `draft`, never paid, published before, original `expiry_date` not yet passed | published — the same trial resumed, `expiry_date` kept (P3-10, ADR-081) |
+| `draft` or `expired`, never paid, published before (window passed) | 422 `TRIAL_ALREADY_USED` (the message names paying as the way on) |
+| `draft`, paid before (refunded) | 422 `PAYMENT_REQUIRED` |
 | `expired`, paid before | 422 `RENEWAL_REQUIRED` |
 | `published` | 422 `INVITATION_ALREADY_PUBLISHED` |
 | `pending_payment` | 422 `PAYMENT_PENDING` |
@@ -133,6 +136,18 @@ No body. Order: verified email (403 `EMAIL_NOT_VERIFIED`) → ownership (404) �
 ```json
 { "success": true, "data": { "status": "published", "slug": "andi-sarah", "url": "https://invitation.vizunicum.my.id/andi-sarah", "published_at": "…", "expiry_date": "2027-05-18", "trial": true } }
 ```
+
+### What `POST /unpublish` does (P3-10, ADR-081)
+
+No body (any field is 400). Ownership (404) → under the invitation's lock, status must be `published` (422 `INVITATION_NOT_PUBLISHED`) → returns to `paid` if the history ever reached `paid`, otherwise to `draft` (a BR-2.8 trial is never handed `paid`). `published_at` and `expiry_date` are unchanged; the slug stays reserved. The public page 404s on the next request and a `cache.invalidate` job is queued.
+
+```json
+{ "success": true, "data": { "status": "paid", "slug": "andi-sarah" } }
+```
+
+### Slug change after publish (BR-6.2, P3-10)
+
+`PATCH /settings` with a new `slug` on an invitation that was ever published needs `confirm_slug_change: true` (422 `SLUG_CHANGE_NEEDS_CONFIRMATION` otherwise) and is rate limited (`slug-change`). Its response carries, in addition to the settings, `"slug_change": { "previous_slug": "andi-sarah", "links_broken": true }`.
 
 Required fields are resolved against the **canonical** document (`events.*.date`, `gift.accounts.*`, `gallery.photos`, PLAN/08) — both here and in `publish-check` and `change-template`. Until P3-09 the checks used this API's detail shape (`event_date`, `bank_accounts`) and reported those paths missing for every invitation.
 

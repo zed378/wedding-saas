@@ -1,0 +1,10 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    "caddy-ratelimit missing from image — both docker-compose.yml and docker-compose.staging.yml reference caddy:2.9-alpine, which does not include the caddy-ratelimit module. Caddy will fail to start with 'unknown directive: rate_limit', making all three hosts unreachable. Add deploy/caddy/Dockerfile using xcaddy with github.com/mholt/caddy-ratelimit and update both compose files to reference it.",
+    "Blackbox exporter not deployed — cert alert permanently silent — CertificateExpiresInFourteenDays uses probe_ssl_earliest_cert_expiry but no blackbox exporter service or scrape configuration exists in deploy/prometheus/. Add the exporter service to both compose files and add prometheus/blackbox.yml with the three hostname targets.",
+    "ACME HTTP-01 challenge port not exposed in docker-compose.yml — the development compose Caddy service only publishes 443:443; ACME HTTP-01 needs port 80. The staging compose is correct. Fix the dev compose to expose 80:80 as well, or document that ACME cannot be exercised through this profile.",
+    "routing-check.sh body-cap test is inconclusive — a 12 MB POST to /api/media/upload returns 401/403 before Caddy evaluates the body cap, so the DoD item confirming proxy-level enforcement has no passing test. Add a probe that can reach Caddy's size check (unauthenticated route or authenticated test token) to confirm the 413 comes from Caddy, not the app."
+  ],
+  "reviewDoc": "c:\\Users\\Zed\\Documents\\Project\\wedding-invitation\\.agents\\tasks\\review-p311.md"
+}

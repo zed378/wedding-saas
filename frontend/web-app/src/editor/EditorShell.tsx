@@ -8,6 +8,7 @@ import { PublishCta } from "./PublishCta";
 import { ChangeTemplate } from "./ChangeTemplate";
 import { SharePreview } from "./SharePreview";
 import { PanelBoundary } from "../components/PanelBoundary";
+import { UnpublishAction } from "./UnpublishAction";
 
 /**
  * P1-22 step 1 — the editor layout. `docs/UI-UX/09` § Editor Layout, `docs/UI-UX/12`.
@@ -38,6 +39,12 @@ export interface EditorShellProps {
   readonly dashboardHref: string;
   /** `P2-14`. Reload the editor after the template changed underneath it. */
   readonly onTemplateChanged?: () => void;
+  /**
+   * P3-15. The current status of the invitation, for showing the unpublish action.
+   * When `published`, the unpublish button is shown. On unpublish the caller reloads.
+   */
+  readonly invitationStatus?: string | undefined;
+  readonly onUnpublished?: (() => void) | undefined;
 }
 
 const TABS: readonly { readonly id: EditorTab; readonly label: string }[] = [
@@ -52,6 +59,8 @@ export function EditorShell({
   properties,
   dashboardHref,
   onTemplateChanged,
+  invitationStatus,
+  onUnpublished,
 }: EditorShellProps) {
   const [tab, setTab] = useState<EditorTab>("properties");
 
@@ -84,6 +93,10 @@ export function EditorShell({
           />
           {/* `P2-12`. Beside publish, because a preview is what a couple sends before it. */}
           <SharePreview />
+          {/* P3-15. Unpublish action for published invitations. */}
+          {invitationStatus === "published" && onUnpublished !== undefined && (
+            <UnpublishAction onUnpublished={onUnpublished} />
+          )}
           <PublishCta />
         </div>
       </header>

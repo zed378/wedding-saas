@@ -273,6 +273,199 @@ export function localSlugProblem(slug: string): string | undefined {
   return undefined;
 }
 
+// ─── P3-14: Order, payment initiation, payment status ───────────────────────
+
+/**
+ * P3-14. Input for `POST /invitations/:id/orders`. `docs/API/07` § Order creation.
+ *
+ * `amount_total` is NEVER in the request — the server calculates it from `package_id`.
+ * Sending it would open a price-manipulation path (`docs/SECURITY/07` § Pricing).
+ */
+export interface CreateOrderInput {
+  readonly packageId: string;
+  readonly addonIds: readonly string[];
+}
+
+/** The created order row returned by `POST /invitations/:id/orders`. */
+export interface CreatedOrder {
+  readonly id: string;
+  readonly invitation_id: string;
+  readonly package_id: string;
+  readonly addons: readonly string[];
+  readonly amount_total: number;
+  readonly order_type: string;
+  readonly status: string;
+  readonly expired_at: string;
+}
+
+export async function createOrder(
+  api: ApiClient,
+  invitationId: string,
+  input: CreateOrderInput,
+): Promise<CreatedOrder> {
+  const result = await api.request<CreatedOrder>(
+    `/invitations/${encodeURIComponent(invitationId)}/orders`,
+    {
+      method: "POST",
+      body: {
+        package_id: input.packageId,
+        addon_ids: input.addonIds,
+      },
+    },
+  );
+  return result.data;
+}
+
+/** `GET /orders/:id` — order detail for the payment page summary. */
+export interface OrderDetail {
+  readonly id: string;
+  readonly invitation_id: string;
+  readonly package_id: string;
+  readonly amount_total: number;
+  readonly status: string;
+  readonly expired_at: string;
+  readonly created_at: string;
+}
+
+export async function getOrder(
+  api: ApiClient,
+  orderId: string,
+): Promise<OrderDetail> {
+  const result = await api.request<OrderDetail>(
+    `/orders/${encodeURIComponent(orderId)}`,
+  );
+  return result.data;
+}
+
+/** The response from `POST /orders/:id/payment` — the provider redirect URL and token. */
+export interface PaymentInitiation {
+  readonly redirect_url: string;
+  readonly token: string;
+  readonly expires_at: string;
+}
+
+export async function initiatePayment(
+  api: ApiClient,
+  orderId: string,
+): Promise<PaymentInitiation> {
+  const result = await api.request<PaymentInitiation>(
+    `/orders/${encodeURIComponent(orderId)}/payment`,
+    { method: "POST" },
+  );
+  return result.data;
+}
+
+/**
+ * `GET /orders/:id/payment/status` — the ONLY source of truth for payment status.
+ *
+ * `docs/SECURITY/07` Golden Rule: payment status MUST NOT come from URL parameters.
+ * A redirect URL with `?status=success` is purely for display purposes (e.g., to show
+ * "Memeriksa pembayaran..." immediately) and NEVER used to determine actual status.
+ */
+export interface PaymentStatus {
+  readonly order_status: string;
+  readonly payment_status: string | null;
+  readonly paid_at: string | null;
+}
+
+export async function getPaymentStatus(
+  api: ApiClient,
+  orderId: string,
+  signal?: AbortSignal,
+): Promise<PaymentStatus> {
+  const result = await api.request<PaymentStatus>(
+    `/orders/${encodeURIComponent(orderId)}/payment/status`,
+    { ...(signal !== undefined ? { signal } : {}) },
+  );
+  return result.data;
+}
+
+// ─── P3-15: Publish, unpublish, slug change ──────────────────────────────────
+
+/**
+ * P3-15. `GET /invitations/:id/publish-check` — completeness check before the confirmation.
+ *
+ * The client runs the same check locally (`PublishCta.tsx`), but the server is authoritative.
+ * This call exists so the modal can show the server's view of what is missing, not the
+ * client's, which rules out a discrepancy caused by stale editor state.
+ */
+export interface PublishCheckResult {
+  readonly ready: boolean;
+  readonly missing_fields?: readonly {
+    readonly section_key: string;
+    readonly path: string;
+    readonly label: string;
+  }[];
+}
+
+export async function checkPublish(
+  api: ApiClient,
+  invitationId: string,
+): Promise<PublishCheckResult> {
+  const result = await api.request<PublishCheckResult>(
+    `/invitations/${encodeURIComponent(invitationId)}/publish-check`,
+  );
+  return result.data;
+}
+
+/** What `POST /invitations/:id/publish` returns on success. */
+export interface PublishedInvitation {
+  readonly status: string;
+  readonly slug: string;
+  readonly published_at: string;
+  readonly expiry_date: string;
+  readonly public_url: string;
+}
+
+export async function publishInvitation(
+  api: ApiClient,
+  invitationId: string,
+): Promise<PublishedInvitation> {
+  const result = await api.request<PublishedInvitation>(
+    `/invitations/${encodeURIComponent(invitationId)}/publish`,
+    { method: "POST" },
+  );
+  return result.data;
+}
+
+export async function unpublishInvitation(
+  api: ApiClient,
+  invitationId: string,
+): Promise<{ status: string }> {
+  const result = await api.request<{ status: string }>(
+    `/invitations/${encodeURIComponent(invitationId)}/unpublish`,
+    { method: "POST" },
+  );
+  return result.data;
+}
+
+/**
+ * Update the invitation's slug via `PATCH /invitations/:id/settings`.
+ *
+ * Used both in slug-conflict recovery (P3-15 step 9) and slug-change-after-publish
+ * (P3-15 step 13). A slug change on a published invitation returns `slug_change` in the
+ * response (ADR-081); the caller is responsible for surfacing the broken-link warning.
+ */
+export async function updateSlug(
+  api: ApiClient,
+  invitationId: string,
+  slug: string,
+): Promise<{ slug: string; slug_change?: { previous_slug: string; links_broken: boolean } }> {
+  const result = await api.request<{
+    slug: string;
+    slug_change?: { previous_slug: string; links_broken: boolean };
+  }>(
+    `/invitations/${encodeURIComponent(invitationId)}/settings`,
+    {
+      method: "PATCH",
+      body: { slug },
+    },
+  );
+  return result.data;
+}
+
+// ─── Slug helpers ─────────────────────────────────────────────────────────────
+
 /**
  * A first suggestion from the couple's own words.
  *

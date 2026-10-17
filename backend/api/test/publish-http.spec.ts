@@ -9,6 +9,7 @@ import { UnauthenticatedError } from "../src/http/errors";
 import { SessionService } from "../src/modules/auth/session.service";
 import { PublishController } from "../src/modules/publishing/publish.controller";
 import { PublishService } from "../src/modules/publishing/publish.service";
+import { UnpublishService } from "../src/modules/publishing/unpublish.service";
 import { PolicyRegistry } from "../src/shared/rate-limit/config";
 import {
   POLICY_REGISTRY,
@@ -20,6 +21,7 @@ import {
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const INVITATION_ID = "33333333-3333-4333-8333-333333333333";
 const calls: { invitationId: string; emailVerified: boolean }[] = [];
+const unpublishCalls: { invitationId: string; scope: string }[] = [];
 
 describe("POST /api/v1/invitations/:id/publish over HTTP", () => {
   let app: INestApplication;
@@ -45,6 +47,15 @@ describe("POST /api/v1/invitations/:id/publish over HTTP", () => {
                 expiry_date: "2027-05-18",
                 trial: true,
               };
+            },
+          },
+        },
+        {
+          provide: UnpublishService,
+          useValue: {
+            unpublish: async (scope: string, invitationId: string) => {
+              unpublishCalls.push({ invitationId, scope });
+              return { status: "paid", slug: "budi-dan-siti" };
             },
           },
         },
@@ -92,6 +103,7 @@ describe("POST /api/v1/invitations/:id/publish over HTTP", () => {
 
   beforeEach(() => {
     calls.length = 0;
+    unpublishCalls.length = 0;
   });
 
   const post = () =>
@@ -133,5 +145,40 @@ describe("POST /api/v1/invitations/:id/publish over HTTP", () => {
       `/api/v1/invitations/${INVITATION_ID}/publish`,
     );
     expect(res.status).toBe(401);
+  });
+
+  describe("POST /api/v1/invitations/:id/unpublish (P3-10)", () => {
+    const unpublish = () =>
+      request(app.getHttpServer())
+        .post(`/api/v1/invitations/${INVITATION_ID}/unpublish`)
+        .set("Authorization", "Bearer good");
+
+    it("unpublishes: 200 with the status it returned to and the slug", async () => {
+      const res = await unpublish();
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual({ status: "paid", slug: "budi-dan-siti" });
+      expect(unpublishCalls).toHaveLength(1);
+      expect(unpublishCalls[0]!.invitationId).toBe(INVITATION_ID);
+    });
+
+    it.each([
+      ["a target status", { status: "draft" }],
+      ["a slug", { slug: "other" }],
+    ])(
+      "refuses %s in the body without calling the service",
+      async (_label, body) => {
+        const res = await unpublish().send(body);
+        expect(res.status).toBe(400);
+        expect(unpublishCalls).toEqual([]);
+      },
+    );
+
+    it("requires authentication", async () => {
+      const res = await request(app.getHttpServer()).post(
+        `/api/v1/invitations/${INVITATION_ID}/unpublish`,
+      );
+      expect(res.status).toBe(401);
+      expect(unpublishCalls).toEqual([]);
+    });
   });
 });

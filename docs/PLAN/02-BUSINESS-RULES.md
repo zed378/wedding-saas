@@ -15,7 +15,7 @@
   - **Guests see no difference between a lapsed trial and a lapsed paid invitation**, and that is API/08's existing instruction, not an omission: it forbids distinguishing "never published" from "unpublished" from "expired" in the public response.
   - The difference is **owner-facing only** — the dashboard shows an upgrade prompt rather than a renewal prompt. It is derived from whether the invitation ever reached `paid`, which `invitation_status_history` records and which `InvitationRepository.findUnpaidInvitation` already reads for BR-1.4.
   - **No new status and no new column.** A `needs_upgrade` flag beside `status = 'published'` would give the renderer two fields to consult before deciding a page is visible, and forgetting the second leaves an invitation live after its trial ended.
-- BR-2.5 A `published` invitation can be `unpublished` (returns to private, data is not lost, remains `paid`).
+- BR-2.5 A `published` invitation can be `unpublished` (returns to private, data is not lost, remains `paid`). A BR-2.8 trial returns to `draft`, since it was never paid; republishing never extends `expiry_date` (P3-10, ADR-081).
 - BR-2.6 A `published` invitation that passes its `expiry_date` automatically becomes `expired` (not publicly accessible, shows an "invitation has ended" page).
 - BR-2.7 Status transitions MUST NOT move backward automatically except by an admin (e.g., refund).
 - See the full diagram in 06-INVITATION-LIFECYCLE.md.

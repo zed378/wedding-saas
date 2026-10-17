@@ -2559,3 +2559,172 @@ publishing impossible:
 6. **No cache warming here**: the public fetch is `no-store`, so the page is live as soon as the transaction
    commits (E2E-measured). `P3-12` adds caching and must invalidate on publish.
 7. The owner's confirmation is queued as `notification.send` `invitation_published` for `P4-06`.
+
+### ADR-081 — Unpublish: a trial returns to `draft`, and no republish adds validity
+
+**Date** 2026-09-15 · **Task** `P3-10` · **Status** Accepted (extends ADR-052 — for the project owner's review) · **Amends** `docs/API/04`, `docs/PLAN/02` BR-2.5, `docs/PLAN/06`, `docs/BACKEND/06`
+
+**Context** — BR-2.5 and `docs/BACKEND/06` say unpublish returns an invitation to `paid`. They were written
+before BR-2.8's trial existed, and three gaps follow:
+
+1. A trial was never paid. Returning it to `paid` would hand out the product: the next publish would take
+   the paid path with a full package's validity.
+2. BR-2.8 allows one trial. It does not say what unpublishing inside the three days and publishing again is.
+3. `P3-09` set `expiry_date = today + package months` on every paid publish, so unpublish-then-republish
+   renewed a paid invitation for free, indefinitely. A defect in `P3-09`, found while specifying this task.
+
+**Decisions**
+
+1. **`published → draft` (USER)** is a new edge, used by `UnpublishService` only when
+   `invitation_status_history` never reached `paid`. A paid invitation still returns to `paid`.
+2. **A trial unpublished inside its window resumes.** Republishing a never-paid `draft` that was published
+   before is allowed while its stored `expiry_date` has not passed (WIB), and keeps that date; after it,
+   `TRIAL_ALREADY_USED`. "Once" is read as one three-day window, not one click — an owner who hides a page to
+   fix a typo has not used a second trial, and cannot gain a day by doing so.
+3. **A republish keeps `expiry_date`.** A `paid` invitation with a `published_at` republishes with its
+   existing dates unless a paid order newer than `published_at` exists (a fresh purchase, e.g. after a
+   refund), which grants the package's months from today. A kept date that has passed → `RENEWAL_REQUIRED`.
+   `EntitlementsService` now exposes `purchasedAt` (the latest paid order's `created_at`) for this.
+4. **A refunded invitation (`draft`, history reached `paid`)** answers `PAYMENT_REQUIRED` rather than
+   `TRIAL_ALREADY_USED` — the way back is paying, and the old message would have been wrong.
+5. **Slug change after publish** returns `slug_change: { previous_slug, links_broken: true }` so the client can
+   warn; confirmation (`P1-14`) and the `slug-change` rate limit are unchanged.
+6. **Cache invalidation** is queued as `cache.invalidate` `{ slug, invitationId, reason }` on unpublish and on
+   a post-publish slug change. Nothing consumes it yet: the public read is `no-store`, so the page 404s on the
+   next request (E2E-proven through the production public-invite build). `P3-12` must consume the job and add
+   the "404 through the cache layer" test the `P3-10` card asks for.
+
+**Alternatives rejected** — Trial unpublish to `paid` with a flag: a second field to consult on every publish.
+Refusing every trial republish: punishes a harmless unpublish and is not what "once" protects. Extending
+`expiry_date` by the time spent unpublished: rewards unpublishing and needs a new column.
+
+**Consequences** — `published → draft` by USER exists in the machine; only `UnpublishService` requests it,
+guarded by history. The `P3-09` test "refuses a trial for a draft that was ever published before" now backdates
+the expiry, because inside the window that is a resume.
+
+---
+
+### ADR-082 — Public page caching: versioned keys, pointer-based slug index, and singleflight stampede protection
+
+**Date** 2026-10-17 · **Task** `P3-12` · **Status** Accepted · **Amends** `docs/ARCHITECTURE/06`, `docs/API/08`
+
+**Context** — Public invitations experience spiky traffic (family & guests opening links within minutes). Serving directly from origin PostgreSQL is susceptible to cache stampedes (R3) when cold or after cache expiry. A naive slug-only cache key would serve stale HTML if the invitation switches template versions. Additionally, unpublishing must take the page down immediately (`P3-10` obligation), and Redis failures must never bring down public invitation pages.
+
+**Decisions**
+
+1. **Two-level cache keying with slug pointer**:
+   - `slug:{slug}` stores `{ invitationId, templateVersionId }`.
+   - `{invitationId}:{templateVersionId}` stores the serialized public invitation DTO.
+   - Keying payload on `invitation_id + template_version_id` guarantees that changing template version never serves stale HTML or mismatched sections.
+2. **In-process singleflight stampede protection**:
+   - Cold cache misses on the same slug collapse into a single running promise via `Singleflight`.
+   - Exactly one origin database query and entitlement check is executed; all 100 concurrent callers share the resulting DTO. Verified by integration test.
+3. **Fail-open resilience**:
+   - Cache reads and writes are wrapped in safe fallbacks. If Redis is unreachable, timeouts, or errors, the API logs a warning and transparently falls back to origin DB queries. Guests never see 500 due to Redis outages.
+4. **Immediate and asynchronous invalidation**:
+   - Synchronous in-process invalidation in `UnpublishService` and `PublishService` ensures the public page immediately 404s after unpublish through the cache layer (`P3-10` obligation).
+   - Asynchronous `cache.invalidate` BullMQ jobs in the `general` pool clean up Redis wildcard keys across cache generations.
+5. **Observability**:
+   - Prometheus metrics `wi_public_invitation_cache_hits_total` and `wi_public_invitation_cache_misses_total` track cache performance.
+   - Alert `PublicInvitationCacheHitRatioLow` alerts if hit ratio drops below 50% under sustained traffic (> 1 req/s for 5m).
+6. **Immutable asset caching**:
+   - Caddy reverse proxy sets `Cache-Control: public, max-age=31536000, immutable` for `/_next/static/*` and static media assets, relying on UUID/hash versioning.
+
+---
+
+### ADR-083 — Scheduled invitation expiry, renewal validity extension (`GREATEST`), and two-tier retention cleanup
+
+**Date** 2026-10-17 · **Task** `P3-13` · **Status** Accepted · **Amends** `docs/PLAN/02` (BR-2.6, BR-9.1), `docs/BACKEND/06`, `docs/ARCHITECTURE/05`
+
+**Context** — An invitation's lifecycle after publish includes expiry, potential renewal, and data retention/purge:
+1. Per `docs/PLAN/06` and BR-2.6, status mutations must never happen on-the-fly during HTTP requests; an overdue invitation must only transition to `expired` through an autonomous scheduled sweep (`invitation_expiry_check` at 00:05 WIB).
+2. Per BR-2.6 and `docs/BACKEND/06` § Renewal, when a renewal order is paid, validity must be extended from whichever is later: the existing future `expiry_date` (for an early renewal) or `now() AT TIME ZONE 'Asia/Jakarta'` (for an expired invitation). Furthermore, if the invitation was `expired`, it must be restored to `published` atomically with an audit log record.
+3. Per BR-9.1, invitations expired for 90 days without renewal transition to `soft_deleted`. 30 days after soft deletion, hard deletion permanently purges personal data and removes all associated storage objects (`thumbnail`, `medium`, `large` variants) from Cloudflare R2 / MinIO.
+4. Per `P1-19` obligation and `docs/PLAN/11` § Deletion, individually removed gallery photos soft-deleted for more than 7 days must also be physically purged from storage and database.
+
+**Decisions**
+
+1. **Daily Expiry Sweep (`invitation_expiry_check`)**:
+   - Runs daily at 00:05 WIB in the `api-jobs` process (ADR-078).
+   - Queries `published` invitations where `expiry_date < (now() AT TIME ZONE 'Asia/Jakarta')::date`.
+   - Transitions status via `InvitationStatusService.transitionWithin` with actor `SYSTEM` and reason `"expiry_date passed, daily job"`.
+   - Invalidates public invitation cache synchronously and emits `notification.send` (`invitation_expired`).
+2. **Renewal Entitlement Application (`GREATEST` logic)**:
+   - When a renewal order settles (`OrderService.settlePaid`), validity is computed in SQL:
+     `expiry_date = (GREATEST(expiry_date, (now() AT TIME ZONE 'Asia/Jakarta')::date) + (validity_months || ' months')::interval)::date`.
+   - If the current status is `expired`, `OrderService` transitions the invitation back to `published` with actor `SYSTEM`.
+3. **Foreign Key Integrity on Hard Delete (`orders.invitation_id` RESTRICT)**:
+   - Financial audit rules require order records to be kept permanently. If an invitation has associated orders, `hardDeleteInvitation` scrubs all child entities (`people`, `events`, `gallery`, `guestbook`, `rsvps`, `settings`, `media`) and purges storage objects, leaving a minimal tombstone row with status `deleted`. If no orders exist, the invitation row is deleted outright.
+4. **Two-Tier Media Retention Cleanup (`invitation_soft_delete_cleanup`)**:
+   - Runs daily at 01:00 WIB.
+   - Sweep 1: Identifies expired invitations past 90 days and moves them to `soft_deleted`.
+   - Sweep 2: Identifies soft-deleted invitations past 30 days, deletes their storage objects across all image variants, and executes hard deletion.
+   - Sweep 3 (`P1-19` obligation): Queries media rows with `status = 'ready' AND deleted_at < now() - interval '7 days'`, deletes storage objects for `thumbnail`, `medium`, and `large` variants, and removes the media records from the database.
+5. **Observability**:
+   - Added Prometheus counters: `wi_invitations_expired_total`, `wi_invitations_renewed_total`, `wi_invitations_soft_deleted_total`, `wi_invitations_hard_deleted_total`, and `wi_media_orphans_cleaned_total`.
+
+
+---
+
+### ADR-084 — Frontend checkout security: URL parameter disregard, server-authoritative status polling, and in-app browser escape
+
+**Date** 2026-10-17 · **Task** `P3-14` · **Status** Accepted · **Amends** `docs/UI-UX/13`, `docs/SECURITY/07`, `docs/FRONTEND/01`
+
+**Context** — Payment checkout in `web-app` (`/checkout/:invitationId` and `/checkout/:invitationId/payment/:orderId`) faces two primary challenges:
+1. Per the Golden Rule of Payment Security (`docs/SECURITY/07`), any status in a return URL query string (`?status=success`, `?transaction_status=settlement`, etc.) is untrusted and must never alter application state or grant access.
+2. In Indonesia, invitation links and checkout actions are frequently launched inside in-app WebViews (WhatsApp, Instagram, Facebook, Line, TikTok). These WebViews frequently block popups (e.g. Midtrans Snap modals) and deep links, trapping users in broken checkout funnels.
+3. At MVP, there is only one active package (ADR-023: Rp 139.000 / 12 months) and no active addons. A multi-column pricing table with one column is poor UX.
+
+**Decisions**
+
+1. **Complete disregard of return URL status**:
+   - The UI never inspects or branches on `status`, `transaction_status`, or similar query parameters.
+   - The only query parameter inspected is `?returning=true` (per `docs/FRONTEND/01`), which serves only as a trigger to initiate immediate server polling.
+2. **Server-authoritative status polling**:
+   - Payment status is determined solely by polling `GET /orders/:id/payment/status`.
+   - Polling runs at 3-second intervals for up to 60 seconds.
+   - Transitions to success only when the server returns `payment_status === 'success'`.
+3. **60-Second Timeout Fallback**:
+   - If polling reaches 60 seconds without a final settlement, the spinner is replaced by an informational banner: *"Pembayaran masih diproses. Kami akan mengirimkan konfirmasi ke email Anda segera setelah pembayaran berhasil diverifikasi."*
+   - Includes a manual *"Cek Status Lagi"* button, avoiding perpetual spinning without leaving the user in doubt (`docs/UI-UX/18`).
+4. **In-app browser detection and escape**:
+   - `lib/in-app-browser.ts` identifies WhatsApp, Instagram, Facebook, Line, and TikTok User-Agents.
+   - When detected, renders an alert banner alerting the user to open in Chrome or Safari for gateway compatibility, with an automated intent/scheme fallback.
+5. **Single package card presentation**:
+   - Clear display of the single MVP package (price, 12 months active period, full features list) alongside trust signals (QRIS, BCA, Mandiri, BNI, BRI, Visa/Mastercard badges) and server-calculated totals.
+
+**Consequences** — Zero risk of URL parameter tampering granting publication entitlements. WhatsApp/Instagram in-app users are protected from stuck payment popups. Polling ceases gracefully after 60 seconds with clear user communication.
+
+---
+
+### ADR-085 — Frontend publish and unpublish UX: inline slug conflict recovery, field navigation, and consequence-first unpublish modal
+
+**Date** 2026-10-17 · **Task** `P3-15` · **Status** Accepted · **Amends** `docs/PLAN/04` § F8, `docs/UI-UX/05`, `docs/UI-UX/12`
+
+**Context** — Publishing and unpublishing invitations in `web-app` involves several user-facing edge cases:
+1. When required fields are missing according to server-authoritative rules, users need a direct way to navigate to the specific incomplete field rather than an abstract error.
+2. If an invitation is complete but unpaid, the flow must seamlessly route to checkout without confusion.
+3. If a chosen slug conflicts with an existing published invitation (`409 SLUG_TAKEN`), forcing the user to exit the modal to settings loses publish intent and creates churn.
+4. Unpublishing deactivates public URLs; users must understand the exact consequences before confirming.
+
+**Decisions**
+
+1. **Navigable missing-fields modal**:
+   - The publish CTA checks completeness against the server (`GET /invitations/:id/publish-check`).
+   - If fields are missing, renders a modal listing human-readable Indonesian labels.
+   - Clicking an item sets `activeSectionKey` on `EditorStore`, scrolls the section into view, and focuses the matching input field (`[name="..."]`).
+2. **Inline slug conflict recovery**:
+   - When `publishInvitation` encounters a 409 `SLUG_TAKEN`, `PublishCta` captures the server's suggestion and switches to an inline retry state within the confirmation modal.
+   - Users can accept the suggestion with one click or edit the slug with immediate validation, then save via `PATCH /settings` and re-publish in place without abandoning the dialog.
+3. **Checkout redirection on payment required**:
+   - On `PAYMENT_REQUIRED` or `PAYMENT_PENDING`, the modal presents a dedicated activation prompt explaining the tier (Rp 139.000 for 12 months) with a direct link to `/checkout/:invitationId`.
+4. **Publish success and share screen**:
+   - Renders `PublishSuccessModal` showing the verified live public URL, a one-click copy button, and a pre-formatted WhatsApp share link (`https://wa.me/?text=...`).
+5. **Consequence-first unpublish confirmation**:
+   - `UnpublishAction` renders only when `invitationStatus === 'published'`.
+   - The confirmation modal plainly states: *"Tautan publik akan berhenti bekerja. Tamu yang sudah punya link tidak akan bisa mengaksesnya."*
+   - On confirmation, executes `POST /unpublish` (reverting to `paid` or `draft`) and invokes `onUnpublished()` to refresh editor state.
+
+**Consequences** — Zero dead-ends during the publish flow. Slug conflicts are resolved in-context. Unpublishing provides explicit consequence warnings to avoid accidental guest lockout.
+
+

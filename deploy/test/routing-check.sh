@@ -21,6 +21,18 @@
 #                      (default: uses the seeded demo slug from db:seed)
 #   CERT_WARN_DAYS     days-to-expiry threshold below which the check warns
 #                      (default: 14)
+#   MEDIA_AUTH_TOKEN   Bearer token for an authenticated user. When set, the
+#                      body-cap check sends a 12 MB POST with real credentials,
+#                      making the test conclusive: Caddy must enforce the cap
+#                      before NestJS authenticates the request (or simultaneously
+#                      while streaming the body to the backend, at which point
+#                      a 413 from Caddy precedes any 4xx from NestJS).
+#                      Without this variable the check is inconclusive — an auth
+#                      gate can return 401 before the body is fully read, meaning
+#                      the cap may never be evaluated. The check is still run and
+#                      a 413 is accepted as a PASS, but a 401/403 is a FAIL
+#                      rather than a warning, because proxy-level cap enforcement
+#                      cannot be confirmed from the outside without credentials.
 
 set -euo pipefail
 
@@ -29,6 +41,7 @@ INVITE_HOST="${INVITE_HOST:-invitation.vizunicum.my.id}"
 ADMIN_HOST="${ADMIN_HOST:-admin.vizunicum.my.id}"
 SLUG="${SLUG:-demo}"
 CERT_WARN_DAYS="${CERT_WARN_DAYS:-14}"
+MEDIA_AUTH_TOKEN="${MEDIA_AUTH_TOKEN:-}"
 
 PASS=0
 FAIL=0
@@ -186,27 +199,62 @@ section "Media upload body cap (11MB limit)"
 
 # Generate a file larger than 11MB (12MB) and try to POST it.
 # We expect a 413 (Request Entity Too Large) from Caddy.
+#
+# Why this needs MEDIA_AUTH_TOKEN to be conclusive:
+#
+# Caddy enforces `request_body { max_size 11MB }` by counting bytes as the body
+# is read during request handling. When the backend (NestJS) is an upstream
+# reverse_proxy target, Caddy streams the body to the backend — it does not buffer
+# the entire body before forwarding. If NestJS sends a 401 response before reading
+# the body (i.e. auth middleware rejects on headers alone), the connection is torn
+# down and Caddy never finishes counting bytes against the limit.
+#
+# With a valid Bearer token, NestJS passes auth and reads the body. Caddy then
+# counts the bytes in parallel; once the limit is exceeded it injects a 413 before
+# NestJS finishes processing. This is the only reliable way to confirm proxy-level
+# enforcement from the outside.
+#
+# Without MEDIA_AUTH_TOKEN: a 413 is a PASS (Caddy rejected unauthenticated
+# oversized requests); a 401/403 means auth fired first and the cap is UNVERIFIED.
+# A 401/403 is reported as a FAIL to surface the gap rather than silently passing.
+
 tmpfile=$(mktemp)
 dd if=/dev/urandom of="$tmpfile" bs=1M count=12 2>/dev/null
 
-status=$(curl -s -o /dev/null -w '%{http_code}' \
-  --max-time 30 \
-  -X POST \
-  -H "Content-Type: application/octet-stream" \
-  --data-binary "@$tmpfile" \
-  "https://${APP_HOST}/api/media/upload" 2>/dev/null || echo "000")
+if [[ -n "${MEDIA_AUTH_TOKEN:-}" ]]; then
+  # Authenticated probe — conclusive.
+  status=$(curl -s -o /dev/null -w '%{http_code}' \
+    --max-time 30 \
+    -X POST \
+    -H "Content-Type: application/octet-stream" \
+    -H "Authorization: Bearer ${MEDIA_AUTH_TOKEN}" \
+    --data-binary "@$tmpfile" \
+    "https://${APP_HOST}/api/media/upload" 2>/dev/null || echo "000")
+
+  if [[ "$status" == "413" ]]; then
+    green "POST /api/media/upload with 12MB body (authenticated) → 413 (body cap enforced by Caddy before NestJS)"
+  else
+    red "POST /api/media/upload with 12MB body (authenticated) → $status (expected 413 from Caddy)"
+  fi
+else
+  # Unauthenticated probe — partially conclusive.
+  status=$(curl -s -o /dev/null -w '%{http_code}' \
+    --max-time 30 \
+    -X POST \
+    -H "Content-Type: application/octet-stream" \
+    --data-binary "@$tmpfile" \
+    "https://${APP_HOST}/api/media/upload" 2>/dev/null || echo "000")
+
+  if [[ "$status" == "413" ]]; then
+    green "POST /api/media/upload with 12MB body → 413 (body cap enforced by Caddy on unauthenticated request)"
+  elif [[ "$status" == "401" || "$status" == "403" ]]; then
+    red "POST /api/media/upload with 12MB body → $status (auth gate fired first — body cap UNVERIFIED; set MEDIA_AUTH_TOKEN=<bearer-token> for a conclusive test)"
+  else
+    red "POST /api/media/upload with 12MB body → $status (expected 413)"
+  fi
+fi
 
 rm -f "$tmpfile"
-
-if [[ "$status" == "413" ]]; then
-  green "POST /api/media/upload with 12MB body → 413 (body cap enforced by Caddy)"
-elif [[ "$status" == "401" || "$status" == "403" ]]; then
-  # Auth check fires before size check — acceptable, means Caddy forwarded (body cap may be
-  # checked after auth). Document this as an acceptable alternative.
-  yellow "POST /api/media/upload with 12MB body → $status (auth gate first; body cap test inconclusive — verify with an authenticated token)"
-else
-  red "POST /api/media/upload with 12MB body → $status (expected 413)"
-fi
 
 # ---------------------------------------------------------------------------
 # 9. Certificate expiry check

@@ -96,7 +96,7 @@ export function PropertiesPanel() {
         const regionPath = regionPathBeside(pinPath);
         const current = getAtPath(store.getState().data, regionPath);
         const chosen = typeof current === "string" ? current : "";
-        if (chosen === "" || !chosen.startsWith(located.province.code)) {
+        if (located.province?.code && (chosen === "" || !chosen.startsWith(located.province.code))) {
           edit(regionPath, located.regency?.code ?? located.province.code);
         }
       });

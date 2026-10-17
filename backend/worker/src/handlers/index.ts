@@ -9,6 +9,7 @@ import type { WorkerEnv } from "../env.js";
 import { MediaRepository } from "../media/media-repository.js";
 import { makeMediaProcessHandler } from "../media/media-process.handler.js";
 import { makeCleanupStagingHandler } from "../media/cleanup-staging.handler.js";
+import { makeCacheInvalidateHandler } from "./cache-invalidate.handler.js";
 
 /**
  * Job handlers, by pool.
@@ -77,13 +78,18 @@ export function registerHandlers(
       // API (docs/BACKEND/08 allows it "if it's fast enough"; ADR-077), so the provider gets its
       // answer only after the transaction committed or rolled back.
       // P4-06: notification.send
-      // P2-*:  cache.invalidate
+      // P3-12: cache.invalidate
+      runner.register(
+        "cache.invalidate",
+        makeCacheInvalidateHandler({ redis: runner.redis }),
+      );
       break;
 
     case "cron": {
-      // `order_expire_check` and `payment_reconciliation` are consumed by the API's jobs process
-      // (ADR-078): they change orders and payments through the API's services. Never register them
-      // here — two consumers would run two different implementations of one rule.
+      // `order_expire_check`, `payment_reconciliation`, `invitation_expiry_check`, and `invitation_soft_delete_cleanup`
+      // are consumed by the API's jobs process (ADR-078): they change orders, payments, and invitations
+      // through the API's services. Never register them here — two consumers would run two different
+      // implementations of one rule.
       if (deps === undefined) break;
       runner.register(
         "media_cleanup_staging",
@@ -92,8 +98,8 @@ export function registerHandlers(
           storage: deps.storage,
         }),
       );
-      // P4-*: the remaining sweeps. Registering them as no-ops now would mean the expiry
-      // check "succeeds" every night while expiring nothing.
+      // P4-*: the remaining sweeps (e.g. reminder_email_h7_h1). Registering them as no-ops now would
+      // mean the check "succeeds" every night while expiring nothing.
       break;
     }
   }

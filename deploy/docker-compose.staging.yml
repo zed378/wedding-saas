@@ -431,13 +431,17 @@ services:
   # cert is the origin cert (Cloudflare to origin). In a setup without the
   # tunnel, Caddy's cert faces users directly.
   #
-  # Requires the caddy-ratelimit module. Use the custom image or enable it via
-  # the official xcaddy build. The Dockerfile target `caddy-builder` in this
-  # repo produces it (deploy/caddy/Dockerfile if it exists).
+  # Uses a custom image built from deploy/caddy/Dockerfile via xcaddy. The
+  # standard caddy:2.9-alpine image does NOT include the caddy-ratelimit module
+  # that Caddyfile.production requires. Using the upstream image causes Caddy to
+  # exit immediately with "unknown directive: rate_limit", making all three hosts
+  # unreachable.
   #
   # Set TLS_EMAIL in .env to the Let's Encrypt account email.
   caddy:
-    image: caddy:2.9-alpine
+    build:
+      context: ..
+      dockerfile: deploy/caddy/Dockerfile
     restart: unless-stopped
     ports:
       - "80:80"    # HTTP + ACME HTTP-01 challenge
@@ -455,6 +459,40 @@ services:
         condition: service_started
       public-invite:
         condition: service_started
+
+  # Prometheus Blackbox Exporter — probes the three production hostnames over HTTPS
+  # to provide the probe_ssl_earliest_cert_expiry metric used by the
+  # CertificateExpiresInFourteenDays alert in deploy/prometheus/alerts.yml.
+  #
+  # Without this service the metric is never scraped and the alert never fires —
+  # a certificate that fails to renew would expire silently with no page to ops.
+  #
+  # Add the scrape job to prometheus.yml (see deploy/prometheus/blackbox.yml for
+  # the full relabel configuration):
+  #
+  #   - job_name: blackbox_tls
+  #     metrics_path: /probe
+  #     params:
+  #       module: [https_2xx]
+  #     static_configs:
+  #       - targets:
+  #           - https://app.vizunicum.my.id
+  #           - https://invitation.vizunicum.my.id
+  #           - https://admin.vizunicum.my.id
+  #     relabel_configs:
+  #       - source_labels: [__address__]
+  #         target_label: __param_target
+  #       - source_labels: [__param_target]
+  #         target_label: instance
+  #       - target_label: __address__
+  #         replacement: blackbox-exporter:9115
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    command:
+      - "--config.file=/etc/blackbox/blackbox.yml"
 
 volumes:
   clamav-data:

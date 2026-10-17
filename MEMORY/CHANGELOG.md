@@ -10,6 +10,69 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-17 — Payment security review and Phase 3 acceptance (Phase 3 complete)
+
+**Added / Verified** — payment security review and formal acceptance gate ([P3-16](./records/2026-10-17-P3-16-payment-security-review.md), [Phase 3 Summary](./records/2026-10-17-PHASE-3-SUMMARY.md))
+
+- Executed payment tampering methodology (`docs/TESTING/04`): URL return parameter tampering resistance, forged/unsigned webhook rejection with HTTP 401, replay idempotency, and database state consistency proven in automated test suite.
+- Clause-by-clause audit of `docs/SECURITY/07`: concept separation, Golden Rule, SHA-512 webhook signature verification, `payments.provider_reference_id` UNIQUE constraint idempotency, server-side price recalculation, manual admin refund control, and late-payment review flags.
+- PCI-DSS minimal scope confirmed: 0 credit card or CVV inputs exist in application code; all entry on Midtrans hosted surface (SAQ-A qualification).
+- Sensitive log redaction verified: `@wi/logging` automatically scrubs signatures, secrets, tokens, keys, and raw payloads from stdout logs.
+- Publish latency (< 5s) and Redis burst cache invalidation SLA proven.
+- Formal security reviewer sign-off recorded. Phase 3 (Order, Payment, Publishing) complete (16/16 tasks).
+
+### 2026-10-17 — Frontend publish flow and share screen
+
+**Added** — frontend publish flow and share screen ([P3-15](./records/2026-10-17-P3-15-publish-flow-and-share.md))
+
+- Publish button wired to authoritative server `/publish-check` with a modal listing missing required fields. Clicking a missing field activates its section in the store and focuses the input directly.
+- Slug confirmation modal showing the public URL with link-break warning, supporting inline 409 `SLUG_TAKEN` conflict recovery with server suggestion chip without abandoning the modal flow (ADR-085).
+- Payment-required detection (`PAYMENT_REQUIRED` / `PAYMENT_PENDING`) displaying clear activation package info and linking to `/checkout/:invitationId`.
+- Publish success modal displaying the live public link with clipboard copy action and one-click WhatsApp share link.
+- Consequence-first unpublish modal (`UnpublishAction`) for published invitations clearly explaining that guest links will stop working before confirming unpublish.
+
+### 2026-10-17 — Frontend checkout and payment status
+
+**Added** — frontend checkout and payment status ([P3-14](./records/2026-10-17-P3-14-checkout-and-payment-status.md))
+
+- Single package checkout screen (`/checkout/:invitationId`) displaying Rp 139.000 / 12 months with server-calculated totals and bank/QRIS trust badges.
+- Payment polling screen (`/checkout/:invitationId/payment/:orderId`) strictly ignoring return URL parameters (`?status=success` URL tampering resistance, ADR-084) and resolving state purely via server polling.
+- Accessible `PaymentStatusBanner` covering pending/polling, success, failed, expired, and a 60-second polling timeout fallback reassuring users that webhook processing will notify them via email.
+- In-app browser detection alerting users inside WhatsApp/Instagram WebViews and providing an external browser escape link to prevent gateway popup suppression.
+
+### 2026-10-17 — Invitation expiry job, renewal, and retention cleanup
+
+**Added** — invitation expiry job and renewal ([P3-13](./records/2026-10-17-P3-13-invitation-expiry-and-renewal.md))
+
+- Scheduled `invitation_expiry_check` at 00:05 WIB moving overdue published invitations to `expired`, invalidating public cache, and emitting expiry notification events. Expiry mutations are strictly forbidden on HTTP read requests.
+- Renewal payment processing extending `expiry_date` via SQL `GREATEST(expiry_date, now() in Jakarta)` and restoring `published` status if expired.
+- Scheduled `invitation_soft_delete_cleanup` at 01:00 WIB soft-deleting after 90 days and hard-deleting after 30 days with full Cloudflare R2 / MinIO storage object purge (`thumb`, `med`, `large`), preserving financial orders with scrubbed tombstones.
+- 7-day grace period cleanup purging individually soft-deleted gallery photos and their storage objects (`P1-19` obligation).
+
+### 2026-10-17 — Public page caching and invalidation
+
+**Added** — public page caching and invalidation ([P3-12](./records/2026-10-17-P3-12-public-caching.md))
+
+- Two-level Redis cache (`invitation_id:template_version_id` versioned payload and `slug` pointer) with in-process Singleflight stampede protection reducing concurrent cold misses to a single database fetch.
+- Immediate in-process and worker general pool cache invalidation on publish, unpublish, slug updates, and settings changes. Fail-open Redis error handling ensures public pages never return 500 when cache is degraded.
+- Immutable static asset caching headers in Caddy, Prometheus cache hit/miss metrics, and low cache hit ratio alerts.
+
+### 2026-10-08 — Production subdomain routing and TLS
+
+**Added** — production subdomain routing and TLS ([P3-11](./records/2026-10-08-P3-11-subdomain-routing-tls.md))
+
+- Production Caddy configuration routing traffic across three subdomains with automatic ACME TLS, differentiated security headers, webhook rate limit bypass, and 11MB media upload cap.
+
+### 2026-09-15 — Unpublish
+
+**Added** — unpublish and republish ([P3-10](./records/2026-09-15-P3-10-unpublish-republish.md))
+
+- Couples can take a published invitation offline and put it back without paying again; the address stays theirs meanwhile. Changing the address after publishing now tells the app that shared links broke.
+
+**Fixed**
+
+- Unpublishing and republishing a paid invitation no longer restarts its validity period, and a free trial can no longer be restarted that way.
+
 ### 2026-09-15 — Publishing
 
 **Added** — publish endpoint ([P3-09](./records/2026-09-15-P3-09-publish.md))

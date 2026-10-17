@@ -6,8 +6,11 @@ import { PublicInvitationController } from "./public-invitation.controller";
 import { PublicPreviewController } from "./public-preview.controller";
 import { PublicRumController } from "./public-rum.controller";
 import { PublicInvitationService } from "./public-invitation.service";
+import { PublicInvitationCache } from "./public-invitation-cache";
 import { PublishController } from "./publish.controller";
 import { PublishService } from "./publish.service";
+import { UnpublishService } from "./unpublish.service";
+import { InvitationExpiryService } from "./invitation-expiry.service";
 import { AuthModule } from "../auth/auth.module";
 import { InvitationModule } from "../invitation/invitation.module";
 
@@ -27,7 +30,17 @@ import { InvitationModule } from "../invitation/invitation.module";
     PublicRumController,
   ],
   // The repository comes from the global `TenancyModule`.
-  providers: [PublicInvitationService, PublishService],
-  exports: [PublicInvitationService],
+  providers: [
+    PublicInvitationService,
+    PublicInvitationCache,
+    PublishService,
+    UnpublishService,
+    InvitationExpiryService,
+  ],
+  exports: [
+    PublicInvitationService,
+    PublicInvitationCache,
+    InvitationExpiryService,
+  ],
 })
 export class PublishingModule {}

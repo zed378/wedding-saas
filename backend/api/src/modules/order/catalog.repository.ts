@@ -12,6 +12,8 @@ export type AddonRow = typeof addons.$inferSelect;
 export interface PaidPurchase {
   readonly package: PackageRow;
   readonly addonIds: readonly string[];
+  /** When that order was created — `P3-10` tells a fresh purchase from a republish by it. */
+  readonly purchasedAt: Date;
 }
 
 /**
@@ -76,7 +78,11 @@ export class CatalogRepository implements CatalogReader {
    */
   async latestPaidPurchase(invitationId: string): Promise<PaidPurchase | null> {
     const rows = await this.db
-      .select({ package: packages, addonIds: orders.addonIds })
+      .select({
+        package: packages,
+        addonIds: orders.addonIds,
+        purchasedAt: orders.createdAt,
+      })
       .from(orders)
       .innerJoin(packages, eq(orders.packageId, packages.id))
       .where(
@@ -87,6 +93,10 @@ export class CatalogRepository implements CatalogReader {
     const row = rows[0];
     return row === undefined
       ? null
-      : { package: row.package, addonIds: row.addonIds };
+      : {
+          package: row.package,
+          addonIds: row.addonIds,
+          purchasedAt: row.purchasedAt,
+        };
   }
 }

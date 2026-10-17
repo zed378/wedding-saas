@@ -15,8 +15,16 @@ import {
   PREVIEW_TOKEN_PATTERN,
 } from "../invitation/preview-link.service";
 
+import { PublicInvitationCache } from "./public-invitation-cache";
+
 /**
- * `P2-07` — `GET /public/i/:slug`. `docs/API/08`.
+ * `P2-07`, `P3-12` — `GET /public/i/:slug`. `docs/API/08`, `docs/ARCHITECTURE/06`.
+ *
+ * ## Cached with Singleflight stampede protection
+ *
+ * Public page traffic is spiky (many guests opening links around the event).
+ * Responses are cached in Redis keyed on `invitation_id + template_version_id` with
+ * a slug index. Concurrent cold misses collapse into 1 origin render via Singleflight.
  *
  * ## One 404, whatever the reason
  *
@@ -43,6 +51,7 @@ export class PublicInvitationService {
     private readonly repository: PublicInvitationRepository,
     @Inject(ENV) private readonly env: Env,
     private readonly entitlements: EntitlementsService,
+    private readonly cache?: PublicInvitationCache,
   ) {}
 
   async bySlug(rawSlug: string): Promise<PublicInvitationDto> {
@@ -53,15 +62,95 @@ export class PublicInvitationService {
     // "there is no invitation here".
     if (checkSlugFormat(slug) !== undefined) throw notFound();
 
-    const found = await this.repository.findPublishedBySlug(slug);
-    if (found === null) throw notFound();
+    // P3-12: Fast-path cache lookup (fail-open)
+    if (this.cache) {
+      let cached: PublicInvitationDto | undefined;
+      try {
+        cached = await this.cache.get(slug);
+      } catch {
+        cached = undefined;
+      }
 
-    // `P3-01`: the watermark is the invitation's entitlement — its paid package's flag, or
-    // `true` when nobody has paid (BR-2.8's trial publish included). Never a client hint.
+      if (cached !== undefined) {
+        this.cache.recordHit();
+        return cached;
+      }
+
+      this.cache.recordMiss();
+    }
+
+    const computeDto = async (): Promise<PublicInvitationDto> => {
+      if (this.cache) {
+        let rechecked: PublicInvitationDto | undefined;
+        try {
+          rechecked = await this.cache.get(slug);
+        } catch {
+          rechecked = undefined;
+        }
+        if (rechecked !== undefined) {
+          return rechecked;
+        }
+      }
+
+      const found = await this.repository.findPublishedBySlug(slug);
+      if (found === null) throw notFound();
+
+      // `P3-01`: the watermark is the invitation's entitlement — its paid package's flag, or
+      // `true` when nobody has paid (BR-2.8's trial publish included). Never a client hint.
+      const { watermark } = await this.entitlements.forInvitation(
+        found.invitation.id,
+      );
+      const dto = toPublicInvitation(
+        { ...found, watermark },
+        this.env.CDN_BASE_URL,
+      );
+
+      // Populate Redis cache keyed on invitation_id + template_version_id
+      if (this.cache) {
+        await this.cache
+          .set(
+            slug,
+            found.invitation.id,
+            found.invitation.templateVersionId,
+            dto,
+          )
+          .catch(() => {});
+      }
+
+      return dto;
+    };
+
+    // P3-12: Singleflight stampede protection on cold miss
+    if (this.cache) {
+      return this.cache.executeSingleflight(slug, computeDto);
+    }
+    return computeDto();
+  }
+
+  /**
+   * Proactively warm/refresh the cache for a published invitation (P3-12).
+   */
+  async warm(slug: string): Promise<PublicInvitationDto | null> {
+    const normalized = slug.trim().toLowerCase();
+    if (checkSlugFormat(normalized) !== undefined) return null;
+
+    const found = await this.repository.findPublishedBySlug(normalized);
+    if (found === null) return null;
+
     const { watermark } = await this.entitlements.forInvitation(
       found.invitation.id,
     );
-    return toPublicInvitation({ ...found, watermark }, this.env.CDN_BASE_URL);
+    const dto = toPublicInvitation(
+      { ...found, watermark },
+      this.env.CDN_BASE_URL,
+    );
+    await this.cache?.set(
+      normalized,
+      found.invitation.id,
+      found.invitation.templateVersionId,
+      dto,
+    );
+    return dto;
   }
 
   /**

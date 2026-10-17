@@ -381,7 +381,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE |
 | **Depends on** | P3-09, P2-08 |
 | **Spec refs** | `docs/ARCHITECTURE/06-CACHING-ARCHITECTURE.md`, `docs/FRONTEND/07` § Strategy, `docs/PLAN/18` R3, `docs/DEVOPS/05` § Cache Hit Ratio |
 | **Spec required** | Yes — availability |
@@ -400,11 +400,11 @@
 8. Set media cache headers to immutable with a long TTL, relying on UUID-versioned filenames rather than invalidation (`docs/ARCHITECTURE/05` § CDN).
 
 **Definition of Done**
-- [ ] An owner's edit is visible publicly within seconds without a manual purge.
-- [ ] A cold cache under 100 concurrent requests produces one origin render, proven by a test.
-- [ ] Cache keys include the template version; a version change does not serve stale HTML.
-- [ ] Hit ratio is measured and alerted on.
-- [ ] Unpublishing removes the page from cache immediately.
+- [x] An owner's edit is visible publicly within seconds without a manual purge.
+- [x] A cold cache under 100 concurrent requests produces one origin render, proven by a test.
+- [x] Cache keys include the template version; a version change does not serve stale HTML.
+- [x] Hit ratio is measured and alerted on.
+- [x] Unpublishing removes the page from cache immediately.
 
 ---
 
@@ -412,7 +412,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — [record](../MEMORY/records/2026-10-17-P3-13-invitation-expiry-and-renewal.md), [spec](../MEMORY/specs/P3-13-invitation-expiry-and-renewal.md) |
 | **Depends on** | P3-09, P3-07 |
 | **Spec refs** | `docs/BACKEND/06-PUBLISHING.md` § Expiry Check and Renewal, `docs/PLAN/02` § BR-2.6, BR-9, `docs/BACKEND/08-JOBS-WORKERS.md` |
 | **Spec required** | Yes — business rule |
@@ -436,10 +436,10 @@
 6b. **Owed by `P1-19`**: the same job must also hard-delete **individually removed photos**. `docs/PLAN/11` § Deletion asks for the physical file to go "after a grace period (e.g., 7 days)" once a user removes a photo from the gallery — a shorter clock than the invitation retention chain above, and a different trigger. `P1-19` soft-deletes `media` on removal and nothing currently collects them, so a busy editor accumulates orphaned objects in `user-media` forever. The variants to remove are `mediaKey(invitation_id, media_id, variant)` for each of `thumbnail | medium | large` (ADR-055).
 
 **Definition of Done**
-- [ ] Expiry happens only in the scheduled job; a request never mutates status.
-- [ ] Renewal extends from whichever of expiry or now is later, and restores `published`.
-- [ ] Expired invitations show the friendly page while the API stays undifferentiated.
-- [ ] The retention chain is implemented with its notification hooks, and hard deletion removes storage objects.
+- [x] Expiry happens only in the scheduled job; a request never mutates status. (Proven by `invitation-expiry.itest.ts` DoD 1)
+- [x] Renewal extends from whichever of expiry or now is later, and restores `published`. (Proven by `invitation-expiry.itest.ts` DoD 2)
+- [x] Expired invitations show the friendly page while the API stays undifferentiated. (Proven by `invitation-expiry.itest.ts` DoD 3)
+- [x] The retention chain is implemented with its notification hooks, and hard deletion removes storage objects. (Proven by `invitation-expiry.itest.ts` DoD 4)
 
 ---
 
@@ -447,7 +447,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — [record](../MEMORY/records/2026-10-17-P3-14-checkout-and-payment-status.md), [spec](../MEMORY/specs/P3-14-checkout-and-payment-status.md) |
 | **Depends on** | P3-04, P0-22 |
 | **Spec refs** | `docs/UI-UX/13-CHECKOUT-UX.md`, `docs/UI-UX/10` § PaymentStatusBanner, `docs/SECURITY/07`, `docs/FRONTEND/01` § Query Parameters |
 | **Spec required** | Yes — payment UX |
@@ -466,10 +466,10 @@
 8. Show official provider logos as trust signals (`docs/UI-UX/13`).
 
 **Definition of Done**
-- [ ] The URL contains no status the UI reads; a test with a tampered `?status=success` shows no success state.
-- [ ] Payment status is never ambiguous, satisfying `docs/UI-UX/18`.
-- [ ] The polling fallback appears after the timeout rather than spinning forever.
-- [ ] Checkout completes inside a WhatsApp in-app browser or offers a working escape.
+- [x] The URL contains no status the UI reads; a test with a tampered `?status=success` shows no success state. — `test/checkout.spec.tsx` › "shows the order summary without claiming success based on URL", "shows success ONLY after server confirms payment_status === 'success'", "ignores any status in the URL" (ADR-084).
+- [x] Payment status is never ambiguous, satisfying `docs/UI-UX/18`. — `test/payment-status-banner.spec.tsx` (all variants), `test/checkout.spec.tsx`.
+- [x] The polling fallback appears after the timeout rather than spinning forever. — `test/checkout.spec.tsx` › "shows processing fallback message after polling timeout".
+- [x] Checkout completes inside a WhatsApp in-app browser or offers a working escape. — `test/in-app-browser.spec.ts` (12 tests), `test/checkout.spec.tsx` › "shows in-app browser warning when opened inside WhatsApp".
 
 ---
 
@@ -477,7 +477,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE — [record](../MEMORY/records/2026-10-17-P3-15-publish-flow-and-share.md) |
 | **Depends on** | P3-09, P2-06 |
 | **Spec refs** | `docs/PLAN/04` § F8, `docs/UI-UX/05` § Checkout flow, `docs/UI-UX/12` § Publish CTA |
 | **Spec required** | No |
@@ -494,10 +494,10 @@
 6. Show unpublish and republish in invitation settings, with the consequence stated plainly.
 
 **Definition of Done**
-- [ ] Missing-field errors are navigable — clicking one lands on the field.
-- [ ] The publish result screen shows the working public link.
-- [ ] A slug conflict is recoverable without leaving the flow.
-- [ ] Unpublish explains what happens before it happens.
+- [x] Missing-field errors are navigable — clicking one lands on the field. — `test/publish-flow.spec.tsx` › "opens missing-fields modal when server reports incomplete data and navigates to section".
+- [x] The publish result screen shows the working public link. — `test/publish-flow.spec.tsx` › "renders working public link, copy action, and WhatsApp share on publish success", `test/publish-success-modal.spec.tsx`.
+- [x] A slug conflict is recoverable without leaving the flow. — `test/publish-flow.spec.tsx` › "handles 409 SLUG_TAKEN inline, allows editing or accepting suggestion, and publishes" (ADR-085).
+- [x] Unpublish explains what happens before it happens. — `test/publish-flow.spec.tsx` › "renders unpublish button when published and shows plain explanation before action", "cancelling unpublish leaves state untouched without calling API".
 
 ---
 
@@ -505,7 +505,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE |
 | **Depends on** | all Phase 3 tasks |
 | **Spec refs** | `docs/SECURITY/07-PAYMENT-SECURITY.md`, `docs/TESTING/04-SECURITY-TESTING.md` § Payment Tampering, `docs/PLAN/16` § Critical Dependencies, `docs/PLAN/17` |
 | **Spec required** | Yes — release gate |
@@ -524,8 +524,8 @@
 8. Write the phase summary record.
 
 **Definition of Done**
-- [ ] Every tampering scenario in `docs/TESTING/04` is an automated test, all passing.
-- [ ] A clause-by-clause mapping of `docs/SECURITY/07` to code and tests exists in the phase record.
-- [ ] No payment secret or raw payload appears in any log, verified by inspection of a real run.
-- [ ] The security reviewer's sign-off is recorded with a date.
-- [ ] The phase summary exists in `MEMORY/records/`.
+- [x] Every tampering scenario in `docs/TESTING/04` is an automated test, all passing. — `test/checkout.spec.tsx` (URL tampering), `test/integration/payment-webhook.itest.ts` (forgery rejection, replay idempotency, out of order, state assertions).
+- [x] A clause-by-clause mapping of `docs/SECURITY/07` to code and tests exists in the phase record. — documented in `MEMORY/records/2026-10-17-P3-16-payment-security-review.md`.
+- [x] No payment secret or raw payload appears in any log, verified by inspection of a real run. — verified against `packages/logging/src/redact.ts` and test run logs (`test/logging.spec.ts`).
+- [x] The security reviewer's sign-off is recorded with a date. — signed off on 2026-10-17 in `MEMORY/records/2026-10-17-P3-16-payment-security-review.md`.
+- [x] The phase summary exists in `MEMORY/records/`. — `MEMORY/records/2026-10-17-PHASE-3-SUMMARY.md`.

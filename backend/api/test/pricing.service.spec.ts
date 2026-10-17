@@ -217,13 +217,17 @@ describe("PricingService.calculate", () => {
   });
 });
 
+const PURCHASED = new Date("2027-01-01T00:00:00Z");
+
 describe("EntitlementsService", () => {
   const invitationId = "0b8e6a8e-6a5c-4f8e-9a51-2f6a0f9d6c11";
 
   it("follows the paid package, whichever tier it is", async () => {
     const plus = PACKAGES[1]!;
     const service = new EntitlementsService(
-      catalog({ purchase: { package: plus, addonIds: [] } }),
+      catalog({
+        purchase: { package: plus, addonIds: [], purchasedAt: PURCHASED },
+      }),
     );
     expect(await service.forInvitation(invitationId)).toEqual({
       packageId: "plus",
@@ -231,12 +235,19 @@ describe("EntitlementsService", () => {
       watermark: false,
       durationMonths: 24,
       customDomain: false,
+      purchasedAt: PURCHASED,
     });
   });
 
   it("keeps a deactivated package's entitlements for invitations that bought it", async () => {
     const service = new EntitlementsService(
-      catalog({ purchase: { package: PACKAGES[2]!, addonIds: [] } }),
+      catalog({
+        purchase: {
+          package: PACKAGES[2]!,
+          addonIds: [],
+          purchasedAt: PURCHASED,
+        },
+      }),
     );
     expect((await service.forInvitation(invitationId)).packageId).toBe(
       "retired",
@@ -246,7 +257,11 @@ describe("EntitlementsService", () => {
   it("grants a custom domain only when the paid order carried the addon", async () => {
     const service = new EntitlementsService(
       catalog({
-        purchase: { package: PACKAGES[0]!, addonIds: ["custom_domain"] },
+        purchase: {
+          package: PACKAGES[0]!,
+          addonIds: ["custom_domain"],
+          purchasedAt: PURCHASED,
+        },
       }),
     );
     expect((await service.forInvitation(invitationId)).customDomain).toBe(true);
@@ -261,6 +276,7 @@ describe("EntitlementsService", () => {
       watermark: true,
       durationMonths: null,
       customDomain: false,
+      purchasedAt: null,
     });
   });
 

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, count, eq, isNull, desc, inArray, ne, sql } from "drizzle-orm";
+import { and, count, eq, isNull, desc, inArray, ne, or, sql } from "drizzle-orm";
 
 import { DB, type Database } from "../../infra/db/client";
 import {
@@ -14,8 +14,11 @@ import {
   invitationGuestbook,
   invitationPreviewTokens,
   invitationStatusHistory,
+  invitationCustomDomains,
+  invitationViewCounts,
   auditLogs,
   media,
+  orders,
   templateVersions,
   templates,
 } from "../../infra/db/schema/index";
@@ -1995,18 +1998,26 @@ export class InvitationRepository {
     tx: Transaction,
     invitationId: string,
     scope: TenantScope,
-    validity: { readonly months: number } | { readonly days: number },
+    validity:
+      | { readonly months: number }
+      | { readonly days: number }
+      /** `P3-10` — a republish: keep the dates the first publish set (`published_at` is history). */
+      | { readonly keep: true },
   ): Promise<{ publishedAt: Date; expiryDate: string }> {
-    const interval =
-      "months" in validity
-        ? sql`make_interval(months => ${validity.months})`
-        : sql`make_interval(days => ${validity.days})`;
+    const set =
+      "keep" in validity
+        ? { publishedAt: sql`coalesce(${invitations.publishedAt}, now())` }
+        : {
+            publishedAt: sql`now()`,
+            expiryDate: sql`((now() AT TIME ZONE 'Asia/Jakarta')::date + ${
+              "months" in validity
+                ? sql`make_interval(months => ${validity.months})`
+                : sql`make_interval(days => ${validity.days})`
+            })::date`,
+          };
     const [row] = await tx
       .update(invitations)
-      .set({
-        publishedAt: sql`now()`,
-        expiryDate: sql`((now() AT TIME ZONE 'Asia/Jakarta')::date + ${interval})::date`,
-      })
+      .set(set)
       .where(
         and(eq(invitations.id, invitationId), eq(invitations.ownerId, scope)),
       )
@@ -2015,6 +2026,21 @@ export class InvitationRepository {
         expiryDate: invitations.expiryDate,
       });
     return { publishedAt: row!.publishedAt!, expiryDate: row!.expiryDate! };
+  }
+
+  /** `P3-10` — whether the invitation's `expiry_date` is today or later in WIB. `false` when unset. */
+  async expiryStillRunning(
+    tx: Transaction,
+    invitationId: string,
+  ): Promise<boolean> {
+    const [row] = await tx
+      .select({
+        running: sql<boolean>`coalesce(${invitations.expiryDate} >= (now() AT TIME ZONE 'Asia/Jakarta')::date, false)`,
+      })
+      .from(invitations)
+      .where(eq(invitations.id, invitationId))
+      .limit(1);
+    return row?.running ?? false;
   }
 
   async findUnpaidInvitation(
@@ -2207,6 +2233,235 @@ export class InvitationRepository {
 
       return row ?? null;
     });
+  }
+
+  /**
+   * `P3-13` — published invitations whose `expiry_date` is strictly before today in WIB.
+   * `docs/BACKEND/06` § Expiry Check.
+   */
+  async overduePublishedInvitations(
+    limit = 100,
+  ): Promise<
+    Array<{
+      readonly id: string;
+      readonly slug: string | null;
+      readonly ownerId: string;
+      readonly expiryDate: string;
+    }>
+  > {
+    const rows = await this.db
+      .select({
+        id: invitations.id,
+        slug: invitations.slug,
+        ownerId: invitations.ownerId,
+        expiryDate: invitations.expiryDate,
+      })
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.status, "published"),
+          isNull(invitations.deletedAt),
+          sql`${invitations.expiryDate} < (now() AT TIME ZONE 'Asia/Jakarta')::date`,
+        ),
+      )
+      .orderBy(invitations.expiryDate)
+      .limit(limit);
+
+    return rows.map((r) => ({
+      id: r.id,
+      slug: r.slug,
+      ownerId: r.ownerId,
+      expiryDate: r.expiryDate!,
+    }));
+  }
+
+  /**
+   * `P3-13` — invitations expired for at least `olderThanDays` (BR-9.1: 90 days) without renewal.
+   */
+  async expiredInvitationsForSoftDelete(
+    olderThanDays = 90,
+    limit = 100,
+  ): Promise<Array<{ readonly id: string; readonly ownerId: string }>> {
+    return this.db
+      .select({
+        id: invitations.id,
+        ownerId: invitations.ownerId,
+      })
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.status, "expired"),
+          isNull(invitations.deletedAt),
+          or(
+            sql`${invitations.expiryDate} <= ((now() AT TIME ZONE 'Asia/Jakarta')::date - interval '1 day' * ${olderThanDays})::date`,
+            sql`${invitations.updatedAt} <= now() - interval '1 day' * ${olderThanDays}`,
+          ),
+        ),
+      )
+      .limit(limit);
+  }
+
+  /**
+   * `P3-13` — mark an invitation soft-deleted (setting deleted_at).
+   */
+  async markSoftDeleted(tx: Transaction, invitationId: string): Promise<void> {
+    await tx
+      .update(invitations)
+      .set({
+        deletedAt: sql`now()`,
+        updatedAt: sql`now()`,
+      })
+      .where(eq(invitations.id, invitationId));
+  }
+
+  /**
+   * `P3-13` — invitations in `soft_deleted` for at least `olderThanDays` (BR-9.1: 30 days).
+   */
+  async softDeletedInvitationsForHardDelete(
+    olderThanDays = 30,
+    limit = 100,
+  ): Promise<Array<{ readonly id: string }>> {
+    return this.db
+      .select({
+        id: invitations.id,
+      })
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.status, "soft_deleted"),
+          sql`${invitations.deletedAt} IS NOT NULL AND ${invitations.deletedAt} <= now() - interval '1 day' * ${olderThanDays}`,
+        ),
+      )
+      .limit(limit);
+  }
+
+  /**
+   * `P3-13` — find media items belonging to an invitation.
+   */
+  async findMediaForInvitation(
+    invitationId: string,
+  ): Promise<Array<{ readonly id: string; readonly invitationId: string }>> {
+    const rows = await this.db
+      .select({
+        id: media.id,
+        invitationId: media.invitationId,
+      })
+      .from(media)
+      .where(eq(media.invitationId, invitationId));
+    return rows.filter(
+      (r): r is { readonly id: string; readonly invitationId: string } =>
+        r.invitationId !== null,
+    );
+  }
+
+  /**
+   * `P3-13` — hard delete invitation data. If an order references this invitation
+   * (`orders.invitation_id` ON DELETE RESTRICT), wipe all personal children and media
+   * rows, scrubbing internalName and slug while leaving the FK target intact. If no order
+   * exists, hard delete the row completely (cascading).
+   */
+  async hardDeleteInvitation(
+    tx: Transaction,
+    invitationId: string,
+  ): Promise<boolean> {
+    const [hasOrder] = await tx
+      .select({ id: orders.id })
+      .from(orders)
+      .where(eq(orders.invitationId, invitationId))
+      .limit(1);
+
+    if (hasOrder !== undefined) {
+      await tx.delete(media).where(eq(media.invitationId, invitationId));
+      await tx
+        .delete(invitationGallery)
+        .where(eq(invitationGallery.invitationId, invitationId));
+      await tx
+        .delete(invitationGuestbook)
+        .where(eq(invitationGuestbook.invitationId, invitationId));
+      await tx
+        .delete(invitationGuests)
+        .where(eq(invitationGuests.invitationId, invitationId));
+      await tx
+        .delete(invitationEvents)
+        .where(eq(invitationEvents.invitationId, invitationId));
+      await tx
+        .delete(invitationPeople)
+        .where(eq(invitationPeople.invitationId, invitationId));
+      await tx
+        .delete(invitationBankAccounts)
+        .where(eq(invitationBankAccounts.invitationId, invitationId));
+      await tx
+        .delete(invitationQuote)
+        .where(eq(invitationQuote.invitationId, invitationId));
+      await tx
+        .delete(invitationPreviewTokens)
+        .where(eq(invitationPreviewTokens.invitationId, invitationId));
+      await tx
+        .delete(invitationSettings)
+        .where(eq(invitationSettings.invitationId, invitationId));
+      await tx
+        .delete(invitationStatusHistory)
+        .where(eq(invitationStatusHistory.invitationId, invitationId));
+      await tx
+        .delete(invitationCustomDomains)
+        .where(eq(invitationCustomDomains.invitationId, invitationId));
+      await tx
+        .delete(invitationViewCounts)
+        .where(eq(invitationViewCounts.invitationId, invitationId));
+      await tx
+        .update(invitations)
+        .set({
+          internalName: null,
+          slug: null,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(invitations.id, invitationId));
+      return true;
+    }
+
+    await tx.delete(invitations).where(eq(invitations.id, invitationId));
+    return true;
+  }
+
+  /**
+   * `P3-13` (owed by `P1-19`, `docs/PLAN/11` § Deletion) — media soft-deleted > olderThanDays (7 days).
+   */
+  async orphanedSoftDeletedMedia(
+    olderThanDays = 7,
+    limit = 100,
+  ): Promise<Array<{ readonly id: string; readonly invitationId: string }>> {
+    const rows = await this.db
+      .select({
+        id: media.id,
+        invitationId: media.invitationId,
+      })
+      .from(media)
+      .where(
+        and(
+          sql`${media.deletedAt} IS NOT NULL`,
+          sql`${media.deletedAt} <= now() - interval '1 day' * ${olderThanDays}`,
+        ),
+      )
+      .limit(limit);
+
+    return rows.filter(
+      (r): r is { readonly id: string; readonly invitationId: string } =>
+        r.invitationId !== null,
+    );
+  }
+
+  /**
+   * `P3-13` — hard delete media row.
+   */
+  async hardDeleteMedia(tx: Transaction, mediaId: string): Promise<void> {
+    await tx.delete(media).where(eq(media.id, mediaId));
+  }
+
+  /**
+   * `P3-13` — run work within a database transaction.
+   */
+  async transaction<R>(work: (tx: Transaction) => Promise<R>): Promise<R> {
+    return this.db.transaction(work);
   }
 }
 

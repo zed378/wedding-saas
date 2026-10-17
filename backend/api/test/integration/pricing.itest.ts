@@ -195,6 +195,7 @@ describe("pricing and entitlements (P3-01)", () => {
         watermark: true,
         durationMonths: null,
         customDomain: false,
+        purchasedAt: null,
       });
     });
 
@@ -221,6 +222,7 @@ describe("pricing and entitlements (P3-01)", () => {
         watermark: row.has_watermark,
         durationMonths: row.duration_months,
         customDomain: false,
+        purchasedAt: expect.any(Date),
       });
     });
 

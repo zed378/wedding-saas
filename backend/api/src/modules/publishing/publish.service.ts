@@ -17,6 +17,8 @@ import { PublishCheckService } from "../invitation/publish-check.service";
 import { SlugService } from "../invitation/slug.service";
 import { EntitlementsService } from "../order/entitlements.service";
 
+import { PublicInvitationCache } from "./public-invitation-cache";
+
 /** BR-2.8: how long a free trial publish stays live. */
 export const TRIAL_DAYS = 3;
 
@@ -60,6 +62,7 @@ export class PublishService {
     private readonly status: InvitationStatusService,
     @Inject(JOB_QUEUE) private readonly queue: JobQueue,
     @Inject(ENV) private readonly env: Env,
+    private readonly cache?: PublicInvitationCache,
   ) {}
 
   async publish(
@@ -92,9 +95,12 @@ export class PublishService {
       invitationId,
       user.scope,
       async ({ tx, invitation }) => {
-        const trial = await this.decide(tx, invitation.id, invitation.status);
+        const plan = await this.decide(tx, invitation, entitlement.purchasedAt);
 
-        if (!trial && entitlement.durationMonths === null) {
+        if (
+          plan.validity === "package" &&
+          entitlement.durationMonths === null
+        ) {
           // `paid` status with no paid order behind it — data that should not exist. Refuse loudly.
           logger.error(
             {
@@ -116,16 +122,19 @@ export class PublishService {
           invitation.id,
           "published",
           { kind: "USER", userId: user.scope },
-          trial ? "user: free trial publish (BR-2.8)" : "user: publish",
+          plan.trial ? "user: free trial publish (BR-2.8)" : "user: publish",
         );
         const dates = await this.invitations.recordPublication(
           tx,
           invitation.id,
           user.scope,
-          trial
-            ? { days: TRIAL_DAYS }
-            : { months: entitlement.durationMonths! },
+          plan.validity === "keep"
+            ? { keep: true }
+            : plan.validity === "trial"
+              ? { days: TRIAL_DAYS }
+              : { months: entitlement.durationMonths! },
         );
+        const trial = plan.trial;
         return { trial, slug: invitation.slug!, ...dates };
       },
     );
@@ -142,6 +151,11 @@ export class PublishService {
       },
       "invitation published",
     );
+    // P3-12: Invalidate existing cache entry if any so fresh state is served
+    if (result.slug) {
+      await this.cache?.invalidate({ slug: result.slug, invitationId });
+    }
+
     // `docs/BACKEND/06`: the owner's confirmation email (`P4-06` sends it). After the commit.
     await this.queue.enqueue(
       "general",
@@ -161,27 +175,52 @@ export class PublishService {
   }
 
   /**
-   * Whether this publish is a trial, or why it may not happen. Under the lock.
-   * `MEMORY/specs/P3-09-publish.md` § 4 and § 8.
+   * Whether this publish is a trial, how long it lasts, or why it may not happen. Under the lock.
+   * `MEMORY/specs/P3-09-publish.md` § 8, `MEMORY/specs/P3-10-unpublish-republish.md` § 2.
+   *
+   * **A republish never adds validity** (`P3-10`): the dates the first publish set are kept, unless a
+   * paid order newer than that publish exists — a fresh purchase, e.g. after a refund.
    */
   private async decide(
     tx: Parameters<
       Parameters<InvitationRepository["withLockedOwned"]>[2]
     >[0]["tx"],
-    invitationId: string,
-    status: string,
-  ): Promise<boolean> {
-    switch (status) {
-      case "paid":
-        return false;
+    invitation: {
+      readonly id: string;
+      readonly status: string;
+      readonly publishedAt: Date | null;
+    },
+    purchasedAt: Date | null,
+  ): Promise<{ trial: boolean; validity: "package" | "trial" | "keep" }> {
+    switch (invitation.status) {
+      case "paid": {
+        const republish =
+          invitation.publishedAt !== null &&
+          (purchasedAt === null || purchasedAt <= invitation.publishedAt);
+        if (!republish) return { trial: false, validity: "package" };
+        if (!(await this.invitations.expiryStillRunning(tx, invitation.id))) {
+          throw renewalRequired();
+        }
+        return { trial: false, validity: "keep" };
+      }
       case "draft": {
-        // BR-2.8: never paid AND never published. The second half is what makes it once.
-        const used = await this.invitations.everReached(tx, invitationId, [
-          "paid",
-          "published",
-        ]);
-        if (used) throw trialAlreadyUsed();
-        return true;
+        if (await this.invitations.everReached(tx, invitation.id, ["paid"])) {
+          // Refunded (BR-5.4): the way back is paying again, not a trial.
+          throw new BusinessRuleError(
+            "PAYMENT_REQUIRED",
+            "Lakukan pembayaran untuk menerbitkan undangan ini.",
+          );
+        }
+        // BR-2.8: once. A trial unpublished inside its three days resumes with the same end date (ADR-081).
+        if (
+          await this.invitations.everReached(tx, invitation.id, ["published"])
+        ) {
+          if (await this.invitations.expiryStillRunning(tx, invitation.id)) {
+            return { trial: true, validity: "keep" };
+          }
+          throw trialAlreadyUsed();
+        }
+        return { trial: true, validity: "trial" };
       }
       case "published":
         throw new BusinessRuleError(
@@ -194,14 +233,11 @@ export class PublishService {
           "Selesaikan pembayaran untuk menerbitkan undangan ini.",
         );
       case "expired": {
-        const everPaid = await this.invitations.everReached(tx, invitationId, [
+        const everPaid = await this.invitations.everReached(tx, invitation.id, [
           "paid",
         ]);
         if (!everPaid) throw trialAlreadyUsed();
-        throw new BusinessRuleError(
-          "RENEWAL_REQUIRED",
-          "Masa aktif undangan ini sudah berakhir. Perpanjang untuk menerbitkannya kembali.",
-        );
+        throw renewalRequired();
       }
       default:
         throw new NotFoundError();
@@ -237,5 +273,12 @@ function trialAlreadyUsed(): BusinessRuleError {
   return new BusinessRuleError(
     "TRIAL_ALREADY_USED",
     "Masa uji coba gratis undangan ini sudah dipakai. Lakukan pembayaran untuk menerbitkannya kembali.",
+  );
+}
+
+function renewalRequired(): BusinessRuleError {
+  return new BusinessRuleError(
+    "RENEWAL_REQUIRED",
+    "Masa aktif undangan ini sudah berakhir. Perpanjang untuk menerbitkannya kembali.",
   );
 }

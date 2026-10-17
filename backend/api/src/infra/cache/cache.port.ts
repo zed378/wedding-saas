@@ -47,6 +47,11 @@ export interface CachePort {
    * not be relied on as a version number by anything else.
    */
   invalidateNamespace(namespace: string): Promise<number>;
+
+  /**
+   * Delete a specific key within a namespace. Never throws.
+   */
+  delete(namespace: string, key: string): Promise<void>;
 }
 
 /** Injection token. */

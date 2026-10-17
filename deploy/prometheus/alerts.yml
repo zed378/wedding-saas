@@ -54,3 +54,17 @@ groups:
         annotations:
           summary: "A payment notification needs manual review ({{ $labels.result }})"
           runbook: "payment_notifications WHERE needs_review ORDER BY received_at DESC"
+
+  - name: cache
+    rules:
+      # docs/DEVOPS/07: "Public Invitation cache hit ratio drops drastically (< 50%) suddenly —
+      # High — Slack + investigate" (P3-12, target > 90% docs/DEVOPS/05).
+      - alert: PublicInvitationCacheHitRatioLow
+        expr: (rate(wi_public_invitation_cache_hits_total[5m]) / (rate(wi_public_invitation_cache_hits_total[5m]) + rate(wi_public_invitation_cache_misses_total[5m]))) < 0.50 and (rate(wi_public_invitation_cache_hits_total[5m]) + rate(wi_public_invitation_cache_misses_total[5m])) > 1
+        for: 5m
+        labels:
+          severity: high
+          channel: ops
+        annotations:
+          summary: "Public invitation cache hit ratio dropped below 50%"
+          runbook: "docs/DEVOPS/05-MONITORING.md (Cache hit ratio target > 90%); investigate excessive cache invalidations or redis eviction"

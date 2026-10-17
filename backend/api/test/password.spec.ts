@@ -82,7 +82,9 @@ describe("verifyPassword", () => {
     await expect(verifyPassword(null, PASSWORD)).resolves.toBe(false);
     await expect(verifyPassword(undefined, PASSWORD)).resolves.toBe(false);
     await expect(verifyPassword("", PASSWORD)).resolves.toBe(false);
-  });
+    // Three dummy argon2 verifications (the timing guard) exceeded the 5 s default under `pnpm verify`'s
+    // parallel turbo run on 2026-09-15 (P3-10). The assertion is about the answer, not the speed.
+  }, 30_000);
 
   it("returns false rather than throwing on a corrupt hash", async () => {
     // A truncated column must not become a 500 on the login path, and must certainly

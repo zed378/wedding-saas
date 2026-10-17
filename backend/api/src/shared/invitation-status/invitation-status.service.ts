@@ -63,6 +63,11 @@ interface Rule {
   readonly by: readonly ActorKind[];
   /** Backward transitions must say why (`docs/PLAN/06` § Transition Rules). */
   readonly reasonRequired?: boolean;
+  /**
+   * `P3-10`, ADR-081: the edge exists only for an invitation whose `invitation_status_history` never reached
+   * this status. Checked here, under the row lock, so the rule does not depend on every caller remembering it.
+   */
+  readonly neverReached?: InvitationStatus;
   readonly note: string;
 }
 
@@ -82,9 +87,14 @@ const TRANSITIONS: Record<InvitationStatus, readonly Rule[]> = {
       by: ["SYSTEM"],
       note: "late payment confirmed after the order expired",
     },
-    // `P3-09`, BR-2.8, ADR-080: the free trial publish. The machine cannot see history, so WHETHER this
-    // draft may take it — never paid, never published — is `PublishService`'s check, under the lock.
-    { to: "published", by: ["USER"], note: "free trial publish (BR-2.8)" },
+    // `P3-09`, BR-2.8, ADR-080: the free trial publish. Never paid is enforced here; the rest of the
+    // eligibility (once, inside its window — ADR-081) is `PublishService`'s check, under the same lock.
+    {
+      to: "published",
+      by: ["USER"],
+      neverReached: "paid",
+      note: "free trial publish (BR-2.8)",
+    },
   ],
 
   pending_payment: [
@@ -107,6 +117,15 @@ const TRANSITIONS: Record<InvitationStatus, readonly Rule[]> = {
       to: "paid",
       by: ["USER"],
       note: "unpublish — stays paid, republishable free",
+    },
+    // `P3-10`, ADR-081: unpublishing a BR-2.8 trial. It was never paid, so returning it to `paid` would
+    // hand out the product. Never for a paid invitation: a user taking one to `draft` is a refund, and
+    // refunds are ADMIN-only with a reason.
+    {
+      to: "draft",
+      by: ["USER"],
+      neverReached: "paid",
+      note: "unpublish a free trial (never paid)",
     },
     { to: "expired", by: ["SYSTEM"], note: "expiry_date passed, daily job" },
   ],
@@ -200,7 +219,25 @@ export class InvitationStatusService {
     if (current === undefined) throw new NotFoundError();
 
     const from = current.status as InvitationStatus;
-    assertAllowed(from, to, actor, reason);
+    const rule = assertAllowed(from, to, actor, reason);
+    if (rule.neverReached !== undefined) {
+      const [reached] = await tx
+        .select({ id: invitationStatusHistory.id })
+        .from(invitationStatusHistory)
+        .where(
+          and(
+            eq(invitationStatusHistory.invitationId, invitationId),
+            eq(invitationStatusHistory.toStatus, rule.neverReached),
+          ),
+        )
+        .limit(1);
+      if (reached !== undefined) {
+        throw new BusinessRuleError(
+          "INVALID_STATUS_TRANSITION",
+          `That change is not available from the ${from} state.`,
+        );
+      }
+    }
 
     await tx
       .update(invitations)
@@ -276,7 +313,7 @@ function assertAllowed(
   to: InvitationStatus,
   actor: Actor,
   reason: string | undefined,
-): void {
+): Rule {
   if (from === to) {
     throw new BusinessRuleError(
       "INVALID_STATUS_TRANSITION",
@@ -328,6 +365,7 @@ function assertAllowed(
       "This change requires a reason to be recorded.",
     );
   }
+  return rule;
 }
 
 /** A description for history rows whose caller gave none. Never empty. */

@@ -31,6 +31,7 @@ interface InvitationDetail {
     readonly name: string;
     readonly version: string;
   };
+  readonly status: string;
   readonly settings?: { readonly enabled_sections?: readonly string[] };
   readonly [key: string]: unknown;
 }
@@ -195,6 +196,10 @@ export function EditorScreen({
         title={detail.internal_name ?? "Undangan tanpa nama"}
         dashboardHref="/dashboard"
         onTemplateChanged={() => {
+          setReloads((count) => count + 1);
+        }}
+        invitationStatus={detail.status}
+        onUnpublished={() => {
           setReloads((count) => count + 1);
         }}
         preview={<LivePreview />}

@@ -34,6 +34,8 @@ When the strategy changes from `path` to `subdomain`, the old path form must ans
 POST /invitations/:id/unpublish
   → guard: status === 'published'
   → set status = 'paid' (NOT draft — the rule in PLAN/06), published_at is not reset (history)
+    — a BR-2.8 trial (history never reached 'paid') returns to 'draft' instead (P3-10, ADR-081)
+  → expiry_date is not touched: a republish returns to it, and never extends it
   → invalidate this invitation's public page cache IMMEDIATELY (to avoid a window where the old page is still cached even though it should no longer be public)
   → statusHistory.record(...)
 ```

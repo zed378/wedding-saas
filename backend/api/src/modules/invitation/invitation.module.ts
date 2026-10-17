@@ -19,6 +19,7 @@ import { PublishCheckService } from "./publish-check.service";
 import { PreviewLinkService } from "./preview-link.service";
 import { InvitationStatusService } from "../../shared/invitation-status/invitation-status.service";
 import { RegionsModule } from "../regions/regions.module";
+import { InvitationRetentionService } from "./invitation-retention.service";
 
 /** P1-09 and P1-10. The sub-resources are `P1-11` onwards. */
 @Module({
@@ -44,6 +45,7 @@ import { RegionsModule } from "../regions/regions.module";
     InvitationStatusService,
     PublishCheckService,
     PreviewLinkService,
+    InvitationRetentionService,
   ],
   exports: [
     InvitationCreateService,
@@ -59,6 +61,7 @@ import { RegionsModule } from "../regions/regions.module";
     // `P3-09`: the publishing module's publish gate uses these.
     PublishCheckService,
     InvitationStatusService,
+    InvitationRetentionService,
   ],
 })
 export class InvitationModule {}

@@ -123,6 +123,15 @@ app.vizunicum.my.id {
 		}
 	}
 
+	# Static Next.js assets — immutable long TTL (P3-12, docs/ARCHITECTURE/05 § CDN)
+	@static_app {
+		path /_next/static/*
+	}
+	handle @static_app {
+		header Cache-Control "public, max-age=31536000, immutable"
+		reverse_proxy http://web-app:3100
+	}
+
 	# Everything else → authenticated Next.js app
 	handle {
 		reverse_proxy http://web-app:3100
@@ -136,6 +145,15 @@ invitation.vizunicum.my.id {
 	tls {env.TLS_EMAIL}
 
 	import security_headers_invitation
+
+	# Static Next.js and immutable assets (P3-12, docs/ARCHITECTURE/05 § CDN)
+	@static_invite {
+		path /_next/static/*
+	}
+	handle @static_invite {
+		header Cache-Control "public, max-age=31536000, immutable"
+		reverse_proxy http://public-invite:3200
+	}
 
 	# Public API paths (guest RSVP and guestbook submissions) — rate limited.
 	@public_api {

@@ -43,6 +43,7 @@ export interface Settlement {
   /** Whether THIS call moved the order to `paid` — the only case that emits `order.paid`. */
   readonly becamePaid: boolean;
   readonly needsReview: boolean;
+  readonly invitationId?: string;
 }
 
 /** `P3-08` — an order in its owner's history: the creation shape plus what happened since. */
@@ -359,11 +360,43 @@ export class OrderService {
         result = "applied_entitlement_skipped";
         needsReview = true;
       }
+    } else if (order.orderType === "renewal") {
+      try {
+        const renewed = await this.repository.applyRenewal(
+          tx,
+          order.invitationId,
+          order.packageId,
+        );
+        if (renewed === null) {
+          result = "applied_entitlement_skipped";
+          needsReview = true;
+        } else {
+          metrics.invitationsRenewed.inc();
+          if (renewed.status === "expired") {
+            await this.status.transitionWithin(
+              tx,
+              order.invitationId,
+              "published",
+              { kind: "SYSTEM", userId: null },
+              result === "late_payment"
+                ? "payment webhook: late renewal payment confirmed (review)"
+                : "renewal payment confirmed",
+            );
+          }
+        }
+      } catch (error) {
+        if (
+          !(error instanceof BusinessRuleError) ||
+          error.code !== "INVALID_STATUS_TRANSITION"
+        ) {
+          throw error;
+        }
+        result = "applied_entitlement_skipped";
+        needsReview = true;
+      }
     }
-    // `renewal`: extending `expiry_date` and `expired → published` belong to `P3-13`, which reads paid
-    // renewal orders. Nothing about the invitation changes here.
 
-    return { result, becamePaid: true, needsReview };
+    return { result, becamePaid: true, needsReview, invitationId: order.invitationId };
   }
 
   /**

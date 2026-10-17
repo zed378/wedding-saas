@@ -1,0 +1,54 @@
+# deploy/prometheus/blackbox.yml
+#
+# Prometheus Blackbox Exporter configuration — P3-11.
+#
+# The blackbox exporter probes the three production hostnames over HTTPS. Its
+# probe_ssl_earliest_cert_expiry metric is the data source for the
+# CertificateExpiresInFourteenDays alert rule in deploy/prometheus/alerts.yml.
+#
+# Without this file and the exporter service, that metric is never scraped and
+# the alert never fires — making the 14-day certificate-expiry alert silently
+# inactive.
+#
+# Usage:
+#   This file is mounted read-only into the blackbox-exporter container.
+#   See the `blackbox-exporter` service in docker-compose.staging.yml.
+#
+# Prometheus scrape job (add to prometheus.yml):
+#
+#   - job_name: blackbox_tls
+#     metrics_path: /probe
+#     params:
+#       module: [https_2xx]
+#     static_configs:
+#       - targets:
+#           - https://app.vizunicum.my.id
+#           - https://invitation.vizunicum.my.id
+#           - https://admin.vizunicum.my.id
+#     relabel_configs:
+#       - source_labels: [__address__]
+#         target_label: __param_target
+#       - source_labels: [__param_target]
+#         target_label: instance
+#       - target_label: __address__
+#         replacement: blackbox-exporter:9115
+
+modules:
+  # Probe an HTTPS endpoint: follow redirects, verify the TLS certificate chain,
+  # and collect TLS metadata including probe_ssl_earliest_cert_expiry.
+  https_2xx:
+    prober: http
+    timeout: 15s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: []  # empty = accept any 2xx
+      method: GET
+      follow_redirects: true
+      fail_if_ssl: false
+      fail_if_not_ssl: true
+      tls_config:
+        # Verify the certificate against the system trust store.
+        # Set insecure_skip_verify: true ONLY for internal/self-signed certs.
+        insecure_skip_verify: false
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: true

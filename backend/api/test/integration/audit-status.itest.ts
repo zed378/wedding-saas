@@ -239,9 +239,36 @@ describe("backward transitions require a reason (docs/PLAN/06)", () => {
 
   it("refuses a refund from a user", async () => {
     const { invitationId, userId } = await seedInvitation("published");
+    // A paid invitation: `published → draft` by a user exists only for a never-paid trial (ADR-081).
+    await pool.query(
+      "INSERT INTO invitation_status_history (invitation_id, from_status, to_status, reason) VALUES ($1, 'pending_payment', 'paid', 'test: paid')",
+      [invitationId],
+    );
     await expect(
       status.transition(invitationId, "draft", USER(userId), "I want a refund"),
     ).rejects.toThrow(BusinessRuleError);
+    expect(await statusOf(invitationId)).toBe("published");
+  });
+
+  it("lets a user unpublish a never-paid trial to draft, and nothing that was ever paid (ADR-081)", async () => {
+    const trial = await seedInvitation("published");
+    await status.transition(trial.invitationId, "draft", USER(trial.userId));
+    expect(await statusOf(trial.invitationId)).toBe("draft");
+
+    // And the trial edge back out of draft is closed to anything that was ever paid (a refunded invitation).
+    const refunded = await seedInvitation("draft");
+    await pool.query(
+      "INSERT INTO invitation_status_history (invitation_id, from_status, to_status, reason) VALUES ($1, 'pending_payment', 'paid', 'test: paid')",
+      [refunded.invitationId],
+    );
+    await expect(
+      status.transition(
+        refunded.invitationId,
+        "published",
+        USER(refunded.userId),
+      ),
+    ).rejects.toMatchObject({ code: "INVALID_STATUS_TRANSITION" });
+    expect(await statusOf(refunded.invitationId)).toBe("draft");
   });
 
   it("allows a user to soft-delete their own invitation from any state", async () => {

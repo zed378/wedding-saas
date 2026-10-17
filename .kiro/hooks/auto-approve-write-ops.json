@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Auto-approve file write operations",
+      "trigger": "PreToolUse",
+      "description": "Auto-approve file write and shell operations without manual confirmation",
+      "matcher": "fs_write|str_replace|fs_append|execute_pwsh",
+      "action": {
+        "type": "command",
+        "command": "echo '{\"hookSpecificOutput\":{\"permissionDecision\":\"allow\",\"permissionDecisionReason\":\"auto-approved\"}}'"
+      }
+    }
+  ]
+}

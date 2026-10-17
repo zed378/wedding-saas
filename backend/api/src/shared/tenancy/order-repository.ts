@@ -2,7 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 import { DB, type Database } from "../../infra/db/client";
-import { invitations, orders } from "../../infra/db/schema/index";
+import { invitations, orders, packages } from "../../infra/db/schema/index";
 import type { Transaction } from "../db/transaction";
 import type { TenantScope } from "./tenant-scope";
 
@@ -259,6 +259,57 @@ export class OrderRepository {
       .where(and(eq(orders.id, orderId), eq(orders.status, from)))
       .returning({ id: orders.id });
     return rows.length === 1;
+  }
+
+  /**
+   * `P3-13` — extend `expiry_date` from `GREATEST(expiry_date, now() in WIB)` by package duration.
+   * `docs/BACKEND/06` § Renewal. Runs under transaction holding the invitation row lock.
+   */
+  async applyRenewal(
+    tx: Transaction,
+    invitationId: string,
+    packageId: string,
+  ): Promise<{
+    slug: string | null;
+    status: string;
+    newExpiryDate: string;
+  } | null> {
+    const [pkg] = await tx
+      .select({ durationMonths: packages.durationMonths })
+      .from(packages)
+      .where(eq(packages.id, packageId))
+      .limit(1);
+    if (!pkg) return null;
+
+    const [invitation] = await tx
+      .select({
+        id: invitations.id,
+        status: invitations.status,
+        slug: invitations.slug,
+        expiryDate: invitations.expiryDate,
+      })
+      .from(invitations)
+      .where(eq(invitations.id, invitationId))
+      .for("update")
+      .limit(1);
+    if (!invitation) return null;
+
+    const [updated] = await tx
+      .update(invitations)
+      .set({
+        expiryDate: sql`(GREATEST(COALESCE(${invitations.expiryDate}, (now() AT TIME ZONE 'Asia/Jakarta')::date), (now() AT TIME ZONE 'Asia/Jakarta')::date) + make_interval(months => ${pkg.durationMonths}))::date`,
+        updatedAt: sql`now()`,
+      })
+      .where(eq(invitations.id, invitationId))
+      .returning({
+        expiryDate: invitations.expiryDate,
+      });
+
+    return {
+      slug: invitation.slug,
+      status: invitation.status,
+      newExpiryDate: updated!.expiryDate!,
+    };
   }
 
   /**

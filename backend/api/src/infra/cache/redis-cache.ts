@@ -105,6 +105,14 @@ export class RedisCache implements CachePort {
     }
   }
 
+  async delete(namespace: string, key: string): Promise<void> {
+    try {
+      await this.redis.del(await this.#key(namespace, key));
+    } catch (error) {
+      this.#report("cache.delete_failed", namespace, error);
+    }
+  }
+
   async #key(namespace: string, key: string): Promise<string> {
     const generation = await this.#generation(namespace);
     return `cache:${namespace}:${String(generation)}:${key}`;

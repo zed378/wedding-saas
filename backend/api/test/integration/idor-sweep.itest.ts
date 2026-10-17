@@ -105,6 +105,13 @@ interface SweepCase {
   readonly crossOwnParent?: (ctx: Ctx) => request.Test;
   /** As `crossChildControl`, for the same-owner case. */
   readonly crossOwnParentControl?: (ctx: Ctx) => request.Test;
+  /**
+   * `P3-10`. State the positive control needs and a fresh tenant does not have — `unpublish` answers its
+   * owner 422 unless the invitation is live. Run on the owner's fresh tenant only: the attack still runs
+   * against Alice's unpublished invitation, where a missing ownership check answers 422 rather than 404
+   * and fails the sweep all the same.
+   */
+  readonly prepareOwner?: (pool: Pool, t: PhaseOneTenant) => Promise<void>;
 }
 
 /** A uuid that names nothing, for the indistinguishability control. */
@@ -375,6 +382,21 @@ const CASES: readonly SweepCase[] = [
     send: (c, token, t) =>
       auth(
         api(c).post(`/api/v1/invitations/${t.invitation.id}/publish`),
+        token,
+      ),
+  },
+  {
+    // P3-10. Unpublishing somebody else's invitation takes a wedding page off the internet days before the day.
+    label: "POST /invitations/:id/unpublish",
+    prepareOwner: async (pool, t) => {
+      await pool.query(
+        "UPDATE invitations SET status = 'published', published_at = now(), expiry_date = CURRENT_DATE + 3 WHERE id = $1",
+        [t.invitation.id],
+      );
+    },
+    send: (c, token, t) =>
+      auth(
+        api(c).post(`/api/v1/invitations/${t.invitation.id}/unpublish`),
         token,
       ),
   },
@@ -739,6 +761,7 @@ describe("P1-25, P2-14 — IDOR sweep over every owner-scoped :id endpoint (comp
     "%s still answers the owner",
     async (label, sweepCase) => {
       const tenant = await createPhaseOneTenant(owner, signingKey, "Owner");
+      await sweepCase.prepareOwner?.(owner, tenant);
       const res = await sweepCase.send(ctx, tenant.token, tenant);
 
       expect(

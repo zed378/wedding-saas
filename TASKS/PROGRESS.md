@@ -2,11 +2,10 @@
 
 Single source of truth for where the project stands. Updated in the same commit as the work it describes (`00-TASK-CONVENTIONS.md` global DoD item 11).
 
-**Last updated**: 2026-10-08
-**Current phase**: Phase 3 — Order, Payment and Publishing (11 / 16 done). **Phase 2 is complete** (18 / 18 including the owner-requested `P2-16`, `P2-17` and `P2-18`; [summary](../MEMORY/records/2026-09-13-PHASE-2-SUMMARY.md)); **Phase 1 is complete** (25 / 25, [summary](../MEMORY/records/2026-09-12-PHASE-1-SUMMARY.md)); Phase 0 is 26 / 27 done. **Staging is live** but runs code from before Phase 2's fixes: redeploy, run migrations `0007`–`0014`, start the new `api-jobs` service, `db:seed:regions`, and reseed before showing it to anyone. `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
-
+**Last updated**: 2026-10-17
+**Current phase**: Phase 4 — Engagement (0 / 12 done). **Phase 3 is complete** (16 / 16 done, [summary](../MEMORY/records/2026-10-17-PHASE-3-SUMMARY.md)); **Phase 2 is complete** (18 / 18 including the owner-requested `P2-16`, `P2-17` and `P2-18`; [summary](../MEMORY/records/2026-09-13-PHASE-2-SUMMARY.md)); **Phase 1 is complete** (25 / 25, [summary](../MEMORY/records/2026-09-12-PHASE-1-SUMMARY.md)); Phase 0 is 26 / 27 done. **Staging is live** but runs code from before Phase 2's fixes: redeploy, run migrations `0007`–`0014`, start the new `api-jobs` service, `db:seed:regions`, and reseed before showing it to anyone. `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
 The only task left is `P0-17` (CI/CD), deferred by ADR-028. Its **deployment** half was waived by the project owner on 2026-09-11; deploying is `git pull` plus a compose command. Its **verification** half was not waived and is the one Phase 0 exit criterion still unmet — see below. **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
-**Overall**: 80 / 140 tasks done
+**Overall**: 85 / 140 tasks done
 
 **No automated pipeline**: `P0-17` is deferred (ADR-028). Before merging to `main`, run `scripts/verify.sh`. The `:id`-endpoint gate blocks in `.githooks/pre-push`; integration tests, the coverage floor, SAST and dependency scanning are **not** running anywhere until `P0-17` is picked up — revisit before Phase 3 payment code.
 
@@ -26,8 +25,8 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 | [Phase 0 — Foundation](./PHASE-0-FOUNDATION.md) | 27 | 26 | **ACTIVE** | — |
 | [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 25 | **COMPLETE** — 2026-09-12 | Phase 0 exit criteria |
 | [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 18 | 18 | **COMPLETE** — including three owner-requested cards added after the phase summary | Phase 1 exit + `P1-25` — **met** |
-| [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 10 | **ACTIVE** | Phase 2 exit — **met** (LCP qualified by `OQ-26`) | Phase 2 exit — **met** (LCP qualified by `OQ-26`) |
-| [Phase 4 — Engagement](./PHASE-4-ENGAGEMENT.md) | 12 | 0 | Not started | Phase 3 exit |
+| [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 16 | **COMPLETE** — 2026-10-17 | Phase 2 exit — **met** (LCP qualified by `OQ-26`) |
+| [Phase 4 — Engagement](./PHASE-4-ENGAGEMENT.md) | 12 | 0 | **ACTIVE** | Phase 3 exit — **met** |
 | [Phase 5 — Admin Panel](./PHASE-5-ADMIN-PANEL.md) | 14 | 0 | Not started | Phase 4 exit |
 | [Phase 6 — Hardening and Launch](./PHASE-6-HARDENING-AND-LAUNCH.md) | 17 | 0 | Not started | Phase 5 exit |
 | [Phase 7 — Post-Launch](./PHASE-7-POST-LAUNCH.md) | 11 | 0 | Not started | MVP launched, `P6-17` signed off |
@@ -160,11 +159,11 @@ Roadmap: Week 8-9. **Entry needs `OQ-02` and `OQ-05` answered.**
 | P3-09 | Publish endpoint | backend | L | **DONE** — paid publish and BR-2.8 trial (new `draft → published` edge, history-checked); trial notice on the public page; E2E live < 5 s; **fixed: completeness checks read the editor DTO instead of the canonical document, so nothing on the reference template could ever be published** (ADR-080) | P2-06, P3-05 |
 | P3-10 | Unpublish, republish, slug change | backend | M | **DONE** — unpublish to `paid`, or `draft` for a never-paid trial (new edge); **fixed: unpublish + republish renewed validity for free** — republish keeps `expiry_date` unless a newer paid order exists; a trial resumes only inside its window; `slug_change` in the settings response; the through-the-cache 404 test is carried to `P3-12` (ADR-081) | P3-09 |
 | P3-11 | Production subdomain routing and TLS | infra | M | **DONE** — [record](../MEMORY/records/2026-10-08-P3-11-subdomain-routing-tls.md); `Caddyfile.production` with three hostnames, ACME TLS, rate limiting, webhook bypass, media body cap, security headers | P3-09, P0-23 |
-| P3-12 | Public page caching and invalidation | backend, infra | L | TODO | P3-09, P2-08 |
-| P3-13 | Invitation expiry job and renewal | worker, backend | L | TODO | P3-09, P3-07 |
-| P3-14 | Frontend — checkout and payment status | web-app | L | TODO | P3-04, P0-22 |
-| P3-15 | Frontend — publish flow and share | web-app | M | TODO | P3-09, P2-06 |
-| P3-16 | Payment security review and acceptance | all | L | TODO | all above |
+| P3-12 | Public page caching and invalidation | backend, infra | L | **DONE** — [record](../MEMORY/records/2026-10-17-P3-12-public-caching.md); Redis two-level cache (slug pointer + versioned payload); singleflight collapses 100 concurrent cold misses into 1 DB query; fail-open on Redis errors; immediate in-process and worker cache invalidation; 404 immediately through cache on unpublish (P3-10 obligation met); metrics and alert (ADR-082) | P3-09, P2-08 |
+| P3-13 | Invitation expiry job and renewal | worker, backend | L | **DONE** — [record](../MEMORY/records/2026-10-17-P3-13-invitation-expiry-and-renewal.md); scheduled 00:05 WIB sweep moves overdue published to expired; renewal validity extension via GREATEST restores published; public API returns undifferentiated 404; 01:00 WIB retention sweep soft-deletes after 90 days, hard-deletes after 30 days purging R2/MinIO storage objects; 7-day gallery media purge (P1-19 obligation met); order financial integrity preserved (ADR-083) | P3-09, P3-07 |
+| P3-14 | Frontend — checkout and payment status | web-app | L | **DONE** — [record](../MEMORY/records/2026-10-17-P3-14-checkout-and-payment-status.md); single package (Rp 139k/12mo); URL status ignored (`?status=success` tampering resistance, ADR-084); accessible `PaymentStatusBanner`; 60s timeout fallback; WhatsApp/IG WebView detection and escape | P3-04, P0-22 |
+| P3-15 | Frontend — publish flow and share | web-app | M | **DONE** — [record](../MEMORY/records/2026-10-17-P3-15-publish-flow-and-share.md); server `publish-check`; navigable missing-field modal switching active section & focusing field; slug confirm modal with inline 409 `SLUG_TAKEN` recovery & suggestions (ADR-085); checkout routing; working public link + WhatsApp share; consequence-first unpublish | P3-09, P2-06 |
+| P3-16 | Payment security review and acceptance | all | L | **DONE** — [record](../MEMORY/records/2026-10-17-P3-16-payment-security-review.md); payment tampering suite passing; clause-by-clause audit of docs/SECURITY/07; PCI scope minimal (SAQ-A); log redaction verified; publish SLA < 5s; security sign-off recorded; Phase 3 complete (16/16) | all above |
 
 **Critical path**: `P3-01` → `P3-02` → `P3-03` → `P3-05` → `P3-09`. `P3-05` is the most security-critical task in the project; `P3-16` gates production.
 

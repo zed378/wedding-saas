@@ -73,6 +73,7 @@ export function SectionListPanel() {
               >
                 <button
                   type="button"
+                  data-section={section.section_key}
                   // `aria-current` rather than a class alone: which section is open is
                   // information, and a colour is not information to everyone.
                   aria-current={isActive ? "true" : undefined}

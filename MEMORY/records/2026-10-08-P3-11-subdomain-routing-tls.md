@@ -37,10 +37,12 @@
 | Path | Change |
 |---|---|
 | `deploy/Caddyfile.production` | Created — production Caddy config with three hostnames, ACME TLS, rate limiting, body cap, security headers |
+| `deploy/caddy/Dockerfile` | Created (iteration 2) — xcaddy build that adds caddy-ratelimit to the Caddy binary; both compose files now build from this |
 | `deploy/prometheus/alerts.yml` | Added `tls` alert group with `CertificateExpiresInFourteenDays` rule |
-| `deploy/docker-compose.yml` | Added `caddy` service behind `--profile proxy`; added `caddy-data` and `caddy-config` volumes |
-| `deploy/docker-compose.staging.yml` | Added `caddy` service (always-on); added `caddy-data` and `caddy-config` volumes |
-| `deploy/test/routing-check.sh` | Created — post-deploy verification script |
+| `deploy/prometheus/blackbox.yml` | Created (iteration 2) — blackbox exporter module config for HTTPS TLS probing; required for the cert-expiry alert |
+| `deploy/docker-compose.yml` | Added `caddy` service (build from `deploy/caddy/Dockerfile`, behind `--profile proxy`); added `blackbox-exporter` service (behind `--profile proxy`); added volumes |
+| `deploy/docker-compose.staging.yml` | Added `caddy` service (build from `deploy/caddy/Dockerfile`, always-on); added `blackbox-exporter` service; added volumes |
+| `deploy/test/routing-check.sh` | Created; updated (iteration 2) — body-cap test accepts `MEDIA_AUTH_TOKEN` for conclusive check; reports FAIL on 401/403 |
 | `docs/DEVOPS/03-REVERSE-PROXY.md` | Updated to note `deploy/Caddyfile.production` is the authoritative implementation |
 
 ## Decisions Made
@@ -108,17 +110,17 @@ No unit or integration tests added: this task is pure infrastructure configurati
 
 Nothing. This is a new infrastructure-only configuration file; there was no existing code to break.
 
-The `caddy-ratelimit` module dependency means the image that runs in production must be built with `xcaddy` or a pre-built image that includes the module. The standard `caddy:2.9-alpine` image will fail to start with `unknown directive: rate_limit`. A `deploy/caddy/Dockerfile` build target using `xcaddy` should be added before the first production deploy — this is a follow-up, not a blocker for the configuration itself.
+The `caddy-ratelimit` module dependency means the image that runs in production must be built with `xcaddy` or a pre-built image that includes the module. The standard `caddy:2.9-alpine` image will fail to start with `unknown directive: rate_limit`. A `deploy/caddy/Dockerfile` build target using `xcaddy` was added (iteration 2) and both compose files updated to build from it.
 
 ## Follow-Ups and Open Questions
 
-- **`deploy/caddy/Dockerfile`** — a custom Caddy image built with `xcaddy` that includes `caddy-ratelimit`. The standard official image does not include it and will refuse to start. Should be added before the first production deploy of this config.
-- **Blackbox exporter configuration** — `CertificateExpiresInFourteenDays` depends on the Prometheus blackbox exporter scraping each of the three hostnames. The scrape target configuration (`prometheus.yml` / `blackbox.yml`) needs to be added to `deploy/prometheus/` before the alert is active.
 - **P5-01** — when the admin panel ships, replace the two `respond "Admin panel not yet available (P5-01)" 503` entries in the admin host block with a `reverse_proxy http://admin:8080` (or whatever port the admin app exposes).
 - **P7-01 (custom domains)** — when programmatic DNS becomes available, add an `on-demand TLS` server block for `*.invitation.vizunicum.my.id` (or per-invitation custom domains). The Caddy config is structured to make this a minimal additive change.
+- **body-cap confirmed test** — `routing-check.sh` can confirm proxy-level enforcement if run with `MEDIA_AUTH_TOKEN=<bearer>`. Without a token, a 401 from NestJS precedes the cap check and the test fails with an explicit message directing the operator to re-run with credentials.
 
 ## What to Watch
 
-- **Caddy startup with the standard image** — if `rate_limit` fails to load, Caddy exits immediately with `unknown directive`. The symptom is all three hosts returning connection-refused. Check `docker compose logs caddy`.
+- **Caddy startup** — if `rate_limit` fails to load (wrong image, failed build), Caddy exits immediately with `unknown directive: rate_limit`. Symptom: all three hosts return connection-refused. Check `docker compose logs caddy`. The custom image built from `deploy/caddy/Dockerfile` includes the module and verifies it at image build time.
 - **ACME rate limits** — Let's Encrypt has a 50 certificates/domain/week limit. With three fixed hostnames, we are well below it, but renewals that fail and retry rapidly can hit the failed-validation limit. Watch Caddy logs for `acme` and `certificate` lines.
-- **Cert expiry alert firing without Blackbox exporter** — the `CertificateExpiresInFourteenDays` alert uses `probe_ssl_earliest_cert_expiry`. If the blackbox exporter is not yet deployed, the metric does not exist and the alert never fires. Until the exporter is running, monitor certificate expiry manually with `routing-check.sh`.
+- **Blackbox exporter must be running** — the `CertificateExpiresInFourteenDays` alert only fires if `blackbox-exporter` is up and Prometheus is scraping it. Confirm the scrape job exists in `prometheus.yml` (see the comment in `deploy/prometheus/blackbox.yml`) and that `probe_ssl_earliest_cert_expiry` appears in the Prometheus metrics endpoint.
+- **Body-cap test requires a token** — `routing-check.sh` reports FAIL (not warn) when the body-cap check returns 401/403, because that means the cap is unverified. Run with `MEDIA_AUTH_TOKEN=<bearer>` in CI after deployment to get a conclusive result.

@@ -55,6 +55,10 @@ export class JobRunner {
     this.dlq = new Queue(DLQ_NAME, { connection: options.connection });
   }
 
+  get redis(): Redis {
+    return this.options.redis;
+  }
+
   register<T>(jobName: string, handler: Handler<T>): this {
     // Throws for an unregistered name -- a job with no policy has no retry count, no
     // pool and no dead-letter decision, and inventing those silently is how a job ends

@@ -15,6 +15,9 @@ import {
  * The invitation is filled in through the API — entering data is not under test — then published, and
  * the clock runs from the publish response to the first 200 from the public address. It is published as
  * a BR-2.8 trial (the account never paid), so the page must also carry the trial notice.
+ *
+ * `P3-10` extends it: unpublish → the public address answers 404 at once; republish → live again with the
+ * trial's original end date.
  */
 
 let stack: FullStack;
@@ -142,4 +145,22 @@ test("a published invitation is reachable at its public address within five seco
   await page.goto(`${PUBLIC_INVITE_ORIGIN}/${slug}`);
   await expect(page.locator("body")).toContainText("Budi");
   await expect(page.locator('[data-trial-watermark="true"]')).toBeVisible();
+
+  // ---- `P3-10`: unpublish takes the page down on the very next request, through the production
+  // public-invite build (the only layer that could cache it today). A trial goes back to `draft`.
+  const unpublished = await api("POST", `/invitations/${id}/unpublish`);
+  expect(unpublished).toEqual({ status: "draft", slug });
+  const gone = await request.get(`${PUBLIC_INVITE_ORIGIN}/${slug}`);
+  expect(gone.status()).toBe(404);
+
+  // Republished inside the trial window: the same trial, the same end date.
+  const republished = await api("POST", `/invitations/${id}/publish`);
+  expect(republished).toMatchObject({
+    status: "published",
+    trial: true,
+    expiry_date: published["expiry_date"],
+  });
+  expect((await request.get(`${PUBLIC_INVITE_ORIGIN}/${slug}`)).status()).toBe(
+    200,
+  );
 });

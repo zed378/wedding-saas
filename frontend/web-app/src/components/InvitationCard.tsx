@@ -51,6 +51,12 @@ export function InvitationCard({
   const name = invitation.internal_name ?? "Undangan tanpa nama";
   const eventDate = formatDate(invitation.nearest_event_date);
   const published = invitation.status === "published";
+  /**
+   * P3-14. Show a "Bayar" button for invitations that need payment.
+   * `pending_payment` = order exists but not yet paid; `expired` = show upgrade/renew.
+   */
+  const needsPayment =
+    invitation.status === "pending_payment" || invitation.status === "expired";
 
   return (
     <li className="rounded-lg border border-border bg-surface-raised p-4">
@@ -142,6 +148,24 @@ export function InvitationCard({
           >
             Hapus
           </button>
+        )}
+
+        {/*
+         * P3-14. "Bayar" for pending_payment, "Perbarui" for expired.
+         * Links to the checkout page so the user can pay without re-creating an order.
+         */}
+        {needsPayment && (
+          <a
+            className="focus-ring rounded-md bg-primary-600 px-3 py-1.5 text-sm font-medium text-text-inverse hover:bg-primary-700"
+            href={`/checkout/${invitation.id}`}
+            aria-label={
+              invitation.status === "expired"
+                ? `Perbarui ${name}`
+                : `Bayar ${name}`
+            }
+          >
+            {invitation.status === "expired" ? "Perbarui" : "Bayar"}
+          </a>
         )}
       </div>
     </li>

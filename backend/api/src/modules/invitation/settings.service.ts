@@ -1,5 +1,6 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 
+import { JOB_QUEUE, type JobQueue } from "../../infra/queue/queue.module";
 import {
   BusinessRuleError,
   ConflictError,
@@ -69,6 +70,14 @@ export interface SettingsPatch {
 
 export interface SettingsResult extends SettingsDto {
   readonly slug: string | null;
+  /**
+   * `P3-10`, BR-6.2: present only on the response to a slug change on an invitation that was published
+   * before — the client shows that links already shared no longer work.
+   */
+  readonly slug_change?: {
+    readonly previous_slug: string | null;
+    readonly links_broken: true;
+  };
 }
 
 @Injectable()
@@ -76,6 +85,7 @@ export class SettingsService {
   constructor(
     private readonly repository: InvitationRepository,
     private readonly slugs: SlugService,
+    @Inject(JOB_QUEUE) private readonly queue: JobQueue,
   ) {}
 
   async get(scope: TenantScope, invitationId: string): Promise<SettingsResult> {
@@ -129,9 +139,10 @@ export class SettingsService {
       assertThemeKeysValid(template.customizableThemeKeys, patch.themeOverride);
     }
 
-    if (patch.slug !== undefined) {
-      await this.applySlugChange(scope, invitation, patch);
-    }
+    const slugChange =
+      patch.slug !== undefined
+        ? await this.applySlugChange(scope, invitation, patch)
+        : undefined;
 
     const toggles: Parameters<InvitationRepository["updateSettings"]>[2] = {
       ...(patch.enabledSections !== undefined
@@ -158,7 +169,10 @@ export class SettingsService {
       await this.repository.updateSettings(invitationId, scope, toggles);
     }
 
-    return this.get(scope, invitationId);
+    const result = await this.get(scope, invitationId);
+    return slugChange === undefined
+      ? result
+      : { ...result, slug_change: slugChange };
   }
 
   /**
@@ -248,10 +262,10 @@ export class SettingsService {
     scope: TenantScope,
     invitation: { id: string; slug: string | null; publishedAt: Date | null },
     patch: SettingsPatch,
-  ): Promise<void> {
+  ): Promise<SettingsResult["slug_change"]> {
     const next = patch.slug!.trim();
 
-    if (next === invitation.slug) return;
+    if (next === invitation.slug) return undefined;
 
     const hasBeenPublished = invitation.publishedAt !== null;
 
@@ -300,7 +314,22 @@ export class SettingsService {
         },
         "slug changed on a previously published invitation; old links are now dead",
       );
+      // `P3-12` drops the old address from the cache when one exists.
+      if (invitation.slug !== null) {
+        await this.queue.enqueue(
+          "general",
+          "cache.invalidate",
+          {
+            slug: invitation.slug,
+            invitationId: invitation.id,
+            reason: "slug_changed",
+          },
+          { relatedId: invitation.id },
+        );
+      }
+      return { previous_slug: invitation.slug, links_broken: true };
     }
+    return undefined;
   }
 }
 

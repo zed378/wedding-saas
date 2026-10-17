@@ -84,6 +84,41 @@ export const metrics = {
     "Pending orders expired unpaid, by order type — a checkout-funnel signal (P3-07).",
     ["order_type"],
   ),
+  publicInvitationCacheHits: new Counter(
+    "wi_public_invitation_cache_hits_total",
+    "Public invitation page cache hits in Redis (P3-12).",
+    [],
+  ),
+  publicInvitationCacheMisses: new Counter(
+    "wi_public_invitation_cache_misses_total",
+    "Public invitation page cache misses falling through to the database (P3-12).",
+    [],
+  ),
+  invitationsExpired: new Counter(
+    "wi_invitations_expired_total",
+    "Invitations transitioned to expired because expiry_date passed (P3-13).",
+    [],
+  ),
+  invitationsRenewed: new Counter(
+    "wi_invitations_renewed_total",
+    "Invitations renewed by a paid renewal order (P3-13).",
+    [],
+  ),
+  invitationsSoftDeleted: new Counter(
+    "wi_invitations_soft_deleted_total",
+    "Invitations soft-deleted after 90 days expired without renewal (P3-13, BR-9.1).",
+    [],
+  ),
+  invitationsHardDeleted: new Counter(
+    "wi_invitations_hard_deleted_total",
+    "Invitations hard-deleted after 30 days soft-deleted with storage purged (P3-13, BR-9.1).",
+    [],
+  ),
+  mediaOrphansCleaned: new Counter(
+    "wi_media_orphans_cleaned_total",
+    "Individually soft-deleted media files hard-deleted after 7 days grace period (P3-13, P1-19).",
+    [],
+  ),
 } as const;
 
 export function renderMetrics(): string {

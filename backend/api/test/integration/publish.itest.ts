@@ -237,8 +237,10 @@ describe("publish (P3-09)", () => {
       expect((await row(id)).status).toBe("expired");
     });
 
-    it("refuses a trial for a draft that was ever published before", async () => {
+    it("refuses a trial for a draft that was ever published before, once its window has passed", async () => {
       // A refund returns an invitation to `draft` from anywhere (ADR-019); its history still shows a publish.
+      // Inside the original three days that is a resumed trial (ADR-081, `unpublish.itest.ts`); after them it
+      // is a second trial.
       const { user, id } = await invitation();
       await service.publish(verified(user), id);
       await new InvitationStatusService(harness.db).transition(
@@ -246,6 +248,10 @@ describe("publish (P3-09)", () => {
         "draft",
         { kind: "ADMIN", userId: user.id },
         "refund",
+      );
+      await harness.pool.query(
+        "UPDATE invitations SET expiry_date = (now() AT TIME ZONE 'Asia/Jakarta')::date - 1 WHERE id = $1",
+        [id],
       );
 
       expect(

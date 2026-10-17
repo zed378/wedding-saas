@@ -237,9 +237,16 @@ services:
   #   docker compose -f deploy/docker-compose.yml --profile proxy up -d
   #
   # Set TLS_EMAIL in .env before using with real hostnames.
+  #
+  # IMPORTANT: This uses a custom image built from deploy/caddy/Dockerfile via xcaddy,
+  # because Caddyfile.production uses the caddy-ratelimit module which is NOT included
+  # in the standard caddy:2.9-alpine image. Using the upstream image would cause Caddy
+  # to exit immediately with "unknown directive: rate_limit".
   caddy:
     profiles: ["proxy"]
-    image: caddy:2.9-alpine
+    build:
+      context: ..
+      dockerfile: deploy/caddy/Dockerfile
     restart: unless-stopped
     ports:
       - "80:80"    # HTTP (ACME HTTP-01 challenge)
@@ -253,6 +260,22 @@ services:
     depends_on:
       api:
         condition: service_healthy
+
+  # Prometheus Blackbox Exporter — probes the three production hostnames over HTTPS
+  # to provide the probe_ssl_earliest_cert_expiry metric used by the
+  # CertificateExpiresInFourteenDays alert in deploy/prometheus/alerts.yml.
+  # Without this service that alert is permanently silent.
+  # Behind --profile proxy because it needs the hostnames to be reachable.
+  blackbox-exporter:
+    profiles: ["proxy"]
+    image: prom/blackbox-exporter:v0.25.0
+    restart: unless-stopped
+    ports:
+      - "9115:9115"
+    volumes:
+      - ./prometheus/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    command:
+      - "--config.file=/etc/blackbox/blackbox.yml"
 
 volumes:
   postgres-data:
