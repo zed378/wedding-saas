@@ -68,5 +68,50 @@ GET    /public/preview/:token                      Render an unpublished invitat
 - Input validation & sanitization is just as strict as authenticated endpoints (SECURITY/08).
 - Guestbook: if `guestbook_moderation = true`, the new entry's `status = pending` and does NOT appear in `GET guestbook` until approved by the owner.
 
+### POST /public/i/:slug/guestbook (`P4-03`)
+- **Body**: `{ "guest_name": string (1..150), "message": string (1..1000) }` (strict, unknown keys rejected).
+- **Status Codes**:
+  - `201 Created`: Entry submitted. Returns `{ "success": true, "data": { "id": "...", "guest_name": "...", "message": "...", "status": "approved" | "pending", "created_at": "..." } }`.
+  - `400 Bad Request`: Validation error or non-whitelisted keys.
+  - `404 Not Found`: Invitation not found, not published, or soft-deleted.
+  - `422 Unprocessable Entity`: `code: "GUESTBOOK_DISABLED"` when `guestbook_enabled` is false.
+  - `429 Too Many Requests`: Exceeded 10 submissions/hour per IP hash and slug (`rateLimit("guestbook")`).
+- **Security & Moderation**:
+  - Sanitizes `guest_name` and `message` using `TEXT_FIELDS` before database insertion to prevent stored XSS.
+  - Anonymizes IP as a SHA-256 hash stored in `submitted_ip_hash`.
+  - Initial status is `approved` when `guestbook_moderation = false`, or `pending` when `guestbook_moderation = true`.
+  - Duplicate spam detector: identical message from a different IP hash within 5 minutes is automatically forced to `pending`.
+  - Asynchronously enqueues `guestbook.submitted` notification job to BullMQ `general` queue.
+
+### GET /public/i/:slug/guestbook (`P4-03`)
+- **Query Params**: `page` (positive int, default 1), `per_page` / `limit` (positive int <= 100, default 20).
+- **Status Codes**:
+  - `200 OK`: Returns paginated list of approved entries:
+    ```json
+    {
+      "success": true,
+      "data": [
+        {
+          "id": "uuid",
+          "guest_name": "Budi Pratama",
+          "message": "Selamat menempuh hidup baru!",
+          "created_at": "2026-10-17T12:00:00.000Z"
+        }
+      ],
+      "meta": {
+        "page": 1,
+        "per_page": 20,
+        "total": 1,
+        "total_pages": 1
+      }
+    }
+    ```
+  - `404 Not Found`: Invitation not found, not published, or soft-deleted.
+  - `429 Too Many Requests`: Rate-limited under `rateLimit("general-public")`.
+- **Filtering & Visibility**:
+  - SQL-enforced filter `status = 'approved'` ensures unapproved/pending or rejected messages are never leaked.
+  - Ordered newest first (`created_at DESC`).
+  - Omits `submitted_ip_hash`, `moderated_by`, and `moderated_at` from public response to protect privacy.
+
 ## Caching
 - `GET /public/i/:slug` is the primary candidate for CDN/app-level caching (see ARCHITECTURE/06-CACHING-ARCHITECTURE.md) — the response must be deterministic per `invitation_id + template_version_id`, without user-specific data (personalization `?to=Name` is handled on the frontend, not in this API response).

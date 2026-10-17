@@ -27,6 +27,10 @@ const EXEMPT: Readonly<Record<string, string>> = {
     "public by design; the status predicate is the rule — public-invitation.itest.ts › 'answers a draft, an unpublished, an expired and a deleted invitation identically…'",
   "POST /public/i/:slug/rsvp":
     "public attendance submission; published status predicate is the authorization boundary (P4-01) — public-rsvp.itest.ts › 'returns 404 and stores nothing for a draft, unpublished, expired, or deleted invitation'",
+  "POST /public/i/:slug/guestbook":
+    "public guestbook submission; published status predicate is the authorization boundary (P4-03) — public-guestbook.itest.ts › 'returns 404 and stores nothing for a draft, unpublished, expired, or deleted invitation'",
+  "GET /public/i/:slug/guestbook":
+    "public guestbook approved listing; published status predicate is the authorization boundary (P4-03) — public-guestbook.itest.ts › 'returns 404 for a draft, unpublished, expired, or deleted invitation'",
   "GET /public/preview/:token":
     "a bearer credential, not an owner route — preview-link.itest.ts › 'answers expired, revoked, invented, malformed and deleted-invitation tokens identically'",
   "GET /api/v1/templates/:slug":

@@ -1,5 +1,6 @@
 import { Global, Module } from "@nestjs/common";
 
+import { GuestbookRepository } from "./guestbook-repository";
 import { InvitationRepository } from "./invitation-repository";
 import { PublicInvitationRepository } from "./public-invitation-repository";
 import { RsvpRepository } from "./rsvp-repository";
@@ -18,11 +19,13 @@ import { RsvpRepository } from "./rsvp-repository";
   // demo lookup, and a second module providing its own instance would be a second
   // place the no-owner query could be constructed from.
   providers: [
+    GuestbookRepository,
     InvitationRepository,
     PublicInvitationRepository,
     RsvpRepository,
   ],
   exports: [
+    GuestbookRepository,
     InvitationRepository,
     PublicInvitationRepository,
     RsvpRepository,

@@ -10,6 +10,18 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-17 — Public guestbook submission and listing
+
+**Added** — public guestbook submission and approved listing endpoints ([P4-03](./records/2026-10-17-P4-03-public-guestbook.md))
+
+- Added `POST /public/i/:slug/guestbook` allowing wedding guests to submit congratulatory wishes (`guest_name`, `message`).
+- Respected owner `guestbook_moderation` toggle: entries default to `approved` when off and `pending` when on.
+- Added duplicate content spam detection: identical messages from a different IP hash within 5 minutes are forced to `pending` (ADR-087).
+- Added `GET /public/i/:slug/guestbook` returning paginated lists of entries filtered strictly by `status = 'approved'`, hiding pending/unapproved entries and visitor IP hashes.
+- Sanitized free text inputs via `TEXT_FIELDS` ("plain" mode) preventing stored XSS, and anonymized visitor IP via SHA-256 in `submitted_ip_hash`.
+- Enqueued asynchronous `guestbook.submitted` notification job to worker `general` pool.
+- Enforced rate limiting at 10 submissions/hour per IP hash and slug (`rateLimit("guestbook")`).
+
 ### 2026-10-17 — Owner RSVP management and CSV export
 
 **Added** — owner-facing RSVP management and export endpoints ([P4-02](./records/2026-10-17-P4-02-owner-rsvp-management.md))

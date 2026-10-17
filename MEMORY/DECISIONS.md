@@ -2727,4 +2727,48 @@ the expiry, because inside the window that is a resume.
 
 **Consequences** — Zero dead-ends during the publish flow. Slug conflicts are resolved in-context. Unpublishing provides explicit consequence warnings to avoid accidental guest lockout.
 
+---
+
+### ADR-086 — RSVP management: tenancy repository encapsulation, CSV formula sanitization, and notification dispatch
+
+**Date** 2026-10-17 · **Tasks** `P4-01`, `P4-02` · **Status** Accepted · **Amends** `docs/PLAN/02` § BR-7, `docs/API/04` § Guests, `docs/SECURITY/05`
+
+**Context** — Public RSVP submissions and owner RSVP management touch the `invitation_guests` table, which is guarded under `scripts/check-tenant-scope.mjs`. In addition, public submissions need to trigger asynchronous owner notifications without blocking the HTTP request, and CSV exports of attendee lists present formula injection risks (`=SUM(...)`, `+CMD`, etc.) when opened in spreadsheet software.
+
+**Decisions**
+1. **Tenancy repository encapsulation**:
+   - `RsvpRepository` lives in `backend/api/src/shared/tenancy/rsvp-repository.ts`.
+   - Dual interface: public writes (`insertPublicRsvp`) are scoped to published invitations, while owner operations (`findManyByInvitation`, `updateGuestStatus`, `deleteGuest`, `getRsvpStats`) are strictly tenant-scoped (`WHERE invitations.owner_id = scope`).
+2. **Notification job dispatch**:
+   - Asynchronous `rsvp.submitted` jobs are enqueued to BullMQ `general` queue with idempotency keys (`rsvp.submitted:${guest.id}`).
+   - Failure to enqueue logs a warning but never fails the guest submission.
+3. **CSV formula injection neutralization**:
+   - Free-text fields (`name`, `notes`, `dietary_requirements`) starting with `=`, `+`, `-`, `@`, `\t`, or `\r` are prefixed with `'` and enclosed in quotes per OWASP guidelines.
+
+**Consequences** — Zero risk of cross-tenant guest leaks. Spreadsheets opening attendee exports are immune to remote code execution and formula evaluation.
+
+---
+
+### ADR-087 — Public guestbook: repository boundary, duplicate content spam guard, and approved-only public listing
+
+**Date** 2026-10-17 · **Task** `P4-03` · **Status** Accepted · **Amends** `docs/PLAN/02` § BR-7, `docs/API/08` § Guestbook, `docs/SECURITY/10`
+
+**Context** — Public guestbook submissions allow visitors to write wedding wishes. Two challenges exist:
+1. Spammers or bots flooding weddings with duplicate messages across different proxies.
+2. The `invitation_guestbook` table is guarded under `scripts/check-tenant-scope.mjs`, but public visitors have no owner scope while owner moderation (`P4-04`) will require strict owner scoping.
+
+**Decisions**
+1. **Centralized GuestbookRepository**:
+   - `GuestbookRepository` in `backend/api/src/shared/tenancy/guestbook-repository.ts` encapsulates all `invitation_guestbook` queries.
+   - Public queries (`findPublishedGuestbookTarget`, `hasRecentDuplicateMessage`, `insertGuestbookEntry`, `findApprovedEntries`) filter on published, non-deleted status without owner scope.
+2. **Duplicate content spam guard**:
+   - When a visitor posts a message identical to another entry created on the same invitation within 5 minutes (300 seconds) from a different IP hash, its status is forced to `pending` regardless of whether `guestbook_moderation` is turned off.
+   - Genuine distinct entries proceed directly to `approved` when moderation is off, or `pending` when on.
+3. **Strict approved-only public listing**:
+   - `GET /public/i/:slug/guestbook` enforces SQL `status = 'approved'`, ordered newest first (`created_at DESC`).
+   - Visitor IP hashes (`submitted_ip_hash`), moderator IDs, and moderation timestamps are stripped from public responses.
+
+**Consequences** — Sybil/proxy duplicate message spam is trapped in the moderation queue without disrupting legitimate guests. Architectural tenancy guards remain strictly enforced.
+
+
 
