@@ -7,8 +7,11 @@ import { TEXT_FIELDS } from "../../shared/sanitizer/registry";
 import {
   RsvpRepository,
   type AttendanceStatus,
+  type FindRsvpsOptions,
   type RsvpRow,
+  type RsvpSummary,
 } from "../../shared/tenancy/rsvp-repository";
+import type { TenantScope } from "../../shared/tenancy/tenant-scope";
 import { JOB_QUEUE, type JobQueue } from "../../infra/queue/queue.module";
 import { logger } from "../../shared/logging/logger";
 
@@ -26,6 +29,22 @@ export interface RsvpResponse {
   readonly guest_count: number;
   readonly message: string | null;
   readonly created_at: string;
+}
+
+/**
+ * Escape a CSV cell, mitigating spreadsheet formula injection (OWASP).
+ * Prepends a single quote if the value begins with '=', '+', '-', '@', '\t', or '\r'.
+ */
+export function escapeCsvCell(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) {
+    return '""';
+  }
+  let str = String(value);
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = "'" + str;
+  }
+  const escaped = str.replace(/"/g, '""');
+  return `"${escaped}"`;
 }
 
 /**
@@ -115,5 +134,119 @@ export class RsvpService {
       message: row.message,
       created_at: row.createdAt.toISOString(),
     };
+  }
+
+  /**
+   * List RSVPs for an invitation owned by the current user (P4-02).
+   */
+  async getRsvpsForOwner(
+    scope: TenantScope,
+    invitationId: string,
+    options: FindRsvpsOptions = {},
+  ): Promise<{ items: RsvpResponse[]; total: number }> {
+    const result = await this.rsvpRepository.findRsvpsForOwner(
+      scope,
+      invitationId,
+      options,
+    );
+
+    if (!result) {
+      throw new NotFoundError("Undangan tidak ditemukan.");
+    }
+
+    return {
+      items: result.items.map((r) => ({
+        id: r.id,
+        guest_name: r.guestName,
+        attendance_status: r.attendanceStatus,
+        guest_count: r.guestCount,
+        message: r.message,
+        created_at: r.createdAt.toISOString(),
+      })),
+      total: result.total,
+    };
+  }
+
+  /**
+   * Get attendance summary aggregated in SQL for an invitation owned by the current user (P4-02).
+   */
+  async getRsvpSummaryForOwner(
+    scope: TenantScope,
+    invitationId: string,
+  ): Promise<RsvpSummary> {
+    const summary = await this.rsvpRepository.getRsvpSummaryForOwner(
+      scope,
+      invitationId,
+    );
+
+    if (!summary) {
+      throw new NotFoundError("Undangan tidak ditemukan.");
+    }
+
+    return summary;
+  }
+
+  /**
+   * Generate CSV export with formula injection mitigation for an invitation owned by the current user (P4-02).
+   */
+  async exportRsvpsCsv(
+    scope: TenantScope,
+    invitationId: string,
+  ): Promise<{ filename: string; csv: string }> {
+    const data = await this.rsvpRepository.findAllRsvpsForExport(
+      scope,
+      invitationId,
+    );
+
+    if (!data) {
+      throw new NotFoundError("Undangan tidak ditemukan.");
+    }
+
+    const headers = [
+      "No",
+      "Nama Tamu",
+      "Status Kehadiran",
+      "Jumlah Tamu",
+      "Pesan",
+      "Waktu Konfirmasi",
+    ];
+
+    const rows: string[] = [headers.join(",")];
+
+    data.items.forEach((item, index) => {
+      const row = [
+        escapeCsvCell(index + 1),
+        escapeCsvCell(item.guestName),
+        escapeCsvCell(item.attendanceStatus),
+        escapeCsvCell(item.guestCount),
+        escapeCsvCell(item.message ?? ""),
+        escapeCsvCell(item.createdAt.toISOString()),
+      ];
+      rows.push(row.join(","));
+    });
+
+    return {
+      filename: `rsvps-${data.slug}.csv`,
+      csv: rows.join("\r\n"),
+    };
+  }
+
+  /**
+   * Delete an RSVP entry belonging to an invitation owned by the current user (P4-02).
+   */
+  async deleteRsvpForOwner(
+    scope: TenantScope,
+    invitationId: string,
+    rsvpId: string,
+  ): Promise<void> {
+    const deleted = await this.rsvpRepository.deleteRsvpForOwner(
+      scope,
+      invitationId,
+      rsvpId,
+    );
+
+    if (!deleted) {
+      throw new NotFoundError("RSVP tidak ditemukan.");
+    }
   }
 }

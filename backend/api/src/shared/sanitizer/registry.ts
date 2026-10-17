@@ -111,6 +111,8 @@ export const NOT_USER_TEXT: Readonly<Record<string, string>> = {
   longitude: "a number with a range check; coerced, never stored as text",
   per_page:
     "a pagination integer, coerced and bounded; never stored or rendered",
+  limit:
+    "a pagination integer, coerced and bounded; never stored or rendered (P4-02)",
   page: "a pagination integer, coerced and bounded; never stored or rendered",
 
   // --- RUM reports (`P2-13`, `POST /public/rum`). Deliberately specific key names: this

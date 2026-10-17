@@ -49,6 +49,8 @@ export interface TenantInvitation {
   readonly photoId: string;
   /** `P2-12`. A live share-preview token's id, for the revoke endpoint. */
   readonly previewTokenId: string;
+  /** `P4-02`. An RSVP entry id, for RSVP owner management endpoints. */
+  readonly rsvpId: string;
   readonly markers: readonly string[];
 }
 
@@ -212,9 +214,17 @@ async function createInvitationWithChildren(
     [invitation.id, `fixture-${unique()}`, user.id],
   );
 
+  // `P4-02`. An RSVP entry for the owner management sweep.
+  const { rows: rsvps } = await pool.query<{ id: string }>(
+    `INSERT INTO invitation_guests (invitation_id, guest_name, attendance_status, guest_count, message)
+     VALUES ($1, $2, 'attending', 1, $3) RETURNING id`,
+    [invitation.id, `${name} RSVP Guest`, `${name} RSVP message`],
+  );
+
   return {
     invitation,
     previewTokenId: previewTokens[0]!.id,
+    rsvpId: rsvps[0]!.id,
     eventId: events[0]!.id,
     bankAccountId: accounts[0]!.id,
     mediaId,
@@ -226,6 +236,7 @@ async function createInvitationWithChildren(
       accountNumber,
       caption,
       `${name} quote text`,
+      `${name} RSVP Guest`,
     ],
   };
 }

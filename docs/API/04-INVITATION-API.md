@@ -72,17 +72,18 @@ POST   /api/v1/invitations/:id/gallery/reorder      { ordered_photo_ids: [...] }
 
 ## Sub-resource: RSVP (owner side)
 
-Public submission is in 08-PUBLIC-INVITATION-API.md. These are the owner's management endpoints (PLAN/04 § F10, UI-UX/10 § RsvpTable).
+Public submission is in 08-PUBLIC-INVITATION-API.md. These are the owner's management endpoints (PLAN/04 § F10, UI-UX/10 § RsvpTable, P4-02).
 
 ```
-GET    /api/v1/invitations/:id/rsvps                 ?attendance_status=&page=  Paginated list
-GET    /api/v1/invitations/:id/rsvps/summary          Totals per status + total guest count
-GET    /api/v1/invitations/:id/rsvps/export           CSV download
+GET    /api/v1/invitations/:id/rsvps                 ?attendance_status=&page=&limit=  Paginated list
+GET    /api/v1/invitations/:id/rsvps/summary          Totals per status + total attending guest count
+GET    /api/v1/invitations/:id/rsvps/export           CSV download (rate limited: export)
 DELETE /api/v1/invitations/:id/rsvps/:rsvp_id         Remove a spam or mistaken entry
 ```
 
-- The summary is computed in SQL, not by loading every row — a popular wedding produces hundreds of entries and the dashboard reads this on every visit.
-- CSV cells beginning with `=`, `+`, `-` or `@` are prefixed so a guest name cannot execute as a formula when the file is opened in a spreadsheet. The export is opened by non-technical users and forwarded to clients (UI-UX/04, Budi's journey).
+- The summary is computed in SQL (`getRsvpSummaryForOwner`), not by loading every row — a popular wedding produces hundreds of entries and the dashboard reads this on every visit.
+- CSV cells beginning with `=`, `+`, `-`, `@`, `\t` or `\r` are prefixed with `'` so a guest name cannot execute as a formula when the file is opened in a spreadsheet. The export is opened by non-technical users and forwarded to clients (UI-UX/04, Budi's journey). Rate-limited under `export` policy (30/hr per user).
+- Object-level authorization is enforced at query level; a non-owner receives 404, never 403. Attempting to delete an RSVP belonging to another invitation also returns 404.
 
 ## Sub-resource: Guestbook (owner side)
 

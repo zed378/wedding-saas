@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
 
 import { DB, type Database } from "../../infra/db/client";
 import {
@@ -36,6 +36,20 @@ export interface PublishedRsvpTarget {
   readonly rsvpEnabled: boolean;
 }
 
+export interface RsvpSummary {
+  readonly total_responses: number;
+  readonly attending: number;
+  readonly not_attending: number;
+  readonly maybe: number;
+  readonly total_attending_guests: number;
+}
+
+export interface FindRsvpsOptions {
+  readonly page?: number | undefined;
+  readonly limit?: number | undefined;
+  readonly status?: AttendanceStatus | undefined;
+}
+
 /**
  * `P4-01` & `P4-02` — RSVP data access.
  *
@@ -43,11 +57,34 @@ export interface PublishedRsvpTarget {
  *
  * 1. Public submissions (`insertRsvp`, `findPublishedRsvpTarget`): No owner scope. Replaces owner
  *    check with `status = 'published' AND deleted_at IS NULL`, identical to `PublicInvitationRepository`.
- * 2. Owner reads/management (`findRsvpsForOwner`): Strictly tenant-scoped by `owner_id = scope.userId`.
+ * 2. Owner reads/management (`findRsvpsForOwner`, `getRsvpSummaryForOwner`, etc.): Strictly tenant-scoped
+ *    by `owner_id = scope`.
  */
 @Injectable()
 export class RsvpRepository {
   constructor(@Inject(DB) private readonly db: Database) {}
+
+  /**
+   * Verify that the invitation exists, is owned by scope, and is not deleted.
+   */
+  async ownsInvitation(
+    scope: TenantScope,
+    invitationId: string,
+  ): Promise<boolean> {
+    const [row] = await this.db
+      .select({ one: sql<number>`1` })
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.id, invitationId),
+          eq(invitations.ownerId, scope),
+          isNull(invitations.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    return row !== undefined;
+  }
 
   /**
    * Resolve an invitation by slug for public RSVP submission.
@@ -112,12 +149,32 @@ export class RsvpRepository {
   }
 
   /**
-   * Tenant-scoped list for the invitation owner (P4-02).
+   * Tenant-scoped paginated list for the invitation owner (P4-02).
    */
   async findRsvpsForOwner(
     scope: TenantScope,
     invitationId: string,
-  ): Promise<RsvpRow[]> {
+    options: FindRsvpsOptions = {},
+  ): Promise<{ items: RsvpRow[]; total: number } | null> {
+    const isOwner = await this.ownsInvitation(scope, invitationId);
+    if (!isOwner) return null;
+
+    const page = Math.max(1, options.page ?? 1);
+    const limit = Math.max(1, Math.min(100, options.limit ?? 20));
+    const offset = (page - 1) * limit;
+
+    const conditions = [eq(invitationGuests.invitationId, invitationId)];
+    if (options.status !== undefined) {
+      conditions.push(eq(invitationGuests.attendanceStatus, options.status));
+    }
+
+    const [countResult] = await this.db
+      .select({ total: count() })
+      .from(invitationGuests)
+      .where(and(...conditions));
+
+    const total = Number(countResult?.total ?? 0);
+
     const rows = await this.db
       .select({
         id: invitationGuests.id,
@@ -130,19 +187,116 @@ export class RsvpRepository {
         createdAt: invitationGuests.createdAt,
       })
       .from(invitationGuests)
-      .innerJoin(invitations, eq(invitations.id, invitationGuests.invitationId))
+      .where(and(...conditions))
+      .orderBy(desc(invitationGuests.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      items: rows.map((r) => ({
+        ...r,
+        attendanceStatus: r.attendanceStatus as AttendanceStatus,
+      })),
+      total,
+    };
+  }
+
+  /**
+   * Aggregated RSVP summary computed directly in SQL (P4-02).
+   */
+  async getRsvpSummaryForOwner(
+    scope: TenantScope,
+    invitationId: string,
+  ): Promise<RsvpSummary | null> {
+    const isOwner = await this.ownsInvitation(scope, invitationId);
+    if (!isOwner) return null;
+
+    const [summary] = await this.db
+      .select({
+        totalResponses: count(invitationGuests.id),
+        attending: sql<number>`count(case when ${invitationGuests.attendanceStatus} = 'attending' then 1 end)::int`,
+        notAttending: sql<number>`count(case when ${invitationGuests.attendanceStatus} = 'not_attending' then 1 end)::int`,
+        maybe: sql<number>`count(case when ${invitationGuests.attendanceStatus} = 'maybe' then 1 end)::int`,
+        totalAttendingGuests: sql<number>`coalesce(sum(case when ${invitationGuests.attendanceStatus} = 'attending' then ${invitationGuests.guestCount} else 0 end), 0)::int`,
+      })
+      .from(invitationGuests)
+      .where(eq(invitationGuests.invitationId, invitationId));
+
+    return {
+      total_responses: Number(summary?.totalResponses ?? 0),
+      attending: Number(summary?.attending ?? 0),
+      not_attending: Number(summary?.notAttending ?? 0),
+      maybe: Number(summary?.maybe ?? 0),
+      total_attending_guests: Number(summary?.totalAttendingGuests ?? 0),
+    };
+  }
+
+  /**
+   * Fetch all RSVPs for CSV export, returning the invitation slug (P4-02).
+   */
+  async findAllRsvpsForExport(
+    scope: TenantScope,
+    invitationId: string,
+  ): Promise<{ slug: string; items: RsvpRow[] } | null> {
+    const [inv] = await this.db
+      .select({ slug: invitations.slug })
+      .from(invitations)
       .where(
         and(
-          eq(invitationGuests.invitationId, invitationId),
+          eq(invitations.id, invitationId),
           eq(invitations.ownerId, scope),
           isNull(invitations.deletedAt),
         ),
       )
-      .orderBy(desc(invitationGuests.createdAt));
+      .limit(1);
 
-    return rows.map((r) => ({
-      ...r,
-      attendanceStatus: r.attendanceStatus as AttendanceStatus,
-    }));
+    if (!inv) return null;
+
+    const rows = await this.db
+      .select({
+        id: invitationGuests.id,
+        invitationId: invitationGuests.invitationId,
+        guestName: invitationGuests.guestName,
+        attendanceStatus: invitationGuests.attendanceStatus,
+        guestCount: invitationGuests.guestCount,
+        message: invitationGuests.message,
+        submittedIpHash: invitationGuests.submittedIpHash,
+        createdAt: invitationGuests.createdAt,
+      })
+      .from(invitationGuests)
+      .where(eq(invitationGuests.invitationId, invitationId))
+      .orderBy(invitationGuests.createdAt);
+
+    return {
+      slug: inv.slug ?? "invitation",
+      items: rows.map((r) => ({
+        ...r,
+        attendanceStatus: r.attendanceStatus as AttendanceStatus,
+      })),
+    };
+  }
+
+  /**
+   * Delete an RSVP row if owned by scope and belonging to invitationId (P4-02).
+   */
+  async deleteRsvpForOwner(
+    scope: TenantScope,
+    invitationId: string,
+    rsvpId: string,
+  ): Promise<boolean> {
+    const isOwner = await this.ownsInvitation(scope, invitationId);
+    if (!isOwner) return false;
+
+    const rows = await this.db
+      .delete(invitationGuests)
+      .where(
+        and(
+          eq(invitationGuests.id, rsvpId),
+          eq(invitationGuests.invitationId, invitationId),
+        ),
+      )
+      .returning({ id: invitationGuests.id });
+
+    return rows.length > 0;
   }
 }

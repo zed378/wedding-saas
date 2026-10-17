@@ -73,7 +73,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE |
 | **Depends on** | P4-01 |
 | **Spec refs** | `docs/PLAN/04` § F10, `docs/UI-UX/10` § RsvpTable, `docs/API/04-INVITATION-API.md`, `docs/UI-UX/04` (Budi) |
 | **Spec required** | Yes — new API surface |
@@ -94,10 +94,10 @@
 6. Rate limit export, which is the most expensive read on the endpoint.
 
 **Definition of Done**
-- [ ] All four endpoints exist, are ownership-scoped, and `docs/API/04` is amended.
-- [ ] The summary is computed in the database and matches a row-by-row count in a test.
-- [ ] CSV injection is prevented, with a test using a `=cmd` guest name.
-- [ ] Another user's RSVP list returns 404.
+- [x] All four endpoints exist, are ownership-scoped, and `docs/API/04` is amended.
+- [x] The summary is computed in the database and matches a row-by-row count in a test.
+- [x] CSV injection is prevented, with a test using a `=cmd` guest name.
+- [x] Another user's RSVP list returns 404.
 
 ---
 

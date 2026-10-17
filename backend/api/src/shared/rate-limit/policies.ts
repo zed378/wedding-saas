@@ -117,6 +117,7 @@ export const DEFAULT_POLICIES: readonly RateLimitPolicy[] = [
     key: "user",
   },
   { name: "media-upload", limit: 60, windowSeconds: 60 * 60, key: "user" },
+  { name: "export", limit: 30, windowSeconds: 60 * 60, key: "user" },
   { name: "general-authenticated", limit: 300, windowSeconds: 60, key: "user" },
   { name: "general-public", limit: 100, windowSeconds: 60, key: "ip" },
 ] as const;

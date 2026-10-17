@@ -558,6 +558,51 @@ const CASES: readonly SweepCase[] = [
     send: (c, token, t) =>
       auth(api(c).get(`/api/v1/media/${t.mediaId}`), token),
   },
+  {
+    label: "GET /invitations/:id/rsvps",
+    send: (c, token, t) =>
+      auth(api(c).get(`/api/v1/invitations/${t.invitation.id}/rsvps`), token),
+  },
+  {
+    label: "GET /invitations/:id/rsvps/summary",
+    send: (c, token, t) =>
+      auth(
+        api(c).get(`/api/v1/invitations/${t.invitation.id}/rsvps/summary`),
+        token,
+      ),
+  },
+  {
+    label: "GET /invitations/:id/rsvps/export",
+    send: (c, token, t) =>
+      auth(
+        api(c).get(`/api/v1/invitations/${t.invitation.id}/rsvps/export`),
+        token,
+      ),
+  },
+  {
+    label: "DELETE /invitations/:id/rsvps/:rsvp_id",
+    send: (c, token, t) =>
+      auth(
+        api(c).delete(
+          `/api/v1/invitations/${t.invitation.id}/rsvps/${t.rsvpId}`,
+        ),
+        token,
+      ),
+    crossChild: (c) =>
+      auth(
+        api(c).delete(
+          `/api/v1/invitations/${c.mallory.invitation.id}/rsvps/${c.alice.rsvpId}`,
+        ),
+        c.mallory.token,
+      ),
+    crossOwnParent: (c) =>
+      auth(
+        api(c).delete(
+          `/api/v1/invitations/${c.alice.invitation.id}/rsvps/${c.alice.second.rsvpId}`,
+        ),
+        c.alice.token,
+      ),
+  },
 ];
 
 interface MatrixRow {
@@ -586,7 +631,12 @@ describe("P1-25, P2-14 — IDOR sweep over every owner-scoped :id endpoint (comp
   let signingKey: string;
 
   beforeAll(async () => {
-    owner = await connect(["invitations", "media", "invitation_gallery"]);
+    owner = await connect([
+      "invitations",
+      "media",
+      "invitation_gallery",
+      "invitation_guests",
+    ]);
     await resetTenantData(owner);
 
     signingKey = "phase-1-sweep-signing-key-0000000000000000";

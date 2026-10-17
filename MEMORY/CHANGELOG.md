@@ -10,6 +10,16 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-17 — Owner RSVP management and CSV export
+
+**Added** — owner-facing RSVP management and export endpoints ([P4-02](./records/2026-10-17-P4-02-owner-rsvp-management.md))
+
+- Added `GET /api/v1/invitations/:id/rsvps` for paginated guest RSVP listing with optional attendance status filtering (`attending`, `not_attending`, `maybe`).
+- Added `GET /api/v1/invitations/:id/rsvps/summary` computing attendance breakdown and headcount sums directly in PostgreSQL SQL aggregation.
+- Added `GET /api/v1/invitations/:id/rsvps/export` returning downloadable CSV with formula injection protection (neutralizing `=`, `+`, `-`, `@`, `\t`, `\r` prefixes with single quotes) and `export` rate limiting (30/hr per user).
+- Added `DELETE /api/v1/invitations/:id/rsvps/:rsvp_id` allowing owners to remove spam or erroneous responses.
+- Enforced object-level authorization across all 4 endpoints (query-level `WHERE owner_id = :scope`), returning 404 for non-owners, verified in integration tests and the 100-case IDOR sweep.
+
 ### 2026-10-17 — Public RSVP submission
 
 **Added** — public attendance confirmation endpoint ([P4-01](./records/2026-10-17-P4-01-public-rsvp-submission.md))
