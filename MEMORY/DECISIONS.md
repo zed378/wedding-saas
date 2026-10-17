@@ -2772,3 +2772,28 @@ the expiry, because inside the window that is a resume.
 
 
 
+
+---
+
+### ADR-088 — Owner guestbook moderation: query-level scoping, bidirectional cache invalidation, and parent-child isolation
+
+**Date** 2026-10-17 · **Task** `P4-04` · **Status** Accepted · **Amends** `docs/PLAN/02` § BR-7, `docs/API/04` § Sub-resource: Guestbook (owner side), `docs/SECURITY/05`
+
+**Context** — Invitation owners need to view, approve, reject, and delete guestbook messages left by wedding visitors. This introduces several constraints:
+1. Multi-tenancy and IDOR: Access must be strictly isolated to the invitation owner at the database query level (`WHERE owner_id = :scope AND deleted_at IS NULL`), returning 404 for non-owners (never 403) and 404 for cross-invitation entry IDs (`docs/SECURITY/05`).
+2. Cache consistency: The public invitation page is cached in Redis (`PublicInvitationCache`). When an owner approves a pending message, rejects an approved message, or deletes an approved message, the public page must reflect the change immediately rather than waiting for cache TTL (`docs/ARCHITECTURE/06`).
+3. Audit trail: Who made the decision and when must be preserved (`moderated_by` and `moderated_at`).
+
+**Decisions**
+1. **Query-level tenant scoping in `GuestbookRepository`**:
+   - `getInvitationOwnerScope(scope, invitationId)` checks `eq(invitations.ownerId, scope)` and `isNull(invitations.deletedAt)` returning `{ slug } | null`.
+   - `findGuestbookForOwner`, `moderateGuestbookEntryForOwner`, and `deleteGuestbookEntryForOwner` require this owner check and ensure `invitation_id = :invitationId`. Non-owners and attempts to touch another invitation's entries yield 404.
+2. **Bidirectional cache invalidation**:
+   - Moderating an entry from `pending` to `approved` invalidates the public cache so the message immediately appears.
+   - Moderating an entry from `approved` to `rejected`, or deleting an `approved` entry, invalidates the public cache so the revoked message immediately disappears.
+   - Moderating `pending` to `rejected` or deleting a non-approved entry skips cache invalidation since public visitors could not see it anyway.
+3. **Audit and toggle semantics**:
+   - Updates always stamp `moderated_by = moderatorUserId` and `moderated_at = new Date()`.
+   - Per `docs/API/04`, the moderation toggle in settings does not alter historical entries: toggling moderation ON does not retroactively hide existing approved entries, and toggling it OFF does not auto-approve the pending queue.
+
+**Consequences** — Zero cross-tenant leakage or child ID confusion; instant public consistency upon owner moderation; full auditability of moderation actions.

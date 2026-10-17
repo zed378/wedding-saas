@@ -51,6 +51,8 @@ export interface TenantInvitation {
   readonly previewTokenId: string;
   /** `P4-02`. An RSVP entry id, for RSVP owner management endpoints. */
   readonly rsvpId: string;
+  /** `P4-04`. A guestbook entry id, for guestbook owner moderation endpoints. */
+  readonly guestbookId: string;
   readonly markers: readonly string[];
 }
 
@@ -221,10 +223,18 @@ async function createInvitationWithChildren(
     [invitation.id, `${name} RSVP Guest`, `${name} RSVP message`],
   );
 
+  // `P4-04`. A guestbook entry for the owner moderation sweep.
+  const { rows: guestbooks } = await pool.query<{ id: string }>(
+    `INSERT INTO invitation_guestbook (invitation_id, guest_name, message, status)
+     VALUES ($1, $2, $3, 'pending') RETURNING id`,
+    [invitation.id, `${name} Guestbook Guest`, `${name} Guestbook message`],
+  );
+
   return {
     invitation,
     previewTokenId: previewTokens[0]!.id,
     rsvpId: rsvps[0]!.id,
+    guestbookId: guestbooks[0]!.id,
     eventId: events[0]!.id,
     bankAccountId: accounts[0]!.id,
     mediaId,
@@ -237,6 +247,7 @@ async function createInvitationWithChildren(
       caption,
       `${name} quote text`,
       `${name} RSVP Guest`,
+      `${name} Guestbook Guest`,
     ],
   };
 }

@@ -603,6 +603,62 @@ const CASES: readonly SweepCase[] = [
         c.alice.token,
       ),
   },
+  {
+    label: "GET /invitations/:id/guestbook",
+    send: (c, token, t) =>
+      auth(
+        api(c).get(`/api/v1/invitations/${t.invitation.id}/guestbook`),
+        token,
+      ),
+  },
+  {
+    label: "PATCH /invitations/:id/guestbook/:entry_id",
+    send: (c, token, t) =>
+      auth(
+        api(c).patch(
+          `/api/v1/invitations/${t.invitation.id}/guestbook/${t.guestbookId}`,
+        ),
+        token,
+      ).send({ status: "approved" }),
+    crossChild: (c) =>
+      auth(
+        api(c).patch(
+          `/api/v1/invitations/${c.mallory.invitation.id}/guestbook/${c.alice.guestbookId}`,
+        ),
+        c.mallory.token,
+      ).send({ status: "approved" }),
+    crossOwnParent: (c) =>
+      auth(
+        api(c).patch(
+          `/api/v1/invitations/${c.alice.invitation.id}/guestbook/${c.alice.second.guestbookId}`,
+        ),
+        c.alice.token,
+      ).send({ status: "approved" }),
+  },
+  {
+    label: "DELETE /invitations/:id/guestbook/:entry_id",
+    send: (c, token, t) =>
+      auth(
+        api(c).delete(
+          `/api/v1/invitations/${t.invitation.id}/guestbook/${t.guestbookId}`,
+        ),
+        token,
+      ),
+    crossChild: (c) =>
+      auth(
+        api(c).delete(
+          `/api/v1/invitations/${c.mallory.invitation.id}/guestbook/${c.alice.guestbookId}`,
+        ),
+        c.mallory.token,
+      ),
+    crossOwnParent: (c) =>
+      auth(
+        api(c).delete(
+          `/api/v1/invitations/${c.alice.invitation.id}/guestbook/${c.alice.second.guestbookId}`,
+        ),
+        c.alice.token,
+      ),
+  },
 ];
 
 interface MatrixRow {
@@ -636,6 +692,7 @@ describe("P1-25, P2-14 — IDOR sweep over every owner-scoped :id endpoint (comp
       "media",
       "invitation_gallery",
       "invitation_guests",
+      "invitation_guestbook",
     ]);
     await resetTenantData(owner);
 

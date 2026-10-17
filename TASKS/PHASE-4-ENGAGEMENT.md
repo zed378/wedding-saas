@@ -136,7 +136,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE |
 | **Depends on** | P4-03 |
 | **Spec refs** | `docs/PLAN/04` § F11, `docs/UI-UX/10` § GuestbookModerationList, `docs/API/04-INVITATION-API.md` |
 | **Spec required** | Yes — new API surface |
@@ -155,10 +155,10 @@
 5. Handle the moderation toggle honestly: turning moderation **on** does not retroactively hide already-approved messages; turning it **off** does not auto-approve the pending queue. Whatever is chosen, state it in the UI — an owner who thinks they hid something that is still public has been failed by the product.
 
 **Definition of Done**
-- [ ] Approve, reject and delete work and are ownership-scoped.
-- [ ] Approval invalidates the cache and the entry appears publicly.
-- [ ] Moderator identity and time are recorded.
-- [ ] Toggle semantics are implemented, documented, and surfaced in the UI copy.
+- [x] Approve, reject and delete work and are ownership-scoped.
+- [x] Approval invalidates the cache and the entry appears publicly.
+- [x] Moderator identity and time are recorded.
+- [x] Toggle semantics are implemented, documented, and surfaced in the UI copy.
 
 ---
 

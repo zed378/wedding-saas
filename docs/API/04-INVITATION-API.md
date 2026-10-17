@@ -90,13 +90,15 @@ DELETE /api/v1/invitations/:id/rsvps/:rsvp_id         Remove a spam or mistaken 
 Owner moderation, distinct from the platform-level admin moderation queue in 09-ADMIN-API.md (PLAN/04 § F11, BR-7.3).
 
 ```
-GET    /api/v1/invitations/:id/guestbook              ?status=pending|approved|rejected&page=
+GET    /api/v1/invitations/:id/guestbook              ?status=pending|approved|rejected&page=&limit=
 PATCH  /api/v1/invitations/:id/guestbook/:entry_id     { status: approved|rejected }
 DELETE /api/v1/invitations/:id/guestbook/:entry_id
 ```
 
+- Query-level tenant scoping enforces ownership: non-owners receive 404, never 403 (SECURITY/05).
+- Cross-invitation entry IDs return 404 (SECURITY/05).
 - `moderated_by` and `moderated_at` are recorded on every decision (DATABASE/09).
-- Approving an entry invalidates the invitation's public page cache so the message appears without waiting for TTL (ARCHITECTURE/06).
+- Cache invalidation: approving a pending entry, rejecting a previously-approved entry, or deleting an approved entry invalidates the invitation's public page cache (`PublicInvitationCache`) so changes reflect immediately without waiting for TTL (ARCHITECTURE/06, P4-04).
 - Turning moderation on does **not** retroactively hide already-approved entries, and turning it off does **not** auto-approve the pending queue. The UI states this, because an owner who believes they hid something that is still public has been failed by the product.
 
 ## Sub-resource: Bank Accounts, Quote

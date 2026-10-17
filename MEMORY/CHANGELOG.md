@@ -10,6 +10,17 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-17 — Owner guestbook moderation
+
+**Added** — owner-facing guestbook moderation and deletion endpoints ([P4-04](./records/2026-10-17-P4-04-owner-guestbook-moderation.md))
+
+- Added `GET /api/v1/invitations/:id/guestbook` for paginated listing of guestbook entries with optional status filtering (`pending`, `approved`, `rejected`).
+- Added `PATCH /api/v1/invitations/:id/guestbook/:entry_id` allowing owners to approve or reject messages; tracks `moderated_by` and `moderated_at`.
+- Added `DELETE /api/v1/invitations/:id/guestbook/:entry_id` allowing owners to permanently delete inappropriate or spam entries.
+- Integrated automatic cache invalidation (`PublicInvitationCache`): approving an entry, rejecting an approved entry, or deleting an approved entry immediately flushes the public page cache.
+- Enforced query-level tenant scoping (`WHERE owner_id = :scope AND deleted_at IS NULL`), returning 404 for non-owners and 404 for cross-invitation entry IDs.
+- Added IDOR sweep test coverage and verified zero tenant boundary leakage.
+
 ### 2026-10-17 — Public guestbook submission and listing
 
 **Added** — public guestbook submission and approved listing endpoints ([P4-03](./records/2026-10-17-P4-03-public-guestbook.md))

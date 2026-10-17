@@ -178,7 +178,7 @@ Roadmap: Week 10-11.
 | P4-01 | Public RSVP submission | backend | M | **DONE** — [record](../MEMORY/records/2026-10-17-P4-01-public-rsvp-submission.md) | P2-07, P1-07 |
 | P4-02 | Owner RSVP management and export | backend | M | **DONE** — [record](../MEMORY/records/2026-10-17-P4-02-owner-rsvp-management.md) | P4-01 |
 | P4-03 | Public guestbook | backend | M | **DONE** — [record](../MEMORY/records/2026-10-17-P4-03-public-guestbook.md); public submit and approved list; moderation toggle respected; duplicate spam detector flags to pending in 5m; XSS sanitization; SHA-256 IP hash (ADR-087) | P2-07, P1-07 |
-| P4-04 | Owner guestbook moderation | backend | M | TODO | P4-03 |
+| P4-04 | Owner guestbook moderation | backend | M | **DONE** — [record](../MEMORY/records/2026-10-17-P4-04-owner-guestbook-moderation.md); owner endpoints GET/PATCH/DELETE; query-level tenant scoping (404); public cache invalidation on approved changes; IDOR sweep covered (ADR-088) | P4-03 |
 | P4-05 | Abuse controls and adaptive CAPTCHA | backend | M | TODO — Turnstile (ADR-011); threshold `OQ-14` | P4-01, P4-03 |
 | P4-06 | Notification module and email port | backend, worker | L | TODO — Resend (ADR-013) | P0-15 |
 | P4-07 | Transactional email wiring | worker | L | TODO | P4-06 |

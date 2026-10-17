@@ -201,4 +201,201 @@ export class GuestbookRepository {
       total,
     };
   }
+
+  /**
+   * Resolve an invitation owned by the tenant scope.
+   */
+  async getInvitationOwnerScope(
+    scope: TenantScope,
+    invitationId: string,
+  ): Promise<{ slug: string | null } | null> {
+    const [row] = await this.db
+      .select({ slug: invitations.slug })
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.id, invitationId),
+          eq(invitations.ownerId, scope),
+          isNull(invitations.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  /**
+   * Tenant-scoped paginated list of guestbook entries for the owner (P4-04).
+   * Optional status filter ('pending', 'approved', 'rejected').
+   */
+  async findGuestbookForOwner(
+    scope: TenantScope,
+    invitationId: string,
+    options: FindOwnerGuestbookOptions = {},
+  ): Promise<{ items: GuestbookRow[]; total: number } | null> {
+    const inv = await this.getInvitationOwnerScope(scope, invitationId);
+    if (!inv) return null;
+
+    const page = Math.max(1, options.page ?? 1);
+    const limit = Math.max(1, Math.min(100, options.limit ?? 20));
+    const offset = (page - 1) * limit;
+
+    const conditions = [eq(invitationGuestbook.invitationId, invitationId)];
+    if (options.status !== undefined) {
+      conditions.push(eq(invitationGuestbook.status, options.status));
+    }
+
+    const [countResult] = await this.db
+      .select({ total: count() })
+      .from(invitationGuestbook)
+      .where(and(...conditions));
+
+    const total = Number(countResult?.total ?? 0);
+
+    const rows = await this.db
+      .select({
+        id: invitationGuestbook.id,
+        invitationId: invitationGuestbook.invitationId,
+        guestName: invitationGuestbook.guestName,
+        message: invitationGuestbook.message,
+        status: invitationGuestbook.status,
+        submittedIpHash: invitationGuestbook.submittedIpHash,
+        moderatedBy: invitationGuestbook.moderatedBy,
+        moderatedAt: invitationGuestbook.moderatedAt,
+        createdAt: invitationGuestbook.createdAt,
+      })
+      .from(invitationGuestbook)
+      .where(and(...conditions))
+      .orderBy(desc(invitationGuestbook.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      items: rows.map((r) => ({
+        ...r,
+        status: r.status as GuestbookEntryStatus,
+      })),
+      total,
+    };
+  }
+
+  /**
+   * Update guestbook entry status (approve / reject) as the owner (P4-04).
+   * Records moderated_by and moderated_at.
+   */
+  async moderateGuestbookEntryForOwner(
+    scope: TenantScope,
+    invitationId: string,
+    entryId: string,
+    newStatus: GuestbookEntryStatus,
+    moderatorUserId: string,
+  ): Promise<{
+    row: GuestbookRow;
+    slug: string | null;
+    previousStatus: GuestbookEntryStatus;
+  } | null> {
+    const inv = await this.getInvitationOwnerScope(scope, invitationId);
+    if (!inv) return null;
+
+    // Find entry ensuring it belongs to this invitation
+    const [existing] = await this.db
+      .select()
+      .from(invitationGuestbook)
+      .where(
+        and(
+          eq(invitationGuestbook.id, entryId),
+          eq(invitationGuestbook.invitationId, invitationId),
+        ),
+      )
+      .limit(1);
+
+    if (!existing) return null;
+
+    const now = new Date();
+    const [updated] = await this.db
+      .update(invitationGuestbook)
+      .set({
+        status: newStatus,
+        moderatedBy: moderatorUserId,
+        moderatedAt: now,
+      })
+      .where(
+        and(
+          eq(invitationGuestbook.id, entryId),
+          eq(invitationGuestbook.invitationId, invitationId),
+        ),
+      )
+      .returning();
+
+    if (!updated) return null;
+
+    return {
+      row: {
+        id: updated.id,
+        invitationId: updated.invitationId,
+        guestName: updated.guestName,
+        message: updated.message,
+        status: updated.status as GuestbookEntryStatus,
+        submittedIpHash: updated.submittedIpHash,
+        moderatedBy: updated.moderatedBy,
+        moderatedAt: updated.moderatedAt,
+        createdAt: updated.createdAt,
+      },
+      slug: inv.slug,
+      previousStatus: existing.status as GuestbookEntryStatus,
+    };
+  }
+
+  /**
+   * Delete guestbook entry as the owner (P4-04).
+   */
+  async deleteGuestbookEntryForOwner(
+    scope: TenantScope,
+    invitationId: string,
+    entryId: string,
+  ): Promise<{
+    deleted: boolean;
+    slug: string | null;
+    previousStatus: GuestbookEntryStatus;
+  } | null> {
+    const inv = await this.getInvitationOwnerScope(scope, invitationId);
+    if (!inv) return null;
+
+    const [existing] = await this.db
+      .select({
+        id: invitationGuestbook.id,
+        status: invitationGuestbook.status,
+      })
+      .from(invitationGuestbook)
+      .where(
+        and(
+          eq(invitationGuestbook.id, entryId),
+          eq(invitationGuestbook.invitationId, invitationId),
+        ),
+      )
+      .limit(1);
+
+    if (!existing) return null;
+
+    await this.db
+      .delete(invitationGuestbook)
+      .where(
+        and(
+          eq(invitationGuestbook.id, entryId),
+          eq(invitationGuestbook.invitationId, invitationId),
+        ),
+      );
+
+    return {
+      deleted: true,
+      slug: inv.slug,
+      previousStatus: existing.status as GuestbookEntryStatus,
+    };
+  }
+}
+
+export interface FindOwnerGuestbookOptions {
+  readonly page?: number | undefined;
+  readonly limit?: number | undefined;
+  readonly status?: GuestbookEntryStatus | undefined;
 }
