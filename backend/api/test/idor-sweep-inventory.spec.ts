@@ -25,6 +25,8 @@ const SWEEP = join(__dirname, "integration", "idor-sweep.itest.ts");
 const EXEMPT: Readonly<Record<string, string>> = {
   "GET /public/i/:slug":
     "public by design; the status predicate is the rule — public-invitation.itest.ts › 'answers a draft, an unpublished, an expired and a deleted invitation identically…'",
+  "POST /public/i/:slug/rsvp":
+    "public attendance submission; published status predicate is the authorization boundary (P4-01) — public-rsvp.itest.ts › 'returns 404 and stores nothing for a draft, unpublished, expired, or deleted invitation'",
   "GET /public/preview/:token":
     "a bearer credential, not an owner route — preview-link.itest.ts › 'answers expired, revoked, invented, malformed and deleted-invitation tokens identically'",
   "GET /api/v1/templates/:slug":

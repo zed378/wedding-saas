@@ -10,6 +10,18 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-17 — Public RSVP submission
+
+**Added** — public attendance confirmation endpoint ([P4-01](./records/2026-10-17-P4-01-public-rsvp-submission.md))
+
+- Added `POST /public/i/:slug/rsvp` allowing guests to confirm attendance (`attending`, `not_attending`, `maybe`), party count (clamped 1..10), and message.
+- Enforced strict lifecycle and privacy isolation: returns 404 for draft, unpaid, expired, soft-deleted, or nonexistent slugs, revealing no existence info.
+- Enforced business rule: returns 422 `RSVP_DISABLED` when `invitation_settings.rsvp_enabled` is false.
+- Free text input sanitized against stored XSS via registered `TEXT_FIELDS` ("plain" mode).
+- Visitor IP address hashed via SHA-256 hex digest before storage in `submitted_ip_hash`.
+- Asynchronous notification job `notification.send` with template `rsvp_submitted` enqueued to worker `general` pool.
+- Enforced rate limiting at 10 submissions/hr per IP hash and slug with auto-block escalation.
+
 ### 2026-10-17 — Payment security review and Phase 3 acceptance (Phase 3 complete)
 
 **Added / Verified** — payment security review and formal acceptance gate ([P3-16](./records/2026-10-17-P3-16-payment-security-review.md), [Phase 3 Summary](./records/2026-10-17-PHASE-3-SUMMARY.md))

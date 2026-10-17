@@ -33,7 +33,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE |
 | **Depends on** | P2-07, P1-07 |
 | **Spec refs** | `docs/API/08-PUBLIC-INVITATION-API.md`, `docs/DATABASE/09-GUESTS.md`, `docs/PLAN/02` § BR-7, `docs/SECURITY/10-ABUSE-PREVENTION.md` |
 | **Spec required** | Yes — public surface |
@@ -53,11 +53,11 @@
 9. Return a friendly confirmation; on rate limit, an inline message that leaves the form filled (`docs/UI-UX/05` § Public RSVP flow).
 
 **Definition of Done**
-- [ ] Submitting to a draft, unpublished or expired invitation returns 404 and stores nothing.
-- [ ] Submitting when `rsvp_enabled = false` is rejected even with a hand-crafted request.
-- [ ] Script payloads in name or message do not survive to the public page.
-- [ ] Raw IPs are never stored, verified by inspecting the column.
-- [ ] Rate limiting holds under a burst from one source, and different guests behind one NAT are not permanently blocked from a single legitimate submission each.
+- [x] Submitting to a draft, unpublished or expired invitation returns 404 and stores nothing.
+- [x] Submitting when `rsvp_enabled = false` is rejected even with a hand-crafted request.
+- [x] Script payloads in name or message do not survive to the public page.
+- [x] Raw IPs are never stored, verified by inspecting the column.
+- [x] Rate limiting holds under a burst from one source, and different guests behind one NAT are not permanently blocked from a single legitimate submission each.
 
 **Abuse cases to test**
 | Abuse case | Source | Expectation |

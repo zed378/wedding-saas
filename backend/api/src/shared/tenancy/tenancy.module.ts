@@ -2,6 +2,7 @@ import { Global, Module } from "@nestjs/common";
 
 import { InvitationRepository } from "./invitation-repository";
 import { PublicInvitationRepository } from "./public-invitation-repository";
+import { RsvpRepository } from "./rsvp-repository";
 
 /**
  * The tenant-scoped data access layer.
@@ -16,7 +17,15 @@ import { PublicInvitationRepository } from "./public-invitation-repository";
   // `PublicInvitationRepository` is global too since `P2-11`: the catalogue needs the
   // demo lookup, and a second module providing its own instance would be a second
   // place the no-owner query could be constructed from.
-  providers: [InvitationRepository, PublicInvitationRepository],
-  exports: [InvitationRepository, PublicInvitationRepository],
+  providers: [
+    InvitationRepository,
+    PublicInvitationRepository,
+    RsvpRepository,
+  ],
+  exports: [
+    InvitationRepository,
+    PublicInvitationRepository,
+    RsvpRepository,
+  ],
 })
 export class TenancyModule {}
