@@ -10,6 +10,16 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-17 — Transactional email wiring
+
+**Added** — transactional email wiring, renewal reminders, and retention warnings ([P4-07](./records/2026-10-17-P4-07-transactional-email-wiring.md))
+
+- Authored and wired remaining transactional email templates: `invitation_expiry_reminder` (H-7 and H-1 with actionable renewal links), `invitation_retention_warning` (BR-9.1 warnings at Days 30, 60, and 83), and `order_refunded`.
+- Introduced decoupled subpath export `@wi/ui/email` in `@wi/ui/package.json` to prevent pulling `react-dom/server` into client component bundles in `web-app` (ADR-091).
+- Attached generated PDF invoice from `invoices` table to `order_paid` delivery via `EmailAttachment` support in `EmailPort` and `ResendEmailAdapter`.
+- Wired scheduled daily sweep `reminder_email_h7_h1` at 08:00 WIB with Redis/BullMQ idempotency keys `invitation.reminder:${days}:${id}:${expiryDate}`.
+- Wired scheduled retention warning sweep for expired invitations approaching 90-day deletion cutoff with idempotency keys `invitation.retention_warning:${stage}:${id}`.
+
 ### 2026-10-17 — Notification module and email port
 
 **Added** — centralized transactional email architecture, `EmailPort` abstraction, and event-driven worker handler ([P4-06](./records/2026-10-17-P4-06-notification-module-and-email-port.md))

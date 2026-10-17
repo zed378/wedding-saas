@@ -73,6 +73,25 @@ export interface GuestbookSubmittedPayload {
   readonly message?: string;
 }
 
+export interface InvitationExpiryReminderPayload {
+  readonly template: "invitation_expiry_reminder";
+  readonly invitationId: string;
+  readonly daysRemaining: number;
+}
+
+export interface InvitationRetentionWarningPayload {
+  readonly template: "invitation_retention_warning";
+  readonly invitationId: string;
+  readonly warningNumber: 1 | 2 | 3;
+  readonly daysRemainingUntilDeletion: number;
+}
+
+export interface OrderRefundedPayload {
+  readonly template: "order_refunded";
+  readonly orderId: string;
+  readonly reason?: string;
+}
+
 export type NotificationJobPayload =
   | EmailVerificationPayload
   | PasswordResetPayload
@@ -83,5 +102,8 @@ export type NotificationJobPayload =
   | BankAccountChangedPayload
   | InvitationPublishedPayload
   | InvitationExpiredPayload
+  | InvitationExpiryReminderPayload
+  | InvitationRetentionWarningPayload
+  | OrderRefundedPayload
   | RsvpSubmittedPayload
   | GuestbookSubmittedPayload;

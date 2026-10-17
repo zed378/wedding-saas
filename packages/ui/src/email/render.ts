@@ -14,6 +14,9 @@ import type {
   InvitationExpiredProps,
   RsvpSubmittedProps,
   GuestbookSubmittedProps,
+  InvitationExpiryReminderProps,
+  InvitationRetentionWarningProps,
+  OrderRefundedProps,
 } from "./types.js";
 import {
   EmailVerificationEmail,
@@ -27,6 +30,9 @@ import {
   InvitationExpiredEmail,
   RsvpSubmittedEmail,
   GuestbookSubmittedEmail,
+  InvitationExpiryReminderEmail,
+  InvitationRetentionWarningEmail,
+  OrderRefundedEmail,
 } from "./templates.js";
 
 function stripHtml(html: string): string {
@@ -95,6 +101,18 @@ export function renderEmail(
   props: GuestbookSubmittedProps,
 ): RenderedEmail;
 export function renderEmail(
+  template: "invitation_expiry_reminder",
+  props: InvitationExpiryReminderProps,
+): RenderedEmail;
+export function renderEmail(
+  template: "invitation_retention_warning",
+  props: InvitationRetentionWarningProps,
+): RenderedEmail;
+export function renderEmail(
+  template: "order_refunded",
+  props: OrderRefundedProps,
+): RenderedEmail;
+export function renderEmail(
   template: EmailTemplateKey,
   props: unknown,
 ): RenderedEmail {
@@ -154,6 +172,24 @@ export function renderEmail(
       const p = props as unknown as InvitationExpiredProps;
       element = React.createElement(InvitationExpiredEmail, p);
       subject = `Masa Aktif Undangan "${p.invitationTitle}" Telah Berakhir`;
+      break;
+    }
+    case "invitation_expiry_reminder": {
+      const p = props as unknown as InvitationExpiryReminderProps;
+      element = React.createElement(InvitationExpiryReminderEmail, p);
+      subject = `Pengingat: Masa Aktif Undangan "${p.invitationTitle}" Berakhir dalam ${p.daysRemaining} Hari`;
+      break;
+    }
+    case "invitation_retention_warning": {
+      const p = props as unknown as InvitationRetentionWarningProps;
+      element = React.createElement(InvitationRetentionWarningEmail, p);
+      subject = `Peringatan Penghapusan Data Undangan: ${p.daysRemainingUntilDeletion} Hari Tersisa`;
+      break;
+    }
+    case "order_refunded": {
+      const p = props as unknown as OrderRefundedProps;
+      element = React.createElement(OrderRefundedEmail, p);
+      subject = `Pengembalian Dana Berhasil Diproses — Pesanan #${p.orderNumber}`;
       break;
     }
     case "rsvp_submitted": {

@@ -90,6 +90,35 @@ export interface GuestbookSubmittedProps extends BaseEmailProps {
   readonly moderationUrl: string;
 }
 
+export interface InvitationExpiryReminderProps extends BaseEmailProps {
+  readonly recipientName: string;
+  readonly invitationTitle: string;
+  readonly daysRemaining: number;
+  readonly expiryDateFormatted: string;
+  readonly renewalUrl: string;
+  readonly publicUrl?: string | undefined;
+}
+
+export interface InvitationRetentionWarningProps extends BaseEmailProps {
+  readonly recipientName: string;
+  readonly invitationTitle: string;
+  readonly warningNumber: 1 | 2 | 3;
+  readonly daysRemainingUntilDeletion: number;
+  readonly deletionDateFormatted: string;
+  readonly renewalUrl: string;
+  readonly dashboardUrl: string;
+}
+
+export interface OrderRefundedProps extends BaseEmailProps {
+  readonly recipientName: string;
+  readonly orderNumber: string;
+  readonly invitationTitle?: string | undefined;
+  readonly amountFormatted: string;
+  readonly reason?: string | undefined;
+  readonly supportUrl?: string | undefined;
+  readonly dashboardUrl: string;
+}
+
 export type EmailTemplateKey =
   | "email_verification"
   | "password_reset"
@@ -100,6 +129,9 @@ export type EmailTemplateKey =
   | "bank_account_changed"
   | "invitation_published"
   | "invitation_expired"
+  | "invitation_expiry_reminder"
+  | "invitation_retention_warning"
+  | "order_refunded"
   | "rsvp_submitted"
   | "guestbook_submitted";
 

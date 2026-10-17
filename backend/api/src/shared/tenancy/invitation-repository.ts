@@ -1,5 +1,15 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, count, eq, isNull, desc, inArray, ne, or, sql } from "drizzle-orm";
+import {
+  and,
+  count,
+  eq,
+  isNull,
+  desc,
+  inArray,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 
 import { DB, type Database } from "../../infra/db/client";
 import {
@@ -2246,9 +2256,7 @@ export class InvitationRepository {
    * `P3-13` — published invitations whose `expiry_date` is strictly before today in WIB.
    * `docs/BACKEND/06` § Expiry Check.
    */
-  async overduePublishedInvitations(
-    limit = 100,
-  ): Promise<
+  async overduePublishedInvitations(limit = 100): Promise<
     Array<{
       readonly id: string;
       readonly slug: string | null;
@@ -2279,6 +2287,102 @@ export class InvitationRepository {
       slug: r.slug,
       ownerId: r.ownerId,
       expiryDate: r.expiryDate!,
+    }));
+  }
+
+  /**
+   * `P4-07` — invitations published and expiring in exactly the given day offsets (e.g. 7, 1).
+   * Used by `reminder_email_h7_h1` daily sweep.
+   */
+  async invitationsExpiringInDays(
+    days: readonly number[],
+    limit = 200,
+  ): Promise<
+    Array<{
+      readonly id: string;
+      readonly slug: string | null;
+      readonly ownerId: string;
+      readonly expiryDate: string;
+      readonly daysRemaining: number;
+    }>
+  > {
+    if (days.length === 0) return [];
+    const validDays = days.map((d) => Math.floor(d)).filter((d) => !isNaN(d));
+    if (validDays.length === 0) return [];
+
+    const rows = await this.db
+      .select({
+        id: invitations.id,
+        slug: invitations.slug,
+        ownerId: invitations.ownerId,
+        expiryDate: invitations.expiryDate,
+        daysRemaining: sql<number>`(${invitations.expiryDate} - (now() AT TIME ZONE 'Asia/Jakarta')::date)::int`,
+      })
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.status, "published"),
+          isNull(invitations.deletedAt),
+          sql`(${invitations.expiryDate} - (now() AT TIME ZONE 'Asia/Jakarta')::date)::int IN (${sql.raw(validDays.join(","))})`,
+        ),
+      )
+      .limit(limit);
+
+    return rows.map((r) => ({
+      id: r.id,
+      slug: r.slug,
+      ownerId: r.ownerId,
+      expiryDate: r.expiryDate!,
+      daysRemaining: Number(r.daysRemaining),
+    }));
+  }
+
+  /**
+   * `P4-07`, BR-9.1 — expired invitations reaching defined retention warning intervals (e.g. 30, 60, 83 days expired).
+   */
+  async expiredInvitationsForRetentionWarning(
+    daysExpired: readonly number[],
+    limit = 200,
+  ): Promise<
+    Array<{
+      readonly id: string;
+      readonly slug: string | null;
+      readonly ownerId: string;
+      readonly expiryDate: string;
+      readonly daysExpired: number;
+    }>
+  > {
+    if (daysExpired.length === 0) return [];
+    const validDays = daysExpired
+      .map((d) => Math.floor(d))
+      .filter((d) => !isNaN(d));
+    if (validDays.length === 0) return [];
+
+    const rows = await this.db
+      .select({
+        id: invitations.id,
+        slug: invitations.slug,
+        ownerId: invitations.ownerId,
+        expiryDate: invitations.expiryDate,
+        daysExpired: sql<number>`((now() AT TIME ZONE 'Asia/Jakarta')::date - ${invitations.expiryDate})::int`,
+      })
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.status, "expired"),
+          isNull(invitations.deletedAt),
+          sql`${invitations.expiryDate} IS NOT NULL`,
+          sql`((now() AT TIME ZONE 'Asia/Jakarta')::date - ${invitations.expiryDate})::int IN (${sql.raw(validDays.join(","))})`,
+        ),
+      )
+      .limit(limit);
+
+    return rows.map((r) => ({
+      id: r.id,
+      slug: r.slug,
+      ownerId: r.ownerId,
+      expiryDate: r.expiryDate!,
+      daysExpired: Number(r.daysExpired),
     }));
   }
 

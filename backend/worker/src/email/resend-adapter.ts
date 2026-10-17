@@ -49,6 +49,16 @@ export class ResendEmailAdapter implements EmailPort {
       body.headers = message.headers;
     }
 
+    if (message.attachments && message.attachments.length > 0) {
+      body.attachments = message.attachments.map((att) => ({
+        filename: att.filename,
+        content: Buffer.isBuffer(att.content)
+          ? att.content.toString("base64")
+          : att.content,
+        ...(att.contentType ? { content_type: att.contentType } : {}),
+      }));
+    }
+
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.config.apiKey}`,
       "Content-Type": "application/json",

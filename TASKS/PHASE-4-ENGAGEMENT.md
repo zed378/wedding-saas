@@ -223,7 +223,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE |
 | **Depends on** | P4-06 |
 | **Spec refs** | `docs/PLAN/13-NOTIFICATION-SYSTEM.md` § Notification List, `docs/BACKEND/07`, `docs/PLAN/02` § BR-9 |
 | **Spec required** | No |
@@ -242,10 +242,10 @@
 7. Test each template rendering with real data shapes, including long names and missing optional fields.
 
 **Definition of Done**
-- [ ] Every notification in `docs/PLAN/13`'s table is implemented and tested.
-- [ ] Reminder jobs are idempotent; a double run sends one email.
-- [ ] Deletion warnings send at the defined points before data loss.
-- [ ] No email leaks another user's data; templates render only the recipient's own information.
+- [x] Every notification in `docs/PLAN/13`'s table is implemented and tested.
+- [x] Reminder jobs are idempotent; a double run sends one email.
+- [x] Deletion warnings send at the defined points before data loss.
+- [x] No email leaks another user's data; templates render only the recipient's own information.
 
 ---
 

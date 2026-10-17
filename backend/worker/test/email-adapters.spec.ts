@@ -122,5 +122,42 @@ describe("Email Adapters (P4-06)", () => {
         }),
       ).rejects.toThrow(/Failed to reach Resend API/);
     });
+
+    it("serializes attachments with base64 encoding to Resend API", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "resend-msg-att-1" }),
+      });
+      global.fetch = mockFetch;
+
+      const adapter = new ResendEmailAdapter({
+        apiKey: "re_test_key_123",
+        defaultFrom: "Momen Bahagia <halo@momenbahagia.id>",
+      });
+
+      const buffer = Buffer.from("Invoice PDF Content");
+      await adapter.send({
+        to: "buyer@example.com",
+        subject: "Invoice",
+        html: "<p>Invoice attached</p>",
+        text: "Invoice attached",
+        attachments: [
+          {
+            filename: "invoice.pdf",
+            content: buffer,
+            contentType: "application/pdf",
+          },
+        ],
+      });
+
+      const [, options] = mockFetch.mock.calls[0] as [string, any];
+      const body = JSON.parse(options.body as string);
+      expect(body.attachments).toBeDefined();
+      expect(body.attachments).toHaveLength(1);
+      expect(body.attachments[0].filename).toBe("invoice.pdf");
+      expect(body.attachments[0].content).toBe(buffer.toString("base64"));
+      expect(body.attachments[0].content_type).toBe("application/pdf");
+    });
   });
 });

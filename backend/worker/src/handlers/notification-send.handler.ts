@@ -1,12 +1,10 @@
 import { Pool as PgPool } from "pg";
-import { renderEmail } from "@wi/ui";
+import { renderEmail } from "@wi/ui/email";
 import type { Handler, JobContext } from "../runner.js";
 import type { EmailPort } from "../email/email-port.js";
 import type { WorkerEnv } from "../env.js";
 import { logger } from "../logger.js";
-import type {
-  NotificationJobPayload,
-} from "./notification-send.types.js";
+import type { NotificationJobPayload } from "./notification-send.types.js";
 
 export interface NotificationHandlerDeps {
   readonly pg: PgPool;
@@ -132,12 +130,24 @@ export function makeNotificationSendHandler(
     return res.rows[0] ?? null;
   }
 
+  async function fetchInvoice(
+    orderId: string,
+  ): Promise<{ number: string; pdf: Buffer } | null> {
+    const res = await pg.query<{ number: string; pdf: Buffer }>(
+      "SELECT number, pdf FROM invoices WHERE order_id = $1 LIMIT 1",
+      [orderId],
+    );
+    return res.rows[0] ?? null;
+  }
+
   return async (
     data: NotificationJobPayload,
     context: JobContext,
   ): Promise<void> => {
     logger.debug(
-      { context: { event: "notification.processing", template: data.template } },
+      {
+        context: { event: "notification.processing", template: data.template },
+      },
       "handling notification.send",
     );
 
@@ -273,6 +283,17 @@ export function makeNotificationSendHandler(
           return;
         }
 
+        const invoice = await fetchInvoice(data.orderId);
+        const attachments = invoice
+          ? [
+              {
+                filename: `${invoice.number}.pdf`,
+                content: invoice.pdf,
+                contentType: "application/pdf",
+              },
+            ]
+          : undefined;
+
         const rendered = renderEmail("order_paid", {
           recipientName: order.full_name,
           orderNumber: order.id.slice(0, 8).toUpperCase(),
@@ -289,6 +310,7 @@ export function makeNotificationSendHandler(
           html: rendered.html,
           text: rendered.text,
           idempotencyKey: `order-paid:${order.id}:${context.attempt}`,
+          ...(attachments ? { attachments } : {}),
         });
         break;
       }
@@ -298,7 +320,12 @@ export function makeNotificationSendHandler(
         const owner = await fetchInvitationOwner(data.invitationId);
         if (!owner) {
           logger.warn(
-            { context: { invitation_id: data.invitationId, template: data.template } },
+            {
+              context: {
+                invitation_id: data.invitationId,
+                template: data.template,
+              },
+            },
             "invitation not found for bank_account_changed, skipping",
           );
           return;
@@ -327,7 +354,9 @@ export function makeNotificationSendHandler(
         const owner = await fetchInvitationOwner(data.invitationId);
         if (!owner) return;
 
-        const publicUrl = owner.slug ? `${publicOrigin}/${owner.slug}` : publicOrigin;
+        const publicUrl = owner.slug
+          ? `${publicOrigin}/${owner.slug}`
+          : publicOrigin;
         const rendered = renderEmail("invitation_published", {
           recipientName: owner.full_name,
           invitationTitle: owner.internal_name ?? "Undangan Pernikahan",
@@ -361,6 +390,119 @@ export function makeNotificationSendHandler(
           subject: rendered.subject,
           html: rendered.html,
           text: rendered.text,
+        });
+        break;
+      }
+
+      case "invitation_expiry_reminder": {
+        const owner = await fetchInvitationOwner(data.invitationId);
+        if (!owner) {
+          logger.warn(
+            {
+              context: {
+                invitation_id: data.invitationId,
+                template: data.template,
+              },
+            },
+            "invitation not found for invitation_expiry_reminder, skipping",
+          );
+          return;
+        }
+
+        const publicUrl = owner.slug
+          ? `${publicOrigin}/${owner.slug}`
+          : undefined;
+        const renewalUrl = `${appOrigin}/dashboard/invitations/${data.invitationId}/renew`;
+        const rendered = renderEmail("invitation_expiry_reminder", {
+          recipientName: owner.full_name,
+          invitationTitle: owner.internal_name ?? "Undangan Pernikahan",
+          daysRemaining: data.daysRemaining,
+          expiryDateFormatted: formatDateId(owner.expiry_date),
+          renewalUrl,
+          publicUrl,
+        });
+
+        await emailPort.send({
+          to: owner.email,
+          subject: rendered.subject,
+          html: rendered.html,
+          text: rendered.text,
+          idempotencyKey: `expiry-reminder:${data.daysRemaining}:${owner.id}:${owner.expiry_date}:${context.attempt}`,
+        });
+        break;
+      }
+
+      case "invitation_retention_warning": {
+        const owner = await fetchInvitationOwner(data.invitationId);
+        if (!owner) {
+          logger.warn(
+            {
+              context: {
+                invitation_id: data.invitationId,
+                template: data.template,
+              },
+            },
+            "invitation not found for invitation_retention_warning, skipping",
+          );
+          return;
+        }
+
+        // BR-9.1: deletion occurs 90 days after expiry.
+        const expiryDate = owner.expiry_date
+          ? new Date(owner.expiry_date)
+          : new Date();
+        const deletionDate = new Date(
+          expiryDate.getTime() + 90 * 24 * 60 * 60 * 1000,
+        );
+        const renewalUrl = `${appOrigin}/dashboard/invitations/${data.invitationId}/renew`;
+        const dashboardUrl = `${appOrigin}/dashboard`;
+
+        const rendered = renderEmail("invitation_retention_warning", {
+          recipientName: owner.full_name,
+          invitationTitle: owner.internal_name ?? "Undangan Pernikahan",
+          warningNumber: data.warningNumber,
+          daysRemainingUntilDeletion: data.daysRemainingUntilDeletion,
+          deletionDateFormatted: formatDateId(deletionDate),
+          renewalUrl,
+          dashboardUrl,
+        });
+
+        await emailPort.send({
+          to: owner.email,
+          subject: rendered.subject,
+          html: rendered.html,
+          text: rendered.text,
+          idempotencyKey: `retention-warning:${data.warningNumber}:${owner.id}:${context.attempt}`,
+        });
+        break;
+      }
+
+      case "order_refunded": {
+        const order = await fetchOrderDetails(data.orderId);
+        if (!order) {
+          logger.warn(
+            { context: { order_id: data.orderId, template: data.template } },
+            "order not found for order_refunded email, skipping",
+          );
+          return;
+        }
+
+        const rendered = renderEmail("order_refunded", {
+          recipientName: order.full_name,
+          orderNumber: order.id.slice(0, 8).toUpperCase(),
+          invitationTitle: order.invitation_title ?? undefined,
+          amountFormatted: formatRupiah(order.amount_total),
+          reason: data.reason,
+          supportUrl: `${appOrigin}/support`,
+          dashboardUrl: `${appOrigin}/dashboard/orders`,
+        });
+
+        await emailPort.send({
+          to: order.email,
+          subject: rendered.subject,
+          html: rendered.html,
+          text: rendered.text,
+          idempotencyKey: `order-refunded:${order.id}:${context.attempt}`,
         });
         break;
       }

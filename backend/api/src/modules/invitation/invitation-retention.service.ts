@@ -1,7 +1,8 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { mediaKey, type StoragePort } from "@wi/storage";
 
 import { STORAGE } from "../../infra/storage/storage.module";
+import { JOB_QUEUE, type JobQueue } from "../../infra/queue/queue.module";
 import { InvitationStatusService } from "../../shared/invitation-status/invitation-status.service";
 import { logger } from "../../shared/logging/logger";
 import { metrics } from "../../shared/metrics/metrics";
@@ -15,6 +16,7 @@ import { InvitationRepository } from "../../shared/tenancy/invitation-repository
  * 2. Soft-deleted for >= 30 days -> hard delete row from DB and purge storage files from `user-media`.
  * 3. Individually soft-deleted gallery photos older than 7 days grace period (PLAN/11 § Deletion, P1-19) ->
  *    purge physical storage files and delete media rows.
+ * 4. P4-07: Dispatches three retention warnings before deletion at days 30, 60, and 83 expired.
  *
  * Runs inside the API's jobs process (`api-jobs`, ADR-078).
  */
@@ -24,13 +26,18 @@ export class InvitationRetentionService {
     private readonly repository: InvitationRepository,
     private readonly status: InvitationStatusService,
     @Inject(STORAGE) private readonly storage: StoragePort,
+    @Optional()
+    @Inject(JOB_QUEUE)
+    private readonly queue?: JobQueue,
   ) {}
 
   async sweep(): Promise<{
     softDeletedInvitations: number;
     hardDeletedInvitations: number;
     cleanedOrphanedMedia: number;
+    retentionWarningsSent: number;
   }> {
+    const retentionWarningsSent = await this.sweepRetentionWarnings();
     const softDeletedInvitations = await this.sweepSoftDelete();
     const hardDeletedInvitations = await this.sweepHardDelete();
     const cleanedOrphanedMedia = await this.cleanupOrphanedMedia();
@@ -39,7 +46,90 @@ export class InvitationRetentionService {
       softDeletedInvitations,
       hardDeletedInvitations,
       cleanedOrphanedMedia,
+      retentionWarningsSent,
     };
+  }
+
+  /**
+   * P4-07, BR-9.1:
+   * Three retention warnings before permanent deletion, at defined intervals during
+   * the 90-day expired window:
+   * - Warning 1: Day 30 expired (60 days left)
+   * - Warning 2: Day 60 expired (30 days left)
+   * - Warning 3: Day 83 expired (7 days left before soft-delete)
+   */
+  async sweepRetentionWarnings(limit = 100): Promise<number> {
+    if (!this.queue) return 0;
+
+    const warningMilestones = [
+      { daysExpired: 30, warningNumber: 1 as const, daysRemaining: 60 },
+      { daysExpired: 60, warningNumber: 2 as const, daysRemaining: 30 },
+      { daysExpired: 83, warningNumber: 3 as const, daysRemaining: 7 },
+    ] as const;
+
+    const milestonesDays = warningMilestones.map((m) => m.daysExpired);
+    const dueInvitations =
+      await this.repository.expiredInvitationsForRetentionWarning(
+        milestonesDays,
+        limit,
+      );
+
+    let warningsSent = 0;
+
+    for (const item of dueInvitations) {
+      const milestone = warningMilestones.find(
+        (m) => m.daysExpired === item.daysExpired,
+      );
+      if (!milestone) continue;
+
+      try {
+        const idempotencyKey = `invitation.retention_warning:${milestone.warningNumber}:${item.id}`;
+
+        await this.queue.enqueue(
+          "general",
+          "notification.send",
+          {
+            template: "invitation_retention_warning",
+            invitationId: item.id,
+            warningNumber: milestone.warningNumber,
+            daysRemainingUntilDeletion: milestone.daysRemaining,
+          },
+          {
+            idempotencyKey,
+            relatedId: item.id,
+          },
+        );
+
+        warningsSent++;
+        logger.info(
+          {
+            context: {
+              event: "invitation.retention_warning_enqueued",
+              invitation_id: item.id,
+              warning_number: milestone.warningNumber,
+              days_expired: item.daysExpired,
+              days_remaining: milestone.daysRemaining,
+              idempotency_key: idempotencyKey,
+            },
+          },
+          "retention warning notification enqueued",
+        );
+      } catch (error) {
+        logger.error(
+          {
+            context: {
+              event: "invitation.retention_warning_failed",
+              invitation_id: item.id,
+              warning_number: milestone.warningNumber,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          },
+          "failed to enqueue retention warning notification",
+        );
+      }
+    }
+
+    return warningsSent;
   }
 
   /**
@@ -106,7 +196,9 @@ export class InvitationRetentionService {
 
     for (const item of softDeletedList) {
       try {
-        const mediaItems = await this.repository.findMediaForInvitation(item.id);
+        const mediaItems = await this.repository.findMediaForInvitation(
+          item.id,
+        );
         for (const m of mediaItems) {
           for (const variant of ["thumbnail", "medium", "large"] as const) {
             try {

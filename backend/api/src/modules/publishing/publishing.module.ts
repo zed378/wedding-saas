@@ -11,6 +11,7 @@ import { PublishController } from "./publish.controller";
 import { PublishService } from "./publish.service";
 import { UnpublishService } from "./unpublish.service";
 import { InvitationExpiryService } from "./invitation-expiry.service";
+import { InvitationReminderService } from "./invitation-reminder.service";
 import { AuthModule } from "../auth/auth.module";
 import { InvitationModule } from "../invitation/invitation.module";
 
@@ -36,11 +37,13 @@ import { InvitationModule } from "../invitation/invitation.module";
     PublishService,
     UnpublishService,
     InvitationExpiryService,
+    InvitationReminderService,
   ],
   exports: [
     PublicInvitationService,
     PublicInvitationCache,
     InvitationExpiryService,
+    InvitationReminderService,
   ],
 })
 export class PublishingModule {}

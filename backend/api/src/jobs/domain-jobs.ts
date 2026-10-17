@@ -4,6 +4,7 @@ import { InvoiceService } from "../modules/order/invoice/invoice.service";
 import { OrderService } from "../modules/order/order.service";
 import { PaymentReconciliationService } from "../modules/payment/payment-reconciliation.service";
 import { InvitationExpiryService } from "../modules/publishing/invitation-expiry.service";
+import { InvitationReminderService } from "../modules/publishing/invitation-reminder.service";
 import { InvitationRetentionService } from "../modules/invitation/invitation-retention.service";
 
 /**
@@ -41,4 +42,7 @@ export const DOMAIN_JOBS: Readonly<Record<string, DomainJob>> = {
   // docs/BACKEND/08: `invitation_soft_delete_cleanup`, daily 01:00 WIB (P3-13, BR-9.1).
   invitation_soft_delete_cleanup: (app) =>
     app.get(InvitationRetentionService).sweep(),
+  // docs/BACKEND/08: `reminder_email_h7_h1`, daily 08:00 WIB (P4-07).
+  reminder_email_h7_h1: (app) =>
+    app.get(InvitationReminderService).sendExpiryReminders(),
 };

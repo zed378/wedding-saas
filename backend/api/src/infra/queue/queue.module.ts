@@ -119,6 +119,9 @@ export interface JobQueue {
               };
 
               await queueFor(name).add(name, envelope, {
+                ...(options?.idempotencyKey !== undefined
+                  ? { jobId: options.idempotencyKey }
+                  : {}),
                 removeOnComplete: { count: 100 },
                 removeOnFail: { count: 1000 },
               });

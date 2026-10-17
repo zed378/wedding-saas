@@ -2855,4 +2855,28 @@ the expiry, because inside the window that is a resume.
 
 **Consequences** — Zero vendor lock-in across the application; verified cross-client email rendering in Bahasa Indonesia; guaranteed delivery of security-critical notices; complete deliverability documentation in `docs/DEVOPS/09-EMAIL-DELIVERABILITY.md`.
 
+---
+
+### ADR-091 — Transactional email subpath export `@wi/ui/email` and 3-stage retention warning schedule
+
+**Date** 2026-10-17 · **Task** `P4-07` · **Status** Accepted · **Amends** `docs/PLAN/13`, `docs/PLAN/02` § BR-9.1, `packages/ui`
+
+**Context** — Two challenges emerged while implementing P4-07:
+1. Next.js Turbopack client components: Exporting `renderEmail` (which imports `react-dom/server`) directly from `@wi/ui` root index polluted client component imports in `web-app`, causing SSR/client bundling errors during `next build`.
+2. Data retention warnings (BR-9.1): BR-9.1 requires sending warnings to couples before their expired invitations are soft-deleted at Day 90, but did not specify exact intervals.
+
+**Decisions**
+1. **Decoupled subpath export `@wi/ui/email`**:
+   - Root `packages/ui/src/index.ts` exports only email types (`export type * from "./email/types.js"`).
+   - Server rendering logic and templates are exported via dedicated subpath `./email` in `packages/ui/package.json`.
+   - Consumers doing email rendering (`backend/worker`) import from `@wi/ui/email`, keeping client web bundles free of `react-dom/server`.
+2. **3-stage retention warning schedule**:
+   - Stage 1 at Day 30 expired (60 days remaining before soft delete).
+   - Stage 2 at Day 60 expired (30 days remaining before soft delete).
+   - Stage 3 at Day 83 expired (7 days remaining before soft delete).
+   - Each warning is dispatched with an explicit stage-tagged idempotency key (`invitation.retention_warning:${stage}:${id}`) preventing duplicate alerts.
+
+**Consequences** — Zero SSR bundle pollution in frontend apps; predictable, actionable warnings for couples prior to permanent data loss.
+
+
 

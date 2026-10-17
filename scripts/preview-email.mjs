@@ -19,7 +19,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
 
 // Dynamic import from compiled @wi/ui
-const uiPath = path.resolve(rootDir, "packages/ui/dist/index.js");
+const uiPath = path.resolve(rootDir, "packages/ui/dist/email/index.js");
 if (!fs.existsSync(uiPath)) {
   console.error("Error: @wi/ui is not built yet. Run 'pnpm --filter @wi/ui build' first.");
   process.exit(1);
@@ -82,6 +82,32 @@ const sampleProps = {
     invitationTitle: "Pernikahan Maya & Dimas",
     renewalUrl: "https://momenbahagia.id/dashboard/invitations/inv-1/renew",
     expiredDate: "17 Oktober 2026",
+  },
+  invitation_expiry_reminder: {
+    recipientName: "Maya & Dimas",
+    invitationTitle: "Pernikahan Maya & Dimas",
+    daysRemaining: 7,
+    expiryDateFormatted: "24 Oktober 2026",
+    renewalUrl: "https://momenbahagia.id/dashboard/invitations/inv-1/renew",
+    publicUrl: "https://undangan.momenbahagia.id/maya-dimas",
+  },
+  invitation_retention_warning: {
+    recipientName: "Maya & Dimas",
+    invitationTitle: "Pernikahan Maya & Dimas",
+    warningNumber: 1,
+    daysRemainingUntilDeletion: 60,
+    deletionDateFormatted: "16 Desember 2026",
+    renewalUrl: "https://momenbahagia.id/dashboard/invitations/inv-1/renew",
+    dashboardUrl: "https://momenbahagia.id/dashboard",
+  },
+  order_refunded: {
+    recipientName: "Maya Putri",
+    orderNumber: "ORD-202610-0042",
+    invitationTitle: "Pernikahan Maya & Dimas",
+    amountFormatted: "Rp 149.000",
+    reason: "Permintaan pembatalan sebelum publish",
+    supportUrl: "https://momenbahagia.id/support",
+    dashboardUrl: "https://momenbahagia.id/dashboard/orders",
   },
   rsvp_submitted: {
     recipientName: "Maya & Dimas",
