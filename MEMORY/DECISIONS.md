@@ -2825,3 +2825,34 @@ the expiry, because inside the window that is a resume.
 
 **Consequences** — Seamless frictionless experience for normal wedding guests; automatic defense-in-depth against bot floods; clean public pages without destructive rejection of visitor submissions.
 
+---
+
+### ADR-090 — Transactional email delivery architecture, EmailPort abstraction, and non-opt-outable security notifications
+
+**Date** 2026-10-17 · **Task** `P4-06` · **Status** Accepted · **Amends** `docs/BACKEND/07-NOTIFICATION.md`, `docs/PLAN/13-NOTIFICATION-SYSTEM.md`, `docs/ARCHITECTURE/07`
+
+**Context** — Transactional emails must be reliably delivered without blocking HTTP requests or leaking vendor details into application code. Four constraints govern the architecture:
+1. Vendor abstraction: Resend is the chosen transactional provider (ADR-013), but Amazon SES is the expected future migration target when volume increases.
+2. Centralized, typed templates: Email markup must render reliably across diverse desktop and mobile email clients, styled with Momen Bahagia branding, with localized copy in Bahasa Indonesia (ADR-001).
+3. Delivery reliability: Worker jobs on pool `general` must handle intermittent provider failures (e.g., 429 rate limits, 5xx server errors) with exponential backoff and dead-letter queue (DLQ) preservation.
+4. Preference enforcement vs security controls: Users can opt out of notification emails (`rsvp_email`, `guestbook_email`), but critical security notices (`password_changed`, `bank_account_changed`) must never be suppressed (ADR-025, `docs/PLAN/13`).
+
+**Decisions**
+1. **`EmailPort` abstraction with `ResendEmailAdapter` and `MemoryEmailAdapter`**:
+   - `EmailPort` defines `send(message: EmailMessage): Promise<EmailSendResult>`.
+   - `ResendEmailAdapter` utilizes native Node.js 24 `fetch` to POST to `https://api.resend.com/emails` with Bearer auth, avoiding heavy third-party SDK dependencies. Transient errors (429/5xx) throw `ResendEmailError` to trigger BullMQ retries.
+   - `MemoryEmailAdapter` captures sent messages in an in-memory array (`getSent()`, `findSentTo()`, `clear()`) for deterministic, zero-network unit and integration testing.
+2. **Centralized React Email components in `packages/ui/src/email/`**:
+   - 11 typed transactional email templates (`email_verification`, `password_reset`, `password_changed`, `registration_attempt_existing_account`, `account_deletion_requested`, `order_paid`, `bank_account_changed`, `invitation_published`, `invitation_expired`, `rsvp_submitted`, `guestbook_submitted`).
+   - Standard `EmailLayout` using responsive table-based layout, Momen Bahagia branding, and compliant footer (including notification preferences and unsubscribe links).
+   - `renderEmail` produces valid HTML with `<!DOCTYPE html>` DOCTYPE and clean, stripped plaintext versions.
+3. **Event-driven BullMQ consumer in `backend/worker`**:
+   - `makeNotificationSendHandler` handles `notification.send` on queue `general`.
+   - Idempotent execution with 3 attempts and exponential backoff (`delay: 10_000`), preserving permanent failures in `dead-letter`.
+4. **Strict preference rules**:
+   - `rsvp_submitted` and `guestbook_submitted` inspect `user_notification_preferences`. If `rsvp_email` or `guestbook_email` is false, delivery is cleanly skipped and logged.
+   - Security alerts (`bank_account_changed`, `password_changed`) and direct account lifecycle notifications unconditionally bypass preference checks.
+
+**Consequences** — Zero vendor lock-in across the application; verified cross-client email rendering in Bahasa Indonesia; guaranteed delivery of security-critical notices; complete deliverability documentation in `docs/DEVOPS/09-EMAIL-DELIVERABILITY.md`.
+
+

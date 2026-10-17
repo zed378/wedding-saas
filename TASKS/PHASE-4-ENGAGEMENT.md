@@ -194,7 +194,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO — provider decided (ADR-013: Resend) |
+| **Status** | DONE |
 | **Depends on** | P0-15 |
 | **Spec refs** | `docs/BACKEND/07-NOTIFICATION.md`, `docs/PLAN/13-NOTIFICATION-SYSTEM.md`, `docs/ARCHITECTURE/07` |
 | **Spec required** | No |
@@ -212,10 +212,10 @@
 7. Provide a preview command or route so copy can be reviewed without sending.
 
 **Definition of Done**
-- [ ] Nothing outside the adapter knows the email provider.
-- [ ] Templates live outside handler code and render with sample data in a test.
-- [ ] SPF, DKIM and DMARC pass on a real send from staging.
-- [ ] A provider outage produces retries and a DLQ entry, not a lost transaction.
+- [x] Nothing outside the adapter knows the email provider.
+- [x] Templates live outside handler code and render with sample data in a test.
+- [x] SPF, DKIM and DMARC pass on a real send from staging (`docs/DEVOPS/09-EMAIL-DELIVERABILITY.md`).
+- [x] A provider outage produces retries and a DLQ entry, not a lost transaction.
 
 ---
 

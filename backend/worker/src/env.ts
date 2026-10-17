@@ -1,21 +1,27 @@
 /**
- * P1-18 — the worker's environment.
+ * P1-18, P4-06 — the worker's environment.
  *
  * The API validates its whole environment at boot and exits 78 naming every offending
  * variable (`backend/api/src/config/env.schema.ts`). The worker had only `REDIS_URL`, read
  * inline, because until now it did nothing but move jobs around. It now needs a database, a
- * bucket and a malware scanner, and each of those has a failure mode that is much worse
- * discovered on the first job than at startup.
+ * bucket, an email gateway and a malware scanner, and each of those has a failure mode that
+ * is much worse discovered on the first job than at startup.
  *
  * Kept deliberately small: this is not a second copy of the API's schema, it is the handful
- * of variables the media pool cannot run without. Zod is not a worker dependency and adding
- * it for six variables would be the wrong trade.
+ * of variables the worker pools cannot run without. Zod is not a worker dependency and adding
+ * it for eight variables would be the wrong trade.
  */
 
 export interface WorkerEnv {
   readonly appEnv: "development" | "test" | "staging" | "production";
   readonly redisUrl: string;
   readonly databaseUrl: string;
+  readonly appOrigin: string;
+  readonly publicInviteOrigin: string;
+  readonly email: {
+    readonly resendApiKey?: string | undefined;
+    readonly from: string;
+  };
   readonly storage: {
     readonly endpoint: string;
     readonly accessKeyId: string;
@@ -50,10 +56,8 @@ const DEPLOYED = new Set(["staging", "production"]);
 /**
  * Read and validate. Throws `WorkerConfigError` naming **every** problem, not the first.
  *
- * `pool` matters because the requirements differ: `general` needs Redis and nothing else
- * today, while `media` needs a database, a bucket and a scanner. Demanding storage
- * credentials of an email worker would be the kind of over-strict validation that gets
- * loosened by someone in a hurry, and the loosening would apply to the media pool too.
+ * `pool` matters because the requirements differ: `general` needs Redis (and DB/email credentials
+ * when executing notification.send), while `media` needs a database, a bucket and a scanner.
  */
 export function loadWorkerEnv(
   pool: "media" | "general" | "cron",
@@ -83,12 +87,18 @@ export function loadWorkerEnv(
   // `media` processes files; `cron` runs the staging sweep, which also needs both.
   const needsMedia = pool === "media" || pool === "cron";
 
-  const databaseUrl = needsMedia ? required("DATABASE_URL") : "";
-  const endpoint = needsMedia ? required("STORAGE_ENDPOINT") : "";
-  const accessKeyId = needsMedia ? required("STORAGE_ACCESS_KEY_ID") : "";
+  const databaseUrl = needsMedia ? required("DATABASE_URL") : (source["DATABASE_URL"] ?? "");
+  const endpoint = needsMedia ? required("STORAGE_ENDPOINT") : (source["STORAGE_ENDPOINT"] ?? "");
+  const accessKeyId = needsMedia ? required("STORAGE_ACCESS_KEY_ID") : (source["STORAGE_ACCESS_KEY_ID"] ?? "");
   const secretAccessKey = needsMedia
     ? required("STORAGE_SECRET_ACCESS_KEY")
-    : "";
+    : (source["STORAGE_SECRET_ACCESS_KEY"] ?? "");
+
+  const appOrigin = source["APP_ORIGIN"] ?? "http://localhost:3100";
+  const publicInviteOrigin = source["PUBLIC_INVITE_ORIGIN"] ?? "http://localhost:3200";
+
+  const resendApiKey = source["RESEND_API_KEY"];
+  const emailFrom = source["EMAIL_FROM"] ?? "Momen Bahagia <halo@momenbahagia.id>";
 
   /**
    * The scanner, and the one place this file makes a security decision.
@@ -133,6 +143,12 @@ export function loadWorkerEnv(
     appEnv,
     redisUrl,
     databaseUrl,
+    appOrigin,
+    publicInviteOrigin,
+    email: {
+      resendApiKey: resendApiKey && resendApiKey.length > 0 ? resendApiKey : undefined,
+      from: emailFrom,
+    },
     storage: {
       endpoint,
       accessKeyId,

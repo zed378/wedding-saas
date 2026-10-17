@@ -70,9 +70,8 @@ async function main(): Promise<void> {
   const redis = new IORedis(env.redisUrl, { maxRetriesPerRequest: null });
   const connection = { url: env.redisUrl } as const;
 
-  // `general` needs no database or bucket today, and building them would demand credentials
-  // an email worker has no use for.
-  const deps = pool === "general" ? undefined : createHandlerDeps(env);
+  // Build handlers and dependencies (storage, pg, emailPort).
+  const deps = createHandlerDeps(env);
 
   const runner = new JobRunner({ pool, connection, redis });
   registerHandlers(pool, runner, deps);
@@ -125,7 +124,7 @@ async function main(): Promise<void> {
     for (const scheduler of schedulers?.values() ?? []) await scheduler.close();
     // A `pg.Pool` that is never ended keeps the process alive past SIGTERM, which turns a
     // rolling deploy into a stuck one.
-    await deps?.pg.end();
+    await deps?.pg?.end();
     await redis.quit();
     process.exit(0);
   };

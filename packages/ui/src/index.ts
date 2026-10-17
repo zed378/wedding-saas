@@ -76,3 +76,7 @@ export {
   type AvatarProps,
   type AvatarSize,
 } from "./components/Avatar.js";
+
+// Transactional email templates and renderer (P4-06)
+export * from "./email/index.js";
+

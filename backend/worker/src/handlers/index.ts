@@ -1,5 +1,5 @@
 import { Pool as PgPool } from "pg";
-import { S3Storage, type StoragePort } from "@wi/storage";
+import { InMemoryStorage, S3Storage, type StoragePort } from "@wi/storage";
 
 import type { Pool } from "../jobs.js";
 import { policyFor } from "../jobs.js";
@@ -10,23 +10,26 @@ import { MediaRepository } from "../media/media-repository.js";
 import { makeMediaProcessHandler } from "../media/media-process.handler.js";
 import { makeCleanupStagingHandler } from "../media/cleanup-staging.handler.js";
 import { makeCacheInvalidateHandler } from "./cache-invalidate.handler.js";
+import { makeNotificationSendHandler } from "./notification-send.handler.js";
+import {
+  type EmailPort,
+  MemoryEmailAdapter,
+  ResendEmailAdapter,
+} from "../email/index.js";
 
 /**
  * Job handlers, by pool.
  *
  * `P1-18` registered the first real ones: `media.process` in the media pool and
- * `media_cleanup_staging` in cron. The rest are still absent, which is the honest state —
- * `payment.webhook_process` needs `P3-05` and `notification.send` needs `P4-06`. Registering
- * an empty stub for either would mean a job that reports success without doing its work,
- * which is worse than one that is not registered: an unregistered job stays queued and
- * visible, where a no-op stub is invisible and wrong.
+ * `media_cleanup_staging` in cron. `P4-06` registers `notification.send` in general.
  */
 
 export interface HandlerDeps {
   readonly env: WorkerEnv;
   /** Closed on shutdown by the caller. */
-  readonly pg: PgPool;
+  readonly pg?: PgPool | undefined;
   readonly storage: StoragePort;
+  readonly emailPort: EmailPort;
 }
 
 /**
@@ -37,15 +40,28 @@ export interface HandlerDeps {
  * turns a rolling deploy into a stuck one.
  */
 export function createHandlerDeps(env: WorkerEnv): HandlerDeps {
+  const pg = env.databaseUrl ? new PgPool({ connectionString: env.databaseUrl, max: 4 }) : undefined;
+  const storage = env.storage.endpoint
+    ? new S3Storage({
+        endpoint: env.storage.endpoint,
+        accessKeyId: env.storage.accessKeyId,
+        secretAccessKey: env.storage.secretAccessKey,
+        buckets: env.storage.buckets,
+      })
+    : new InMemoryStorage();
+
+  const emailPort = env.email.resendApiKey
+    ? new ResendEmailAdapter({
+        apiKey: env.email.resendApiKey,
+        defaultFrom: env.email.from,
+      })
+    : new MemoryEmailAdapter();
+
   return {
     env,
-    pg: new PgPool({ connectionString: env.databaseUrl, max: 4 }),
-    storage: new S3Storage({
-      endpoint: env.storage.endpoint,
-      accessKeyId: env.storage.accessKeyId,
-      secretAccessKey: env.storage.secretAccessKey,
-      buckets: env.storage.buckets,
-    }),
+    pg,
+    storage,
+    emailPort,
   };
 }
 
@@ -56,7 +72,7 @@ export function registerHandlers(
 ): void {
   switch (pool) {
     case "media": {
-      if (deps === undefined) break;
+      if (deps === undefined || deps.pg === undefined) break;
       const repository = new MediaRepository(deps.pg);
 
       runner.register(
@@ -77,12 +93,23 @@ export function registerHandlers(
       // `payment.webhook_process` has no producer: P3-05 processes the webhook synchronously in the
       // API (docs/BACKEND/08 allows it "if it's fast enough"; ADR-077), so the provider gets its
       // answer only after the transaction committed or rolled back.
-      // P4-06: notification.send
       // P3-12: cache.invalidate
       runner.register(
         "cache.invalidate",
         makeCacheInvalidateHandler({ redis: runner.redis }),
       );
+
+      // P4-06: notification.send
+      if (deps !== undefined && deps.pg !== undefined) {
+        runner.register(
+          "notification.send",
+          makeNotificationSendHandler({
+            pg: deps.pg,
+            emailPort: deps.emailPort,
+            env: deps.env,
+          }),
+        );
+      }
       break;
 
     case "cron": {
@@ -90,7 +117,7 @@ export function registerHandlers(
       // are consumed by the API's jobs process (ADR-078): they change orders, payments, and invitations
       // through the API's services. Never register them here — two consumers would run two different
       // implementations of one rule.
-      if (deps === undefined) break;
+      if (deps === undefined || deps.pg === undefined) break;
       runner.register(
         "media_cleanup_staging",
         makeCleanupStagingHandler({
@@ -98,8 +125,6 @@ export function registerHandlers(
           storage: deps.storage,
         }),
       );
-      // P4-*: the remaining sweeps (e.g. reminder_email_h7_h1). Registering them as no-ops now would
-      // mean the check "succeeds" every night while expiring nothing.
       break;
     }
   }

@@ -16,6 +16,7 @@
     "@wi/logging": "workspace:*",
     "@wi/schema": "workspace:*",
     "@wi/storage": "workspace:*",
+    "@wi/ui": "workspace:*",
     "bullmq": "^6.3.4",
     "ioredis": "^5.11.1",
     "pg": "^8.23.0",

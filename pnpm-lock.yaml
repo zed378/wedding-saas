@@ -202,6 +202,9 @@ importers:
       '@wi/storage':
         specifier: workspace:*
         version: link:../../packages/storage
+      '@wi/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       bullmq:
         specifier: ^6.3.4
         version: 6.3.4(ioredis@5.11.1)(pg@8.23.0)

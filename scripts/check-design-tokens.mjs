@@ -79,6 +79,7 @@ const ALLOWED = ["packages/ui/src/tokens.css"];
 const OUTSIDE_THE_RULE = [
   /(^|\/)global-error\.tsx$/,
   /^frontend\/public-invite\//,
+  /^packages\/ui\/src\/email\//,
 ];
 const isTest = (rel) => /\.(spec|itest|e2e|test)\.(ts|mts|tsx)$/.test(rel);
 

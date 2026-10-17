@@ -10,6 +10,17 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-17 — Notification module and email port
+
+**Added** — centralized transactional email architecture, `EmailPort` abstraction, and event-driven worker handler ([P4-06](./records/2026-10-17-P4-06-notification-module-and-email-port.md))
+
+- Implemented `EmailPort` interface and `ResendEmailAdapter` using native Node.js 24 fetch (ADR-013, ADR-090), plus `MemoryEmailAdapter` for isolated test runs.
+- Authored 11 typed transactional email templates with Indonesian copy (ADR-001) in `packages/ui/src/email/` with responsive table layout and accessible footer.
+- Implemented `notification.send` event consumer on worker `general` pool with 3 attempts, exponential backoff, and DLQ preservation.
+- Enforced notification preference rules (`rsvp_email`, `guestbook_email`) while keeping critical security alerts (`password_changed`, `bank_account_changed`) strictly non-opt-outable (ADR-025).
+- Created local preview CLI tool (`scripts/preview-email.mjs`) and comprehensive deliverability documentation (`docs/DEVOPS/09-EMAIL-DELIVERABILITY.md`).
+
+
 ### 2026-10-17 — Public abuse controls and adaptive CAPTCHA
 
 **Added** — multi-layered abuse protection and adaptive Cloudflare Turnstile CAPTCHA ([P4-05](./records/2026-10-17-P4-05-abuse-controls-and-adaptive-captcha.md))
