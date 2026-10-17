@@ -610,6 +610,7 @@ export class InvitationRepository {
       readonly rsvpEnabled?: boolean | undefined;
       readonly guestbookEnabled?: boolean | undefined;
       readonly guestbookModeration?: boolean | undefined;
+      readonly profanityFilterEnabled?: boolean | undefined;
       readonly seoIndexable?: boolean | undefined;
     },
   ): Promise<InvitationSettingsRow | null> {
@@ -630,6 +631,9 @@ export class InvitationRepository {
     }
     if (changes.guestbookModeration !== undefined) {
       patch["guestbookModeration"] = changes.guestbookModeration;
+    }
+    if (changes.profanityFilterEnabled !== undefined) {
+      patch["profanityFilterEnabled"] = changes.profanityFilterEnabled;
     }
     if (changes.seoIndexable !== undefined) {
       patch["seoIndexable"] = changes.seoIndexable;
@@ -657,6 +661,9 @@ export class InvitationRepository {
           : {}),
         ...(changes.guestbookModeration !== undefined
           ? { guestbookModeration: changes.guestbookModeration }
+          : {}),
+        ...(changes.profanityFilterEnabled !== undefined
+          ? { profanityFilterEnabled: changes.profanityFilterEnabled }
           : {}),
         ...(changes.seoIndexable !== undefined
           ? { seoIndexable: changes.seoIndexable }

@@ -122,6 +122,8 @@ export const invitationSettings = pgTable("invitation_settings", {
   guestbookEnabled: boolean("guestbook_enabled").notNull().default(true),
   /** Off by default; the service flips new entries to 'pending' when this is on. */
   guestbookModeration: boolean("guestbook_moderation").notNull().default(false),
+  /** Off by default; flags profanity in free-text to moderation queue (P4-05). */
+  profanityFilterEnabled: boolean("profanity_filter_enabled").notNull().default(false),
   /**
    * FALSE by default, and that default is the privacy decision in `docs/PLAN/15`.
    * A wedding invitation carries names, addresses, times and a guest list; it must

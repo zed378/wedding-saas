@@ -2797,3 +2797,31 @@ the expiry, because inside the window that is a resume.
    - Per `docs/API/04`, the moderation toggle in settings does not alter historical entries: toggling moderation ON does not retroactively hide existing approved entries, and toggling it OFF does not auto-approve the pending queue.
 
 **Consequences** — Zero cross-tenant leakage or child ID confusion; instant public consistency upon owner moderation; full auditability of moderation actions.
+
+---
+
+### ADR-089 — Public abuse controls: adaptive Turnstile CAPTCHA velocity trigger and profanity-filter routing to pending
+
+**Date** 2026-10-17 · **Task** `P4-05` · **Status** Accepted · **Amends** `docs/SECURITY/10` § Abuse Prevention & Content Moderation, `docs/DATABASE/04`, `OQ-14`
+
+**Context** — Public wedding guestbooks and RSVP forms are open write surfaces vulnerable to automated flooding, scraping, and abusive text. Three challenges exist:
+1. CAPTCHA friction: Forcing every ordinary wedding guest to solve a challenge creates unacceptable friction for elderly relatives and non-technical visitors.
+2. Attack mitigation: Automated floods can exhaust server resources and pollute guest lists.
+3. Offensive language: Abusive text must not appear publicly on couples' wedding pages, but outright rejection can trigger false-positive denial of service for innocent guests whose wishes contain unusual slang or names.
+
+**Decisions**
+1. **Adaptive CAPTCHA velocity circuit breaker (`OQ-14`)**:
+   - Both public write endpoints (`POST /public/i/:slug/rsvp` and `POST /public/i/:slug/guestbook`) share a Redis rolling sliding window (`abuse:submissions:<slug>`).
+   - Ordinary traffic experiences zero CAPTCHA requirement (`abuse:captcha:<slug>` key is absent).
+   - If 20 submission attempts occur within 10 minutes (600 seconds) on a slug, `abuse:captcha:<slug>` is activated with TTL 1800 seconds (30 minutes). Subsequent requests require a valid Cloudflare Turnstile token (`captcha_token`).
+   - Probe endpoint `GET /public/i/:slug/captcha-status` allows frontends to know whether Turnstile rendering is currently required for the slug.
+2. **Profanity filter routing to `pending` queue**:
+   - Added `profanity_filter_enabled` boolean column to `invitation_settings` (migration `0015_profanity_filter.sql`), defaulting to false.
+   - When enabled, free-text submissions are checked against `slug_blocklist` terms with `category = 'profanity'` using leetspeak normalization (`foldLeet`).
+   - Flagged guestbook entries are saved with `status = 'pending'`, preserving the wish for owner moderation review while keeping the public page clean.
+3. **Escalating blocks and admin manual unblock in `RateLimiter`**:
+   - Repeat rate limit violations escalate block durations (15m -> 30m -> 1h -> max 24h).
+   - Added `unblockKey(policyName, key)` and `unblockIp(ip)` to allow administrator manual overrides to clear blocks immediately.
+
+**Consequences** — Seamless frictionless experience for normal wedding guests; automatic defense-in-depth against bot floods; clean public pages without destructive rejection of visitor submissions.
+

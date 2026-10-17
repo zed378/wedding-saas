@@ -10,6 +10,17 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-17 — Public abuse controls and adaptive CAPTCHA
+
+**Added** — multi-layered abuse protection and adaptive Cloudflare Turnstile CAPTCHA ([P4-05](./records/2026-10-17-P4-05-abuse-controls-and-adaptive-captcha.md))
+
+- Integrated Cloudflare Turnstile server-side verification (`ADR-011`) for public write surfaces (`POST /public/i/:slug/rsvp` and `POST /public/i/:slug/guestbook`).
+- Added adaptive trigger (`OQ-14`): challenge remains completely off and invisible for normal guests; automatically activates when an invitation receives 20 submissions within 10 minutes, lasting 30 minutes in Redis (`abuse:captcha:<slug>`).
+- Added public probe endpoint `GET /public/i/:slug/captcha-status` for frontends to query whether Turnstile is currently required.
+- Implemented escalating blocks and admin manual unblock methods (`unblockKey`, `unblockIp`) in `RateLimiter`.
+- Added per-invitation profanity filter toggle (`profanity_filter_enabled` in `invitation_settings`, migration `0015_profanity_filter.sql`): flagged guestbook submissions are routed to `pending` queue with `foldLeet` leetspeak normalization.
+- Emitted Prometheus abuse metrics (`abuseCaptchaVerifications`, `abuseCaptchaActivations`, `abuseRateLimitBlocks`, `abuseProfanityFlagged`) and registered alert rules in `deploy/prometheus/alerts.yml`.
+
 ### 2026-10-17 — Owner guestbook moderation
 
 **Added** — owner-facing guestbook moderation and deletion endpoints ([P4-04](./records/2026-10-17-P4-04-owner-guestbook-moderation.md))

@@ -119,6 +119,26 @@ export const metrics = {
     "Individually soft-deleted media files hard-deleted after 7 days grace period (P3-13, P1-19).",
     [],
   ),
+  abuseCaptchaVerifications: new Counter(
+    "wi_abuse_captcha_verifications_total",
+    "Turnstile verification attempts by result (success, failure, missing).",
+    ["result"],
+  ),
+  abuseCaptchaActivations: new Counter(
+    "wi_abuse_captcha_activations_total",
+    "Adaptive CAPTCHA activations triggered on suspicious traffic flood.",
+    ["trigger"],
+  ),
+  abuseRateLimitBlocks: new Counter(
+    "wi_abuse_rate_limit_blocks_total",
+    "Rate limit blocks placed or escalated.",
+    ["policy"],
+  ),
+  abuseProfanityFlagged: new Counter(
+    "wi_abuse_profanity_flagged_total",
+    "Submissions flagged by profanity filter into moderation.",
+    ["surface"],
+  ),
 } as const;
 
 export function renderMetrics(): string {

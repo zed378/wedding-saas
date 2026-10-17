@@ -57,6 +57,7 @@ export interface SettingsPatch {
   readonly rsvpEnabled?: boolean | undefined;
   readonly guestbookEnabled?: boolean | undefined;
   readonly guestbookModeration?: boolean | undefined;
+  readonly profanityFilterEnabled?: boolean | undefined;
   readonly seoIndexable?: boolean | undefined;
   /** Lives on `invitations`, presented here. BR-6.2 governs when it may change. */
   readonly slug?: string | undefined;
@@ -106,6 +107,7 @@ export class SettingsService {
       rsvp_enabled: settings?.rsvpEnabled ?? true,
       guestbook_enabled: settings?.guestbookEnabled ?? true,
       guestbook_moderation: settings?.guestbookModeration ?? false,
+      profanity_filter_enabled: settings?.profanityFilterEnabled ?? false,
       seo_indexable: settings?.seoIndexable ?? false,
     };
   }
@@ -159,6 +161,9 @@ export class SettingsService {
         : {}),
       ...(patch.guestbookModeration !== undefined
         ? { guestbookModeration: patch.guestbookModeration }
+        : {}),
+      ...(patch.profanityFilterEnabled !== undefined
+        ? { profanityFilterEnabled: patch.profanityFilterEnabled }
         : {}),
       ...(patch.seoIndexable !== undefined
         ? { seoIndexable: patch.seoIndexable }

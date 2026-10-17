@@ -1,6 +1,7 @@
 import type { Redis } from "ioredis";
 
 import { logSecurityEvent, logger } from "../logging/logger";
+import { metrics } from "../metrics/metrics";
 import {
   blockDurationSeconds,
   STRIKE_TTL_SECONDS,
@@ -232,6 +233,8 @@ export class RateLimiter {
         block_seconds: seconds,
       });
 
+      metrics.abuseRateLimitBlocks.inc({ policy: policy.name });
+
       return seconds;
     } catch {
       // A block that could not be written is a block that does not exist. Saying so is
@@ -244,6 +247,60 @@ export class RateLimiter {
   async strikes(policy: RateLimitPolicy, key: string): Promise<number> {
     const value = await this.redis.get(this.strikeKey(policy, key));
     return value === null ? 0 : Number(value);
+  }
+
+  /**
+   * Lift a temporary block and reset strikes. `docs/SECURITY/10` § Monitoring & Auto-block.
+   * Manual admin override to unblock an IP or key.
+   */
+  async unblock(policy: RateLimitPolicy, key: string): Promise<boolean> {
+    try {
+      const blockKey = this.blockKey(policy, key);
+      const strikeKey = this.strikeKey(policy, key);
+      const result = await this.redis.del(blockKey, strikeKey);
+      return result > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Lift a block by policy name and key string. */
+  async unblockKey(policyName: string, key: string): Promise<boolean> {
+    try {
+      const blockKey = `rl:block:${policyName}:${key}`;
+      const strikeKey = `rl:strikes:${policyName}:${key}`;
+      const result = await this.redis.del(blockKey, strikeKey);
+      return result > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Lift all policy blocks for a given client IP address.
+   */
+  async unblockIp(ip: string): Promise<number> {
+    try {
+      const blockPattern = `rl:block:*${ip}*`;
+      const strikePattern = `rl:strikes:*${ip}*`;
+      const blockKeys = await this.redis.keys(blockPattern);
+      const strikeKeys = await this.redis.keys(strikePattern);
+      const allKeys = [...new Set([...blockKeys, ...strikeKeys])];
+      if (allKeys.length === 0) return 0;
+      return await this.redis.del(...allKeys);
+    } catch {
+      return 0;
+    }
+  }
+
+  /** Check whether a key is currently blocked. */
+  async isBlocked(policy: RateLimitPolicy, key: string): Promise<boolean> {
+    try {
+      const pttl = await this.redis.pttl(this.blockKey(policy, key));
+      return pttl > 0;
+    } catch {
+      return false;
+    }
   }
 
   /**

@@ -28,6 +28,7 @@ CREATE TABLE invitation_settings (
   rsvp_enabled                  BOOLEAN NOT NULL DEFAULT true,
   guestbook_enabled              BOOLEAN NOT NULL DEFAULT true,
   guestbook_moderation             BOOLEAN NOT NULL DEFAULT false,
+  profanity_filter_enabled         BOOLEAN NOT NULL DEFAULT false, -- P4-05, ADR-089: optional filter routing profanity to moderation queue
   seo_indexable                     BOOLEAN NOT NULL DEFAULT false,
   updated_at                         TIMESTAMPTZ NOT NULL DEFAULT now()
 );

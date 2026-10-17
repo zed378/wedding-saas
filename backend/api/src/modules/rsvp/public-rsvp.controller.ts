@@ -25,6 +25,7 @@ const submitRsvpSchema = z
     attendance_status: z.enum(["attending", "not_attending", "maybe"]),
     guest_count: z.number().int().min(1).max(10).optional(),
     message: z.string().trim().max(1000, "Pesan maksimal 1000 karakter").nullable().optional(),
+    captcha_token: z.string().trim().max(2048).optional(),
   })
   .strict();
 

@@ -25,6 +25,7 @@ import { RsvpModule } from "./modules/rsvp/rsvp.module";
 import { GuestbookModule } from "./modules/guestbook/guestbook.module";
 import { MetricsModule } from "./shared/metrics/metrics.module";
 import { RateLimitModule } from "./shared/rate-limit/rate-limit.module";
+import { AbuseModule } from "./shared/abuse/abuse.module";
 
 /**
  * The middleware chain, in order. Positions later tasks fill are reserved here rather
@@ -62,6 +63,7 @@ import { RateLimitModule } from "./shared/rate-limit/rate-limit.module";
     QueueModule,
     CacheModule,
     RateLimitModule,
+    AbuseModule,
     AuthModule,
     UserModule,
     InvitationModule,

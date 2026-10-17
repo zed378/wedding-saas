@@ -30,6 +30,7 @@ const submitGuestbookSchema = z
       .trim()
       .min(1, "Pesan wajib diisi")
       .max(1000, "Pesan maksimal 1000 karakter"),
+    captcha_token: z.string().trim().max(2048).optional(),
   })
   .strict();
 
@@ -118,5 +119,15 @@ export class PublicGuestbookController {
     });
 
     return ok(items, pageMeta(pagination, total));
+  }
+
+  /**
+   * Check if adaptive CAPTCHA is required for this invitation slug (P4-05).
+   */
+  @Get(":slug/captcha-status")
+  @UseGuards(rateLimit("general-public"))
+  async captchaStatus(@Param("slug") slug: string) {
+    const required = await this.service.isCaptchaRequired(slug);
+    return ok({ captcha_required: required });
   }
 }

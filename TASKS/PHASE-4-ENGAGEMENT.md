@@ -166,7 +166,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO — vendor decided (ADR-011: Cloudflare Turnstile); the activation threshold is open as `OQ-14` |
+| **Status** | DONE |
 | **Depends on** | P4-01, P4-03 |
 | **Spec refs** | `docs/SECURITY/10-ABUSE-PREVENTION.md`, `docs/PLAN/18` R8, `docs/DEVOPS/07-ALERTING.md` |
 | **Spec required** | Yes — abuse prevention |
@@ -183,10 +183,10 @@
 6. Give admins a manual override to lift a block (`docs/SECURITY/10` § Monitoring & Auto-block), wired into the panel in Phase 5.
 
 **Definition of Done**
-- [ ] CAPTCHA activates automatically under a simulated flood and deactivates after it subsides.
-- [ ] A normal guest never sees a challenge in the happy path.
-- [ ] Repeat violators are blocked with escalating duration.
-- [ ] Abuse metrics exist with alert rules attached.
+- [x] CAPTCHA activates automatically under a simulated flood and deactivates after it subsides.
+- [x] A normal guest never sees a challenge in the happy path.
+- [x] Repeat violators are blocked with escalating duration.
+- [x] Abuse metrics exist with alert rules attached.
 
 ---
 

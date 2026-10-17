@@ -31,6 +31,8 @@ const EXEMPT: Readonly<Record<string, string>> = {
     "public guestbook submission; published status predicate is the authorization boundary (P4-03) — public-guestbook.itest.ts › 'returns 404 and stores nothing for a draft, unpublished, expired, or deleted invitation'",
   "GET /public/i/:slug/guestbook":
     "public guestbook approved listing; published status predicate is the authorization boundary (P4-03) — public-guestbook.itest.ts › 'returns 404 for a draft, unpublished, expired, or deleted invitation'",
+  "GET /public/i/:slug/captcha-status":
+    "public adaptive CAPTCHA status probe (P4-05) — abuse-controls.itest.ts › 'returns captcha_required flag for a given slug'",
   "GET /public/preview/:token":
     "a bearer credential, not an owner route — preview-link.itest.ts › 'answers expired, revoked, invented, malformed and deleted-invitation tokens identically'",
   "GET /api/v1/templates/:slug":

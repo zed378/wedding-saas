@@ -14,12 +14,14 @@ import {
 import type { TenantScope } from "../../shared/tenancy/tenant-scope";
 import { JOB_QUEUE, type JobQueue } from "../../infra/queue/queue.module";
 import { logger } from "../../shared/logging/logger";
+import { AbuseProtectionService } from "../../shared/abuse/abuse-protection.service";
 
 export interface SubmitRsvpDto {
   readonly guest_name: string;
   readonly attendance_status: AttendanceStatus;
   readonly guest_count?: number;
   readonly message?: string | null;
+  readonly captcha_token?: string;
 }
 
 export interface RsvpResponse {
@@ -48,12 +50,13 @@ export function escapeCsvCell(value: string | number | null | undefined): string
 }
 
 /**
- * `P4-01` — Service managing RSVP attendance submissions.
+ * `P4-01` & `P4-05` — Service managing RSVP attendance submissions and abuse protection.
  */
 @Injectable()
 export class RsvpService {
   constructor(
     private readonly rsvpRepository: RsvpRepository,
+    @Optional() private readonly abuseProtection?: AbuseProtectionService,
     @Optional() @Inject(JOB_QUEUE) private readonly queue?: JobQueue,
   ) {}
 
@@ -84,6 +87,14 @@ export class RsvpService {
       );
     }
 
+    if (this.abuseProtection) {
+      await this.abuseProtection.verifySubmission(
+        slug,
+        dto.captcha_token,
+        clientIp,
+      );
+    }
+
     const sanitized = sanitizeFields(
       {
         guest_name: dto.guest_name,
@@ -91,6 +102,22 @@ export class RsvpService {
       },
       TEXT_FIELDS,
     );
+
+    // Flag profanity in metrics if enabled on invitation settings (P4-05)
+    if (target.profanityFilterEnabled && this.abuseProtection) {
+      if (sanitized.message) {
+        await this.abuseProtection.containsProfanity(
+          sanitized.message as string,
+          "rsvp",
+        );
+      }
+      if (sanitized.guest_name) {
+        await this.abuseProtection.containsProfanity(
+          sanitized.guest_name as string,
+          "rsvp",
+        );
+      }
+    }
 
     const ipHash = createHash("sha256").update(clientIp).digest("hex");
 
@@ -248,5 +275,13 @@ export class RsvpService {
     if (!deleted) {
       throw new NotFoundError("RSVP tidak ditemukan.");
     }
+  }
+
+  /**
+   * Check whether adaptive CAPTCHA is currently required for a given slug (P4-05).
+   */
+  async isCaptchaRequired(slug: string): Promise<boolean> {
+    if (!this.abuseProtection) return false;
+    return this.abuseProtection.isCaptchaRequired(slug);
   }
 }

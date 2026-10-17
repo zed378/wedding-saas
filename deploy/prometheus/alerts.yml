@@ -68,3 +68,26 @@ groups:
         annotations:
           summary: "Public invitation cache hit ratio dropped below 50%"
           runbook: "docs/DEVOPS/05-MONITORING.md (Cache hit ratio target > 90%); investigate excessive cache invalidations or redis eviction"
+
+  - name: abuse
+    rules:
+      # docs/DEVOPS/07: Abuse flood alert when multiple CAPTCHA activations occur within a short window.
+      - alert: AbuseCaptchaFloodDetected
+        expr: sum(increase(wi_abuse_captcha_activations_total[10m])) > 3
+        labels:
+          severity: high
+          channel: security
+        annotations:
+          summary: "Adaptive CAPTCHA triggered on multiple invitations due to flood traffic"
+          runbook: "docs/SECURITY/10-ABUSE-PREVENTION.md § Guestbook/RSVP Spam; inspect Redis abuse:captcha:* and abuse:velocity:*"
+
+      # docs/DEVOPS/07: Spike in rate limit blocks indicates an active brute-force or spam attack.
+      - alert: AbuseRateLimitBlocksSpike
+        expr: sum(increase(wi_abuse_rate_limit_blocks_total[10m])) > 10
+        labels:
+          severity: high
+          channel: security
+        annotations:
+          summary: "More than 10 rate-limit blocks placed in 10 minutes"
+          runbook: "docs/SECURITY/10-ABUSE-PREVENTION.md § Monitoring & Auto-block; inspect blocked keys in Redis"
+

@@ -26,7 +26,7 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 | [Phase 1 — Auth and Invitation Core](./PHASE-1-AUTH-AND-INVITATION-CORE.md) | 25 | 25 | **COMPLETE** — 2026-09-12 | Phase 0 exit criteria |
 | [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 18 | 18 | **COMPLETE** — including three owner-requested cards added after the phase summary | Phase 1 exit + `P1-25` — **met** |
 | [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 16 | **COMPLETE** — 2026-10-17 | Phase 2 exit — **met** (LCP qualified by `OQ-26`) |
-| [Phase 4 — Engagement](./PHASE-4-ENGAGEMENT.md) | 12 | 2 | **ACTIVE** | Phase 3 exit — **met** |
+| [Phase 4 — Engagement](./PHASE-4-ENGAGEMENT.md) | 12 | 5 | **ACTIVE** | Phase 3 exit — **met** |
 | [Phase 5 — Admin Panel](./PHASE-5-ADMIN-PANEL.md) | 14 | 0 | Not started | Phase 4 exit |
 | [Phase 6 — Hardening and Launch](./PHASE-6-HARDENING-AND-LAUNCH.md) | 17 | 0 | Not started | Phase 5 exit |
 | [Phase 7 — Post-Launch](./PHASE-7-POST-LAUNCH.md) | 11 | 0 | Not started | MVP launched, `P6-17` signed off |
@@ -179,7 +179,7 @@ Roadmap: Week 10-11.
 | P4-02 | Owner RSVP management and export | backend | M | **DONE** — [record](../MEMORY/records/2026-10-17-P4-02-owner-rsvp-management.md) | P4-01 |
 | P4-03 | Public guestbook | backend | M | **DONE** — [record](../MEMORY/records/2026-10-17-P4-03-public-guestbook.md); public submit and approved list; moderation toggle respected; duplicate spam detector flags to pending in 5m; XSS sanitization; SHA-256 IP hash (ADR-087) | P2-07, P1-07 |
 | P4-04 | Owner guestbook moderation | backend | M | **DONE** — [record](../MEMORY/records/2026-10-17-P4-04-owner-guestbook-moderation.md); owner endpoints GET/PATCH/DELETE; query-level tenant scoping (404); public cache invalidation on approved changes; IDOR sweep covered (ADR-088) | P4-03 |
-| P4-05 | Abuse controls and adaptive CAPTCHA | backend | M | TODO — Turnstile (ADR-011); threshold `OQ-14` | P4-01, P4-03 |
+| P4-05 | Abuse controls and adaptive CAPTCHA | backend | M | **DONE** — [record](../MEMORY/records/2026-10-17-P4-05-abuse-controls-and-adaptive-captcha.md); Cloudflare Turnstile; adaptive trigger (20 req / 10m window triggers 30m CAPTCHA challenge, OQ-14); GET /public/i/:slug/captcha-status; rate-limit block escalation + admin unblock; optional profanity filter to pending; abuse metrics & Prometheus alerts (ADR-089) | P4-01, P4-03 |
 | P4-06 | Notification module and email port | backend, worker | L | TODO — Resend (ADR-013) | P0-15 |
 | P4-07 | Transactional email wiring | worker | L | TODO | P4-06 |
 | P4-08 | Preferences and delivery monitoring | backend, worker | M | TODO | P4-07 |

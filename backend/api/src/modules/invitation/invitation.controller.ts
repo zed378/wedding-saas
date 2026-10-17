@@ -249,6 +249,7 @@ const settingsSchema = z
     rsvp_enabled: z.boolean().optional(),
     guestbook_enabled: z.boolean().optional(),
     guestbook_moderation: z.boolean().optional(),
+    profanity_filter_enabled: z.boolean().optional(),
     seo_indexable: z.boolean().optional(),
     slug: z
       .string()
@@ -857,6 +858,9 @@ export class InvitationController {
           : {}),
         ...(input.guestbook_moderation !== undefined
           ? { guestbookModeration: input.guestbook_moderation }
+          : {}),
+        ...(input.profanity_filter_enabled !== undefined
+          ? { profanityFilterEnabled: input.profanity_filter_enabled }
           : {}),
         ...(input.seo_indexable !== undefined
           ? { seoIndexable: input.seo_indexable }

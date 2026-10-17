@@ -34,6 +34,7 @@ export interface RsvpRow {
 export interface PublishedRsvpTarget {
   readonly invitationId: string;
   readonly rsvpEnabled: boolean;
+  readonly profanityFilterEnabled: boolean;
 }
 
 export interface RsvpSummary {
@@ -95,6 +96,7 @@ export class RsvpRepository {
       .select({
         invitationId: invitations.id,
         rsvpEnabled: invitationSettings.rsvpEnabled,
+        profanityFilterEnabled: invitationSettings.profanityFilterEnabled,
       })
       .from(invitations)
       .innerJoin(
@@ -116,6 +118,7 @@ export class RsvpRepository {
     return {
       invitationId: first.invitationId,
       rsvpEnabled: first.rsvpEnabled,
+      profanityFilterEnabled: first.profanityFilterEnabled,
     };
   }
 

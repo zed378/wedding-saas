@@ -15,6 +15,7 @@ export interface PublishedGuestbookTarget {
   readonly invitationId: string;
   readonly guestbookEnabled: boolean;
   readonly guestbookModeration: boolean;
+  readonly profanityFilterEnabled: boolean;
 }
 
 export interface InsertGuestbookParams {
@@ -67,6 +68,7 @@ export class GuestbookRepository {
         invitationId: invitations.id,
         guestbookEnabled: invitationSettings.guestbookEnabled,
         guestbookModeration: invitationSettings.guestbookModeration,
+        profanityFilterEnabled: invitationSettings.profanityFilterEnabled,
       })
       .from(invitations)
       .innerJoin(
@@ -89,6 +91,7 @@ export class GuestbookRepository {
       invitationId: first.invitationId,
       guestbookEnabled: first.guestbookEnabled,
       guestbookModeration: first.guestbookModeration,
+      profanityFilterEnabled: first.profanityFilterEnabled,
     };
   }
 

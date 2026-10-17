@@ -76,6 +76,8 @@ export const NOT_USER_TEXT: Readonly<Record<string, string>> = {
   id_token: "a Google JWT, accepted only if its signature verifies (P1-04)",
   refresh_token:
     "an opaque credential; never rendered, never stored in the clear",
+  captcha_token:
+    "a Cloudflare Turnstile verification response token; verified upstream and never stored or rendered (P4-05)",
 
   // Identifiers and opaque values. Format-validated, and none of them is prose.
   email:

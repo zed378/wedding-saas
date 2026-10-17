@@ -16,10 +16,12 @@ import type { TenantScope } from "../../shared/tenancy/tenant-scope";
 import { JOB_QUEUE, type JobQueue } from "../../infra/queue/queue.module";
 import { logger } from "../../shared/logging/logger";
 import { PublicInvitationCache } from "../publishing/public-invitation-cache";
+import { AbuseProtectionService } from "../../shared/abuse/abuse-protection.service";
 
 export interface SubmitGuestbookDto {
   readonly guest_name: string;
   readonly message: string;
+  readonly captcha_token?: string;
 }
 
 export interface GuestbookResponse {
@@ -49,12 +51,13 @@ export interface OwnerGuestbookListItem {
 }
 
 /**
- * `P4-03` & `P4-04` — Service managing public guestbook and owner moderation.
+ * `P4-03`, `P4-04` & `P4-05` — Service managing public guestbook, abuse protection, and owner moderation.
  */
 @Injectable()
 export class GuestbookService {
   constructor(
     private readonly guestbookRepository: GuestbookRepository,
+    @Optional() private readonly abuseProtection?: AbuseProtectionService,
     @Optional() @Inject(JOB_QUEUE) private readonly queue?: JobQueue,
     @Optional() private readonly cache?: PublicInvitationCache,
   ) {}
@@ -91,6 +94,14 @@ export class GuestbookService {
       );
     }
 
+    if (this.abuseProtection) {
+      await this.abuseProtection.verifySubmission(
+        slug,
+        dto.captcha_token,
+        clientIp,
+      );
+    }
+
     const sanitized = sanitizeFields(
       {
         guest_name: dto.guest_name,
@@ -101,10 +112,22 @@ export class GuestbookService {
 
     const ipHash = createHash("sha256").update(clientIp).digest("hex");
 
-    // Default status according to owner moderation setting (BR-7.3)
-    const defaultStatus: GuestbookEntryStatus = target.guestbookModeration
-      ? "pending"
-      : "approved";
+    // Check profanity if enabled on invitation settings (P4-05)
+    const hasProfanity =
+      target.profanityFilterEnabled && this.abuseProtection
+        ? (await this.abuseProtection.containsProfanity(
+            sanitized.message as string,
+            "guestbook",
+          )) ||
+          (await this.abuseProtection.containsProfanity(
+            sanitized.guest_name as string,
+            "guestbook",
+          ))
+        : false;
+
+    // Default status according to owner moderation setting (BR-7.3) or profanity flag
+    const defaultStatus: GuestbookEntryStatus =
+      target.guestbookModeration || hasProfanity ? "pending" : "approved";
 
     // Simple duplicate content spam guard: identical message from another IP in 5 min forces pending
     const isDuplicate =
@@ -321,5 +344,13 @@ export class GuestbookService {
       id: entryId,
       deleted: true,
     };
+  }
+
+  /**
+   * Check whether adaptive CAPTCHA is currently required for a given slug (P4-05).
+   */
+  async isCaptchaRequired(slug: string): Promise<boolean> {
+    if (!this.abuseProtection) return false;
+    return this.abuseProtection.isCaptchaRequired(slug);
   }
 }
