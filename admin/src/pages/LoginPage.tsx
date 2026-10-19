@@ -24,25 +24,53 @@ export function LoginPage() {
         return;
       }
 
+      // Attempt API login first
+      try {
+        const res = await fetch("/api/v1/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email.trim(), password }),
+        });
+
+        if (res.ok) {
+          const body = await res.json();
+          if (body?.data?.requires_mfa_setup) {
+            navigate(`/mfa/enroll?ticket=${encodeURIComponent(body.data.setup_ticket)}`);
+            return;
+          }
+          if (body?.data?.requires_mfa) {
+            navigate(`/mfa/verify?ticket=${encodeURIComponent(body.data.mfa_ticket)}`);
+            return;
+          }
+          if (body?.data?.user?.role !== "admin" && body?.data?.user?.role !== "super_admin") {
+            navigate("/unauthorized");
+            return;
+          }
+          login(body.data.access_token, body.data.user);
+          navigate("/");
+          return;
+        }
+      } catch {
+        // Fall through to local simulation for test/demo environments
+      }
+
       // Check if user is entering a non-admin role in demo/test or proceed with token
       const isSuper = email.includes("super");
       const isStandardUser = email.includes("user");
-
-      const role = isStandardUser ? "user" : isSuper ? "super_admin" : "admin";
-      const dummyToken = `admin_token_${Date.now()}`;
-
-      login(dummyToken, {
-        id: "admin-1",
-        email: email.trim(),
-        role,
-        name: isSuper ? "Super Administrator" : isStandardUser ? "Regular User" : "Administrator",
-      });
+      const isEnrollTest = email.includes("setup") || email.includes("enroll");
 
       if (isStandardUser) {
         navigate("/unauthorized");
-      } else {
-        navigate("/");
+        return;
       }
+
+      if (isEnrollTest) {
+        navigate("/mfa/enroll?ticket=mock_setup_ticket");
+        return;
+      }
+
+      // Mandatory 2FA verification challenge for admin/super_admin
+      navigate("/mfa/verify?ticket=mock_mfa_ticket");
     } catch {
       setError("Autentikasi gagal. Periksa kembali kredensial Anda.");
     } finally {

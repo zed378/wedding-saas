@@ -3023,3 +3023,42 @@ the expiry, because inside the window that is a resume.
    - Cloudflare Zero Trust / Access tunnel forms the first perimeter layer in production; application-layer RBAC (`@Roles('admin', 'super_admin')`) and verified session checks form the mandatory second layer.
 
 **Consequences** — Guarantees complete session and origin separation between end-user and administrative boundaries; enforces strict 4-hour administrative timeboxing; prevents clickjacking; provides staff with a dedicated desktop-first operational interface.
+
+---
+
+### ADR-097 — Mandatory Admin 2FA (TOTP RFC 6238), Application-Layer AES-256-GCM Secret Encryption, and Step-Up Re-Authentication
+
+**Date** 2026-10-19 · **Task** `P5-02` · **Status** Accepted · **Amends** `docs/SECURITY/03-AUTHENTICATION-SECURITY.md`, `docs/PLAN/12-ADMIN-PANEL.md`, `docs/DATABASE/02-DATABASE-SCHEMA.md`
+
+**Context** — Administrative accounts have broad privileges over system configuration, user accounts, and financial transactions. A stolen password must never grant administrative access (`docs/SECURITY/03` § Admin Session):
+1. **Mandatory 2FA for Staff**: `admin` and `super_admin` accounts must complete TOTP verification on every login. Standard users (`user`) continue to log in via standard email/password or Google OAuth.
+2. **Secret Encryption at Rest**: Compromise of a database backup or SQL injection must not leak plaintext TOTP secrets. Application-layer AES-256-GCM encryption is required.
+3. **Recovery Code Lifecycle**: Lost authenticator devices must not permanently lock staff out. 8 single-use recovery codes must be generated, stored hashed (SHA-256), and invalidated immediately upon first use.
+4. **Step-Up Re-Authentication**: Highly sensitive actions (such as manual refunds or user suspensions) require re-authentication within the last 10 minutes to prevent unattended browser session abuse.
+
+**Decisions**
+1. **RFC 6238 TOTP Implementation (`MfaService`)**:
+   - Generates 160-bit (20-byte) Base32 secrets.
+   - Computes standard 6-digit numeric OTPs with 30-second steps.
+   - Permits ±1 step drift tolerance (30 seconds before/after) to absorb client device clock skew.
+2. **Application-Layer AES-256-GCM Encryption**:
+   - `user_mfa_factors.secret_encrypted` stores `[12 bytes IV] + [16 bytes AuthTag] + [Ciphertext]`.
+   - Secret key derived deterministically via SHA-256 HKDF-like construction from `JWT_SIGNING_KEY`.
+   - Any tampering with the ciphertext or auth tag throws an authentication error.
+3. **Single-Use Recovery Codes**:
+   - 8 unique alphanumeric codes in `XXXX-XXXX` format generated during setup.
+   - Stored hashed via SHA-256 in `user_recovery_codes`.
+   - On redemption during login or step-up, marked `used_at = NOW()` and cannot be replayed.
+4. **Login Interception & Signed Challenge Tickets**:
+   - When an `admin` or `super_admin` logs in with valid credentials, `LoginService` returns `{ requires_mfa: true, mfa_ticket }` (if enrolled) or `{ requires_mfa_setup: true, setup_ticket }` (if unenrolled).
+   - Tickets are signed, short-lived (5-minute) HS256 JWTs carrying `sub: userId`, `role`, and `purpose`.
+   - No session access token or refresh cookie is minted until valid TOTP or recovery verification completes.
+5. **Step-Up Token & Guard (`StepUpGuard`)**:
+   - Issues 10-minute validity `step_up_token` upon successful 2FA verification.
+   - Sensitive endpoints require the `X-MFA-Step-Up` header or request body claim; returns HTTP 403 `MFA_STEP_UP_REQUIRED` if absent or expired.
+6. **Frontend Integration (`@wi/admin`)**:
+   - `MfaEnrollPage`: Displays secret key with 1-click copy, 8 recovery codes with explicit acknowledgment checkbox, and 6-digit confirmation test.
+   - `MfaVerifyPage`: 6-digit challenge input with seamless toggle to single-use recovery code.
+   - `StepUpModal`: Reusable modal prompting for TOTP verification prior to executing sensitive mutations.
+
+**Consequences** — Satisfies BR-MFA.1 through BR-MFA.6; guarantees zero credential-stuffing vulnerability for administrative sessions; ensures recovery fallback without compromising security invariants; protects against unattended desk session abuse via 10-minute step-up tokens.

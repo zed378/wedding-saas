@@ -2,6 +2,8 @@ import { AdminAuthProvider } from "./auth/admin-auth.js";
 import { RequireAdmin } from "./auth/RequireAdmin.js";
 import { RouterProvider, useRouter } from "./router.js";
 import { LoginPage } from "./pages/LoginPage.js";
+import { MfaVerifyPage } from "./pages/MfaVerifyPage.js";
+import { MfaEnrollPage } from "./pages/MfaEnrollPage.js";
 import { UnauthorizedPage } from "./pages/UnauthorizedPage.js";
 import { DashboardPage } from "./pages/DashboardPage.js";
 import { UsersPage } from "./pages/UsersPage.js";
@@ -21,9 +23,17 @@ import { AuditLogsPage } from "./pages/AuditLogsPage.js";
 export function AppRoutes() {
   const { path } = useRouter();
 
-  // Public / unauthenticated route
+  // Public / unauthenticated routes
   if (path === "/login") {
     return <LoginPage />;
+  }
+
+  if (path === "/mfa/verify") {
+    return <MfaVerifyPage />;
+  }
+
+  if (path === "/mfa/enroll") {
+    return <MfaEnrollPage />;
   }
 
   // Explicit Unauthorized page (BR-Admin.2)

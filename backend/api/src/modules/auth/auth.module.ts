@@ -13,6 +13,8 @@ import {
 import { ENV } from "../../config/config.module";
 import type { Env } from "../../config/env.schema";
 
+import { MfaService } from "./mfa/mfa.service";
+
 /**
  * P1-02 through P1-05. `P1-06` turns `SessionService` into middleware.
  *
@@ -27,6 +29,7 @@ import type { Env } from "../../config/env.schema";
     SessionService,
     GoogleOAuthService,
     PasswordResetService,
+    MfaService,
     {
       // A factory, so a test can replace the verifier with one that never reaches the
       // network -- and so the client id is read from validated configuration rather than
@@ -43,6 +46,7 @@ import type { Env } from "../../config/env.schema";
     SessionService,
     GoogleOAuthService,
     PasswordResetService,
+    MfaService,
   ],
 })
 export class AuthModule {}

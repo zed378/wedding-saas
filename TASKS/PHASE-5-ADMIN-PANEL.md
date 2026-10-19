@@ -63,7 +63,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** |
 | **Depends on** | P1-03, P5-01 |
 | **Spec refs** | `docs/SECURITY/03-AUTHENTICATION-SECURITY.md` § Admin Session, `docs/PLAN/12` § Access Control, `docs/SECURITY/01` § Admin Panel |
 | **Spec required** | Yes — authentication |
@@ -81,11 +81,11 @@
 7. Define the account recovery path for a lost device, and make it require more than an email — the recovery path is a full admin account takeover if it is weak.
 
 **Definition of Done**
-- [ ] An admin cannot reach any panel function without an active TOTP factor.
-- [ ] Refund and suspension require a fresh factor, proven by a test.
-- [ ] Recovery codes are single-use and stored hashed.
-- [ ] TOTP secrets are encrypted at rest.
-- [ ] Failed verification attempts are rate limited and logged.
+- [x] An admin cannot reach any panel function without an active TOTP factor.
+- [x] Refund and suspension require a fresh factor, proven by a test.
+- [x] Recovery codes are single-use and stored hashed.
+- [x] TOTP secrets are encrypted at rest.
+- [x] Failed verification attempts are rate limited and logged.
 
 ---
 

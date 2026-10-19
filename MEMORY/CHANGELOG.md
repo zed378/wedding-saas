@@ -10,6 +10,17 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-19 — Admin 2FA (TOTP) and step-up re-authentication
+
+**Added** — Mandatory TOTP 2FA for administrative accounts, secret encryption at rest, recovery codes, and step-up re-authentication ([P5-02](./records/2026-10-19-P5-02-admin-2fa.md), [ADR-097](./DECISIONS.md#ADR-097))
+
+- Implemented RFC 6238 TOTP verification with HMAC-SHA1, 6-digit numeric codes, 30-second steps, and ±1 step (30s) drift tolerance.
+- Built application-layer AES-256-GCM encryption/decryption for TOTP secrets stored at rest in `user_mfa_factors.secret_encrypted` (`bytea`).
+- Implemented generation and validation of 8 single-use recovery codes in `XXXX-XXXX` format, stored hashed with SHA-256 in `user_recovery_codes`.
+- Added mandatory 2FA challenge interception in `LoginService` for `admin` and `super_admin` accounts via 5-minute signed JWT tickets (`mfa_ticket`, `setup_ticket`).
+- Implemented `StepUpGuard` and `/api/v1/auth/mfa/step-up` endpoint issuing 10-minute step-up re-authentication tokens for sensitive administrative operations.
+- Built admin frontend 2FA enrollment page (`MfaEnrollPage`), challenge verification page (`MfaVerifyPage`), and reusable `StepUpModal` in `@wi/admin`.
+
 ### 2026-10-19 — Admin application shell and session isolation
 
 **Added** — Dedicated admin panel shell, origin isolation, 4-hour session lifespan, and explicit 403 screen ([P5-01](./records/2026-10-19-P5-01-admin-shell-and-session-isolation.md), [ADR-096](./DECISIONS.md#ADR-096))

@@ -33,6 +33,10 @@ export type SecurityEventType =
    */
   | "auth.breach_check_unavailable"
   | "auth.token_reuse_detected"
+  | "auth.mfa_confirm_failed"
+  | "auth.mfa_enrolled"
+  | "auth.recovery_code_used"
+  | "auth.mfa_verify_failed"
   | "authz.idor_attempt"
   | "payment.invalid_signature"
   | "admin.tenant_bypass"

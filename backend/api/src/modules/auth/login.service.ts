@@ -26,11 +26,23 @@ import { SessionService, type AuthenticatedUser } from "./session.service";
  * neither of them arrives through this controller.
  */
 
+import { MfaService } from "./mfa/mfa.service";
+
 export interface Session {
   readonly accessToken: string;
   readonly refresh: IssuedRefreshToken;
   readonly user: AuthenticatedUser;
+  readonly requiresMfa?: false;
 }
+
+export interface MfaChallengeOutcome {
+  readonly requiresMfa: true;
+  readonly isEnrolled: boolean;
+  readonly ticket: string;
+  readonly user: AuthenticatedUser;
+}
+
+export type LoginResult = Session | MfaChallengeOutcome;
 
 /**
  * One error for "no such email" and for "wrong password".
@@ -52,6 +64,7 @@ export class LoginService {
     @Inject(DB) private readonly db: Database,
     @Inject(ENV) private readonly env: Env,
     private readonly sessions: SessionService,
+    private readonly mfa: MfaService = new MfaService(db, env),
   ) {}
 
   /**
@@ -61,7 +74,17 @@ export class LoginService {
    * against a dummy hash when there is none, which is `P1-01`'s reason for existing and
    * has its own timing tests there. Returning early here would undo all of it.
    */
-  async login(rawEmail: string, password: string): Promise<Session> {
+  async login(rawEmail: string, password: string): Promise<Session>;
+  async login(
+    rawEmail: string,
+    password: string,
+    options: { requireSession: false },
+  ): Promise<LoginResult>;
+  async login(
+    rawEmail: string,
+    password: string,
+    options?: { requireSession?: boolean },
+  ): Promise<LoginResult> {
     const email = rawEmail.trim().toLowerCase();
 
     const rows = await this.db
@@ -107,13 +130,38 @@ export class LoginService {
     // parameters move. Failure here must not fail the login -- the old hash still works.
     await this.rehashIfNeeded(row!.id, row!.passwordHash, password);
 
-    return this.issueSession({
+    const authenticatedUser = {
       id: row!.id,
       email: row!.email,
       fullName: row!.fullName,
       role: row!.role,
       emailVerified: row!.emailVerified,
-    });
+    };
+
+    // docs/SECURITY/03 § Admin Session:
+    // 2FA (TOTP) is MANDATORY for admin and super_admin roles.
+    if (row!.role === "admin" || row!.role === "super_admin") {
+      const isEnrolled = await this.mfa.hasConfirmedFactor(row!.id);
+      const ticket = await this.mfa.signMfaTicket(
+        row!.id,
+        row!.email,
+        row!.role,
+        isEnrolled ? "challenge" : "setup",
+      );
+
+      if (options?.requireSession !== false) {
+        throw new Error("MFA challenge required for administrative accounts");
+      }
+
+      return {
+        requiresMfa: true,
+        isEnrolled,
+        ticket,
+        user: authenticatedUser,
+      };
+    }
+
+    return this.issueSession(authenticatedUser);
   }
 
   /**
@@ -197,6 +245,36 @@ export class LoginService {
     ]);
 
     return { accessToken, refresh, user };
+  }
+
+  /** Mint a fresh session by user ID, re-checking active status. */
+  async issueSessionForUserId(userId: string): Promise<Session> {
+    const rows = await this.db
+      .select({
+        id: users.id,
+        email: users.email,
+        fullName: users.fullName,
+        role: users.role,
+        emailVerified: users.emailVerified,
+        status: users.status,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (rows.length === 0 || rows[0]!.status !== "active") {
+      throw new UnauthenticatedError();
+    }
+
+    const user: AuthenticatedUser = {
+      id: rows[0]!.id,
+      email: rows[0]!.email,
+      fullName: rows[0]!.fullName,
+      role: rows[0]!.role,
+      emailVerified: rows[0]!.emailVerified,
+    };
+
+    return this.issueSession(user);
   }
 
   private async rehashIfNeeded(

@@ -90,14 +90,16 @@ export class ForbiddenError extends AppError {
   readonly code: string;
 
   constructor(
-    code: "FORBIDDEN" | "EMAIL_NOT_VERIFIED" = "FORBIDDEN",
+    code: "FORBIDDEN" | "EMAIL_NOT_VERIFIED" | "MFA_STEP_UP_REQUIRED" = "FORBIDDEN",
     message?: string,
   ) {
     super(
       message ??
         (code === "EMAIL_NOT_VERIFIED"
           ? "Verify your email address to continue."
-          : "You do not have permission to perform this action."),
+          : code === "MFA_STEP_UP_REQUIRED"
+            ? "Autentikasi ulang (2FA) diperlukan untuk tindakan sensitif ini."
+            : "You do not have permission to perform this action."),
     );
     this.code = code;
   }

@@ -15,12 +15,13 @@ import { z } from "zod";
 
 import { ENV } from "../../config/config.module";
 import type { Env } from "../../config/env.schema";
-import { ValidationError } from "../../http/errors";
+import { UnauthenticatedError, ValidationError } from "../../http/errors";
 import { ok } from "../../http/envelope";
 import { RegistrationService } from "./registration.service";
 import { LoginService, type Session } from "./login.service";
 import { GoogleOAuthService } from "./oauth/google-oauth.service";
 import { PasswordResetService } from "./password-reset.service";
+import { MfaService } from "./mfa/mfa.service";
 import {
   deriveKey,
   rateLimit,
@@ -86,6 +87,27 @@ const resetSchema = z.object({
   new_password: z.string(),
 });
 
+const mfaSetupSchema = z.object({
+  setup_ticket: z.string().min(1).max(2048).optional(),
+});
+
+const mfaConfirmSchema = z.object({
+  setup_ticket: z.string().min(1).max(2048).optional(),
+  code: z.string().min(6).max(8),
+  recovery_codes: z.array(z.string().min(1)).min(1).max(16),
+});
+
+const mfaVerifySchema = z.object({
+  mfa_ticket: z.string().min(1).max(2048),
+  code: z.string().min(6).max(8).optional(),
+  recovery_code: z.string().min(4).max(64).optional(),
+});
+
+const mfaStepUpSchema = z.object({
+  code: z.string().min(6).max(8).optional(),
+  recovery_code: z.string().min(4).max(64).optional(),
+});
+
 function parse<T>(schema: z.ZodType<T>, body: unknown): T {
   const result = schema.safeParse(body);
   if (result.success) return result.data;
@@ -106,6 +128,7 @@ export class AuthController {
     private readonly google: GoogleOAuthService,
     private readonly resets: PasswordResetService,
     private readonly sessions: SessionService,
+    private readonly mfa: MfaService,
     @Inject(ENV) private readonly env: Env,
     @Inject(RATE_LIMITER) private readonly limiter: RateLimiter,
     @Inject(POLICY_REGISTRY) private readonly policies: PolicyRegistry,
@@ -196,17 +219,156 @@ export class AuthController {
     const input = parse(loginSchema, body);
 
     try {
-      const session = await this.logins.login(input.email, input.password);
-      // Deliberately nothing on success. `docs/SECURITY/10` limits "5 FAILED attempts",
-      // and counting successes would lock out a household sharing an address -- and would
-      // let an attacker exhaust a victim's budget by logging in correctly.
-      return this.respondWithSession(res, session);
+      const outcome = await this.logins.login(input.email, input.password, {
+        requireSession: false,
+      });
+      if (outcome.requiresMfa) {
+        if (outcome.isEnrolled) {
+          return ok({
+            requires_mfa: true,
+            mfa_ticket: outcome.ticket,
+          });
+        }
+        return ok({
+          requires_mfa_setup: true,
+          setup_ticket: outcome.ticket,
+        });
+      }
+
+      return this.respondWithSession(res, outcome);
     } catch (error) {
       // The guard checked the budget before the attempt and could not know the outcome.
       // This is where the outcome is known, so this is where a failure is counted.
       await this.recordLoginFailure(req);
       throw error;
     }
+  }
+
+  @Post("mfa/setup")
+  @HttpCode(200)
+  async mfaSetup(
+    @Body() body: unknown,
+    @Headers("authorization") authorization: string | undefined,
+  ) {
+    let userId: string;
+    let email: string;
+
+    const parsed = mfaSetupSchema.safeParse(body ?? {});
+    if (parsed.success && parsed.data.setup_ticket) {
+      const payload = await this.mfa.verifyMfaTicket(parsed.data.setup_ticket, "setup");
+      userId = payload.userId;
+      email = payload.email;
+    } else if (authorization) {
+      const user = await this.sessions.authenticate(authorization);
+      userId = user.id;
+      email = user.email;
+    } else {
+      throw new UnauthenticatedError("Tiket setup atau sesi diperlukan.");
+    }
+
+    const result = await this.mfa.setupTotp(userId, email);
+    return ok({
+      secret: result.secret,
+      qr_uri: result.qrUri,
+      recovery_codes: result.recoveryCodes,
+    });
+  }
+
+  @Post("mfa/confirm")
+  @HttpCode(200)
+  async mfaConfirm(
+    @Body() body: unknown,
+    @Headers("authorization") authorization: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const input = parse(mfaConfirmSchema, body);
+    let userId: string;
+
+    if (input.setup_ticket) {
+      const payload = await this.mfa.verifyMfaTicket(input.setup_ticket, "setup");
+      userId = payload.userId;
+    } else if (authorization) {
+      const user = await this.sessions.authenticate(authorization);
+      userId = user.id;
+    } else {
+      throw new UnauthenticatedError("Tiket setup atau sesi diperlukan.");
+    }
+
+    await this.mfa.confirmTotp(userId, input.code, input.recovery_codes);
+
+    const session = await this.logins.issueSessionForUserId(userId);
+    return this.respondWithSession(res, session);
+  }
+
+  @Post("mfa/verify")
+  @HttpCode(200)
+  @UseGuards(rateLimit("login"))
+  async mfaVerify(
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const input = parse(mfaVerifySchema, body);
+    if (!input.code && !input.recovery_code) {
+      throw new ValidationError(
+        [{ field: "code", message: "Kode 2FA atau kode pemulihan harus diisi." }],
+        "Kode 2FA atau kode pemulihan harus diisi.",
+      );
+    }
+
+    const payload = await this.mfa.verifyMfaTicket(input.mfa_ticket, "challenge");
+    const result = await this.mfa.verifyCodeOrRecovery(payload.userId, {
+      code: input.code,
+      recoveryCode: input.recovery_code,
+    });
+
+    if (!result.success) {
+      throw new ValidationError(
+        [{ field: "code", message: "Kode 2FA atau kode pemulihan tidak valid." }],
+        "Kode 2FA tidak valid.",
+      );
+    }
+
+    const session = await this.logins.issueSessionForUserId(payload.userId);
+    return this.respondWithSession(res, session);
+  }
+
+  @Post("mfa/step-up")
+  @HttpCode(200)
+  async mfaStepUp(
+    @Body() body: unknown,
+    @Headers("authorization") authorization: string | undefined,
+  ) {
+    if (!authorization) {
+      throw new UnauthenticatedError();
+    }
+
+    const user = await this.sessions.authenticate(authorization);
+    const input = parse(mfaStepUpSchema, body);
+
+    if (!input.code && !input.recovery_code) {
+      throw new ValidationError(
+        [{ field: "code", message: "Kode 2FA atau kode pemulihan harus diisi." }],
+        "Kode 2FA atau kode pemulihan harus diisi.",
+      );
+    }
+
+    const result = await this.mfa.verifyCodeOrRecovery(user.id, {
+      code: input.code,
+      recoveryCode: input.recovery_code,
+    });
+
+    if (!result.success) {
+      throw new ValidationError(
+        [{ field: "code", message: "Kode 2FA atau kode pemulihan tidak valid." }],
+        "Kode 2FA tidak valid.",
+      );
+    }
+
+    const stepUpToken = await this.mfa.signStepUpToken(user.id, user.role);
+    return ok({
+      step_up_token: stepUpToken,
+      expires_in: 600,
+    });
   }
 
   private async recordLoginFailure(req: Request): Promise<void> {
