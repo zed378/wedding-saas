@@ -353,4 +353,44 @@ export class GuestbookService {
     if (!this.abuseProtection) return false;
     return this.abuseProtection.isCaptchaRequired(slug);
   }
+
+  /**
+   * P5-09: Report a guestbook entry on a public invitation page.
+   * Rate limited per IP hash, records into guestbook_reports.
+   */
+  async reportEntry(
+    slug: string,
+    entryId: string,
+    reason: string | undefined,
+    clientIp: string,
+  ): Promise<{ message: string }> {
+    const target =
+      await this.guestbookRepository.findPublishedGuestbookTarget(slug);
+    if (!target) {
+      throw new NotFoundError(`Undangan "${slug}" tidak ditemukan.`);
+    }
+
+    const entry = await this.guestbookRepository.findEntryById(
+      target.invitationId,
+      entryId,
+    );
+    if (!entry) {
+      throw new NotFoundError("Pesan buku tamu tidak ditemukan.");
+    }
+
+    const ipHash = createHash("sha256").update(clientIp).digest("hex");
+    const sanitizedReason = reason?.trim() ? reason.trim().slice(0, 255) : null;
+
+    await this.guestbookRepository.insertReport({
+      guestbookEntryId: entryId,
+      invitationId: target.invitationId,
+      reason: sanitizedReason,
+      reporterIpHash: ipHash,
+    });
+
+    return {
+      message: "Laporan berhasil diterima dan akan ditinjau oleh tim moderasi.",
+    };
+  }
 }
+

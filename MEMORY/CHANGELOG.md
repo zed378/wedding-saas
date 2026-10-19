@@ -10,6 +10,15 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-19 — Moderation queue
+
+**Added** — Platform moderation queue in `@wi/admin`, backend API, and public guest reporting endpoint with instant edge cache invalidation ([P5-09](./records/2026-10-19-P5-09-moderation-queue.md), [ADR-104](./DECISIONS.md#ADR-104))
+
+- Database migration `0017_guestbook_reports.sql` and schema definition for public visitor report storage.
+- Public guest report endpoint `POST /public/i/:slug/guestbook/:entry_id/report` with rate limiting and IP hashing.
+- Administrative moderation endpoints (`GET`, `PATCH`, `DELETE` under `/api/v1/admin/moderation/guestbook`) for listing, approving/rejecting, and permanently deleting entries with mandatory audit logging and real-time cache purging.
+- Interactive moderation dashboard in `@wi/admin` with status tabs, flag source filtering, visitor report inspection modal, and audited action confirmations.
+
 ### 2026-10-19 — Manual refund
 
 **Added** — Administrative manual refund with 2FA step-up verification, entitlement revocation (ADR-019), and audit logging ([P5-08](./records/2026-10-19-P5-08-manual-refund.md), [ADR-103](./DECISIONS.md#ADR-103))

@@ -73,6 +73,12 @@ const EXEMPT: Readonly<Record<string, string>> = {
     "administrative user suspension route restricted to admin and super_admin (P5-06) — admin-users.spec.ts",
   "PATCH /api/v1/admin/users/:id/unsuspend":
     "administrative user unsuspension route restricted to admin and super_admin (P5-06) — admin-users.spec.ts",
+  "POST /public/i/:slug/guestbook/:entry_id/report":
+    "public report surface without auth; rate-limited and anonymously flags for moderation (P5-09) — admin-moderation.spec.ts",
+  "PATCH /api/v1/admin/moderation/guestbook/:id":
+    "administrative guestbook moderation route restricted to admin and super_admin (P5-09) — admin-moderation.spec.ts",
+  "DELETE /api/v1/admin/moderation/guestbook/:id":
+    "administrative guestbook deletion route restricted to admin and super_admin (P5-09) — admin-moderation.spec.ts",
 };
 
 function files(dir: string): string[] {

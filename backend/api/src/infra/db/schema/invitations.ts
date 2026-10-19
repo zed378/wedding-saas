@@ -499,3 +499,33 @@ export const invitationViewCounts = pgTable(
     index("idx_view_counts_invitation").on(t.invitationId),
   ],
 );
+
+/**
+ * P5-09: Guestbook reports table.
+ * Records user reports against guestbook entries submitted on public pages.
+ * Feeds the administrative moderation queue (PLAN/12 § Moderation Queue).
+ */
+export const guestbookReports = pgTable(
+  "guestbook_reports",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    guestbookEntryId: uuid("guestbook_entry_id")
+      .notNull()
+      .references(() => invitationGuestbook.id, { onDelete: "cascade" }),
+    invitationId: uuid("invitation_id")
+      .notNull()
+      .references(() => invitations.id, { onDelete: "cascade" }),
+    reason: varchar("reason", { length: 255 }),
+    reporterIpHash: varchar("reporter_ip_hash", { length: 64 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("idx_guestbook_reports_entry").on(t.guestbookEntryId),
+    index("idx_guestbook_reports_invitation").on(t.invitationId),
+  ],
+);
+

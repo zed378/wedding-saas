@@ -3224,5 +3224,32 @@ the expiry, because inside the window that is a resume.
 
 **Consequences** — Guarantees complete consistency between billing status and invitation availability; protects against unauthorized rogue refunds via mandatory 2FA re-auth; avoids real-world financial reconciliation confusion.
 
+---
+
+### ADR-104 — Platform Moderation Queue, Public Guestbook Reporting, and Real-Time Content Takedown
+
+**Date** 2026-10-19 · **Task** `P5-09` · **Status** Accepted · **Amends** `docs/PLAN/12-ADMIN-PANEL.md`, `docs/API/09-ADMIN-API.md`, `docs/API/08-PUBLIC-INVITATION-API.md`, `docs/DATABASE/06-INVITATION-CHILDREN.md`
+
+**Context** — Public wedding invitations accept attendee guestbook messages. Despite profanity filters and couple moderation options, offensive, spammy, or defamatory content can be submitted.
+1. **Public Guest Reporting Channel (docs/API/08)**: Guests and attendees viewing a live invitation need an abuse reporting mechanism to flag offending messages to platform administrators without requiring an account or session.
+2. **Centralized Platform Moderation**: Support teams need an administrative view across all invitations to review flagged comments, distinguish user-reported items from profanity-flagged or owner-moderated items, inspect report reasons, and take action.
+3. **Real-Time Edge Cache Eviction**: Once a message is rejected or deleted by an administrator, it must not linger in CDN or Redis caches. The public view must update immediately.
+4. **Mandatory Audit Logging**: Approving, rejecting, or permanently deleting guestbook messages must be recorded in `audit_logs` with the acting admin's ID and decision reason.
+
+**Decisions**
+1. **Reporting Data Model (Migration 0017)**:
+   - Added `guestbook_reports` table cascading on `invitation_guestbook.id` deletion, storing optional `reason` (max 500 chars), hashed IP, and creation timestamp.
+2. **Public Endpoint & Abuse Protections**:
+   - `POST /public/i/:slug/guestbook/:entry_id/report`: Validates that the target invitation exists, is published, and that the specified entry belongs to it. Rate limited to prevent griefing.
+3. **Admin Moderation API**:
+   - `GET /api/v1/admin/moderation/guestbook`: Paginated listing with search across name/message/slug, status filters (`all`, `pending`, `approved`, `rejected`), and source categorization (`reported`, `auto_flagged`, `owner_moderation`).
+   - `PATCH /api/v1/admin/moderation/guestbook/:id`: Approves or rejects an entry, writes to `audit_logs`, and immediately invalidates public edge/Redis caches if the invitation is published.
+   - `DELETE /api/v1/admin/moderation/guestbook/:id`: Permanently removes an entry and its associated reports, records `audit_logs`, and purges public caches.
+4. **Admin UI Implementation (`ModerationPage.tsx`)**:
+   - Provides full management UI with visitor report inspection modals, filter chips, message badges, and confirmation dialogs with required reason inputs.
+
+**Consequences** — Platform staff possess complete visibility and responsive controls to maintain safety and compliance across public wedding invitations, backed by comprehensive audit trails and immediate cache eviction.
+
+
 
 

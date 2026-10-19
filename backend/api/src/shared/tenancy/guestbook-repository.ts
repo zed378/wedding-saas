@@ -6,6 +6,7 @@ import {
   invitations,
   invitationSettings,
   invitationGuestbook,
+  guestbookReports,
 } from "../../infra/db/schema/index";
 import type { TenantScope } from "./tenant-scope";
 
@@ -159,6 +160,56 @@ export class GuestbookRepository {
       moderatedAt: row.moderatedAt,
       createdAt: row.createdAt,
     };
+  }
+
+  /**
+   * Find a specific entry by invitation and entry ID.
+   */
+  async findEntryById(
+    invitationId: string,
+    entryId: string,
+  ): Promise<GuestbookRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(invitationGuestbook)
+      .where(
+        and(
+          eq(invitationGuestbook.id, entryId),
+          eq(invitationGuestbook.invitationId, invitationId),
+        ),
+      )
+      .limit(1);
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      invitationId: row.invitationId,
+      guestName: row.guestName,
+      message: row.message,
+      status: row.status as GuestbookEntryStatus,
+      submittedIpHash: row.submittedIpHash,
+      moderatedBy: row.moderatedBy,
+      moderatedAt: row.moderatedAt,
+      createdAt: row.createdAt,
+    };
+  }
+
+  /**
+   * Insert a user-submitted report for a guestbook entry (P5-09).
+   */
+  async insertReport(params: {
+    guestbookEntryId: string;
+    invitationId: string;
+    reason?: string | null;
+    reporterIpHash: string;
+  }): Promise<void> {
+    await this.db.insert(guestbookReports).values({
+      guestbookEntryId: params.guestbookEntryId,
+      invitationId: params.invitationId,
+      reason: params.reason ?? null,
+      reporterIpHash: params.reporterIpHash,
+    });
   }
 
   /**

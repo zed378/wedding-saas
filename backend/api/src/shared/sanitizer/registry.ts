@@ -104,6 +104,8 @@ export const NOT_USER_TEXT: Readonly<Record<string, string>> = {
     "a semver identifier string (e.g. 1.0.0); format-validated by regex (P5-04)",
   customizable_theme_keys:
     "an array of dot-notation theme variable keys validated against template theme schema (P5-04)",
+  flag_source:
+    "a closed z.enum filter for admin moderation queue (all|reported|auto_flagged); never stored or rendered (P5-09)",
 
   // Identifiers and opaque values. Format-validated, and none of them is prose.
   email:

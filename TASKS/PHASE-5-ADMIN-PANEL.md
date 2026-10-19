@@ -271,7 +271,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE |
 | **Depends on** | P5-03, P4-04 |
 | **Spec refs** | `docs/API/09-ADMIN-API.md` § Moderation, `docs/PLAN/12` § Moderation Queue, `docs/PLAN/05` § Admin moderation flow |
 | **Spec required** | No |
@@ -289,10 +289,10 @@
 7. Build the UI for one-to-two-click decisions with a filter per invitation.
 
 **Definition of Done**
-- [ ] Reported and auto-flagged entries reach one queue.
-- [ ] Every decision writes an audit row.
-- [ ] A rejection or deletion takes effect on the public page immediately.
-- [ ] The reporting mechanism exists and is rate limited.
+- [x] Reported and auto-flagged entries reach one queue.
+- [x] Every decision writes an audit row.
+- [x] A rejection or deletion takes effect on the public page immediately.
+- [x] The reporting mechanism exists and is rate limited.
 
 ---
 

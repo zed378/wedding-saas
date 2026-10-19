@@ -130,4 +130,44 @@ export class PublicGuestbookController {
     const required = await this.service.isCaptchaRequired(slug);
     return ok({ captcha_required: required });
   }
+
+  /**
+   * P5-09: Report a guestbook entry for platform moderation.
+   * Rate limited per IP hash under general-public.
+   */
+  @Post(":slug/guestbook/:entry_id/report")
+  @HttpCode(200)
+  @UseGuards(rateLimit("general-public"))
+  async report(
+    @Param("slug") slug: string,
+    @Param("entry_id") entryId: string,
+    @Body() body: unknown,
+    @Req() req: Request,
+  ) {
+    const reportSchema = z
+      .object({
+        reason: z.string().trim().max(255).optional(),
+      })
+      .strict();
+
+    const parsed = reportSchema.safeParse(body ?? {});
+    if (!parsed.success) {
+      throw new ValidationError(
+        parsed.error.issues.map((i) => ({
+          field: i.path.join("."),
+          message: i.message,
+        })),
+      );
+    }
+
+    const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
+    const result = await this.service.reportEntry(
+      slug,
+      entryId,
+      parsed.data.reason,
+      ip,
+    );
+    return ok(result);
+  }
 }
+
