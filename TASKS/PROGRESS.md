@@ -3,9 +3,9 @@
 Single source of truth for where the project stands. Updated in the same commit as the work it describes (`00-TASK-CONVENTIONS.md` global DoD item 11).
 
 **Last updated**: 2026-10-19
-**Current phase**: Phase 5 — Admin Panel (3 / 14 done). **Phase 4 is complete** (12 / 12 done, [summary](../MEMORY/records/2026-10-19-PHASE-4-SUMMARY.md)); **Phase 3 is complete** (16 / 16 done, [summary](../MEMORY/records/2026-10-17-PHASE-3-SUMMARY.md)); **Phase 2 is complete** (18 / 18 including the owner-requested `P2-16`, `P2-17` and `P2-18`; [summary](../MEMORY/records/2026-09-13-PHASE-2-SUMMARY.md)); **Phase 1 is complete** (25 / 25, [summary](../MEMORY/records/2026-09-12-PHASE-1-SUMMARY.md)); Phase 0 is 26 / 27 done. **Staging is live** but runs code from before Phase 2's fixes: redeploy, run migrations `0007`–`0014`, start the new `api-jobs` service, `db:seed:regions`, and reseed before showing it to anyone. `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
+**Current phase**: Phase 5 — Admin Panel (4 / 14 done). **Phase 4 is complete** (12 / 12 done, [summary](../MEMORY/records/2026-10-19-PHASE-4-SUMMARY.md)); **Phase 3 is complete** (16 / 16 done, [summary](../MEMORY/records/2026-10-17-PHASE-3-SUMMARY.md)); **Phase 2 is complete** (18 / 18 including the owner-requested `P2-16`, `P2-17` and `P2-18`; [summary](../MEMORY/records/2026-09-13-PHASE-2-SUMMARY.md)); **Phase 1 is complete** (25 / 25, [summary](../MEMORY/records/2026-09-12-PHASE-1-SUMMARY.md)); Phase 0 is 26 / 27 done. **Staging is live** but runs code from before Phase 2's fixes: redeploy, run migrations `0007`–`0014`, start the new `api-jobs` service, `db:seed:regions`, and reseed before showing it to anyone. `https://app.vizunicum.my.id` and `https://invitation.vizunicum.my.id/{slug}`, served from the VM at `10.1.200.13` through a Cloudflare Tunnel — the host has a private address and no inbound port.
 The only task left is `P0-17` (CI/CD), deferred by ADR-028. Its **deployment** half was waived by the project owner on 2026-09-11; deploying is `git pull` plus a compose command. Its **verification** half was not waived and is the one Phase 0 exit criterion still unmet — see below. **The database schema is complete** — 28 tables across `P0-06`..`P0-10`, 123 constraint tests. The API runs, validates its configuration and serves the three surfaces, and the local stack comes up with one command. the critical path through `P0-11` is complete; `P0-12`, `P0-13`, `P0-18`, `P0-19` and `P0-22` are all unblocked and can run in parallel.
-**Overall**: 100 / 140 tasks done
+**Overall**: 101 / 140 tasks done
 
 **No automated pipeline**: `P0-17` is deferred (ADR-028). Before merging to `main`, run `scripts/verify.sh`. The `:id`-endpoint gate blocks in `.githooks/pre-push`; integration tests, the coverage floor, SAST and dependency scanning are **not** running anywhere until `P0-17` is picked up — revisit before Phase 3 payment code.
 
@@ -27,7 +27,7 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 | [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 18 | 18 | **COMPLETE** — including three owner-requested cards added after the phase summary | Phase 1 exit + `P1-25` — **met** |
 | [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 16 | **COMPLETE** — 2026-10-17 | Phase 2 exit — **met** (LCP qualified by `OQ-26`) |
 | [Phase 4 — Engagement](./PHASE-4-ENGAGEMENT.md) | 12 | 12 | **COMPLETE** — 2026-10-19 | Phase 3 exit — **met** |
-| [Phase 5 — Admin Panel](./PHASE-5-ADMIN-PANEL.md) | 14 | 3 | **ACTIVE** | Phase 4 exit — **met** |
+| [Phase 5 — Admin Panel](./PHASE-5-ADMIN-PANEL.md) | 14 | 4 | **ACTIVE** | Phase 4 exit — **met** |
 | [Phase 6 — Hardening and Launch](./PHASE-6-HARDENING-AND-LAUNCH.md) | 17 | 0 | Not started | Phase 5 exit |
 | [Phase 7 — Post-Launch](./PHASE-7-POST-LAUNCH.md) | 11 | 0 | Not started | MVP launched, `P6-17` signed off |
 
@@ -199,7 +199,7 @@ Roadmap: Week 12-13.
 | P5-01 | Admin shell and session isolation | admin, infra | M | **DONE** — dedicated shell on admin.vizunicum.my.id (port 3300); host-scoped session isolation from user app (Trust Boundary 3→4); 4-hour session lifetime cap; in-memory access tokens; desktop-first sidebar with all 6 modules; explicit 403 UnauthorizedPage; hardened CSP without user embeds; network restriction strategy documented (ADR-096) | P0-22, P0-23 |
 | P5-02 | Admin 2FA and step-up re-auth | backend, admin | L | **DONE** — mandatory RFC 6238 TOTP with ±1 drift; AES-256-GCM secret encryption at rest; 8 hashed single-use recovery codes; login challenge interception; StepUpGuard & 10-min step-up token; frontend enrollment & verification screens (ADR-097) | P1-03, P5-01 |
 | P5-03 | Admin authorization and audit middleware | backend | M | **DONE** — unified requireRole('admin', 'super_admin'); mandatory reason (5-500 chars); audit log queries with filtering; super_admin restriction on raw payment logs; invitation content modification boundary enforced (ADR-098) | P0-14, P1-06 |
-| P5-04 | Template and version management API | backend | L | TODO | P0-20, P5-03 |
+| P5-04 | Template and version management API | backend | L | **DONE** — full CRUD on templates & versions without redeploy; strict @wi/schema section/theme validation; immutable published versions (BR-3.1); in-use deletion protection (409); cache invalidation on publish & deprecate; audit logging (ADR-099) | P0-20, P5-03 |
 | P5-05 | Template editor UI and preview | admin | L | TODO | P5-04, P2-03 |
 | P5-06 | User management | backend, admin | M | TODO | P5-03 |
 | P5-07 | Order and payment management | backend, admin | M | TODO | P5-03, P3-05 |

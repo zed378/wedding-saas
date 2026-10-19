@@ -57,6 +57,10 @@ export const TEXT_FIELDS: Readonly<Record<string, SanitizationMode>> = {
 
   // --- invitation and user ---
   internal_name: "plain",
+
+  // --- template and versions (P5-04) ---
+  name: "plain",
+  changelog: "plain",
 };
 
 /**
@@ -94,6 +98,12 @@ export const NOT_USER_TEXT: Readonly<Record<string, string>> = {
     "a closed or bounded audit resource identifier; used for filtering (P5-03)",
   date_from: "an ISO date string; query filter, never stored or rendered (P5-03)",
   date_to: "an ISO date string; query filter, never stored or rendered (P5-03)",
+  thumbnail_url:
+    "an absolute HTTP/HTTPS URL, format-validated; rendered in img src, not raw html (P5-04)",
+  version:
+    "a semver identifier string (e.g. 1.0.0); format-validated by regex (P5-04)",
+  customizable_theme_keys:
+    "an array of dot-notation theme variable keys validated against template theme schema (P5-04)",
 
   // Identifiers and opaque values. Format-validated, and none of them is prose.
   email:

@@ -49,6 +49,20 @@ const EXEMPT: Readonly<Record<string, string>> = {
     "public reference data with no tenant: Indonesia's administrative regions (P2-17) — regions.itest.ts › 'returns a village with its province, regency and district'",
   "GET /api/v1/admin/payments/:id/raw-log":
     "administrative cross-tenant sensitive log restricted to super_admin and audited (P5-03) — admin-http.spec.ts › 'admin access control and audit logging › GET /api/v1/admin/payments/:id/raw-log › allows super_admin to retrieve payment raw log and records audit + security event'",
+  "GET /api/v1/admin/templates/:id":
+    "administrative catalog management route restricted to admin and super_admin (P5-04) — admin-templates.spec.ts",
+  "PATCH /api/v1/admin/templates/:id":
+    "administrative catalog management route restricted to admin and super_admin (P5-04) — admin-templates.spec.ts",
+  "DELETE /api/v1/admin/templates/:id":
+    "administrative catalog management route restricted to admin and super_admin (P5-04) — admin-templates.spec.ts",
+  "POST /api/v1/admin/templates/:id/versions":
+    "administrative catalog version creation route restricted to admin and super_admin (P5-04) — admin-templates.spec.ts",
+  "PATCH /api/v1/admin/templates/:id/versions/:vid":
+    "administrative catalog version definition update route restricted to admin and super_admin (P5-04) — admin-templates.spec.ts",
+  "POST /api/v1/admin/templates/:id/versions/:vid/publish":
+    "administrative catalog version publication route restricted to admin and super_admin (P5-04) — admin-templates.spec.ts",
+  "POST /api/v1/admin/templates/:id/versions/:vid/deprecate":
+    "administrative catalog version deprecation route restricted to admin and super_admin (P5-04) — admin-templates.spec.ts",
 };
 
 function files(dir: string): string[] {

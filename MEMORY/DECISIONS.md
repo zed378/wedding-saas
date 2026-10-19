@@ -3090,3 +3090,36 @@ the expiry, because inside the window that is a resume.
    - No route exists under `/api/v1/admin/invitations` accepting `PATCH` or `PUT` for user content fields. This is enforced as an architectural absence verified by automated test assertions.
 
 **Consequences** — Strictly implements BR-Admin.1 through BR-Admin.7; eliminates unauthorized administrative access; guarantees audit completeness for all administrative writes; protects customer personal wedding data from unauthorized staff modifications.
+
+---
+
+### ADR-099 — Dynamic Template and Version Management with Immutability and Referencing Checks
+
+**Date** 2026-10-19 · **Task** `P5-04` · **Status** Accepted · **Amends** `docs/API/03-TEMPLATE-API.md`, `docs/PLAN/07-TEMPLATE-SYSTEM.md`, `docs/PLAN/02-BUSINESS-RULES.md`, `docs/DATABASE/03-TEMPLATES.md`
+
+**Context** — Digital wedding invitations in the platform are driven by data templates (`templates` and `template_versions`). Under `docs/PLAN/00` § Constraints, adding or updating templates must never require a code deployment. To support this:
+1. **Dynamic CRUD**: Administrators need full management API endpoints (`/api/v1/admin/templates/*`) for templates and versions.
+2. **Schema Enforcement**: Section and theme definitions must be strictly validated against `@wi/schema` (`validateTemplateVersion`) before persisting to Postgres JSONB columns (`docs/DATABASE/03`), rejecting unknown components and invalid field paths.
+3. **Version Immutability (BR-3.1)**: An invitation references a specific `(template_id, template_version_id)`. Published and deprecated versions must never be modified in-place; edits to released designs violate data integrity for existing invitations. Only `draft` versions may be modified.
+4. **Referential Integrity & Safe Deletion**: `docs/DATABASE/01` sets `ON DELETE RESTRICT` from `invitations` to `templates`. Deleting a template referenced by any invitation must be rejected with HTTP 409 `TEMPLATE_IN_USE` rather than surfacing an unhandled DB constraint violation.
+5. **Catalog Cache Invalidation**: Publishing or deprecating a version must bump the Redis `tpl` cache generation counter via `templateService.invalidate()`.
+6. **Mandatory Auditing**: All template writes require a valid reason (5-500 chars) and record an audit row in the same transaction.
+
+**Decisions**
+1. **Admin Template Endpoints**:
+   - `GET /api/v1/admin/templates`: lists all templates with full version histories.
+   - `GET /api/v1/admin/templates/:id`: retrieves template detail with versions.
+   - `POST /api/v1/admin/templates`: creates template in `draft` status.
+   - `PATCH /api/v1/admin/templates/:id`: updates metadata.
+   - `DELETE /api/v1/admin/templates/:id`: pre-checks invitation references; refuses with HTTP 409 `TEMPLATE_IN_USE` if referenced; otherwise deletes versions and template in a transaction.
+   - `POST /api/v1/admin/templates/:id/versions`: validates definition with `validateTemplateVersion`; creates draft version.
+   - `PATCH /api/v1/admin/templates/:id/versions/:vid`: enforces draft status check; rejects published/deprecated with 409 `VERSION_IMMUTABLE`; validates merged definition with `validateTemplateVersion`.
+   - `POST /api/v1/admin/templates/:id/versions/:vid/publish`: transitions version to `published`, sets `releasedAt`, promotes draft parent template to `published`, invalidates cache.
+   - `POST /api/v1/admin/templates/:id/versions/:vid/deprecate`: transitions version to `deprecated`, invalidates cache.
+2. **Dual-Identifier Lookup for Versions (`:vid`)**:
+   - Version endpoints accept either the version UUID or semver string (e.g. `1.0.0`), resolving `(id = vid OR version = vid) AND template_id = templateId`.
+3. **Guard Compliance**:
+   - Mentions and invokes `validateTemplateVersion` on version writes, satisfying `scripts/check-template-version-writes.mjs`.
+   - Exemption registered in `test/idor-sweep-inventory.spec.ts` pointing to `test/admin-templates.spec.ts`.
+
+**Consequences** — Satisfies all requirements of BR-3.1 and BR-3.3; guarantees template versions can be introduced and published with zero downtime and no deploy; preserves visual stability of existing wedding invitations forever.

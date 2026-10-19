@@ -10,6 +10,17 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-19 — Template and version management API
+
+**Added** — Complete administrative API for templates and versions, strict `@wi/schema` validation, version immutability, safe deletion guards, and catalog cache invalidation ([P5-04](./records/2026-10-19-P5-04-template-and-version-management.md), [ADR-099](./DECISIONS.md#ADR-099))
+
+- Mounted `/api/v1/admin/templates/*` endpoints for creating, updating, listing, versioning, publishing, deprecating, and deleting templates without code deployments.
+- Enforced section and theme structure validation via `validateTemplateVersion` on version writes, rejecting invalid component names or field paths with detailed 400 validation issues.
+- Enforced strict version immutability (BR-3.1), refusing updates to published or deprecated versions with HTTP 409 `VERSION_IMMUTABLE`.
+- Implemented pre-delete checks refusing removal of templates referenced by existing invitations with HTTP 409 `TEMPLATE_IN_USE`.
+- Integrated Redis cache namespace invalidation (`templateService.invalidate()`) on version publication and deprecation.
+- Enforced mandatory action reason and recorded all state mutations in `audit_logs` inside the same database transaction.
+
 ### 2026-10-19 — Admin authorization path and audit middleware
 
 **Added** — Dedicated admin module, role-gating, mandatory reason audit enforcement, sensitive data access restrictions, and content mutation perimeter boundaries ([P5-03](./records/2026-10-19-P5-03-admin-authorization-and-audit.md), [ADR-098](./DECISIONS.md#ADR-098))

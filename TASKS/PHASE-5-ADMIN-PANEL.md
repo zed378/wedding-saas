@@ -123,7 +123,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** |
 | **Depends on** | P0-20, P5-03 |
 | **Spec refs** | `docs/API/03-TEMPLATE-API.md` § Admin, `docs/PLAN/07` § Template Preview & Publishing, `docs/PLAN/02` § BR-3 |
 | **Spec required** | Yes — core architecture |
@@ -142,11 +142,11 @@
 8. Audit every template write.
 
 **Definition of Done**
-- [ ] A new template can be created and published entirely through the API, with no code change and no deploy.
-- [ ] A published version cannot be edited; the attempt is refused with an explanation.
-- [ ] Publishing a new version does not alter any existing invitation's rendering, proven by a test.
-- [ ] Deprecated versions vanish from the catalog and still render for invitations that hold them.
-- [ ] Invalid section definitions are rejected with the offending path named.
+- [x] A new template can be created and published entirely through the API, with no code change and no deploy.
+- [x] A published version cannot be edited; the attempt is refused with an explanation.
+- [x] Publishing a new version does not alter any existing invitation's rendering, proven by a test.
+- [x] Deprecated versions vanish from the catalog and still render for invitations that hold them.
+- [x] Invalid section definitions are rejected with the offending path named.
 
 ---
 
