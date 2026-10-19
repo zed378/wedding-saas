@@ -47,6 +47,8 @@ const EXEMPT: Readonly<Record<string, string>> = {
     "server-to-server; `:provider` names the configured email delivery provider, not a user resource (P4-08) — email-webhook.spec.ts",
   "GET /api/v1/regions/:code":
     "public reference data with no tenant: Indonesia's administrative regions (P2-17) — regions.itest.ts › 'returns a village with its province, regency and district'",
+  "GET /api/v1/admin/payments/:id/raw-log":
+    "administrative cross-tenant sensitive log restricted to super_admin and audited (P5-03) — admin-http.spec.ts › 'admin access control and audit logging › GET /api/v1/admin/payments/:id/raw-log › allows super_admin to retrieve payment raw log and records audit + security event'",
 };
 
 function files(dir: string): string[] {

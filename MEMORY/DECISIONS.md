@@ -3062,3 +3062,31 @@ the expiry, because inside the window that is a resume.
    - `StepUpModal`: Reusable modal prompting for TOTP verification prior to executing sensitive mutations.
 
 **Consequences** — Satisfies BR-MFA.1 through BR-MFA.6; guarantees zero credential-stuffing vulnerability for administrative sessions; ensures recovery fallback without compromising security invariants; protects against unattended desk session abuse via 10-minute step-up tokens.
+
+---
+
+### ADR-098 — Admin Authorization Path, Mandatory Action Reasons, and Content Editing Boundaries
+
+**Date** 2026-10-19 · **Task** `P5-03` · **Status** Accepted · **Amends** `docs/SECURITY/05-MULTI-TENANCY-SECURITY.md`, `docs/API/09-ADMIN-API.md`, `docs/DATABASE/10-AUDIT-LOGS.md`, `docs/PLAN/03-AUTHORIZATION.md`
+
+**Context** — Administrative endpoints possess platform-wide capabilities. To ensure accountability, eliminate privilege creep, and protect customer privacy:
+1. **Role Gating & Least Privilege**: `docs/PLAN/03` dictates that `admin` does not imply `super_admin`. Regular users must receive immediate, consistent HTTP 403 Forbidden without leaking resource existence. Highly sensitive diagnostic endpoints (like raw gateway payment logs) must be restricted exclusively to `super_admin`.
+2. **Mandatory Action Reasons**: Administrative interventions affecting users (e.g. account suspension, manual order refunds) cannot be executed anonymously or without context. A non-empty reason string must be enforced in the request schema.
+3. **Same-Transaction Audit Records**: Any state mutation must write to `audit_logs` inside the exact same database transaction as the change (`P0-14`). If the mutation rolls back, the audit entry must roll back; no phantom audit rows may exist.
+4. **Content Boundary Enforcement**: In accordance with `docs/API/09` § Admin-Specific Principles and `docs/SECURITY/09`, staff must never have the ability to alter customer invitation content (couple names, stories, photos, event schedules). Administrative writes are strictly restricted to lifecycle actions (refund, suspension) and content moderation.
+
+**Decisions**
+1. **Administrative Mount & Role Guarding (`AdminModule`)**:
+   - All admin endpoints reside under `/api/v1/admin/*`, guarded by `@UseGuards(requireAuth(), requireRole("admin", "super_admin"))`.
+   - Regular users (`role: 'user'`) receive HTTP 403 Forbidden (`FORBIDDEN`).
+2. **Super Admin Isolation for Sensitive Operations**:
+   - `GET /api/v1/admin/payments/:id/raw-log` is restricted exclusively to `super_admin`. Access by a standard `admin` returns HTTP 403.
+   - Every raw log access is recorded in `audit_logs` (`action: "payment.raw_log_read"`) and logged as a high-priority security event (`admin.sensitive_data_access`).
+3. **Mandatory Action Reason Schema**:
+   - `adminActionReasonSchema` enforces `reason: z.string().trim().min(5).max(500)`. Blank or whitespace reasons are rejected with HTTP 400 `VALIDATION_ERROR`.
+4. **Audited Tenant-Isolation Bypass**:
+   - Cross-tenant reads required for support operate through dedicated `adminFind*` methods (such as `adminFindInvitationBypassingOwnership`) which record an audit trail entry (`action: "invitation.admin_read"`) inside the transaction.
+5. **Architectural Absence of Content Editing Routes**:
+   - No route exists under `/api/v1/admin/invitations` accepting `PATCH` or `PUT` for user content fields. This is enforced as an architectural absence verified by automated test assertions.
+
+**Consequences** — Strictly implements BR-Admin.1 through BR-Admin.7; eliminates unauthorized administrative access; guarantees audit completeness for all administrative writes; protects customer personal wedding data from unauthorized staff modifications.

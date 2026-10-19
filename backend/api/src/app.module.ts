@@ -25,6 +25,7 @@ import { RsvpModule } from "./modules/rsvp/rsvp.module";
 import { GuestbookModule } from "./modules/guestbook/guestbook.module";
 import { NotificationModule } from "./modules/notification/notification.module";
 import { AnalyticsModule } from "./modules/analytics/analytics.module";
+import { AdminModule } from "./modules/admin/admin.module";
 import { MetricsModule } from "./shared/metrics/metrics.module";
 import { RateLimitModule } from "./shared/rate-limit/rate-limit.module";
 import { AbuseModule } from "./shared/abuse/abuse.module";
@@ -79,6 +80,7 @@ import { AbuseModule } from "./shared/abuse/abuse.module";
     GuestbookModule,
     NotificationModule,
     AnalyticsModule,
+    AdminModule,
     MetricsModule,
     // Scaffolding, not a feature. Removed once a real module exists on each surface.
     ...(process.env["NODE_ENV"] === "production" ? [] : [ReferenceModule]),

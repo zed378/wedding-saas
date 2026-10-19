@@ -10,6 +10,16 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-19 — Admin authorization path and audit middleware
+
+**Added** — Dedicated admin module, role-gating, mandatory reason audit enforcement, sensitive data access restrictions, and content mutation perimeter boundaries ([P5-03](./records/2026-10-19-P5-03-admin-authorization-and-audit.md), [ADR-098](./DECISIONS.md#ADR-098))
+
+- Mounted `/api/v1/admin/*` behind unified `requireRole('admin', 'super_admin')` and 2FA authentication guards.
+- Implemented `AdminAuditLogService` with multi-criteria filtering (`admin_id`, `resource_type`, `date_from`, `date_to`) and cursor/page pagination.
+- Enforced mandatory `reason` schema validation (`min 5, max 500` characters) on administrative write operations, returning 400 for empty or whitespace-only inputs.
+- Restricted `GET /api/v1/admin/payments/:id/raw-log` exclusively to `super_admin`, recording `admin.sensitive_data_access` security events and audit log entries.
+- Formally established content boundary invariant preventing administrative modifications to user-authored invitation content.
+
 ### 2026-10-19 — Admin 2FA (TOTP) and step-up re-authentication
 
 **Added** — Mandatory TOTP 2FA for administrative accounts, secret encryption at rest, recovery codes, and step-up re-authentication ([P5-02](./records/2026-10-19-P5-02-admin-2fa.md), [ADR-097](./DECISIONS.md#ADR-097))

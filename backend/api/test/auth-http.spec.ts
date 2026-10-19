@@ -25,6 +25,7 @@ import { PolicyRegistry } from "../src/shared/rate-limit/config";
 import type { RateLimitDecision } from "../src/shared/rate-limit/rate-limiter";
 import { RateLimiterUnavailableError } from "../src/shared/rate-limit/rate-limiter";
 import { RegistrationService } from "../src/modules/auth/registration.service";
+import { MfaService } from "../src/modules/auth/mfa/mfa.service";
 import { REFRESH_COOKIE_NAME } from "../src/modules/auth/tokens/refresh-token.service";
 import { UnauthenticatedError } from "../src/http/errors";
 
@@ -147,6 +148,7 @@ describe("auth endpoints over HTTP", () => {
         { provide: GoogleOAuthService, useValue: googleStub },
         { provide: PasswordResetService, useValue: resetStub },
         { provide: RegistrationService, useValue: {} },
+        { provide: MfaService, useValue: {} },
         { provide: ENV, useValue: env },
         { provide: RATE_LIMITER, useValue: limiterStub },
         {

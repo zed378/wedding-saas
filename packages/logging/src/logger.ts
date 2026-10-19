@@ -40,6 +40,7 @@ export type SecurityEventType =
   | "authz.idor_attempt"
   | "payment.invalid_signature"
   | "admin.tenant_bypass"
+  | "admin.sensitive_data_access"
   | "upload.rejected";
 
 export interface LoggerConfig {

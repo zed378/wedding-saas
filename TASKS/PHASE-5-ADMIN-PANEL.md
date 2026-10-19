@@ -93,7 +93,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** |
 | **Depends on** | P0-14, P1-06 |
 | **Spec refs** | `docs/SECURITY/05-MULTI-TENANCY-SECURITY.md` § Special Case, `docs/API/09-ADMIN-API.md` § Principles, `docs/DATABASE/10-AUDIT-LOGS.md` |
 | **Spec required** | Yes — authorization, audit |
@@ -111,11 +111,11 @@
 7. Do not let `admin` imply `super_admin` (`docs/PLAN/03` § Authorization Principles).
 
 **Definition of Done**
-- [ ] Every admin write produces an audit row with actor, resource, reason and before/after.
-- [ ] A write without a reason is rejected.
-- [ ] No endpoint exists through which an admin can edit invitation content; a test asserts the route is absent.
-- [ ] Raw payment log access is separately restricted and logged.
-- [ ] A regular user reaching an admin route gets a consistent denial with no information leak.
+- [x] Every admin write produces an audit row with actor, resource, reason and before/after.
+- [x] A write without a reason is rejected.
+- [x] No endpoint exists through which an admin can edit invitation content; a test asserts the route is absent.
+- [x] Raw payment log access is separately restricted and logged.
+- [x] A regular user reaching an admin route gets a consistent denial with no information leak.
 
 ---
 
