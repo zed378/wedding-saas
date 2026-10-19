@@ -10,6 +10,15 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-19 — Page view counter with write-behind flush
+
+**Added** — page view counter with in-memory Redis write-behind, atomic batching, and privacy-preserving daily aggregation ([P4-09](./records/2026-10-19-P4-09-page-view-counter.md))
+
+- Implemented in-memory page view counter via Redis hash increments (`POST /public/i/:slug/view`) with fail-open resiliency, eliminating synchronous database writes on visitor requests.
+- Added scheduled domain job `analytics_counter_flush` running every 1 minute (`* * * * *`) that atomically renames the pending Redis hash and batch upserts into `invitation_view_counts` at daily grain (`Asia/Jakarta`).
+- Added client-side beacon `<PageViewTracker slug={slug} />` in `frontend/public-invite` mounted in public invitation pages with same-origin proxy route `/public/i/[slug]/view/route.ts` and 1KB payload bounds.
+- Implemented `AnalyticsRepository` in `backend/api/src/shared/tenancy` supporting tenant-scoped view summaries with strict query-level owner authorization and zero PII or visitor fingerprinting (ADR-093).
+
 ### 2026-10-19 — Notification preferences and delivery monitoring
 
 **Added** — notification preferences with daily RSVP digest, bounce suppression, and DLQ alerting ([P4-08](./records/2026-10-19-P4-08-preferences-and-delivery-monitoring.md))

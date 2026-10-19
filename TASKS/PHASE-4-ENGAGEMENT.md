@@ -280,7 +280,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE |
 | **Depends on** | P2-07, P0-15 |
 | **Spec refs** | `docs/PLAN/14-ANALYTICS.md`, `docs/ARCHITECTURE/06` § What Is Cached, `docs/BACKEND/08-JOBS-WORKERS.md`, `docs/SECURITY/09` |
 | **Spec required** | Yes — data model, privacy |
@@ -297,10 +297,10 @@
 6. Make the endpoint fire-and-forget from the client: it never blocks rendering and its failure is invisible to the guest.
 
 **Definition of Done**
-- [ ] A page view performs no primary-database write.
-- [ ] The flush job is idempotent and its failure mode is documented as best-effort.
-- [ ] No per-visitor row is created anywhere.
-- [ ] Counter increments survive a flush cycle and appear in the owner dashboard.
+- [x] A page view performs no primary-database write.
+- [x] The flush job is idempotent and its failure mode is documented as best-effort.
+- [x] No per-visitor row is created anywhere.
+- [x] Counter increments survive a flush cycle and appear in the owner dashboard.
 
 ---
 

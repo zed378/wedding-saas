@@ -9,6 +9,7 @@ import { Invitation } from "../../components/Invitation";
 import { ShareBar } from "../../components/ShareBar";
 import { TrialWatermark } from "../../components/TrialWatermark";
 import { WebVitals } from "../../components/WebVitals";
+import { PageViewTracker } from "../../components/PageViewTracker";
 import { InvitationFrame } from "../../components/InvitationFrame";
 import { readConfig } from "../../lib/config";
 import {
@@ -143,6 +144,11 @@ export default async function InvitationPage({ params }: RouteParams) {
   return (
     <InvitationFrame>
       <WebVitals pageKind="invitation" />
+      {/*
+       * `P4-09`: page view counter beacon. Fire-and-forget in-memory Redis increment
+       * flushed to Postgres periodically.
+       */}
+      <PageViewTracker slug={slug} />
       {/*
        * `P2-10` step 2. Above the cover, and rendered only after hydration — a
        * server-rendered guest name would mean one cache entry per guest

@@ -149,6 +149,16 @@ export const metrics = {
     "Email bounce and complaint events recorded from provider webhooks (P4-08).",
     ["provider", "type"],
   ),
+  pageViews: new Counter(
+    "wi_page_views_total",
+    "Page view counter increments recorded on public invitation pages (P4-09).",
+    ["status"],
+  ),
+  analyticsFlush: new Counter(
+    "wi_analytics_flush_total",
+    "Analytics counter flush job executions by outcome (P4-09).",
+    ["status"],
+  ),
 } as const;
 
 export function renderMetrics(): string {

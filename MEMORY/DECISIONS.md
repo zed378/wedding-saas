@@ -2906,6 +2906,35 @@ the expiry, because inside the window that is a resume.
 
 **Consequences** — Couples have flexible notification options; bounce suppression preserves domain reputation; failures in critical transactional mail are immediately alertable.
 
+---
+
+### ADR-093 — Page view counter with in-memory Redis write-behind, atomic batching, and privacy-preserving daily aggregation
+
+**Date** 2026-10-19 · **Task** `P4-09` · **Status** Accepted · **Amends** `docs/PLAN/14-ANALYTICS.md`, `docs/DATABASE/11-ANALYTICS.md`, `docs/ARCHITECTURE/07-BACKGROUND-PROCESSING.md`
+
+**Context** — Public wedding invitation pages experience spiky traffic patterns (hundreds of guest visits within minutes of sending digital invitations or during wedding receptions).
+1. Primary DB protection: Performing synchronous SQL writes on public visitor requests creates serious denial-of-service and database contention risks during traffic surges.
+2. Visitor privacy: Privacy requirements forbid storing visitor IPs, user agents, cookies, or unique fingerprints.
+3. Reliability & fail-open: Page rendering must never be degraded or delayed by analytics collection. Flush failures must be explicitly best-effort.
+
+**Decisions**
+1. **In-memory Redis increment (`HINCRBY`)**:
+   - `POST /public/i/:slug/view` increments pending hash `analytics:views:pending` under key `${invitationId}:${viewDate}` (`Asia/Jakarta` WIB calendar date).
+   - Redis errors fail open: the endpoint logs a warning, increments `wi_page_views_total{status="failed"}`, and returns `{ success: true, data: { recorded: false } }` without failing visitor experience.
+2. **Atomic batch write-behind flush (`analytics_counter_flush`)**:
+   - Scheduled domain job runs every 1 minute (`* * * * *`).
+   - Uses atomic `RENAME analytics:views:pending analytics:views:flushing:<uuid>` so concurrent requests immediately seed a fresh pending hash without race conditions or lost counts.
+   - Reads batch via `HGETALL`, batch upserts to `invitation_view_counts` via `ON CONFLICT (invitation_id, view_date) DO UPDATE SET view_count = invitation_view_counts.view_count + EXCLUDED.view_count`, and deletes the flushing key.
+   - Best-effort execution: flush errors log and increment `wi_analytics_flush_total{status="failure"}` without crashing worker or throwing unhandled exceptions.
+3. **Frontend beacon `<PageViewTracker />`**:
+   - Fires once on initial mount in `frontend/public-invite/src/app/[slug]/page.tsx` via `navigator.sendBeacon` (falling back to `fetch(..., { keepalive: true })`).
+   - Proxied via same-origin route `src/app/public/i/[slug]/view/route.ts` with forwarded-for headers and payload capped at 1KB.
+4. **Tenant-scoped repository isolation**:
+   - `AnalyticsRepository` implemented in `shared/tenancy/analytics-repository.ts` under guarded tenant boundaries.
+   - Organizers view daily aggregates via `getViewSummary(scope, invitationId)` scoped strictly by `i.owner_id = scope`.
+
+**Consequences** — Zero primary database writes occur synchronously on page requests; visitors receive instant response; visitor privacy is preserved with zero PII stored; database load is amortized into 1-minute atomic upsert batches.
+
 
 
 
