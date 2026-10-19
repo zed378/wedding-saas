@@ -79,6 +79,14 @@ const ALLOWED = [
    * sentence here saying what it costs.
    */
   "shared/invitation-status/",
+
+  /**
+   * Phase 5 administrative services (`modules/admin/`).
+   * Platform administrators require cross-tenant aggregates, blast-radius counts,
+   * order/payment lookups, user drawers, and moderation queues across all invitations.
+   * Access is strictly guarded by `requireRole('admin', 'super_admin')` and audited.
+   */
+  "modules/admin/",
 ];
 
 function walk(dir) {

@@ -463,14 +463,14 @@ export function UsersPage() {
                         <span>{user.email}</span>
                         {user.emailVerified ? (
                           <span
-                            className="inline-block text-[10px] text-tone-success-fg font-medium"
+                            className="inline-block text-xs text-tone-success-fg font-medium"
                             title="Email Terverifikasi"
                           >
                             ✓ Terverifikasi
                           </span>
                         ) : (
                           <span
-                            className="inline-block text-[10px] text-tone-warning-fg font-medium"
+                            className="inline-block text-xs text-tone-warning-fg font-medium"
                             title="Belum Verifikasi"
                           >
                             Belum Verifikasi
@@ -633,7 +633,7 @@ export function UsersPage() {
                           >
                             {inv.status}
                           </Badge>
-                          <div className="mt-1 text-[11px] text-text-muted">
+                          <div className="mt-1 text-xs text-text-muted">
                             {formatDate(inv.createdAt)}
                           </div>
                         </div>

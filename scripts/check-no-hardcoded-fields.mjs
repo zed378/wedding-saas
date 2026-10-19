@@ -94,6 +94,13 @@ const ALLOWED = [
    * that actually matters here.
    */
   "frontend/public-invite/src/lib/metadata.ts",
+  /*
+   * P5-05. The administrative template authoring interface (`admin/src/components/templates/`
+   * and `admin/src/pages/TemplatesPage.tsx`). Its purpose is to configure templates,
+   * section definitions, and canonical fields for version publishing and dummy preview rendering.
+   */
+  "admin/src/components/templates/",
+  "admin/src/pages/TemplatesPage.tsx",
 ];
 
 const isTest = (rel) =>

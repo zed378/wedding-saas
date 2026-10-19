@@ -390,7 +390,7 @@ export function ModerationPage() {
                     <td className="py-3 px-4 text-xs">
                       <div className="font-medium text-text">{item.invitationTitle}</div>
                       <div className="font-mono text-text-muted">/{item.invitationSlug}</div>
-                      <div className="text-[11px] text-text-muted mt-1">
+                      <div className="text-xs text-text-muted mt-1">
                         Pemilik: {item.owner.fullName} ({item.owner.email})
                       </div>
                     </td>

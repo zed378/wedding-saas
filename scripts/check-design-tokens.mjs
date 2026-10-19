@@ -80,6 +80,13 @@ const OUTSIDE_THE_RULE = [
   /(^|\/)global-error\.tsx$/,
   /^frontend\/public-invite\//,
   /^packages\/ui\/src\/email\//,
+  /**
+   * P5-05. Template authoring and preview tool (`admin/src/components/templates/`
+   * and `admin/src/pages/TemplatesPage.tsx`). Authors template palettes (hex colors)
+   * and renders realistic mobile frame viewports.
+   */
+  /^admin\/src\/components\/templates\//,
+  /^admin\/src\/pages\/TemplatesPage\.tsx$/,
 ];
 const isTest = (rel) => /\.(spec|itest|e2e|test)\.(ts|mts|tsx)$/.test(rel);
 

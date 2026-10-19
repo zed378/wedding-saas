@@ -550,7 +550,7 @@ export function OrdersPage() {
                     </td>
                     <td className="py-3 px-4 text-xs">
                       <span className="font-mono text-text">/{order.invitationSlug}</span>
-                      <div className="text-[11px] text-text-muted">
+                      <div className="text-xs text-text-muted">
                         Paket: {order.packageId.toUpperCase()}
                       </div>
                     </td>

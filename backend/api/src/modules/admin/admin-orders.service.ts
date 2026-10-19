@@ -4,7 +4,6 @@ import { and, count, desc, eq, ilike, inArray, isNull, or, type SQL } from "driz
 import { DB, type Database } from "../../infra/db/client";
 import {
   auditLogs,
-  invitationStatusHistory,
   invitations,
   invoices,
   orders,
@@ -17,6 +16,7 @@ import type { PageMeta } from "../../http/envelope";
 import { JOB_QUEUE, type JobQueue } from "../../infra/queue/queue.module";
 import type { CurrentUser } from "../../shared/auth-middleware/current-user";
 import { PublicInvitationCache } from "../publishing/public-invitation-cache";
+import { InvitationStatusService } from "../../shared/invitation-status/invitation-status.service";
 import type { AdminOrderQueryDto } from "./schemas/admin-order.schema";
 
 const UUID_REGEX =
@@ -108,6 +108,7 @@ export interface AdminOrderDetailItem {
 export class AdminOrdersService {
   constructor(
     @Inject(DB) private readonly db: Database,
+    private readonly statusService: InvitationStatusService,
     @Optional() @Inject(JOB_QUEUE) private readonly queue?: JobQueue,
     @Optional() private readonly cache?: PublicInvitationCache,
   ) {}
@@ -453,23 +454,14 @@ export class AdminOrdersService {
         })
         .where(eq(orders.id, id));
 
-      // 4. Demote invitation to 'draft' (ADR-019 & BR-5.4)
-      await tx
-        .update(invitations)
-        .set({
-          status: "draft",
-          updatedAt: new Date(),
-        })
-        .where(eq(invitations.id, invitationRow.id));
-
-      // 5. Record invitation lifecycle status history
-      await tx.insert(invitationStatusHistory).values({
-        invitationId: invitationRow.id,
-        fromStatus: previousInvitationStatus,
-        toStatus: "draft",
-        changedBy: admin.id,
-        reason: `admin refund: ${trimmedReason}`,
-      });
+      // 4. Demote invitation to 'draft' (ADR-019 & BR-5.4) using InvitationStatusService
+      await this.statusService.transitionWithin(
+        tx,
+        invitationRow.id,
+        "draft",
+        { kind: "ADMIN", userId: admin.id },
+        `admin refund: ${trimmedReason}`,
+      );
 
       // 6. Record audit log
       await tx.insert(auditLogs).values({
