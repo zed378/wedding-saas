@@ -143,7 +143,7 @@ export function GuestbookModerationList({
               <span>{label}</span>
               {count !== undefined && (
                 <span
-                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-semibold ${
+                  className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${
                     active
                       ? "bg-primary-100 text-primary-800"
                       : "bg-surface-sunken text-text-muted"

@@ -10,6 +10,13 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-19 — Phase 4 test suite and acceptance (Phase 4 complete)
+
+**Added** — Phase 4 test suite and formal acceptance ([P4-12](./records/2026-10-19-P4-12-phase-4-acceptance.md), [Phase 4 Summary](./records/2026-10-19-PHASE-4-SUMMARY.md))
+
+- Implemented automated acceptance suite `backend/api/test/phase-4-acceptance.spec.ts` covering critical engagement flow (RSVP, guestbook submission, moderation gating), XSS sweep across all public fields with 11 attack payloads, rate limiting per policy, zero raw IP storage (SHA-256 IP hashing only), notification delivery and preference gating, and in-memory page view counter under burst load.
+- Verified all 12 tasks of Phase 4 complete, passing 815 backend API tests, 44 worker tests, 149 UI tests, 409 web-app tests, 170 public-invite tests, and 11 repository security and architecture guard scripts with 0 security findings.
+
 ### 2026-10-19 — Frontend engagement screens and live public sections
 
 **Added** — owner RSVP and guestbook moderation dashboards, editor engagement toggles, and live public interactive sections ([P4-11](./records/2026-10-19-P4-11-frontend-engagement-screens.md))

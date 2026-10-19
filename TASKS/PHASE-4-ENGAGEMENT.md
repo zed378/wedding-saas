@@ -362,7 +362,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE |
 | **Depends on** | all Phase 4 tasks |
 | **Spec refs** | `docs/TESTING/03-E2E-TESTING.md` § 3, `docs/PLAN/17-ACCEPTANCE-CRITERIA.md`, `docs/SECURITY/10` |
 | **Spec required** | No |
@@ -380,7 +380,7 @@
 7. Write the phase summary record.
 
 **Definition of Done**
-- [ ] The E2E engagement flow passes including moderation.
-- [ ] The XSS sweep across public fields is clean.
-- [ ] Rate limits match `docs/SECURITY/10` for every public endpoint.
-- [ ] The phase summary exists in `MEMORY/records/`.
+- [x] The E2E engagement flow passes including moderation.
+- [x] The XSS sweep across public fields is clean.
+- [x] Rate limits match `docs/SECURITY/10` for every public endpoint.
+- [x] The phase summary exists in `MEMORY/records/`.
