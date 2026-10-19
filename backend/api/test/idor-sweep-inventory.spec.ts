@@ -63,6 +63,12 @@ const EXEMPT: Readonly<Record<string, string>> = {
     "administrative catalog version publication route restricted to admin and super_admin (P5-04) — admin-templates.spec.ts",
   "POST /api/v1/admin/templates/:id/versions/:vid/deprecate":
     "administrative catalog version deprecation route restricted to admin and super_admin (P5-04) — admin-templates.spec.ts",
+  "GET /api/v1/admin/users/:id":
+    "administrative user detail route restricted to admin and super_admin (P5-06) — admin-users.spec.ts",
+  "PATCH /api/v1/admin/users/:id/suspend":
+    "administrative user suspension route restricted to admin and super_admin (P5-06) — admin-users.spec.ts",
+  "PATCH /api/v1/admin/users/:id/unsuspend":
+    "administrative user unsuspension route restricted to admin and super_admin (P5-06) — admin-users.spec.ts",
 };
 
 function files(dir: string): string[] {

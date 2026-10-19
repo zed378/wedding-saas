@@ -8,9 +8,11 @@ import { AdminAuditLogService } from "./audit-logs.service";
 import { AdminPaymentsController } from "./admin-payments.controller";
 import { AdminTemplatesController } from "./admin-templates.controller";
 import { AdminTemplatesService } from "./admin-templates.service";
+import { AdminUsersController } from "./admin-users.controller";
+import { AdminUsersService } from "./admin-users.service";
 
 /**
- * P5-03 & P5-04: Administrative module.
+ * P5-03, P5-04, P5-06: Administrative module.
  *
  * All routes mounted under `/api/v1/admin/*`, guarded by role verification
  * (admin / super_admin) and audited in the same database transaction.
@@ -21,8 +23,17 @@ import { AdminTemplatesService } from "./admin-templates.service";
     AdminAuditLogsController,
     AdminPaymentsController,
     AdminTemplatesController,
+    AdminUsersController,
   ],
-  providers: [AdminAuditLogService, AdminTemplatesService],
-  exports: [AdminAuditLogService, AdminTemplatesService],
+  providers: [
+    AdminAuditLogService,
+    AdminTemplatesService,
+    AdminUsersService,
+  ],
+  exports: [
+    AdminAuditLogService,
+    AdminTemplatesService,
+    AdminUsersService,
+  ],
 })
 export class AdminModule {}

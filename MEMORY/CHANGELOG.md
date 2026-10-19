@@ -10,6 +10,16 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-19 — User management
+
+**Added** — Administrative user management in `@wi/admin` and backend API with search, filters, details, and audited suspension with session revocation and live invitation continuity ([P5-06](./records/2026-10-19-P5-06-user-management.md), [ADR-101](./DECISIONS.md#ADR-101))
+
+- Implemented administrative user list (`GET /api/v1/admin/users`) with search by email or name, status filter, and pagination conforming to `docs/API/00` `PageMeta`.
+- Built user detail query (`GET /api/v1/admin/users/:id`) surfacing associated invitations and order histories while preserving privacy minimization (no password hashes, tokens, or bank accounts).
+- Enforced dual suspension invariants: immediate session revocation and login blockage via `SessionService.loadActiveUser` alongside guaranteed publication continuity for live wedding invitations (BR-Admin.6).
+- Implemented audited account suspension (`PATCH /api/v1/admin/users/:id/suspend`) and unsuspension with mandatory minimum 5-character reason and `audit_logs` record.
+- Built full `@wi/admin` User Management interface (`UsersPage.tsx`) with search, status filtering, detail drawer, and audited confirmation modals with BR-Admin.6 business rule notice.
+
 ### 2026-10-19 — Template editor UI, assets, dummy preview
 
 **Added** — Complete administrative Template Editor UI in `@wi/admin` with constrained section configuration, WCAG 2.1 AA luminance & contrast checking, live production preview, purpose-tagged assets, and informed deprecation ([P5-05](./records/2026-10-19-P5-05-template-editor-ui.md), [ADR-100](./DECISIONS.md#ADR-100))

@@ -185,7 +185,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE |
 | **Depends on** | P5-03 |
 | **Spec refs** | `docs/API/09-ADMIN-API.md` § User Management, `docs/PLAN/12` § User Management, `docs/SECURITY/09` |
 | **Spec required** | Yes — authorization |
@@ -202,10 +202,10 @@
 6. Build the UI with fast search by email or name, matching the one-to-two-click bar from `docs/UI-UX/03` (Rina).
 
 **Definition of Done**
-- [ ] Suspension revokes sessions and blocks login immediately.
-- [ ] Published invitations remain reachable after their owner is suspended; a test asserts it.
-- [ ] Every suspension has a reason in the audit log.
-- [ ] No credential or sensitive financial field is rendered anywhere in the panel.
+- [x] Suspension revokes sessions and blocks login immediately.
+- [x] Published invitations remain reachable after their owner is suspended; a test asserts it.
+- [x] Every suspension has a reason in the audit log.
+- [x] No credential or sensitive financial field is rendered anywhere in the panel.
 
 ---
 

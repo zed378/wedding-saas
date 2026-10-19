@@ -3151,3 +3151,29 @@ the expiry, because inside the window that is a resume.
 
 **Consequences** — Zero manual JSON editing required to author, test, and release templates; 100% render fidelity between preview and public invitations; eliminates typos in section and field definitions; enforces WCAG accessibility standards before designs can be released to couples.
 
+---
+
+### ADR-101 — Administrative User Management, Suspension Invariants, and Customer Privacy Boundaries
+
+**Date** 2026-10-19 · **Task** `P5-06` · **Status** Accepted · **Amends** `docs/PLAN/12-ADMIN-PANEL.md`, `docs/API/09-ADMIN-API.md`, `docs/SECURITY/09-PRIVACY-DATA-PROTECTION.md`
+
+**Context** — Administrative support staff require visibility into customer accounts to diagnose billing and access issues. However:
+1. **Separation of Operational Support from Invasive Access (docs/SECURITY/09)**: Support staff need to confirm account status, email verification, total invitation counts, and transaction amounts. They do NOT need access to passwords, OAuth credentials, session tokens, or the couple's private bank account numbers.
+2. **Account Suspension Semantics (BR-Admin.5 & BR-Admin.6)**: When an account is suspended due to fraud or Terms of Service violations:
+   - The user must be immediately barred from logging in or using existing active sessions.
+   - **Crucially, published wedding invitations must stay live and accessible to wedding guests (BR-Admin.6)**. Taking down an active wedding invitation as a side effect of an account action could ruin a couple's real-world wedding day if an administrative suspension is mistaken or contested.
+3. **Mandatory Auditing (docs/SECURITY/05)**: Every suspension and unsuspension is an impactful administrative action that requires a verified, non-empty reason recorded directly in the audit log.
+
+**Decisions**
+1. **Dual Enforced Suspension Invariants**:
+   - `users.status = 'suspended'` and revocation of all active refresh tokens in `refresh_tokens`.
+   - `SessionService.loadActiveUser` queries `users.status = 'active'`, causing any ongoing JWT access tokens to be rejected immediately (HTTP 401).
+   - `LoginService.login` validates `status === 'active'`, blocking subsequent authentication attempts (HTTP 403).
+   - Invitation public delivery query in `public-invitation.service.ts` only evaluates `invitations.status = 'published'` and does not check user suspension status, fulfilling BR-Admin.6.
+2. **Response DTO Minimization**:
+   - `AdminUsersService` explicitly selects and whitelists fields, stripping all credential and sensitive banking data from API payloads.
+3. **Audited Mutex Operations**:
+   - `PATCH /api/v1/admin/users/:id/suspend` and `PATCH /api/v1/admin/users/:id/unsuspend` enforce `z.string().trim().min(5).max(500)` for the `reason` field and persist an audit row into `audit_logs` in the same transaction.
+
+**Consequences** — Support operations are fully unblocked while preserving customer privacy and guaranteeing zero disruption to wedding guests attending ceremonies with published invitations.
+
