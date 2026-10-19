@@ -213,7 +213,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE |
 | **Depends on** | P5-03, P3-05 |
 | **Spec refs** | `docs/API/09-ADMIN-API.md` § Order & Payment, `docs/PLAN/12` § Order Management, `docs/SECURITY/07`, `docs/DATABASE/08` |
 | **Spec required** | Yes — payment |
@@ -230,10 +230,10 @@
 6. Never expose a provider server key or webhook secret in the panel.
 
 **Definition of Done**
-- [ ] Order and payment state is visible without exposing raw payloads by default.
-- [ ] Raw log access is separately gated and produces a sensitive-access log entry.
-- [ ] Provider credentials never appear in any response.
-- [ ] The timeline makes a stuck payment diagnosable without database access.
+- [x] Order and payment state is visible without exposing raw payloads by default.
+- [x] Raw log access is separately gated and produces a sensitive-access log entry.
+- [x] Provider credentials never appear in any response.
+- [x] The timeline makes a stuck payment diagnosable without database access.
 
 ---
 

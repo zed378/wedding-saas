@@ -3172,8 +3172,30 @@ the expiry, because inside the window that is a resume.
    - Invitation public delivery query in `public-invitation.service.ts` only evaluates `invitations.status = 'published'` and does not check user suspension status, fulfilling BR-Admin.6.
 2. **Response DTO Minimization**:
    - `AdminUsersService` explicitly selects and whitelists fields, stripping all credential and sensitive banking data from API payloads.
-3. **Audited Mutex Operations**:
-   - `PATCH /api/v1/admin/users/:id/suspend` and `PATCH /api/v1/admin/users/:id/unsuspend` enforce `z.string().trim().min(5).max(500)` for the `reason` field and persist an audit row into `audit_logs` in the same transaction.
-
 **Consequences** — Support operations are fully unblocked while preserving customer privacy and guaranteeing zero disruption to wedding guests attending ceremonies with published invitations.
+
+---
+
+### ADR-102 — Administrative Order and Payment Management, Fraud Signals, and Payment Log Access Gating
+
+**Date** 2026-10-19 · **Task** `P5-07` · **Status** Accepted · **Amends** `docs/PLAN/12-ADMIN-PANEL.md`, `docs/API/09-ADMIN-API.md`, `docs/SECURITY/07-PAYMENT-SECURITY.md`
+
+**Context** — Diagnosing stuck customer orders and disputed payments requires access to transaction statuses, gateway callbacks, and timeline transitions. However:
+1. **Separation of Routine Support from Sensitive Log Inspection**: Routine support only requires order metadata, customer names, payment methods, transaction amounts, and gateway status. Revealing raw provider callback payloads (`raw_callback_payload` in `payments`) by default risks exposing provider-specific customer identifiers or headers.
+2. **Payment Fraud Signal Visibility (docs/DEVOPS/07)**: When an attacker attempts to forge payment provider webhooks (e.g. spoofing a Midtrans settlement notification with an invalid SHA-512 signature), the system records the forgery in `payment_notifications` with `signature_valid = false` and `rejection_reason = 'signature_mismatch'`. Support and security teams must see this fraud signal surfaced prominently to understand why an order remains unpaid despite customer claims.
+3. **No Database Access Required**: Support operators should never need to SSH into the database or inspect server logs to diagnose whether a payment failed, was ignored, or is waiting on provider settlement.
+
+**Decisions**
+1. **Order List & Detail Whitelist**:
+   - `GET /api/v1/admin/orders` returns filtered summary records with `PageMeta` pagination, omitting provider secrets.
+   - `GET /api/v1/admin/orders/:id` aggregates order details, customer contact info, invitation slug, payment attempts from `payments`, and the complete notification timeline from `payment_notifications`.
+   - `rawCallbackPayload` is strictly omitted from the standard `payments` DTO.
+2. **Restricted Raw Log Access**:
+   - Raw callback payloads remain accessible only to `super_admin` through `GET /api/v1/admin/payments/:id/raw-log` (implemented in P5-03), generating an `audit_logs` record and `admin.sensitive_data_access` security event.
+3. **Fraud Signal Surfacing**:
+   - `AdminOrdersService.getOrder` sets `hasFraudAlert: true` if any notification linked to the order has `signatureValid === false` or `rejectionReason === 'signature_mismatch'`.
+   - `@wi/admin` renders a prominent warning banner when `hasFraudAlert` is detected.
+
+**Consequences** — Stuck orders and webhook discrepancies are readily diagnosable in seconds from `@wi/admin`; raw payload secrets are protected by role-gated access logging; forged callbacks are surfaced as actionable fraud signals.
+
 

@@ -10,6 +10,16 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-19 — Order and payment management
+
+**Added** — Administrative order and payment management in `@wi/admin` and backend API with timeline transitions, secret protection, and fraud signal detection ([P5-07](./records/2026-10-19-P5-07-order-and-payment-management.md), [ADR-102](./DECISIONS.md#ADR-102))
+
+- Implemented administrative order list (`GET /api/v1/admin/orders`) with status filtering (`all`, `pending`, `paid`, `failed`, `expired`, `refunded`), search, and `PageMeta` pagination.
+- Built order detail endpoint (`GET /api/v1/admin/orders/:id`) assembling customer data, invitation link, gateway attempts, and chronological notification timeline (`payment_notifications`).
+- Enforced default redaction of `rawCallbackPayload` from standard payment records while providing restricted `super_admin` raw log access under sensitive data access auditing.
+- Implemented fraud signal detection identifying forged callbacks with signature mismatches and surfacing prominent warning alerts in the timeline.
+- Built `@wi/admin` Order and Payment Management interface (`OrdersPage.tsx`) with status filters, search, detail modal, timeline visualizer, and super admin raw log viewer.
+
 ### 2026-10-19 — User management
 
 **Added** — Administrative user management in `@wi/admin` and backend API with search, filters, details, and audited suspension with session revocation and live invitation continuity ([P5-06](./records/2026-10-19-P5-06-user-management.md), [ADR-101](./DECISIONS.md#ADR-101))
