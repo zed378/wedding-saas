@@ -1,8 +1,10 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { and, count, desc, eq, ilike, inArray, isNull, or, type SQL } from "drizzle-orm";
 
 import { DB, type Database } from "../../infra/db/client";
 import {
+  auditLogs,
+  invitationStatusHistory,
   invitations,
   invoices,
   orders,
@@ -10,8 +12,11 @@ import {
   payments,
   users,
 } from "../../infra/db/schema/index";
-import { NotFoundError } from "../../http/errors";
+import { ConflictError, NotFoundError, ValidationError } from "../../http/errors";
 import type { PageMeta } from "../../http/envelope";
+import { JOB_QUEUE, type JobQueue } from "../../infra/queue/queue.module";
+import type { CurrentUser } from "../../shared/auth-middleware/current-user";
+import { PublicInvitationCache } from "../publishing/public-invitation-cache";
 import type { AdminOrderQueryDto } from "./schemas/admin-order.schema";
 
 const UUID_REGEX =
@@ -95,13 +100,17 @@ export interface AdminOrderDetailItem {
 }
 
 /**
- * P5-07: Administrative Order and Payment Management Service.
+ * P5-07, P5-08: Administrative Order and Payment Management Service.
  * docs/PLAN/12-ADMIN-PANEL.md § Order & Payment Management
  * docs/API/09-ADMIN-API.md § Order & Payment Management
  */
 @Injectable()
 export class AdminOrdersService {
-  constructor(@Inject(DB) private readonly db: Database) {}
+  constructor(
+    @Inject(DB) private readonly db: Database,
+    @Optional() @Inject(JOB_QUEUE) private readonly queue?: JobQueue,
+    @Optional() private readonly cache?: PublicInvitationCache,
+  ) {}
 
   async listOrders(
     query: AdminOrderQueryDto,
@@ -380,5 +389,141 @@ export class AdminOrdersService {
       hasFraudAlert,
       invoice,
     };
+  }
+
+  /**
+   * P5-08: Manual Refund.
+   * Single transaction:
+   * - order status = 'refunded'
+   * - invitation status = 'draft' (BR-5.4 & ADR-019)
+   * - records invitation_status_history with admin as actor
+   * - records audit_logs row
+   * - immediately invalidates public invitation cache if previously published
+   */
+  async refundOrder(admin: CurrentUser, id: string, reason: string) {
+    if (!UUID_REGEX.test(id)) {
+      throw new NotFoundError(`Order "${id}" tidak ditemukan.`);
+    }
+
+    const trimmedReason = reason.trim();
+    if (trimmedReason.length < 5) {
+      throw new ValidationError([
+        { field: "reason", message: "Alasan refund minimal 5 karakter." },
+      ]);
+    }
+
+    const result = await this.db.transaction(async (tx) => {
+      // 1. Fetch order under lock
+      const [orderRow] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.id, id))
+        .for("update");
+
+      if (!orderRow) {
+        throw new NotFoundError(`Order "${id}" tidak ditemukan.`);
+      }
+
+      if (orderRow.status !== "paid") {
+        throw new ConflictError(
+          "ORDER_NOT_PAID",
+          `Hanya pesanan berstatus 'paid' yang dapat direfund (status saat ini: '${orderRow.status}').`,
+        );
+      }
+
+      // 2. Fetch associated invitation under lock
+      const [invitationRow] = await tx
+        .select()
+        .from(invitations)
+        .where(eq(invitations.id, orderRow.invitationId))
+        .for("update");
+
+      if (!invitationRow) {
+        throw new NotFoundError("Undangan terkait pesanan tidak ditemukan.");
+      }
+
+      const previousInvitationStatus = invitationRow.status;
+
+      // 3. Demote order to 'refunded'
+      await tx
+        .update(orders)
+        .set({
+          status: "refunded",
+          updatedAt: new Date(),
+        })
+        .where(eq(orders.id, id));
+
+      // 4. Demote invitation to 'draft' (ADR-019 & BR-5.4)
+      await tx
+        .update(invitations)
+        .set({
+          status: "draft",
+          updatedAt: new Date(),
+        })
+        .where(eq(invitations.id, invitationRow.id));
+
+      // 5. Record invitation lifecycle status history
+      await tx.insert(invitationStatusHistory).values({
+        invitationId: invitationRow.id,
+        fromStatus: previousInvitationStatus,
+        toStatus: "draft",
+        changedBy: admin.id,
+        reason: `admin refund: ${trimmedReason}`,
+      });
+
+      // 6. Record audit log
+      await tx.insert(auditLogs).values({
+        adminId: admin.id,
+        action: "order.refund",
+        resourceType: "order",
+        resourceId: id,
+        reason: trimmedReason,
+        beforeState: {
+          order_status: "paid",
+          invitation_status: previousInvitationStatus,
+          amount_total: orderRow.amountTotal.toString(),
+        },
+        afterState: {
+          order_status: "refunded",
+          invitation_status: "draft",
+        },
+      });
+
+      return {
+        orderId: orderRow.id,
+        status: "refunded" as const,
+        invitationId: invitationRow.id,
+        invitationSlug: invitationRow.slug,
+        invitationStatus: "draft" as const,
+        previousInvitationStatus,
+        moneyMovement: "manual" as const,
+        message:
+          "Pesanan berhasil direfund di sistem dan status undangan dikembalikan ke draft. Pengembalian uang riil ke rekening/e-wallet pelanggan wajib diproses manual melalui dashboard gateway pembayaran (Midtrans).",
+      };
+    });
+
+    // 7. Post-transaction cache invalidation if invitation was published
+    if (result.previousInvitationStatus === "published" && result.invitationSlug) {
+      if (this.cache) {
+        await this.cache.invalidate({
+          slug: result.invitationSlug,
+          invitationId: result.invitationId,
+        });
+      }
+      if (this.queue) {
+        await this.queue.enqueue(
+          "general",
+          "cache.invalidate",
+          {
+            slug: result.invitationSlug,
+            invitationId: result.invitationId,
+            reason: "admin refund",
+          },
+          { relatedId: result.invitationId },
+        );
+      }
+    }
+
+    return result;
   }
 }

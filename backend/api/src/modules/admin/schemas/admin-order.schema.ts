@@ -10,3 +10,11 @@ export const adminOrderQuerySchema = z.object({
 });
 
 export type AdminOrderQueryDto = z.infer<typeof adminOrderQuerySchema>;
+
+export const adminOrderRefundSchema = z.object({
+  reason: z.string().trim().min(5).max(500),
+  step_up_code: z.string().trim().optional(),
+});
+
+export type AdminOrderRefundDto = z.infer<typeof adminOrderRefundSchema>;
+

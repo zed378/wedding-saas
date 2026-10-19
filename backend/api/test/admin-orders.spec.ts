@@ -8,7 +8,12 @@ import { AppExceptionFilter } from "../src/http/exception.filter";
 import { AdminOrdersController } from "../src/modules/admin/admin-orders.controller";
 import { AdminOrdersService } from "../src/modules/admin/admin-orders.service";
 import { SessionService } from "../src/modules/auth/session.service";
-import { NotFoundError, UnauthenticatedError } from "../src/http/errors";
+import { MfaService } from "../src/modules/auth/mfa/mfa.service";
+import {
+  ConflictError,
+  NotFoundError,
+  UnauthenticatedError,
+} from "../src/http/errors";
 
 describe("Admin Order and Payment Management API (P5-07)", () => {
   let app: INestApplication;
@@ -146,6 +151,38 @@ describe("Admin Order and Payment Management API (P5-07)", () => {
       if (id === ORDER_1_ID) return mockOrderDetail;
       throw new NotFoundError(`Order "${id}" tidak ditemukan.`);
     }),
+
+    refundOrder: vi.fn(async (_admin: any, id: string, reason: string) => {
+      if (id === ORDER_2_ID) {
+        throw new ConflictError(
+          "ORDER_NOT_PAID",
+          "Hanya pesanan berstatus 'paid' yang dapat direfund.",
+        );
+      }
+      if (id === ORDER_1_ID) {
+        return {
+          orderId: ORDER_1_ID,
+          status: "refunded",
+          invitationId: INVITATION_1_ID,
+          invitationSlug: "budi-and-ratna",
+          invitationStatus: "draft",
+          previousInvitationStatus: "published",
+          moneyMovement: "manual",
+          message:
+            "Pesanan berhasil direfund di sistem dan status undangan dikembalikan ke draft. Pengembalian uang riil ke rekening/e-wallet pelanggan wajib diproses manual melalui dashboard gateway pembayaran (Midtrans).",
+        };
+      }
+      throw new NotFoundError(`Order "${id}" tidak ditemukan.`);
+    }),
+  };
+
+  const mockMfaService = {
+    verifyStepUpToken: vi.fn(async (token: string, userId: string) => {
+      return token === "valid-step-up-token";
+    }),
+    verifyCodeOrRecovery: vi.fn(async (userId: string, body: { code: string }) => {
+      return { success: body.code === "123456" };
+    }),
   };
 
   const mockSessionService = {
@@ -178,6 +215,7 @@ describe("Admin Order and Payment Management API (P5-07)", () => {
       controllers: [AdminOrdersController],
       providers: [
         { provide: AdminOrdersService, useValue: mockAdminOrdersService },
+        { provide: MfaService, useValue: mockMfaService },
         { provide: SessionService, useValue: mockSessionService },
         { provide: APP_FILTER, useClass: AppExceptionFilter },
       ],
@@ -303,6 +341,101 @@ describe("Admin Order and Payment Management API (P5-07)", () => {
 
       expect(res.status).toBe(404);
       expect(res.body.error.code).toBe("NOT_FOUND");
+    });
+  });
+
+  describe("POST /api/v1/admin/orders/:id/refund (Manual Refund with 2FA Step-Up, P5-08)", () => {
+    it("refuses refund without authentication with 401", async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/admin/orders/${ORDER_1_ID}/refund`)
+        .send({ reason: "Permintaan pembatalan pelanggan" });
+
+      expect(res.status).toBe(401);
+    });
+
+    it("refuses refund by non-admin with 403 Forbidden", async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/admin/orders/${ORDER_1_ID}/refund`)
+        .set("Authorization", "Bearer user-token")
+        .send({ reason: "Permintaan pembatalan pelanggan" });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe("FORBIDDEN");
+    });
+
+    it("refuses refund without 2FA step-up authentication (403 MFA_STEP_UP_REQUIRED)", async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/admin/orders/${ORDER_1_ID}/refund`)
+        .set("Authorization", "Bearer admin-token")
+        .send({ reason: "Permintaan pembatalan pelanggan" });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe("MFA_STEP_UP_REQUIRED");
+    });
+
+    it("refuses refund when 2FA TOTP code is incorrect", async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/admin/orders/${ORDER_1_ID}/refund`)
+        .set("Authorization", "Bearer admin-token")
+        .send({
+          reason: "Permintaan pembatalan pelanggan",
+          step_up_code: "999999", // wrong code
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe("MFA_STEP_UP_REQUIRED");
+    });
+
+    it("refuses refund when reason is shorter than 5 characters (400 VALIDATION_ERROR)", async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/admin/orders/${ORDER_1_ID}/refund`)
+        .set("Authorization", "Bearer admin-token")
+        .set("X-MFA-Step-Up", "valid-step-up-token")
+        .send({ reason: "no" });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("VALIDATION_ERROR");
+    });
+
+    it("refuses refund when order is not in paid status (409 ORDER_NOT_PAID)", async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/admin/orders/${ORDER_2_ID}/refund`)
+        .set("Authorization", "Bearer admin-token")
+        .set("X-MFA-Step-Up", "valid-step-up-token")
+        .send({ reason: "Pelanggan salah memilih paket dan minta refund" });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe("ORDER_NOT_PAID");
+    });
+
+    it("processes refund with valid step-up token, resetting invitation to draft and returning manual money movement notice (ADR-019)", async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/admin/orders/${ORDER_1_ID}/refund`)
+        .set("Authorization", "Bearer admin-token")
+        .set("X-MFA-Step-Up", "valid-step-up-token")
+        .send({ reason: "Permintaan pembatalan resmi pelanggan" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.orderId).toBe(ORDER_1_ID);
+      expect(res.body.data.status).toBe("refunded");
+      expect(res.body.data.invitationStatus).toBe("draft");
+      expect(res.body.data.moneyMovement).toBe("manual");
+      expect(res.body.data.message).toContain("Midtrans");
+    });
+
+    it("processes refund with valid 2FA TOTP code passed in body", async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/admin/orders/${ORDER_1_ID}/refund`)
+        .set("Authorization", "Bearer admin-token")
+        .send({
+          reason: "Permintaan pembatalan resmi pelanggan",
+          step_up_code: "123456",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.status).toBe("refunded");
+      expect(res.body.data.invitationStatus).toBe("draft");
+      expect(res.body.data.moneyMovement).toBe("manual");
     });
   });
 });

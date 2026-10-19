@@ -5,6 +5,7 @@ import {
   Inject,
 } from "@nestjs/common";
 import { ForbiddenError } from "../../../http/errors";
+import { maybeCurrentUser } from "../../../shared/auth-middleware/current-user";
 import { MfaService } from "./mfa.service";
 
 /**
@@ -18,7 +19,7 @@ export class StepUpGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
-    const user = req.user;
+    const user = req.user ?? maybeCurrentUser(req);
 
     if (!user || !user.id) {
       throw new ForbiddenError(

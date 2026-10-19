@@ -6,6 +6,7 @@ import {
   Badge,
   Input,
   Select,
+  Textarea,
   Modal,
 } from "@wi/ui";
 import { useAdminAuth } from "../auth/admin-auth.js";
@@ -258,6 +259,17 @@ export function OrdersPage() {
   const [isLoadingRawLog, setIsLoadingRawLog] = useState(false);
   const [rawLogError, setRawLogError] = useState<string | null>(null);
 
+  // Refund Modal State (P5-08)
+  const [targetOrderForRefund, setTargetOrderForRefund] = useState<
+    AdminOrderSummaryItem | AdminOrderDetailItem | null
+  >(null);
+  const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+  const [refundReason, setRefundReason] = useState("");
+  const [refundStepUpCode, setRefundStepUpCode] = useState("");
+  const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
+  const [refundError, setRefundError] = useState<string | null>(null);
+  const [refundSuccessMessage, setRefundSuccessMessage] = useState<string | null>(null);
+
   // Fetch orders from API
   const loadOrders = async () => {
     setIsLoading(true);
@@ -372,6 +384,71 @@ export function OrdersPage() {
       setRawLogError(err?.message || "Gagal memuat log mentah.");
     } finally {
       setIsLoadingRawLog(false);
+    }
+  };
+
+  // Open Refund Modal (P5-08)
+  const handleOpenRefund = (order: AdminOrderSummaryItem | AdminOrderDetailItem) => {
+    setTargetOrderForRefund(order);
+    setRefundReason("");
+    setRefundStepUpCode("");
+    setRefundError(null);
+    setRefundSuccessMessage(null);
+    setIsRefundModalOpen(true);
+  };
+
+  // Process Refund Submission (P5-08)
+  const handleConfirmRefund = async () => {
+    if (!targetOrderForRefund) return;
+    if (refundReason.trim().length < 5) {
+      setRefundError("Alasan refund minimal 5 karakter.");
+      return;
+    }
+
+    setIsSubmittingRefund(true);
+    setRefundError(null);
+
+    try {
+      const res = await fetch(`/api/v1/admin/orders/${targetOrderForRefund.id}/refund`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reason: refundReason.trim(),
+          step_up_code: refundStepUpCode.trim() || undefined,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        if (json.error?.code === "MFA_STEP_UP_REQUIRED") {
+          throw new Error("Verifikasi 2FA diperlukan. Masukkan kode TOTP 6 digit yang valid.");
+        }
+        throw new Error(json.error?.message || "Gagal memproses refund.");
+      }
+
+      setRefundSuccessMessage(
+        json.data?.message ||
+          "Pesanan berhasil direfund dan status undangan dikembalikan ke draft."
+      );
+
+      // Refresh list
+      loadOrders();
+
+      // If detail modal was open for this order, update its status
+      if (selectedOrderDetail && selectedOrderDetail.id === targetOrderForRefund.id) {
+        setSelectedOrderDetail({
+          ...selectedOrderDetail,
+          status: "refunded",
+        });
+      }
+
+      setTimeout(() => {
+        setIsRefundModalOpen(false);
+      }, 1500);
+    } catch (err: any) {
+      setRefundError(err?.message || "Terjadi kesalahan saat memproses refund.");
+    } finally {
+      setIsSubmittingRefund(false);
     }
   };
 
@@ -496,13 +573,24 @@ export function OrdersPage() {
                       </Badge>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <Button
-                        variant="secondary"
-                        onClick={() => handleOpenDetail(order.id)}
-                        aria-label={`Lihat detail pesanan ${order.id}`}
-                      >
-                        Detail
-                      </Button>
+                      <div className="flex items-center justify-end gap-2">
+                        {order.status === "paid" && (
+                          <Button
+                            variant="secondary"
+                            onClick={() => handleOpenRefund(order)}
+                            aria-label={`Refund pesanan ${order.id}`}
+                          >
+                            Refund
+                          </Button>
+                        )}
+                        <Button
+                          variant="secondary"
+                          onClick={() => handleOpenDetail(order.id)}
+                          aria-label={`Lihat detail pesanan ${order.id}`}
+                        >
+                          Detail
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -738,8 +826,21 @@ export function OrdersPage() {
                 )}
               </div>
 
-              {/* Footer Close */}
-              <div className="flex items-center justify-end pt-4 border-t border-border">
+              {/* Footer Close & Actions */}
+              <div className="flex items-center justify-between pt-4 border-t border-border">
+                <div>
+                  {selectedOrderDetail.status === "paid" && (
+                    <Button
+                      variant="danger"
+                      onClick={() => {
+                        setIsDetailModalOpen(false);
+                        handleOpenRefund(selectedOrderDetail);
+                      }}
+                    >
+                      Refund Pesanan
+                    </Button>
+                  )}
+                </div>
                 <Button variant="secondary" onClick={() => setIsDetailModalOpen(false)}>
                   Tutup
                 </Button>
@@ -778,6 +879,86 @@ export function OrdersPage() {
           <div className="flex justify-end pt-2">
             <Button variant="secondary" onClick={() => setIsRawLogModalOpen(false)}>
               Tutup
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Refund Confirmation Modal (P5-08) */}
+      <Modal
+        open={isRefundModalOpen}
+        onClose={() => !isSubmittingRefund && setIsRefundModalOpen(false)}
+        title="Proses Refund Pesanan (Manual)"
+        description={
+          targetOrderForRefund
+            ? `Pembatalan pesanan ${targetOrderForRefund.id.slice(0, 8)}... (${formatCurrency(targetOrderForRefund.amountTotal)})`
+            : "Pembatalan pesanan dan reset status undangan."
+        }
+        size="confirmation"
+      >
+        <div className="space-y-4 pt-2">
+          {/* Important business rule notice (ADR-019 & BR-5.4) */}
+          <div className="rounded-md border border-amber-300 bg-amber-50 p-3.5 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+            <span className="font-bold">Perhatian (ADR-019 & Kebijakan Entitlement):</span>
+            <ul className="mt-1 list-disc pl-4 space-y-0.5">
+              <li>Status pesanan akan diubah menjadi <strong className="font-semibold">REFUNDED</strong>.</li>
+              <li>Status undangan akan otomatis dikembalikan ke <strong className="font-semibold">DRAFT</strong>.</li>
+              <li>Cache halaman undangan publik akan segera dibersihkan (invalidated).</li>
+            </ul>
+          </div>
+
+          <div className="rounded-md border border-blue-300 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
+            <span className="font-bold">Peringatan Aliran Dana (Manual):</span> Sistem ini hanya membatalkan status di database aplikasi. Anda wajib memproses pengembalian dana riil secara manual ke rekening/e-wallet pelanggan melalui dashboard Midtrans.
+          </div>
+
+          <Textarea
+            label="Alasan Refund (Wajib untuk audit log)"
+            placeholder="Tuliskan alasan pengembalian dana (minimal 5 karakter)..."
+            value={refundReason}
+            onChange={(e) => {
+              setRefundReason(e.target.value);
+              if (refundError) setRefundError(null);
+            }}
+            disabled={isSubmittingRefund}
+          />
+
+          <Input
+            label="Kode 2FA / TOTP Authenticator (Step-up Verification)"
+            placeholder="6-digit kode TOTP (misal 123456)"
+            value={refundStepUpCode}
+            onChange={(e) => {
+              setRefundStepUpCode(e.target.value);
+              if (refundError) setRefundError(null);
+            }}
+            disabled={isSubmittingRefund}
+          />
+
+          {refundError && (
+            <div className="rounded bg-red-50 p-3 text-xs text-red-600 dark:bg-red-950/50 dark:text-red-400">
+              {refundError}
+            </div>
+          )}
+
+          {refundSuccessMessage && (
+            <div className="rounded bg-green-50 p-3 text-xs text-green-700 dark:bg-green-950/50 dark:text-green-300">
+              {refundSuccessMessage}
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button
+              variant="secondary"
+              onClick={() => setIsRefundModalOpen(false)}
+              disabled={isSubmittingRefund}
+            >
+              Batal
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleConfirmRefund}
+              disabled={isSubmittingRefund || refundReason.trim().length < 5}
+            >
+              {isSubmittingRefund ? "Memproses..." : "Konfirmasi Refund"}
             </Button>
           </div>
         </div>

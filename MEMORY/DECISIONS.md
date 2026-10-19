@@ -3198,4 +3198,31 @@ the expiry, because inside the window that is a resume.
 
 **Consequences** — Stuck orders and webhook discrepancies are readily diagnosable in seconds from `@wi/admin`; raw payload secrets are protected by role-gated access logging; forged callbacks are surfaced as actionable fraud signals.
 
+---
+
+### ADR-103 — Administrative Manual Refund, Entitlement Revocation, and Money Movement Boundaries
+
+**Date** 2026-10-19 · **Task** `P5-08` · **Status** Accepted · **Amends** `docs/PLAN/02-BUSINESS-RULES.md`, `docs/API/09-ADMIN-API.md`, `docs/SECURITY/07-PAYMENT-SECURITY.md`
+
+**Context** — Customers may request refunds due to wedding cancellations, package downgrades, or accidental double payments.
+1. **Entitlement Revocation & State Transition (ADR-019 & BR-5.4)**: When a refund is processed for a paid order, all publication and premium entitlements tied to that order must be revoked immediately. The associated invitation status must revert to `draft` (unpublishing the invitation if it was published), and any cached public pages at the edge or in Redis must be instantly purged.
+2. **2FA Step-Up Re-Authentication (docs/SECURITY/03)**: Processing a refund is a destructive, high-risk financial and content action. Per admin session security requirements, performing a refund requires a valid 2FA step-up verification (`StepUpGuard`), either via an active step-up JWT token (`X-MFA-Step-Up`) or a fresh 6-digit TOTP code passed in the request body.
+3. **Explicit Separation of System State from Gateway Money Movement**: In Midtrans and Indonesian payment rails (QRIS, Virtual Accounts), refunds cannot be issued automatically via simple reverse webhook or charge API without special escrow arrangements. Therefore, setting an order to `refunded` in the platform updates the database entitlements and audit log, but money disbursement must be performed manually by the finance operator via the payment gateway portal. Clear warnings must prevent operator misunderstandings.
+
+**Decisions**
+1. **Atomic Refund Transaction**:
+   - `AdminOrdersService.refundOrder` executes in a database transaction with `FOR UPDATE` row locks on both the `orders` and `invitations` records.
+   - Refuses refund with `409 ORDER_NOT_PAID` if the order is not currently in `paid` status.
+   - Sets `orders.status = 'refunded'`.
+   - Sets `invitations.status = 'draft'` per ADR-019.
+   - Appends a lifecycle audit record to `invitation_status_history` and a governance log to `audit_logs`.
+   - Purges public edge cache synchronously via `PublicInvitationCache.invalidate()` and dispatches background cache invalidation job if the invitation was previously published.
+2. **Step-Up Authentication Enforcement**:
+   - `POST /api/v1/admin/orders/:id/refund` is guarded by `StepUpGuard`. Missing or invalid 2FA credentials reject with `403 MFA_STEP_UP_REQUIRED`.
+3. **Clear Operational UI Guardrails**:
+   - The admin UI features explicit ADR-019 unpublish warnings and blue callout notices clarifying manual bank disbursement requirements before the confirmation button can be pressed.
+
+**Consequences** — Guarantees complete consistency between billing status and invitation availability; protects against unauthorized rogue refunds via mandatory 2FA re-auth; avoids real-world financial reconciliation confusion.
+
+
 

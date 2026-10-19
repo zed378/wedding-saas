@@ -78,4 +78,94 @@ describe("Admin Order and Payment Management UI (P5-07)", () => {
       ).toBeDefined();
     });
   });
+
+  describe("Manual Refund UI Flow (P5-08)", () => {
+    it("opens refund modal displaying ADR-019 entitlement revocation and manual money movement warnings", async () => {
+      render(<OrdersPage />);
+
+      // Paid order (Budi Santoso) has a Refund button
+      const refundBtn = screen.getByRole("button", {
+        name: /Refund pesanan 33333333-3333-4333-8333-333333333331/i,
+      });
+      fireEvent.click(refundBtn);
+
+      await waitFor(() => {
+        expect(screen.getByText("Proses Refund Pesanan (Manual)")).toBeDefined();
+        expect(screen.getByText(/Perhatian \(ADR-019 & Kebijakan Entitlement\):/i)).toBeDefined();
+        expect(screen.getByText(/Peringatan Aliran Dana \(Manual\):/i)).toBeDefined();
+      });
+    });
+
+    it("keeps confirmation button disabled until reason is at least 5 characters", async () => {
+      render(<OrdersPage />);
+
+      const refundBtn = screen.getByRole("button", {
+        name: /Refund pesanan 33333333-3333-4333-8333-333333333331/i,
+      });
+      fireEvent.click(refundBtn);
+
+      await waitFor(() => {
+        expect(screen.getByText("Proses Refund Pesanan (Manual)")).toBeDefined();
+      });
+
+      const confirmBtn = screen.getByRole("button", { name: "Konfirmasi Refund" }) as HTMLButtonElement;
+      expect(confirmBtn.disabled).toBe(true);
+
+      const reasonInput = screen.getByLabelText(/Alasan Refund/i);
+      fireEvent.change(reasonInput, { target: { value: "test" } });
+      expect(confirmBtn.disabled).toBe(true);
+
+      fireEvent.change(reasonInput, { target: { value: "Permintaan resmi pembatalan" } });
+      expect(confirmBtn.disabled).toBe(false);
+    });
+
+    it("submits refund request with reason and TOTP code and displays success", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          status: "success",
+          data: {
+            orderId: "33333333-3333-4333-8333-333333333331",
+            status: "refunded",
+            invitationStatus: "draft",
+            moneyMovement: "manual",
+            message: "Pesanan berhasil direfund di sistem dan status undangan dikembalikan ke draft.",
+          },
+        }),
+      });
+      global.fetch = mockFetch as any;
+
+      render(<OrdersPage />);
+
+      const refundBtn = screen.getByRole("button", {
+        name: /Refund pesanan 33333333-3333-4333-8333-333333333331/i,
+      });
+      fireEvent.click(refundBtn);
+
+      const reasonInput = screen.getByLabelText(/Alasan Refund/i);
+      const codeInput = screen.getByLabelText(/Kode 2FA \/ TOTP Authenticator/i);
+
+      fireEvent.change(reasonInput, { target: { value: "Pembatalan acara pernikahan" } });
+      fireEvent.change(codeInput, { target: { value: "123456" } });
+
+      const confirmBtn = screen.getByRole("button", { name: "Konfirmasi Refund" });
+      fireEvent.click(confirmBtn);
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledWith(
+          "/api/v1/admin/orders/33333333-3333-4333-8333-333333333331/refund",
+          expect.objectContaining({
+            method: "POST",
+            body: JSON.stringify({
+              reason: "Pembatalan acara pernikahan",
+              step_up_code: "123456",
+            }),
+          }),
+        );
+        expect(
+          screen.getByText(/Pesanan berhasil direfund di sistem dan status undangan dikembalikan ke draft/i),
+        ).toBeDefined();
+      });
+    });
+  });
 });

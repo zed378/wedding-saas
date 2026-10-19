@@ -10,6 +10,15 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-19 — Manual refund
+
+**Added** — Administrative manual refund with 2FA step-up verification, entitlement revocation (ADR-019), and audit logging ([P5-08](./records/2026-10-19-P5-08-manual-refund.md), [ADR-103](./DECISIONS.md#ADR-103))
+
+- Implemented manual refund endpoint (`POST /api/v1/admin/orders/:id/refund`) guarded by `StepUpGuard` requiring fresh 2FA re-authentication.
+- Enforced ADR-019 entitlement revocation: resets invitation to `draft` (unpublishing it) and immediately purges public edge and Redis caches.
+- Atomic database transaction updates `orders.status = 'refunded'`, records status history in `invitation_status_history`, and writes to `audit_logs`.
+- Built refund UI flow in `@wi/admin` with dedicated confirmation modal, prominent ADR-019 unpublish warning, and clear notices on manual gateway money disbursement.
+
 ### 2026-10-19 — Order and payment management
 
 **Added** — Administrative order and payment management in `@wi/admin` and backend API with timeline transitions, secret protection, and fraud signal detection ([P5-07](./records/2026-10-19-P5-07-order-and-payment-management.md), [ADR-102](./DECISIONS.md#ADR-102))

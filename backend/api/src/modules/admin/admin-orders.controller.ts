@@ -1,18 +1,27 @@
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
   Param,
+  Post,
   Query,
+  Req,
   UseGuards,
 } from "@nestjs/common";
+import type { Request } from "express";
 import type { z } from "zod";
 
 import { ok } from "../../http/envelope";
 import { ValidationError } from "../../http/errors";
+import { currentUser } from "../../shared/auth-middleware/current-user";
 import { requireAuth, requireRole } from "../../shared/auth-middleware/guards";
+import { StepUpGuard } from "../auth/mfa/step-up.guard";
 import { AdminOrdersService } from "./admin-orders.service";
-import { adminOrderQuerySchema } from "./schemas/admin-order.schema";
+import {
+  adminOrderQuerySchema,
+  adminOrderRefundSchema,
+} from "./schemas/admin-order.schema";
 
 function parse<T>(schema: z.ZodType<T>, input: unknown): T {
   const result = schema.safeParse(input);
@@ -27,7 +36,7 @@ function parse<T>(schema: z.ZodType<T>, input: unknown): T {
 }
 
 /**
- * P5-07: Administrative Order and Payment Controller.
+ * P5-07, P5-08: Administrative Order and Payment Controller.
  * docs/API/09-ADMIN-API.md § Order & Payment Management
  */
 @Controller("api/v1/admin/orders")
@@ -49,4 +58,25 @@ export class AdminOrdersController {
     const order = await this.orders.getOrder(id);
     return ok(order);
   }
+
+  /**
+   * P5-08: Administrative manual refund.
+   * Requires 2FA step-up re-authentication (StepUpGuard).
+   * Atomically marks order refunded, resets invitation to draft (ADR-019),
+   * records audit log, and invalidates public invitation cache.
+   */
+  @Post(":id/refund")
+  @UseGuards(StepUpGuard)
+  @HttpCode(200)
+  async refund(
+    @Param("id") id: string,
+    @Body() rawBody: unknown,
+    @Req() req: Request,
+  ) {
+    const admin = currentUser(req);
+    const body = parse(adminOrderRefundSchema, rawBody);
+    const result = await this.orders.refundOrder(admin, id, body.reason);
+    return ok(result);
+  }
 }
+

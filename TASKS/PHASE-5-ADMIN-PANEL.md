@@ -241,7 +241,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE |
 | **Depends on** | P5-07 |
 | **Spec refs** | `docs/BACKEND/05-PAYMENT-FLOW.md` § Refund, `docs/PLAN/02` § BR-5.4, `docs/PLAN/06`, `docs/API/09` |
 | **Spec required** | Yes — payment, business rule |
@@ -259,11 +259,11 @@
 7. Show a confirmation dialog naming the customer, the amount, and the effect on the invitation.
 
 **Definition of Done**
-- [ ] The state-transition contradiction is resolved by ADR and the losing document is amended.
-- [ ] Refund requires a reason and a fresh authentication factor.
-- [ ] A refunded published invitation stops being publicly reachable immediately, including from cache.
-- [ ] The audit row records actor, reason, before and after.
-- [ ] The UI states plainly whether money movement is automatic or manual.
+- [x] The state-transition contradiction is resolved by ADR and the losing document is amended.
+- [x] Refund requires a reason and a fresh authentication factor.
+- [x] A refunded published invitation stops being publicly reachable immediately, including from cache.
+- [x] The audit row records actor, reason, before and after.
+- [x] The UI states plainly whether money movement is automatic or manual.
 
 ---
 
