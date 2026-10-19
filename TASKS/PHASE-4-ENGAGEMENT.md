@@ -333,7 +333,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE |
 | **Depends on** | P4-02, P4-04 |
 | **Spec refs** | `docs/UI-UX/10` § RsvpTable, GuestbookModerationList, `docs/UI-UX/14` § Key Interactions, `docs/UI-UX/15`, `docs/UI-UX/17` |
 | **Spec required** | No |
@@ -351,10 +351,10 @@
 7. Show the toggle for moderation and RSVP enablement in editor settings, with plain-language explanations of the effect.
 
 **Definition of Done**
-- [ ] Owner screens work at 360px width.
-- [ ] A failed public submission preserves the guest's input.
-- [ ] Public forms pass the accessibility audit, including a screen reader pass.
-- [ ] Moderation state is obvious to the owner without reading documentation.
+- [x] Owner screens work at 360px width.
+- [x] A failed public submission preserves the guest's input.
+- [x] Public forms pass the accessibility audit, including a screen reader pass.
+- [x] Moderation state is obvious to the owner without reading documentation.
 
 ---
 

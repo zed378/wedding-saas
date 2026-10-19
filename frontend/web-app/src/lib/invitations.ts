@@ -497,6 +497,144 @@ export async function getInvitationAnalytics(
   return result.data;
 }
 
+// ─── P4-11: RSVP Management ──────────────────────────────────────────────────
+
+export type RsvpAttendanceStatus = "attending" | "not_attending" | "maybe";
+
+export interface RsvpItem {
+  readonly id: string;
+  readonly guest_name: string;
+  readonly attendance_status: RsvpAttendanceStatus;
+  readonly guest_count: number;
+  readonly message: string | null;
+  readonly created_at: string;
+}
+
+export interface RsvpSummary {
+  readonly total: number;
+  readonly attending: number;
+  readonly not_attending: number;
+  readonly tentative: number;
+  readonly awaiting: number;
+  readonly total_attending_guests: number;
+}
+
+export async function listInvitationRsvps(
+  api: ApiClient,
+  invitationId: string,
+  options: {
+    page?: number | undefined;
+    limit?: number | undefined;
+    status?: RsvpAttendanceStatus | undefined;
+  } = {},
+): Promise<{ items: readonly RsvpItem[]; meta?: { page: number; per_page: number; total: number } | undefined }> {
+  const query: Record<string, string | number | undefined> = {};
+  if (options.page !== undefined) query["page"] = options.page;
+  if (options.limit !== undefined) query["limit"] = options.limit;
+  if (options.status !== undefined) query["status"] = options.status;
+
+  const result = await api.request<readonly RsvpItem[]>(
+    `/invitations/${encodeURIComponent(invitationId)}/rsvps`,
+    { query },
+  );
+  return { items: result.data, meta: result.meta };
+}
+
+export async function getInvitationRsvpSummary(
+  api: ApiClient,
+  invitationId: string,
+): Promise<RsvpSummary> {
+  const result = await api.request<RsvpSummary>(
+    `/invitations/${encodeURIComponent(invitationId)}/rsvps/summary`,
+  );
+  return result.data;
+}
+
+export async function deleteInvitationRsvp(
+  api: ApiClient,
+  invitationId: string,
+  rsvpId: string,
+): Promise<void> {
+  await api.request(
+    `/invitations/${encodeURIComponent(invitationId)}/rsvps/${encodeURIComponent(rsvpId)}`,
+    { method: "DELETE" },
+  );
+}
+
+// ─── P4-11: Guestbook Moderation ──────────────────────────────────────────────
+
+export type GuestbookStatus = "pending" | "approved" | "rejected";
+
+export interface GuestbookItem {
+  readonly id: string;
+  readonly guest_name: string;
+  readonly message: string;
+  readonly status: GuestbookStatus;
+  readonly created_at: string;
+}
+
+export interface GuestbookSummary {
+  readonly total: number;
+  readonly pending: number;
+  readonly approved: number;
+  readonly rejected: number;
+}
+
+export async function listInvitationGuestbook(
+  api: ApiClient,
+  invitationId: string,
+  options: {
+    page?: number | undefined;
+    limit?: number | undefined;
+    status?: GuestbookStatus | undefined;
+  } = {},
+): Promise<{ items: readonly GuestbookItem[]; meta?: { page: number; per_page: number; total: number } | undefined }> {
+  const query: Record<string, string | number | undefined> = {};
+  if (options.page !== undefined) query["page"] = options.page;
+  if (options.limit !== undefined) query["limit"] = options.limit;
+  if (options.status !== undefined) query["status"] = options.status;
+
+  const result = await api.request<readonly GuestbookItem[]>(
+    `/invitations/${encodeURIComponent(invitationId)}/guestbook`,
+    { query },
+  );
+  return { items: result.data, meta: result.meta };
+}
+
+export async function getInvitationGuestbookSummary(
+  api: ApiClient,
+  invitationId: string,
+): Promise<GuestbookSummary> {
+  const result = await api.request<GuestbookSummary>(
+    `/invitations/${encodeURIComponent(invitationId)}/guestbook/summary`,
+  );
+  return result.data;
+}
+
+export async function moderateGuestbookEntry(
+  api: ApiClient,
+  invitationId: string,
+  entryId: string,
+  status: "approved" | "rejected",
+): Promise<GuestbookItem> {
+  const result = await api.request<GuestbookItem>(
+    `/invitations/${encodeURIComponent(invitationId)}/guestbook/${encodeURIComponent(entryId)}`,
+    { method: "PATCH", body: { status } },
+  );
+  return result.data;
+}
+
+export async function deleteGuestbookEntry(
+  api: ApiClient,
+  invitationId: string,
+  entryId: string,
+): Promise<void> {
+  await api.request(
+    `/invitations/${encodeURIComponent(invitationId)}/guestbook/${encodeURIComponent(entryId)}`,
+    { method: "DELETE" },
+  );
+}
+
 // ─── Slug helpers ─────────────────────────────────────────────────────────────
 
 /**

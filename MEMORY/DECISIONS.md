@@ -2962,6 +2962,32 @@ the expiry, because inside the window that is a resume.
 
 **Consequences** — Protects database from dashboard refresh storms; enforces strict tenant isolation; transparently informs couples of what is measured without false claims of uniqueness.
 
+---
 
+### ADR-095 — Frontend engagement screens (RSVP & Guestbook dashboards), editor feature toggles, and live public interactive sections
 
+**Date** 2026-10-19 · **Task** `P4-11` · **Status** Accepted · **Amends** `docs/UI-UX/10-DASHBOARD-SPEC.md`, `docs/UI-UX/03-USER-PERSONAS.md`, `docs/API/08-PUBLIC-INVITATION-API.md`, `docs/PLAN/07-TEMPLATE-SYSTEM.md`
 
+**Context** — After invitations are published, couples need to manage RSVPs and moderate guestbook entries from their dashboard, while invited guests need accessible, interactive forms on the public invitation page:
+1. Owner RSVP management: Couples need an at-a-glance attendance summary (attending guest headcounts, declines, unconfirmed), status filtering, expandable long messages, and authenticated CSV download. On mobile (<640px down to 360px), a standard HTML table causes horizontal scrolling and is unusable; a stacked card layout is required.
+2. Owner Guestbook moderation: Couples need filter tabs with live counts (`pending`, `approved`, `rejected`) and 1-click moderation actions so they can quickly approve heartfelt wishes while hiding inappropriate remarks (Rina persona, `docs/UI-UX/03`).
+3. Editor settings: Couples need simple toggles for `rsvp_enabled`, `guestbook_enabled`, `guestbook_moderation`, and `profanity_filter_enabled` with clear explanations in Indonesian.
+4. Public interactive sections: The public invitation page must render live RSVP forms and guestbook walls without violating the rule that `@wi/template-renderer` remains 100% generic and forbidden from making network requests (`check-renderer-is-generic.mjs`). Failed submissions must preserve all typed input (DoD requirement) and provide screen-reader announcements.
+
+**Decisions**
+1. **Dedicated owner dashboard screens (`web-app`)**:
+   - `RsvpTable` + `/dashboard/[invitationId]/rsvps`: Header summary cards with real-time totals, status filters (`all`, `attending`, `declined`, `tentative`), authenticated CSV export using in-memory access token, expandable messages, and delete confirmations. Responsive layout renders a semantic table on desktop (>=640px) and accessible stacked cards on mobile (<640px down to 360px).
+   - `GuestbookModerationList` + `/dashboard/[invitationId]/guestbook`: Pending queue banner, status tabs with badge counts, 1-click approve/reject actions, and delete confirmations.
+   - `InvitationCard`: Accessible links added for "RSVP" and "Buku Tamu" with descriptive aria-labels.
+2. **Editor engagement settings (`PropertiesPanel.tsx`)**:
+   - Toggles for `rsvp_enabled`, `guestbook_enabled`, `guestbook_moderation`, and `profanity_filter_enabled` under section settings with plain-language Indonesian descriptions, compliant with `check-no-hardcoded-fields.mjs`.
+3. **Same-origin proxy routes (`public-invite`)**:
+   - Next.js route handlers `/public/i/[slug]/rsvp`, `/public/i/[slug]/guestbook`, and `/public/i/[slug]/captcha-status` forward client requests to backend API with client IP headers (`x-forwarded-for`).
+4. **Live interactive public components (`public-invite`)**:
+   - `PublicRsvpForm` and `PublicGuestbookWall` registered dynamically in `Invitation.tsx` lazy component registry.
+   - Inert in `live`/`demo` preview mode; fully interactive in `public` mode.
+   - Automatically pre-fills `guest_name` from URL query parameter (`?to=...` or `?guest=...`) via `readGuestName()`.
+   - On submission failure (validation or rate limiting), user inputs are strictly preserved and an accessible `role="alert"` announces the error.
+   - On success, `PublicRsvpForm` renders a `role="status"` confirmation, and `PublicGuestbookWall` optimistically appends approved entries or confirms routing to the moderation queue.
+
+**Consequences** — Maintains the strict boundary separating static template rendering from interactive network operations; provides couples with mobile-friendly RSVP & guestbook management; guarantees guests never lose typed wishes or RSVP responses on transient network errors.

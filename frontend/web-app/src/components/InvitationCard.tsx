@@ -145,6 +145,22 @@ export function InvitationCard({
           Statistik
         </a>
 
+        <a
+          className="focus-ring rounded-md border border-border px-3 py-1.5 text-sm font-medium text-text hover:bg-surface-sunken"
+          href={`/dashboard/${invitation.id}/rsvps`}
+          aria-label={`RSVP ${name}`}
+        >
+          RSVP
+        </a>
+
+        <a
+          className="focus-ring rounded-md border border-border px-3 py-1.5 text-sm font-medium text-text hover:bg-surface-sunken"
+          href={`/dashboard/${invitation.id}/guestbook`}
+          aria-label={`Buku Tamu ${name}`}
+        >
+          Buku Tamu
+        </a>
+
         {onDelete !== undefined && (
           <button
             type="button"

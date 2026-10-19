@@ -103,11 +103,17 @@ export const LAZY_SECTIONS: Readonly<Record<string, SectionComponent>> =
       "ClosingSimple",
     ),
     RsvpForm: named(
-      () => import("@wi/template-renderer/sections/interactive-shells.js"),
+      () =>
+        import("./PublicRsvpForm").then((m) => ({
+          RsvpForm: m.PublicRsvpForm,
+        })),
       "RsvpForm",
     ),
     GuestbookWall: named(
-      () => import("@wi/template-renderer/sections/interactive-shells.js"),
+      () =>
+        import("./PublicGuestbookWall").then((m) => ({
+          GuestbookWall: m.PublicGuestbookWall,
+        })),
       "GuestbookWall",
     ),
   });

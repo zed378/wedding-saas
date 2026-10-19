@@ -283,11 +283,122 @@ export function PropertiesPanel() {
         {sectionLabel(section.section_key)}
       </h2>
 
-      {entries.length === 0 && (
-        <p className="text-sm text-text-muted">
-          Bagian ini tidak memiliki isian.
-        </p>
+      {section.component === "RsvpForm" && (
+        <div className="space-y-4 rounded-lg border border-border bg-surface-raised p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <label
+                htmlFor="setting-rsvp-enabled"
+                className="text-sm font-medium text-text"
+              >
+                Aktifkan Formulir RSVP
+              </label>
+              <p className="mt-1 text-xs text-text-muted">
+                Izinkan tamu untuk mengonfirmasi kehadiran mereka secara online
+                langsung di halaman undangan.
+              </p>
+            </div>
+            <input
+              id="setting-rsvp-enabled"
+              type="checkbox"
+              className="focus-ring mt-1 h-5 w-5 rounded border-border"
+              checked={getAtPath(data, "settings.rsvp_enabled") !== false}
+              onChange={(e) => {
+                edit("settings.rsvp_enabled", e.target.checked);
+              }}
+            />
+          </div>
+        </div>
       )}
+
+      {section.component === "GuestbookWall" && (
+        <div className="space-y-4 rounded-lg border border-border bg-surface-raised p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <label
+                htmlFor="setting-guestbook-enabled"
+                className="text-sm font-medium text-text"
+              >
+                Aktifkan Buku Tamu
+              </label>
+              <p className="mt-1 text-xs text-text-muted">
+                Izinkan para tamu mengirimkan ucapan dan doa secara online di
+                halaman undangan.
+              </p>
+            </div>
+            <input
+              id="setting-guestbook-enabled"
+              type="checkbox"
+              className="focus-ring mt-1 h-5 w-5 rounded border-border"
+              checked={getAtPath(data, "settings.guestbook_enabled") !== false}
+              onChange={(e) => {
+                edit("settings.guestbook_enabled", e.target.checked);
+              }}
+            />
+          </div>
+
+          <hr className="border-border" />
+
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <label
+                htmlFor="setting-guestbook-moderation"
+                className="text-sm font-medium text-text"
+              >
+                Moderasi Ucapan Tamu
+              </label>
+              <p className="mt-1 text-xs text-text-muted">
+                Jika diaktifkan, setiap ucapan baru yang dikirimkan tamu harus
+                disetujui terlebih dahulu oleh Anda di panel moderasi sebelum tampil
+                di undangan.
+              </p>
+            </div>
+            <input
+              id="setting-guestbook-moderation"
+              type="checkbox"
+              className="focus-ring mt-1 h-5 w-5 rounded border-border"
+              checked={getAtPath(data, "settings.guestbook_moderation") === true}
+              onChange={(e) => {
+                edit("settings.guestbook_moderation", e.target.checked);
+              }}
+            />
+          </div>
+
+          <hr className="border-border" />
+
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <label
+                htmlFor="setting-profanity-filter"
+                className="text-sm font-medium text-text"
+              >
+                Filter Kata Kasar Otomatis
+              </label>
+              <p className="mt-1 text-xs text-text-muted">
+                Ucapan yang terdeteksi mengandung kata-kata tidak pantas akan secara
+                otomatis dialihkan ke antrean moderasi Anda.
+              </p>
+            </div>
+            <input
+              id="setting-profanity-filter"
+              type="checkbox"
+              className="focus-ring mt-1 h-5 w-5 rounded border-border"
+              checked={getAtPath(data, "settings.profanity_filter_enabled") === true}
+              onChange={(e) => {
+                edit("settings.profanity_filter_enabled", e.target.checked);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {entries.length === 0 &&
+        section.component !== "RsvpForm" &&
+        section.component !== "GuestbookWall" && (
+          <p className="text-sm text-text-muted">
+            Bagian ini tidak memiliki isian.
+          </p>
+        )}
 
       <div className="space-y-4">{rendered}</div>
     </div>

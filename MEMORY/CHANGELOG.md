@@ -10,6 +10,17 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-19 — Frontend engagement screens and live public sections
+
+**Added** — owner RSVP and guestbook moderation dashboards, editor engagement toggles, and live public interactive sections ([P4-11](./records/2026-10-19-P4-11-frontend-engagement-screens.md))
+
+- Built owner `RsvpTable` and `/dashboard/[invitationId]/rsvps` page with attendance breakdown, attending guest headcounts, status filtering, message expansion, authenticated CSV export, and responsive mobile cards (<640px down to 360px).
+- Built owner `GuestbookModerationList` and `/dashboard/[invitationId]/guestbook` page with status tabs (`pending`, `approved`, `rejected`), live badge counts, and 1-click approve/reject actions.
+- Wired accessible action links for "RSVP" and "Buku Tamu" into `InvitationCard.tsx`.
+- Added plain-language engagement toggles in editor settings (`PropertiesPanel.tsx`) for `rsvp_enabled`, `guestbook_enabled`, `guestbook_moderation`, and `profanity_filter_enabled`.
+- Implemented same-origin proxy routes in `frontend/public-invite` for `/public/i/[slug]/rsvp`, `/public/i/[slug]/guestbook`, and `/public/i/[slug]/captcha-status`.
+- Built live public interactive components `PublicRsvpForm` and `PublicGuestbookWall` mounted dynamically in `Invitation.tsx` lazy component registry, keeping the generic template renderer untouched, with strict form input preservation on failure (ADR-095).
+
 ### 2026-10-19 — Owner analytics summary
 
 **Added** — owner analytics summary endpoint and dashboard page ([P4-10](./records/2026-10-19-P4-10-owner-analytics-summary.md))
