@@ -113,6 +113,13 @@
       "when": 1792244000000,
       "tag": "0015_profanity_filter",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792250000000,
+      "tag": "0016_notification_digest_and_bounces",
+      "breakpoints": true
     }
   ]
 }

@@ -253,7 +253,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE |
 | **Depends on** | P4-07 |
 | **Spec refs** | `docs/BACKEND/07` § Preferences, `docs/DATABASE/02-USERS.md`, `docs/DEVOPS/07-ALERTING.md` |
 | **Spec required** | No |
@@ -269,10 +269,10 @@
 5. Track delivery, bounce and complaint rates from the provider, and handle hard bounces so a dead address does not degrade domain reputation.
 
 **Definition of Done**
-- [ ] Preference-gated emails respect the toggle; a test asserts both states.
-- [ ] Mandatory emails ignore preferences.
-- [ ] A permanently failed invoice email raises an alert.
-- [ ] Bounce handling exists and is tested with a simulated bounce.
+- [x] Preference-gated emails respect the toggle; a test asserts both states.
+- [x] Mandatory emails ignore preferences.
+- [x] A permanently failed invoice email raises an alert.
+- [x] Bounce handling exists and is tested with a simulated bounce.
 
 ---
 

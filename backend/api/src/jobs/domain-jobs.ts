@@ -6,6 +6,7 @@ import { PaymentReconciliationService } from "../modules/payment/payment-reconci
 import { InvitationExpiryService } from "../modules/publishing/invitation-expiry.service";
 import { InvitationReminderService } from "../modules/publishing/invitation-reminder.service";
 import { InvitationRetentionService } from "../modules/invitation/invitation-retention.service";
+import { RsvpDigestService } from "../modules/rsvp/rsvp-digest.service";
 
 /**
  * `P3-06`, ADR-078 — scheduled jobs whose work is domain logic the API owns.
@@ -45,4 +46,6 @@ export const DOMAIN_JOBS: Readonly<Record<string, DomainJob>> = {
   // docs/BACKEND/08: `reminder_email_h7_h1`, daily 08:00 WIB (P4-07).
   reminder_email_h7_h1: (app) =>
     app.get(InvitationReminderService).sendExpiryReminders(),
+  // docs/PLAN/13: `rsvp_daily_digest`, daily 09:00 WIB (P4-08).
+  rsvp_daily_digest: (app) => app.get(RsvpDigestService).sendDailyDigests(),
 };

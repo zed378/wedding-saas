@@ -139,6 +139,16 @@ export const metrics = {
     "Submissions flagged by profanity filter into moderation.",
     ["surface"],
   ),
+  notificationDeadLetter: new Counter(
+    "wi_notification_dead_letter_total",
+    "Transactional emails permanently failed and entered the dead-letter queue (P4-08).",
+    ["template"],
+  ),
+  emailBounces: new Counter(
+    "wi_email_bounces_total",
+    "Email bounce and complaint events recorded from provider webhooks (P4-08).",
+    ["provider", "type"],
+  ),
 } as const;
 
 export function renderMetrics(): string {

@@ -10,6 +10,16 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-19 — Notification preferences and delivery monitoring
+
+**Added** — notification preferences with daily RSVP digest, bounce suppression, and DLQ alerting ([P4-08](./records/2026-10-19-P4-08-preferences-and-delivery-monitoring.md))
+
+- Added `rsvp_digest` option to `user_notification_preferences` (migration `0016_notification_digest_and_bounces.sql`), allowing couples to receive a consolidated daily summary instead of per-submission emails.
+- Implemented `RsvpDigestService` and scheduled daily 09:00 WIB sweep `rsvp_daily_digest` aggregating the past 24 hours of RSVPs via `RsvpDailyDigestEmail`.
+- Created `email_bounces` suppression table and webhook endpoint `POST /api/webhooks/email/:provider` to record provider bounces and complaints, suppressing future sends to dead addresses.
+- Implemented `DlqMonitorService` and added Prometheus alert rule `CriticalEmailDeadLettered` in `deploy/prometheus/alerts.yml` to notify on-call when critical transactional emails fail permanently.
+- Enforced strict preference gating on social notifications while ensuring mandatory transactional emails (`order_paid`, `password_reset`, `email_verification`, `bank_account_changed`) unconditionally bypass preferences (ADR-092).
+
 ### 2026-10-17 — Transactional email wiring
 
 **Added** — transactional email wiring, renewal reminders, and retention warnings ([P4-07](./records/2026-10-17-P4-07-transactional-email-wiring.md))

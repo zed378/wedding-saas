@@ -746,28 +746,34 @@ describe("the preview and the public page draw the same invitation", () => {
     };
     const enabled = ["hero", "couple", "event", "gallery", "gift", "quote"];
 
-    const editorSide = render(
-      <TemplateRenderer
-        mode="public"
-        templateVersion={version}
-        invitationData={toEditorDocument(DETAIL, MEDIA)}
-        enabledSections={enabled}
-      />,
-    ).container.innerHTML;
-    cleanup();
-    const publicSide = render(
-      <TemplateRenderer
-        mode="public"
-        templateVersion={version}
-        invitationData={publicPayload}
-        enabledSections={enabled}
-      />,
-    ).container.innerHTML;
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-01T00:00:00Z"));
+    try {
+      const editorSide = render(
+        <TemplateRenderer
+          mode="public"
+          templateVersion={version}
+          invitationData={toEditorDocument(DETAIL, MEDIA)}
+          enabledSections={enabled}
+        />,
+      ).container.innerHTML;
+      cleanup();
+      const publicSide = render(
+        <TemplateRenderer
+          mode="public"
+          templateVersion={version}
+          invitationData={publicPayload}
+          enabledSections={enabled}
+        />,
+      ).container.innerHTML;
 
-    // Not vacuous: the markup carries what was missing before `P2-15`.
-    expect(editorSide).toContain("8801234567");
-    expect(editorSide).toContain("2027-05-15");
-    expect(editorSide).toContain("cover-medium.webp");
-    expect(editorSide).toBe(publicSide);
+      // Not vacuous: the markup carries what was missing before `P2-15`.
+      expect(editorSide).toContain("8801234567");
+      expect(editorSide).toContain("2027-05-15");
+      expect(editorSide).toContain("cover-medium.webp");
+      expect(editorSide).toBe(publicSide);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

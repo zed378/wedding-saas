@@ -80,6 +80,7 @@ const changePasswordSchema = z
 const preferencesSchema = z
   .object({
     rsvp_email: z.boolean().optional(),
+    rsvp_digest: z.boolean().optional(),
     guestbook_email: z.boolean().optional(),
     marketing_email: z.boolean().optional(),
   })
@@ -188,6 +189,7 @@ export class UserController {
     const prefs = await this.users.getPreferences(user.scope);
     return ok({
       rsvp_email: prefs.rsvpEmail,
+      rsvp_digest: prefs.rsvpDigest,
       guestbook_email: prefs.guestbookEmail,
       marketing_email: prefs.marketingEmail,
     });
@@ -204,6 +206,9 @@ export class UserController {
       ...(input.rsvp_email !== undefined
         ? { rsvpEmail: input.rsvp_email }
         : {}),
+      ...(input.rsvp_digest !== undefined
+        ? { rsvpDigest: input.rsvp_digest }
+        : {}),
       ...(input.guestbook_email !== undefined
         ? { guestbookEmail: input.guestbook_email }
         : {}),
@@ -214,6 +219,7 @@ export class UserController {
 
     return ok({
       rsvp_email: prefs.rsvpEmail,
+      rsvp_digest: prefs.rsvpDigest,
       guestbook_email: prefs.guestbookEmail,
       marketing_email: prefs.marketingEmail,
     });

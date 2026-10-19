@@ -119,6 +119,24 @@ export interface OrderRefundedProps extends BaseEmailProps {
   readonly dashboardUrl: string;
 }
 
+export interface RsvpDailyDigestGuestItem {
+  readonly guestName: string;
+  readonly attendanceStatus: "attending" | "not_attending" | "maybe";
+  readonly guestCount: number;
+}
+
+export interface RsvpDailyDigestProps extends BaseEmailProps {
+  readonly recipientName: string;
+  readonly invitationTitle: string;
+  readonly dateFormatted: string;
+  readonly totalResponsesToday: number;
+  readonly attendingCount: number;
+  readonly notAttendingCount: number;
+  readonly maybeCount: number;
+  readonly recentGuests: readonly RsvpDailyDigestGuestItem[];
+  readonly dashboardUrl: string;
+}
+
 export type EmailTemplateKey =
   | "email_verification"
   | "password_reset"
@@ -133,6 +151,7 @@ export type EmailTemplateKey =
   | "invitation_retention_warning"
   | "order_refunded"
   | "rsvp_submitted"
+  | "rsvp_daily_digest"
   | "guestbook_submitted";
 
 export interface RenderedEmail {
@@ -140,3 +159,4 @@ export interface RenderedEmail {
   readonly html: string;
   readonly text: string;
 }
+

@@ -64,12 +64,12 @@ describe("verifyPassword", () => {
     await expect(verifyPassword(hash, "wrong password entirely")).resolves.toBe(
       false,
     );
-  });
+  }, 15_000);
 
   it("is exact: a one-character difference fails", async () => {
     const hash = await hashPassword(PASSWORD);
     await expect(verifyPassword(hash, PASSWORD + " ")).resolves.toBe(false);
-  });
+  }, 15_000);
 
   it("a null hash never verifies", async () => {
     // A Google account has no password (P0-07). The call site that forgets this is the

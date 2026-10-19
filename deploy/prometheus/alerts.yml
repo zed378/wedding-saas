@@ -91,3 +91,25 @@ groups:
           summary: "More than 10 rate-limit blocks placed in 10 minutes"
           runbook: "docs/SECURITY/10-ABUSE-PREVENTION.md § Monitoring & Auto-block; inspect blocked keys in Redis"
 
+  - name: notifications
+    rules:
+      # docs/DEVOPS/07, P4-08: Alert when critical transactional emails fail permanently and enter DLQ.
+      - alert: CriticalEmailDeadLettered
+        expr: sum by (template) (increase(wi_notification_dead_letter_total[15m])) > 0
+        labels:
+          severity: high
+          channel: ops
+        annotations:
+          summary: "A critical notification email permanently failed and was dead-lettered (template: {{ $labels.template }})"
+          runbook: "docs/DEVOPS/07-ALERTING.md § Key Alerts; inspect BullMQ failed jobs for notification.send"
+
+      # docs/DEVOPS/07, P4-08: Deliverability alert when bounce/complaint rate spikes.
+      - alert: EmailDeliveryBounceSpike
+        expr: sum by (provider, type) (increase(wi_email_bounces_total[10m])) > 5
+        labels:
+          severity: high
+          channel: ops
+        annotations:
+          summary: "Spike in email bounces or complaints detected ({{ $labels.type }})"
+          runbook: "docs/DEVOPS/07-ALERTING.md; check email_bounces table and provider reputation dashboard"
+

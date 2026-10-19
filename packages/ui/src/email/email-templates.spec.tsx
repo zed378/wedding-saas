@@ -243,6 +243,42 @@ describe("Email Templates & Rendering (P4-06)", () => {
     expect(rendered.html).toContain("ORD-00000001");
   });
 
+  it("renders RsvpDailyDigestEmail with summary stats and recent guests table", () => {
+    const rendered = renderEmail("rsvp_daily_digest", {
+      recipientName: "Budi & Siti",
+      invitationTitle: "Pernikahan Budi & Siti",
+      dateFormatted: "17 Oktober 2026",
+      totalResponsesToday: 15,
+      attendingCount: 12,
+      notAttendingCount: 2,
+      maybeCount: 1,
+      recentGuests: [
+        {
+          guestName: "Ahmad Fauzi",
+          attendanceStatus: "attending",
+          guestCount: 2,
+        },
+        {
+          guestName: "Citra Lestari",
+          attendanceStatus: "not_attending",
+          guestCount: 1,
+        },
+      ],
+      dashboardUrl: "https://momenbahagia.id/dashboard/invitations/123/rsvp",
+      preferencesUrl: "https://momenbahagia.id/settings/notifications",
+    });
+
+    expect(rendered.subject).toContain("Ringkasan RSVP Harian");
+    expect(rendered.subject).toContain("Pernikahan Budi & Siti");
+    expect(rendered.html).toContain("15 konfirmasi");
+    expect(rendered.html).toContain("Ahmad Fauzi");
+    expect(rendered.html).toContain("Hadir");
+    expect(rendered.html).toContain("Citra Lestari");
+    expect(rendered.html).toContain("Tidak Hadir");
+    expect(rendered.html).toContain("https://momenbahagia.id/settings/notifications");
+    expect(rendered.text).toContain("15 konfirmasi");
+  });
+
   it("throws error for unknown template key", () => {
     expect(() => {
       // @ts-expect-error test invalid key

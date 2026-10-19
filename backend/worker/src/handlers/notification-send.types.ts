@@ -92,6 +92,24 @@ export interface OrderRefundedPayload {
   readonly reason?: string;
 }
 
+export interface RsvpDailyDigestPayload {
+  readonly template: "rsvp_daily_digest";
+  readonly invitationId: string;
+  readonly recipientEmail: string;
+  readonly recipientName: string;
+  readonly invitationTitle: string;
+  readonly dateFormatted: string;
+  readonly totalResponsesToday: number;
+  readonly attendingCount: number;
+  readonly notAttendingCount: number;
+  readonly maybeCount: number;
+  readonly recentGuests: readonly {
+    readonly guestName: string;
+    readonly attendanceStatus: "attending" | "not_attending" | "maybe";
+    readonly guestCount: number;
+  }[];
+}
+
 export type NotificationJobPayload =
   | EmailVerificationPayload
   | PasswordResetPayload
@@ -106,4 +124,5 @@ export type NotificationJobPayload =
   | InvitationRetentionWarningPayload
   | OrderRefundedPayload
   | RsvpSubmittedPayload
+  | RsvpDailyDigestPayload
   | GuestbookSubmittedPayload;

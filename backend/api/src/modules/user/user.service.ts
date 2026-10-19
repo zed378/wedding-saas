@@ -80,6 +80,7 @@ export interface UserProfile {
 
 export interface NotificationPreferences {
   readonly rsvpEmail: boolean;
+  readonly rsvpDigest: boolean;
   readonly guestbookEmail: boolean;
   readonly marketingEmail: boolean;
 }
@@ -272,6 +273,7 @@ export class UserService {
     const rows = await this.db
       .select({
         rsvpEmail: userNotificationPreferences.rsvpEmail,
+        rsvpDigest: userNotificationPreferences.rsvpDigest,
         guestbookEmail: userNotificationPreferences.guestbookEmail,
         marketingEmail: userNotificationPreferences.marketingEmail,
       })
@@ -285,6 +287,7 @@ export class UserService {
     return (
       rows[0] ?? {
         rsvpEmail: true,
+        rsvpDigest: false,
         guestbookEmail: true,
         marketingEmail: false,
       }
@@ -297,6 +300,9 @@ export class UserService {
   ): Promise<NotificationPreferences> {
     const patch: Record<string, unknown> = {};
     if (changes.rsvpEmail !== undefined) patch["rsvpEmail"] = changes.rsvpEmail;
+    if (changes.rsvpDigest !== undefined) {
+      patch["rsvpDigest"] = changes.rsvpDigest;
+    }
     if (changes.guestbookEmail !== undefined) {
       patch["guestbookEmail"] = changes.guestbookEmail;
     }
@@ -312,6 +318,7 @@ export class UserService {
         .values({
           userId: scope,
           rsvpEmail: changes.rsvpEmail ?? true,
+          rsvpDigest: changes.rsvpDigest ?? false,
           guestbookEmail: changes.guestbookEmail ?? true,
           marketingEmail: changes.marketingEmail ?? false,
         })

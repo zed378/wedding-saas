@@ -11,6 +11,7 @@ import type {
   InvitationPublishedProps,
   InvitationExpiredProps,
   RsvpSubmittedProps,
+  RsvpDailyDigestProps,
   GuestbookSubmittedProps,
   InvitationExpiryReminderProps,
   InvitationRetentionWarningProps,
@@ -709,6 +710,134 @@ export function RsvpSubmittedEmail(
       <EmailButton href={props.dashboardUrl}>
         Lihat Daftar Kehadiran
       </EmailButton>
+    </EmailLayout>
+  );
+}
+
+export function RsvpDailyDigestEmail(
+  props: RsvpDailyDigestProps,
+): React.JSX.Element {
+  const statusLabels: Record<
+    "attending" | "not_attending" | "maybe",
+    string
+  > = {
+    attending: "Hadir",
+    not_attending: "Tidak Hadir",
+    maybe: "Belum Pasti",
+  };
+
+  return (
+    <EmailLayout
+      title={`Ringkasan RSVP Harian: ${props.invitationTitle}`}
+      preferencesUrl={props.preferencesUrl}
+      previewText={`Ringkasan kehadiran undangan ${props.invitationTitle} (${props.totalResponsesToday} respon baru)`}
+    >
+      <h1
+        style={{
+          fontSize: "20px",
+          fontWeight: 700,
+          margin: "0 0 16px 0",
+          color: "#1e1b4b",
+        }}
+      >
+        Ringkasan RSVP Harian
+      </h1>
+      <p
+        style={{
+          fontSize: "15px",
+          lineHeight: "24px",
+          color: "#334155",
+          margin: "0 0 16px 0",
+        }}
+      >
+        Halo <strong>{props.recipientName}</strong>,
+      </p>
+      <p
+        style={{
+          fontSize: "15px",
+          lineHeight: "24px",
+          color: "#334155",
+          margin: "0 0 20px 0",
+        }}
+      >
+        Berikut adalah ringkasan konfirmasi kehadiran (RSVP) harian untuk undangan{" "}
+        <strong>{props.invitationTitle}</strong> per tanggal{" "}
+        <strong>{props.dateFormatted}</strong>:
+      </p>
+
+      <div
+        style={{
+          backgroundColor: "#f8fafc",
+          border: "1px solid #e2e8f0",
+          borderRadius: "8px",
+          padding: "16px",
+          marginBottom: "20px",
+        }}
+      >
+        <p style={{ margin: "0 0 8px 0", fontSize: "14px", color: "#334155" }}>
+          Respon Baru 24 Jam Terakhir: <strong>{props.totalResponsesToday} konfirmasi</strong>
+        </p>
+        <p style={{ margin: "0 0 8px 0", fontSize: "14px", color: "#16a34a" }}>
+          Hadir: <strong>{props.attendingCount} orang</strong>
+        </p>
+        <p style={{ margin: "0 0 8px 0", fontSize: "14px", color: "#dc2626" }}>
+          Tidak Hadir: <strong>{props.notAttendingCount} orang</strong>
+        </p>
+        <p style={{ margin: 0, fontSize: "14px", color: "#d97706" }}>
+          Belum Pasti: <strong>{props.maybeCount} orang</strong>
+        </p>
+      </div>
+
+      {props.recentGuests && props.recentGuests.length > 0 ? (
+        <div style={{ marginBottom: "24px" }}>
+          <h2
+            style={{
+              fontSize: "15px",
+              fontWeight: 600,
+              margin: "0 0 12px 0",
+              color: "#1e1b4b",
+            }}
+          >
+            Daftar Respon Terbaru
+          </h2>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              fontSize: "13px",
+              color: "#334155",
+            }}
+          >
+            <thead>
+              <tr style={{ borderBottom: "1px solid #e2e8f0", textAlign: "left" }}>
+                <th style={{ padding: "6px 8px" }}>Nama Tamu</th>
+                <th style={{ padding: "6px 8px" }}>Status</th>
+                <th style={{ padding: "6px 8px", textAlign: "right" }}>Jumlah</th>
+              </tr>
+            </thead>
+            <tbody>
+              {props.recentGuests.map((guest, idx) => (
+                <tr
+                  key={idx}
+                  style={{
+                    borderBottom: "1px solid #f1f5f9",
+                  }}
+                >
+                  <td style={{ padding: "8px" }}>{guest.guestName}</td>
+                  <td style={{ padding: "8px" }}>
+                    {statusLabels[guest.attendanceStatus]}
+                  </td>
+                  <td style={{ padding: "8px", textAlign: "right" }}>
+                    {guest.guestCount}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      <EmailButton href={props.dashboardUrl}>Lihat Rekap Lengkap</EmailButton>
     </EmailLayout>
   );
 }

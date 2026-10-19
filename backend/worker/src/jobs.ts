@@ -157,6 +157,16 @@ export const CRON_JOBS = {
     description: "Send H-7 and H-1 expiry reminders",
     pattern: "0 8 * * *",
   },
+  rsvp_daily_digest: {
+    name: "rsvp_daily_digest",
+    pool: "cron",
+    priority: "medium",
+    attempts: 3,
+    backoff: { type: "fixed", delay: 60_000 },
+    deadLetter: true,
+    description: "Send daily aggregated RSVP summary emails for opted-in invitations",
+    pattern: "0 9 * * *",
+  },
   /**
    * `P3-06`, ADR-078. Scheduled here with every other cron job; CONSUMED by the API's jobs process
    * (`backend/api/src/jobs/domain-jobs.ts`), because it applies payment outcomes through the API's

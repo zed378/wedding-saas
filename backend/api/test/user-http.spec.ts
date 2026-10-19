@@ -53,11 +53,13 @@ const userStub = {
   },
   getPreferences: async () => ({
     rsvpEmail: true,
+    rsvpDigest: false,
     guestbookEmail: true,
     marketingEmail: false,
   }),
   updatePreferences: async () => ({
     rsvpEmail: false,
+    rsvpDigest: true,
     guestbookEmail: true,
     marketingEmail: false,
   }),
@@ -317,6 +319,7 @@ describe("user endpoints over HTTP", () => {
         .expect(200);
       expect(read.body.data).toEqual({
         rsvp_email: true,
+        rsvp_digest: false,
         guestbook_email: true,
         marketing_email: false,
       });
@@ -324,9 +327,10 @@ describe("user endpoints over HTTP", () => {
       const write = await request(app.getHttpServer())
         .patch("/api/v1/users/me/notification-preferences")
         .set(...AUTH)
-        .send({ rsvp_email: false })
+        .send({ rsvp_email: false, rsvp_digest: true })
         .expect(200);
       expect(write.body.data.rsvp_email).toBe(false);
+      expect(write.body.data.rsvp_digest).toBe(true);
     });
 
     it("rejects a non-boolean", async () => {

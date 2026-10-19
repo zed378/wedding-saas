@@ -19,6 +19,7 @@ interface UserRow {
 
 interface UserPrefsRow {
   rsvp_email: boolean;
+  rsvp_digest: boolean;
   guestbook_email: boolean;
 }
 
@@ -81,7 +82,26 @@ function formatDateTimeWib(dateVal: Date = new Date()): string {
 export function makeNotificationSendHandler(
   deps: NotificationHandlerDeps,
 ): Handler<NotificationJobPayload> {
-  const { pg, emailPort, env } = deps;
+  const { pg, env } = deps;
+
+  // P4-08: Dead-address suppression. Hard bounces and complaints are permanently suppressed.
+  const emailPort: EmailPort = {
+    async send(message) {
+      const normalizedEmail = message.to.toLowerCase().trim();
+      const bounceRes = await pg.query<{ id: string }>(
+        "SELECT id FROM email_bounces WHERE email = $1 AND bounce_type IN ('hard_bounce', 'complaint') LIMIT 1",
+        [normalizedEmail],
+      );
+      if ((bounceRes.rowCount ?? 0) > 0) {
+        logger.warn(
+          { context: { to: message.to, subject: message.subject } },
+          "email dispatch suppressed due to prior hard bounce or complaint",
+        );
+        return { id: "suppressed-bounce", status: "simulated" };
+      }
+      return deps.emailPort.send(message);
+    },
+  };
 
   async function fetchUser(userId: string): Promise<UserRow | null> {
     const res = await pg.query<UserRow>(
@@ -93,11 +113,11 @@ export function makeNotificationSendHandler(
 
   async function fetchUserPrefs(userId: string): Promise<UserPrefsRow> {
     const res = await pg.query<UserPrefsRow>(
-      "SELECT rsvp_email, guestbook_email FROM user_notification_preferences WHERE user_id = $1 LIMIT 1",
+      "SELECT rsvp_email, rsvp_digest, guestbook_email FROM user_notification_preferences WHERE user_id = $1 LIMIT 1",
       [userId],
     );
     if (!res.rows[0]) {
-      return { rsvp_email: true, guestbook_email: true };
+      return { rsvp_email: true, rsvp_digest: false, guestbook_email: true };
     }
     return res.rows[0];
   }
@@ -521,6 +541,20 @@ export function makeNotificationSendHandler(
           return;
         }
 
+        if (prefs.rsvp_digest) {
+          logger.info(
+            {
+              context: {
+                user_id: owner.user_id,
+                invitation_id: data.invitationId,
+                template: data.template,
+              },
+            },
+            "RSVP notification deferred to daily digest",
+          );
+          return;
+        }
+
         const rendered = renderEmail("rsvp_submitted", {
           recipientName: owner.full_name,
           invitationTitle: owner.internal_name ?? "Undangan Pernikahan",
@@ -536,6 +570,30 @@ export function makeNotificationSendHandler(
           subject: rendered.subject,
           html: rendered.html,
           text: rendered.text,
+        });
+        break;
+      }
+
+      case "rsvp_daily_digest": {
+        const rendered = renderEmail("rsvp_daily_digest", {
+          recipientName: data.recipientName,
+          invitationTitle: data.invitationTitle,
+          dateFormatted: data.dateFormatted,
+          totalResponsesToday: data.totalResponsesToday,
+          attendingCount: data.attendingCount,
+          notAttendingCount: data.notAttendingCount,
+          maybeCount: data.maybeCount,
+          recentGuests: data.recentGuests,
+          dashboardUrl: `${appOrigin}/dashboard/invitations/${data.invitationId}/rsvp`,
+          preferencesUrl: `${appOrigin}/dashboard/settings/notifications`,
+        });
+
+        await emailPort.send({
+          to: data.recipientEmail,
+          subject: rendered.subject,
+          html: rendered.html,
+          text: rendered.text,
+          idempotencyKey: `rsvp-daily-digest:${data.invitationId}:${data.dateFormatted}:${context.attempt}`,
         });
         break;
       }

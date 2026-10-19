@@ -583,4 +583,134 @@ describe("Notification Send Handler (P4-06)", () => {
     expect(first.html).toContain("Permintaan pembatalan pernikahan");
     expect(first.html).toContain("https://momenbahagia.id/dashboard/orders");
   });
+
+  it("defers rsvp_submitted when user enabled rsvp_digest preference", async () => {
+    const memoryEmail = new MemoryEmailAdapter();
+    const mockPg = {
+      query: vi.fn().mockImplementation(async (sql: string) => {
+        if (sql.includes("FROM invitations")) {
+          return {
+            rows: [
+              {
+                id: "inv-1",
+                internal_name: "Pernikahan Maya & Dimas",
+                user_id: "user-3",
+                email: "dimas@example.com",
+                full_name: "Dimas Anggara",
+              },
+            ],
+          };
+        }
+        if (sql.includes("FROM user_notification_preferences")) {
+          return {
+            rows: [{ rsvp_email: true, rsvp_digest: true, guestbook_email: true }],
+          };
+        }
+        return { rows: [] };
+      }),
+    } as unknown as PgPool;
+
+    const handler = makeNotificationSendHandler({
+      pg: mockPg,
+      emailPort: memoryEmail,
+      env: createMockEnv(),
+    });
+
+    await handler(
+      {
+        template: "rsvp_submitted",
+        invitationId: "inv-1",
+        guestName: "Ahmad Dahlan",
+        attendanceStatus: "attending",
+        guestCount: 2,
+      },
+      dummyContext,
+    );
+
+    const sent = memoryEmail.getSent();
+    expect(sent).toHaveLength(0);
+  });
+
+  it("handles rsvp_daily_digest and dispatches aggregated summary email", async () => {
+    const memoryEmail = new MemoryEmailAdapter();
+    const mockPg = {
+      query: vi.fn().mockResolvedValue({ rows: [] }),
+    } as unknown as PgPool;
+
+    const handler = makeNotificationSendHandler({
+      pg: mockPg,
+      emailPort: memoryEmail,
+      env: createMockEnv(),
+    });
+
+    await handler(
+      {
+        template: "rsvp_daily_digest",
+        invitationId: "inv-1",
+        recipientEmail: "dimas@example.com",
+        recipientName: "Dimas Anggara",
+        invitationTitle: "Pernikahan Maya & Dimas",
+        dateFormatted: "17 Oktober 2026",
+        totalResponsesToday: 10,
+        attendingCount: 8,
+        notAttendingCount: 1,
+        maybeCount: 1,
+        recentGuests: [
+          {
+            guestName: "Budi Santoso",
+            attendanceStatus: "attending",
+            guestCount: 2,
+          },
+        ],
+      },
+      dummyContext,
+    );
+
+    const sent = memoryEmail.getSent();
+    expect(sent).toHaveLength(1);
+    const first = sent[0]!;
+    expect(first.to).toBe("dimas@example.com");
+    expect(first.subject).toContain("Ringkasan RSVP Harian: Pernikahan Maya & Dimas");
+    expect(first.html).toContain("10 konfirmasi");
+    expect(first.html).toContain("Budi Santoso");
+    expect(first.idempotencyKey).toContain("rsvp-daily-digest:inv-1:17 Oktober 2026");
+  });
+
+  it("suppresses email dispatch when recipient address is in email_bounces table (hard_bounce or complaint)", async () => {
+    const memoryEmail = new MemoryEmailAdapter();
+    const mockPg = {
+      query: vi.fn().mockImplementation(async (sql: string) => {
+        if (sql.includes("FROM email_bounces")) {
+          return {
+            rowCount: 1,
+            rows: [{ id: "bounce-1" }],
+          };
+        }
+        if (sql.includes("FROM users")) {
+          return {
+            rows: [{ email: "bounced@example.com", full_name: "Dead Address" }],
+          };
+        }
+        return { rows: [] };
+      }),
+    } as unknown as PgPool;
+
+    const handler = makeNotificationSendHandler({
+      pg: mockPg,
+      emailPort: memoryEmail,
+      env: createMockEnv(),
+    });
+
+    await handler(
+      {
+        template: "email_verification",
+        userId: "user-dead",
+        token: "tok-dead",
+      },
+      dummyContext,
+    );
+
+    const sent = memoryEmail.getSent();
+    expect(sent).toHaveLength(0);
+  });
 });

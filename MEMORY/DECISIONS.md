@@ -2878,5 +2878,34 @@ the expiry, because inside the window that is a resume.
 
 **Consequences** — Zero SSR bundle pollution in frontend apps; predictable, actionable warnings for couples prior to permanent data loss.
 
+---
+
+### ADR-092 — Email delivery monitoring, bounce suppression (`email_bounces`), DLQ alerting, and daily RSVP digest alternative (`rsvp_digest`)
+
+**Date** 2026-10-19 · **Task** `P4-08` · **Status** Accepted · **Amends** `docs/BACKEND/07-NOTIFICATION.md`, `docs/DATABASE/02-USERS.md`, `docs/DEVOPS/07-ALERTING.md`, `docs/PLAN/13`
+
+**Context** — Delivering transactional and social emails involves three reliability and UX requirements:
+1. RSVP frequency fatigue: High-guest-count weddings produce hundreds of RSVP submissions. Forcing one email per guest response causes inbox overload for couples.
+2. Deliverability and domain reputation: Sending to non-existent or hard-bouncing addresses or recipients who reported spam degrades domain reputation across mailbox providers (Gmail, Yahoo, Microsoft).
+3. Dead-letter visibility: Delivery failures for critical transactional notifications (such as invoice receipts and account recovery) must trigger alerts, while non-critical notifications should not page on-call.
+
+**Decisions**
+1. **Daily morning RSVP digest (`rsvp_digest`)**:
+   - Added `rsvp_digest` boolean column to `user_notification_preferences` (migration `0016_notification_digest_and_bounces.sql`), defaulting to false.
+   - Couples can toggle digest mode in preferences. When active, per-submission RSVP emails are skipped.
+   - Scheduled daily job `rsvp_daily_digest` at 09:00 WIB queries RSVPs from the past 24 hours and sends a consolidated summary via `RsvpDailyDigestEmail`.
+2. **Automated bounce suppression (`email_bounces`)**:
+   - Webhook endpoint `POST /api/webhooks/email/:provider` processes delivery status callbacks (Resend, simulated).
+   - Hard bounces and spam complaints are stored in `email_bounces`. The worker checks `isSuppressed()` before sending to suppress subsequent sends to dead addresses.
+   - Soft/transient bounces (e.g. temporary mailbox full) are recorded for observability but do not trigger permanent suppression.
+3. **DLQ alerting for critical transactional emails**:
+   - Increments Prometheus counter `wi_notification_dead_letter_total{template}` on permanent delivery failure in `dead-letter` queue.
+   - Prometheus alert `CriticalEmailDeadLettered` fires if any critical email (`order_paid`, `email_verification`, `password_reset`, `bank_account_changed`) permanently fails.
+4. **Mandatory notifications bypass preferences**:
+   - Invoices, password resets, account verification, and bank account change security alerts unconditionally bypass preference checks.
+
+**Consequences** — Couples have flexible notification options; bounce suppression preserves domain reputation; failures in critical transactional mail are immediately alertable.
+
+
 
 

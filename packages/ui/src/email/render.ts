@@ -13,6 +13,7 @@ import type {
   InvitationPublishedProps,
   InvitationExpiredProps,
   RsvpSubmittedProps,
+  RsvpDailyDigestProps,
   GuestbookSubmittedProps,
   InvitationExpiryReminderProps,
   InvitationRetentionWarningProps,
@@ -29,6 +30,7 @@ import {
   InvitationPublishedEmail,
   InvitationExpiredEmail,
   RsvpSubmittedEmail,
+  RsvpDailyDigestEmail,
   GuestbookSubmittedEmail,
   InvitationExpiryReminderEmail,
   InvitationRetentionWarningEmail,
@@ -95,6 +97,10 @@ export function renderEmail(
 export function renderEmail(
   template: "rsvp_submitted",
   props: RsvpSubmittedProps,
+): RenderedEmail;
+export function renderEmail(
+  template: "rsvp_daily_digest",
+  props: RsvpDailyDigestProps,
 ): RenderedEmail;
 export function renderEmail(
   template: "guestbook_submitted",
@@ -196,6 +202,12 @@ export function renderEmail(
       const p = props as unknown as RsvpSubmittedProps;
       element = React.createElement(RsvpSubmittedEmail, p);
       subject = `Konfirmasi Kehadiran Baru dari ${p.guestName} ("${p.invitationTitle}")`;
+      break;
+    }
+    case "rsvp_daily_digest": {
+      const p = props as unknown as RsvpDailyDigestProps;
+      element = React.createElement(RsvpDailyDigestEmail, p);
+      subject = `[Momen Bahagia] Ringkasan RSVP Harian: ${p.invitationTitle}`;
       break;
     }
     case "guestbook_submitted": {

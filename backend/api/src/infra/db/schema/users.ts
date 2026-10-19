@@ -109,6 +109,8 @@ export const userNotificationPreferences = pgTable(
       .primaryKey()
       .references(() => users.id, { onDelete: "cascade" }),
     rsvpEmail: boolean("rsvp_email").notNull().default(true),
+    /** Alternative to per-submission RSVP emails: daily aggregated digest (P4-08). */
+    rsvpDigest: boolean("rsvp_digest").notNull().default(false),
     guestbookEmail: boolean("guestbook_email").notNull().default(true),
     /** Defaults to false. Opt-in, not opt-out (`docs/SECURITY/09`). */
     marketingEmail: boolean("marketing_email").notNull().default(false),
@@ -246,3 +248,26 @@ export const userRecoveryCodes = pgTable(
       .where(sql`used_at IS NULL`),
   ],
 );
+
+/**
+ * Hard bounces and spam complaints from email delivery providers (P4-08).
+ * Used to suppress dead addresses and protect sender reputation.
+ */
+export const emailBounces = pgTable(
+  "email_bounces",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    email: varchar("email", { length: 255 }).notNull(),
+    bounceType: varchar("bounce_type", { length: 50 }).notNull(), // 'hard_bounce' | 'complaint' | 'transient'
+    message: varchar("message", { length: 1000 }),
+    provider: varchar("provider", { length: 50 }).notNull().default("resend"),
+    providerEmailId: varchar("provider_email_id", { length: 255 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("idx_email_bounces_email").on(t.email)],
+);
+

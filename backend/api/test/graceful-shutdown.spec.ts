@@ -34,7 +34,13 @@ describe("gracefulShutdown", () => {
       release = resolve;
     });
 
+    let requestArrived: (() => void) | undefined;
+    const requestReceived = new Promise<void>((resolve) => {
+      requestArrived = resolve;
+    });
+
     server = createServer((_req, res) => {
+      requestArrived?.();
       void held.then(() => {
         res.writeHead(200, { "content-type": "text/plain" });
         res.end("finished");
@@ -44,7 +50,7 @@ describe("gracefulShutdown", () => {
 
     // Start a request and wait until the server has actually received it.
     const inFlight = fetch(`http://127.0.0.1:${port}/slow`);
-    await new Promise((r) => setTimeout(r, 50));
+    await requestReceived;
 
     let shutdownResolved = false;
     const draining = gracefulShutdown(server, { timeoutMs: 5_000 }).then(() => {
