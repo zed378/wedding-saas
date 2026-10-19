@@ -202,14 +202,20 @@ invitation.vizunicum.my.id {
 }
 
 # ---------------------------------------------------------------------------
-# admin.vizunicum.my.id — admin panel stub (P5-01)
+# admin.vizunicum.my.id — admin panel (P5-01)
 # ---------------------------------------------------------------------------
 admin.vizunicum.my.id {
 	tls {env.TLS_EMAIL}
 
 	import security_headers_app
 
-	# Rate limit the (future) admin API surface.
+	# Hardened Content Security Policy (docs/SECURITY/08, P5-01)
+	# Disallows user iframe embedding (frame-ancestors 'none') and external script injection
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.r2.cloudflarestorage.com https://cdn.vizunicum.my.id; connect-src 'self' https://admin.vizunicum.my.id https://app.vizunicum.my.id; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+	}
+
+	# Rate limit the admin API surface.
 	@admin_api {
 		path /api/*
 	}
@@ -221,12 +227,21 @@ admin.vizunicum.my.id {
 				window 1s
 			}
 		}
-		# When P5-01 lands, replace this respond with a reverse_proxy to the admin app.
-		respond "Admin panel not yet available (P5-01)" 503
+		reverse_proxy http://api:3000 {
+			transport http {
+				read_timeout  30s
+				write_timeout 30s
+			}
+		}
 	}
 
-	# Admin panel UI — stub 503 until P5-01
+	# Admin panel UI → static nginx container on compose network (P5-01)
 	handle {
-		respond "Admin panel not yet available (P5-01)" 503
+		reverse_proxy http://admin:8080 {
+			transport http {
+				read_timeout  30s
+				write_timeout 30s
+			}
+		}
 	}
 }

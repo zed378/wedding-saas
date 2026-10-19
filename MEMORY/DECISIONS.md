@@ -2991,3 +2991,35 @@ the expiry, because inside the window that is a resume.
    - On success, `PublicRsvpForm` renders a `role="status"` confirmation, and `PublicGuestbookWall` optimistically appends approved entries or confirms routing to the moderation queue.
 
 **Consequences** — Maintains the strict boundary separating static template rendering from interactive network operations; provides couples with mobile-friendly RSVP & guestbook management; guarantees guests never lose typed wishes or RSVP responses on transient network errors.
+
+---
+
+### ADR-096 — Admin application shell, host-level session isolation, and network-level restriction strategy
+
+**Date** 2026-10-19 · **Task** `P5-01` · **Status** Accepted · **Amends** `docs/SECURITY/02-TRUST-BOUNDARIES.md`, `docs/SECURITY/03-AUTHENTICATION-SECURITY.md`, `docs/PLAN/12-ADMIN-PANEL.md`, `docs/FRONTEND/01-ROUTING.md`
+
+**Context** — The administrative panel controls all platform resources: user account suspensions, template schema deployments, financial orders and manual refunds, content moderation, and immutable audit logs (Trust Boundary 3→4, `docs/SECURITY/02`):
+1. **Host & Session Isolation**: An end-user session compromise or XSS vulnerability on `app.vizunicum.my.id` must never provide lateral movement or token reuse against the administrative boundary.
+2. **Session Lifespan Cap**: Normal user sessions persist up to 30 days via rotating refresh cookies. For administrative staff, `docs/SECURITY/03` sets a mandatory 4-hour maximum session lifespan.
+3. **Transparent Route Guards**: Standard authenticated users arriving at an admin URL must receive an explicit, informative 403 Unauthorized page (`docs/FRONTEND/01`), not a misleading 404 or an infinite redirect loop.
+4. **Network Restrictions vs Defense-in-Depth**: Relying solely on IP allowlisting or VPN risks administrator lockout during on-call emergencies and does not protect against SSRF or internal network pivots. A defense-in-depth model is necessary.
+
+**Decisions**
+1. **Dedicated administrative origin (`admin.vizunicum.my.id` / port 3300)**:
+   - Built as an independent Vite SPA (`@wi/admin`), served statically by nginx in production with zero SSR overhead.
+   - Separate in-memory access token store (`accessTokenStore`); tokens are never written to `localStorage`, `sessionStorage`, or client-accessible cookies (`check-token-storage.mjs`).
+2. **Hardened Content Security Policy (CSP)**:
+   - Configured in `deploy/Caddyfile.production` and `admin/nginx.conf`.
+   - Anti-clickjacking enforced via `frame-ancestors 'none'` and `X-Frame-Options: DENY`.
+   - Third-party iframe embeds, external script CDNs, and untrusted network endpoints are strictly forbidden.
+3. **Strict 4-hour max session lifespan**:
+   - `MAX_ADMIN_SESSION_MS = 4 * 60 * 60 * 1000` enforced in `AdminAuthProvider`.
+   - Tracks active remaining session time and displays a visual indicator in the desktop sidebar.
+   - Automatically clears tokens and terminates session state when the 4-hour cap expires.
+4. **Desktop-first shell & explicit route guards**:
+   - Desktop sidebar navigation covering all 6 core modules: Dashboard (`/`), Users (`/users`), Templates (`/templates`), Orders (`/orders`), Moderation (`/moderation`), and Audit Logs (`/audit-logs`).
+   - `RequireAdmin` guard displays an accessible `UnauthorizedPage` (403) with clear Indonesian copy and a return link to the user application (`app.vizunicum.my.id`) when an authenticated standard user (`role: 'user'`) is encountered.
+5. **Network restriction strategy**:
+   - Cloudflare Zero Trust / Access tunnel forms the first perimeter layer in production; application-layer RBAC (`@Roles('admin', 'super_admin')`) and verified session checks form the mandatory second layer.
+
+**Consequences** — Guarantees complete session and origin separation between end-user and administrative boundaries; enforces strict 4-hour administrative timeboxing; prevents clickjacking; provides staff with a dedicated desktop-first operational interface.

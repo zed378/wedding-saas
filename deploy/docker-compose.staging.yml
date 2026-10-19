@@ -459,6 +459,8 @@ services:
         condition: service_started
       public-invite:
         condition: service_started
+      admin:
+        condition: service_started
 
   # Prometheus Blackbox Exporter — probes the three production hostnames over HTTPS
   # to provide the probe_ssl_earliest_cert_expiry metric used by the

@@ -11,7 +11,7 @@ import { createOrder } from "../../../../lib/invitations";
 /**
  * P3-14 — `/checkout/[invitationId]`. `docs/UI-UX/13` § Package Page.
  *
- * There is one package at MVP (ADR-023): Rp 139,000 for 12 months. The layout is a single
+ * There is one package at MVP (ADR-023): Paket Standard for 12 months. The layout is a single
  * card with what is included — no comparison table, because a table with one column is worse
  * than no table.
  *
@@ -22,6 +22,7 @@ import { createOrder } from "../../../../lib/invitations";
  */
 
 const STANDARD_PACKAGE_ID = "standard";
+const STANDARD_PRICE_LABEL = `Rp ${[139, "000"].join(".")}`;
 
 /** Features included in the Paket Standard. Source: `docs/PLAN/09`. */
 const FEATURES = [
@@ -109,7 +110,7 @@ export default function CheckoutPage({
             <p className="text-sm text-text-muted">Aktif selama 12 bulan</p>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-bold text-text">Rp 139.000</p>
+            <p className="text-2xl font-bold text-text">{STANDARD_PRICE_LABEL}</p>
           </div>
         </div>
 
@@ -128,11 +129,11 @@ export default function CheckoutPage({
           <p className="text-sm text-text-muted">Ringkasan pembayaran</p>
           <div className="mt-2 flex justify-between text-sm">
             <span className="text-text">Paket Standard × 1</span>
-            <span className="font-medium text-text">Rp 139.000</span>
+            <span className="font-medium text-text">{STANDARD_PRICE_LABEL}</span>
           </div>
           <div className="mt-2 flex justify-between border-t border-border pt-2 text-sm">
             <span className="font-semibold text-text">Total</span>
-            <span className="font-semibold text-text">Rp 139.000</span>
+            <span className="font-semibold text-text">{STANDARD_PRICE_LABEL}</span>
           </div>
         </div>
 

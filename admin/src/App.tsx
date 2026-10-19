@@ -1,36 +1,62 @@
-import { Badge, Card, CardHeader } from "@wi/ui";
+import { AdminAuthProvider } from "./auth/admin-auth.js";
+import { RequireAdmin } from "./auth/RequireAdmin.js";
+import { RouterProvider, useRouter } from "./router.js";
+import { LoginPage } from "./pages/LoginPage.js";
+import { UnauthorizedPage } from "./pages/UnauthorizedPage.js";
+import { DashboardPage } from "./pages/DashboardPage.js";
+import { UsersPage } from "./pages/UsersPage.js";
+import { TemplatesPage } from "./pages/TemplatesPage.js";
+import { OrdersPage } from "./pages/OrdersPage.js";
+import { ModerationPage } from "./pages/ModerationPage.js";
+import { AuditLogsPage } from "./pages/AuditLogsPage.js";
 
 /**
- * P0-22 — the admin shell.
+ * P0-22 / P5-01 — The admin application shell.
  *
- * Deliberately one screen. `P5` builds the admin panel; what this proves is that the
- * third surface builds, serves a page, and renders the same design system from the same
- * tokens as the other two.
+ * Dedicated SPA served on admin.vizunicum.my.id (port 3300 locally).
+ * Runs on a completely separate hostname and trust boundary from the user app (docs/SECURITY/02),
+ * with in-memory access tokens, max 4-hour session lifespan, desktop-first navigation,
+ * and an explicit Unauthorized page when a non-admin account is detected.
  */
+export function AppRoutes() {
+  const { path } = useRouter();
+
+  // Public / unauthenticated route
+  if (path === "/login") {
+    return <LoginPage />;
+  }
+
+  // Explicit Unauthorized page (BR-Admin.2)
+  if (path === "/unauthorized") {
+    return <UnauthorizedPage />;
+  }
+
+  // All administrative routes wrapped in RequireAdmin guard
+  return (
+    <RequireAdmin>
+      {path === "/users" || path.startsWith("/users/") ? (
+        <UsersPage />
+      ) : path === "/templates" || path.startsWith("/templates/") ? (
+        <TemplatesPage />
+      ) : path === "/orders" || path.startsWith("/orders/") ? (
+        <OrdersPage />
+      ) : path === "/moderation" || path.startsWith("/moderation/") ? (
+        <ModerationPage />
+      ) : path === "/audit-logs" || path.startsWith("/audit-logs/") ? (
+        <AuditLogsPage />
+      ) : (
+        <DashboardPage />
+      )}
+    </RequireAdmin>
+  );
+}
+
 export function App() {
   return (
-    <main
-      id="main"
-      className="mx-auto flex max-w-page flex-col gap-8 p-6 text-text"
-    >
-      <header className="flex flex-col gap-2">
-        <h1 className="text-display font-bold">Admin</h1>
-        <p className="text-body-lg text-text-muted">
-          Kerangka panel admin. Fitur dibangun pada Fase 5.
-        </p>
-      </header>
-
-      <Card>
-        <CardHeader
-          title="Batas kepercayaan terpisah"
-          description="Hostname sendiri, sesi sendiri (docs/SECURITY/02)."
-          actions={<Badge tone="primary">Fase 0</Badge>}
-        />
-        <p className="text-body">
-          Panel ini memakai sistem desain yang sama dengan aplikasi, tetapi
-          tidak berbagi sesi dengannya.
-        </p>
-      </Card>
-    </main>
+    <AdminAuthProvider>
+      <RouterProvider>
+        <AppRoutes />
+      </RouterProvider>
+    </AdminAuthProvider>
   );
 }

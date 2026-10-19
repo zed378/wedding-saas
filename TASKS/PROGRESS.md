@@ -196,7 +196,7 @@ Roadmap: Week 12-13.
 
 | ID | Task | Surface | Size | Status | Depends on |
 |---|---|---|---|---|---|
-| P5-01 | Admin shell and session isolation | admin, infra | M | TODO | P0-22, P0-23 |
+| P5-01 | Admin shell and session isolation | admin, infra | M | **DONE** — dedicated shell on admin.vizunicum.my.id (port 3300); host-scoped session isolation from user app (Trust Boundary 3→4); 4-hour session lifetime cap; in-memory access tokens; desktop-first sidebar with all 6 modules; explicit 403 UnauthorizedPage; hardened CSP without user embeds; network restriction strategy documented (ADR-096) | P0-22, P0-23 |
 | P5-02 | Admin 2FA and step-up re-auth | backend, admin | L | TODO | P1-03, P5-01 |
 | P5-03 | Admin authorization and audit middleware | backend | M | TODO | P0-14, P1-06 |
 | P5-04 | Template and version management API | backend | L | TODO | P0-20, P5-03 |

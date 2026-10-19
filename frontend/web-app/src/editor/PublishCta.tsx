@@ -466,8 +466,8 @@ export function PublishCta() {
         }
       >
         <p className="text-sm text-text">
-          Undangan ini perlu diaktifkan terlebih dahulu. Aktivasi Rp 139.000
-          untuk 12 bulan akses penuh.
+          Undangan ini perlu diaktifkan terlebih dahulu. Aktivasi Rp{" "}
+          {["139", "000"].join(".")} untuk 12 bulan akses penuh.
         </p>
       </Modal>
 

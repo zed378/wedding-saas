@@ -35,7 +35,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** |
 | **Depends on** | P0-22, P0-23 |
 | **Spec refs** | `docs/SECURITY/02-TRUST-BOUNDARIES.md` boundary 3→4, `docs/PLAN/12-ADMIN-PANEL.md` § Access Control, `docs/UI-UX/15` § Admin Panel |
 | **Spec required** | Yes — trust boundary |
@@ -52,10 +52,10 @@
 6. Consider network-level restriction (IP allowlist or VPN) for the admin host, and record the decision.
 
 **Definition of Done**
-- [ ] The admin session cookie is not sent to the user application's host, verified by inspection.
-- [ ] Session expiry is shorter than the user session's.
-- [ ] A non-admin sees an unauthorized page, not a 404.
-- [ ] The admin CSP is stricter than the app's and documented.
+- [x] The admin session cookie is not sent to the user application's host, verified by inspection.
+- [x] Session expiry is shorter than the user session's.
+- [x] A non-admin sees an unauthorized page, not a 404.
+- [x] The admin CSP is stricter than the app's and documented.
 
 ---
 

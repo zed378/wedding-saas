@@ -9,7 +9,7 @@
     "preview": "vite preview --port 3300",
     "lint": "echo \"[P0-17] lint not wired yet\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "echo \"[P5-01] no unit tests here yet -- admin screens arrive in Phase 5\""
+    "test": "vitest run"
   },
   "dependencies": {
     "@wi/api-client": "workspace:*",
@@ -20,11 +20,16 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^22.20.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.1.1",
+    "jsdom": "^30.0.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0"
   }
 }

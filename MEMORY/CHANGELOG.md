@@ -10,6 +10,16 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-19 — Admin application shell and session isolation
+
+**Added** — Dedicated admin panel shell, origin isolation, 4-hour session lifespan, and explicit 403 screen ([P5-01](./records/2026-10-19-P5-01-admin-shell-and-session-isolation.md), [ADR-096](./DECISIONS.md#ADR-096))
+
+- Established administrative application shell (`@wi/admin`) running on dedicated origin `admin.vizunicum.my.id` (port 3300 locally) with host-scoped session isolation from user app (Trust Boundary 3→4).
+- Implemented `AdminAuthProvider` with in-memory access token store (`accessTokenStore`) and strict 4-hour max session lifetime (`docs/SECURITY/03`).
+- Built desktop-first administrative navigation shell (`AdminLayout`) covering all 6 core modules: Dashboard (`/`), Users (`/users`), Templates (`/templates`), Orders (`/orders`), Moderation (`/moderation`), and Audit Logs (`/audit-logs`).
+- Implemented `RequireAdmin` route guard rendering explicit 403 `UnauthorizedPage` with return link for non-admin accounts.
+- Configured production Caddy reverse proxy and hardened CSP (`frame-ancestors 'none'`, `X-Frame-Options: DENY`, strict `script-src` and `connect-src`).
+
 ### 2026-10-19 — Phase 4 test suite and acceptance (Phase 4 complete)
 
 **Added** — Phase 4 test suite and formal acceptance ([P4-12](./records/2026-10-19-P4-12-phase-4-acceptance.md), [Phase 4 Summary](./records/2026-10-19-PHASE-4-SUMMARY.md))

@@ -1,9 +1,10 @@
-import { defineConfig } from "vite";
+/// <reference types="vitest" />
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 /**
- * P0-22 — the admin panel.
+ * P0-22 / P5-01 — the admin panel.
  *
  * Vite rather than Next (ADR-009): the admin panel is entirely behind authentication,
  * so there is no SEO, no social preview and no first-paint budget to defend. Everything
@@ -18,4 +19,10 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: { port: 3300 },
   build: { outDir: "dist", sourcemap: true },
+  test: {
+    globals: true,
+    environment: "jsdom",
+    setupFiles: ["./src/testing/setup.ts"],
+    include: ["src/**/*.spec.{ts,tsx}"],
+  },
 });
