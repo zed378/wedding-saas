@@ -2,12 +2,16 @@ import { Inject, Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { Redis as IORedis } from "ioredis";
 
+import { CACHE, type CachePort } from "../../infra/cache/cache.port";
 import { CACHE_REDIS } from "../../infra/cache/cache.module";
 import {
   AnalyticsRepository,
   type ViewCountEntry,
 } from "../../shared/tenancy/analytics-repository";
 import { PublicInvitationRepository } from "../../shared/tenancy/public-invitation-repository";
+import { RsvpRepository } from "../../shared/tenancy/rsvp-repository";
+import { GuestbookRepository } from "../../shared/tenancy/guestbook-repository";
+import type { TenantScope } from "../../shared/tenancy/tenant-scope";
 import { NotFoundError } from "../../http/errors";
 import { logger } from "../../shared/logging/logger";
 import { metrics } from "../../shared/metrics/metrics";
@@ -20,8 +24,29 @@ export interface FlushResult {
   readonly entries: number;
 }
 
+export interface AnalyticsSummary {
+  readonly views: {
+    readonly total: number;
+    readonly daily: ReadonlyArray<{ readonly date: string; readonly count: number }>;
+  };
+  readonly rsvps: {
+    readonly total_responses: number;
+    readonly attending: number;
+    readonly not_attending: number;
+    readonly maybe: number;
+    readonly total_attending_guests: number;
+  };
+  readonly guestbook: {
+    readonly total: number;
+    readonly pending: number;
+    readonly approved: number;
+    readonly rejected: number;
+  };
+}
+
 /**
- * `P4-09` — Page view counter with write-behind flush.
+ * `P4-09`, `P4-10` — Analytics service: page view counter with write-behind flush
+ * and owner analytics summary.
  *
  * Implements `docs/PLAN/14-ANALYTICS.md` & `docs/DATABASE/11-ANALYTICS.md`:
  * - Public page requests increment an in-memory Redis hash counter.
@@ -30,13 +55,17 @@ export interface FlushResult {
  *   accumulated view counts into `invitation_view_counts`.
  * - Flush failure is documented as best-effort.
  * - No per-visitor identity, IP, or user-agent data is stored anywhere.
+ * - Owner summary queries are scoped by tenant ID and cached briefly (30s).
  */
 @Injectable()
 export class AnalyticsService {
   constructor(
     @Inject(CACHE_REDIS) private readonly redis: IORedis,
+    @Inject(CACHE) private readonly cache: CachePort,
     private readonly analyticsRepo: AnalyticsRepository,
     private readonly publicInvitationRepo: PublicInvitationRepository,
+    private readonly rsvpRepo: RsvpRepository,
+    private readonly guestbookRepo: GuestbookRepository,
   ) {}
 
   /**
@@ -155,5 +184,89 @@ export class AnalyticsService {
       );
       return { flushed: 0, entries: 0 };
     }
+  }
+
+  /**
+   * Returns ownership-scoped analytics summary for an invitation (P4-10).
+   * Aggregates total and daily page views, RSVP attendance stats, and guestbook counts.
+   * Cached briefly (30s) to protect the DB from frequent owner reloads.
+   * Throws NotFoundError if the invitation is not owned by the tenant.
+   */
+  async getAnalyticsSummary(
+    scope: TenantScope,
+    invitationId: string,
+  ): Promise<AnalyticsSummary> {
+    const cached = await this.cache.getJson<AnalyticsSummary>(
+      "analytics",
+      invitationId,
+    );
+    if (cached) {
+      return cached;
+    }
+
+    const owns = await this.rsvpRepo.ownsInvitation(scope, invitationId);
+    if (!owns) {
+      throw new NotFoundError("Invitation not found");
+    }
+
+    const [viewSummary, rsvpSummary, guestbookSummary] = await Promise.all([
+      this.analyticsRepo.getViewSummary(scope, invitationId),
+      this.rsvpRepo.getRsvpSummaryForOwner(scope, invitationId),
+      this.guestbookRepo.getGuestbookSummaryForOwner(scope, invitationId),
+    ]);
+
+    // Check for today's unflushed in-memory Redis views
+    const today = new Date().toLocaleDateString("en-CA", {
+      timeZone: "Asia/Jakarta",
+    });
+    let pendingCount = 0;
+    try {
+      const pendingStr = await this.redis.hget(
+        PENDING_VIEWS_HASH,
+        `${invitationId}:${today}`,
+      );
+      pendingCount = Number(pendingStr ?? 0) || 0;
+    } catch {
+      // Degraded cache fails open
+    }
+
+    const daily = [...viewSummary.dailyViews];
+    let totalViews = viewSummary.totalViews + pendingCount;
+    if (pendingCount > 0) {
+      const todayIndex = daily.findIndex((d) => d.date === today);
+      if (todayIndex >= 0) {
+        daily[todayIndex] = {
+          date: today,
+          count: daily[todayIndex]!.count + pendingCount,
+        };
+      } else {
+        daily.unshift({ date: today, count: pendingCount });
+      }
+    }
+
+    const summary: AnalyticsSummary = {
+      views: {
+        total: totalViews,
+        daily,
+      },
+      rsvps: rsvpSummary ?? {
+        total_responses: 0,
+        attending: 0,
+        not_attending: 0,
+        maybe: 0,
+        total_attending_guests: 0,
+      },
+      guestbook: guestbookSummary ?? {
+        total: 0,
+        pending: 0,
+        approved: 0,
+        rejected: 0,
+      },
+    };
+
+    // Cache briefly (30 seconds)
+    await this.cache.setJson("analytics", invitationId, summary, 30);
+
+    return summary;
   }
 }

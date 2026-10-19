@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { AnalyticsService } from "./analytics.service";
+import { OwnerAnalyticsController } from "./owner-analytics.controller";
 import { PublicViewController } from "./public-view.controller";
 
 /**
@@ -9,7 +10,7 @@ import { PublicViewController } from "./public-view.controller";
  * Provides page view counter aggregation and analytics summaries.
  */
 @Module({
-  controllers: [PublicViewController],
+  controllers: [PublicViewController, OwnerAnalyticsController],
   providers: [AnalyticsService],
   exports: [AnalyticsService],
 })

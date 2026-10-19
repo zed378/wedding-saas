@@ -464,6 +464,39 @@ export async function updateSlug(
   return result.data;
 }
 
+/**
+ * P4-10 — Invitation analytics summary. `docs/PLAN/14` § MVP.
+ */
+export interface InvitationAnalytics {
+  readonly views: {
+    readonly total: number;
+    readonly daily: ReadonlyArray<{ readonly date: string; readonly count: number }>;
+  };
+  readonly rsvps: {
+    readonly total_responses: number;
+    readonly attending: number;
+    readonly not_attending: number;
+    readonly maybe: number;
+    readonly total_attending_guests: number;
+  };
+  readonly guestbook: {
+    readonly total: number;
+    readonly pending: number;
+    readonly approved: number;
+    readonly rejected: number;
+  };
+}
+
+export async function getInvitationAnalytics(
+  api: ApiClient,
+  invitationId: string,
+): Promise<InvitationAnalytics> {
+  const result = await api.request<InvitationAnalytics>(
+    `/invitations/${encodeURIComponent(invitationId)}/analytics`,
+  );
+  return result.data;
+}
+
 // ─── Slug helpers ─────────────────────────────────────────────────────────────
 
 /**

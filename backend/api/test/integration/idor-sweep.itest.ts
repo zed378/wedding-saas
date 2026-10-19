@@ -559,6 +559,14 @@ const CASES: readonly SweepCase[] = [
       auth(api(c).get(`/api/v1/media/${t.mediaId}`), token),
   },
   {
+    label: "GET /invitations/:id/analytics",
+    send: (c, token, t) =>
+      auth(
+        api(c).get(`/api/v1/invitations/${t.invitation.id}/analytics`),
+        token,
+      ),
+  },
+  {
     label: "GET /invitations/:id/rsvps",
     send: (c, token, t) =>
       auth(api(c).get(`/api/v1/invitations/${t.invitation.id}/rsvps`), token),

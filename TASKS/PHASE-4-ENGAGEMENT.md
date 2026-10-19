@@ -308,7 +308,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | DONE |
 | **Depends on** | P4-09, P4-02 |
 | **Spec refs** | `docs/PLAN/14-ANALYTICS.md` § MVP, `docs/PLAN/04` § F10 |
 | **Spec required** | No |
@@ -323,9 +323,9 @@
 4. Label the numbers honestly: "page opens" is not "unique guests", and the MVP does not measure the latter (`docs/PLAN/14` § Phase 2).
 
 **Definition of Done**
-- [ ] The endpoint is ownership-scoped and returns the four metric groups.
-- [ ] Numbers match the underlying tables in a seeded test.
-- [ ] Labels do not overstate what is measured.
+- [x] The endpoint is ownership-scoped and returns the four metric groups.
+- [x] Numbers match the underlying tables in a seeded test.
+- [x] Labels do not overstate what is measured.
 
 ---
 

@@ -2935,6 +2935,33 @@ the expiry, because inside the window that is a resume.
 
 **Consequences** — Zero primary database writes occur synchronously on page requests; visitors receive instant response; visitor privacy is preserved with zero PII stored; database load is amortized into 1-minute atomic upsert batches.
 
+---
+
+### ADR-094 — Owner analytics summary endpoint (`GET /api/v1/invitations/:id/analytics`), brief Redis caching, and honest metric presentation
+
+**Date** 2026-10-19 · **Task** `P4-10` · **Status** Accepted · **Amends** `docs/PLAN/14-ANALYTICS.md`, `docs/API/04-INVITATIONS-API.md`, `docs/ARCHITECTURE/06-CACHING-ARCHITECTURE.md`
+
+**Context** — In the final days before a wedding reception, anxious couples refresh their dashboard frequently to monitor RSVP responses, guest attendance, and messages.
+1. Heavy DB queries: Aggregating view counts, RSVP attendance sums, and guestbook moderation totals on every page load would burden PostgreSQL during high-anxiety refresh cycles.
+2. Honest metrics: In the MVP, page views are passive aggregate opens. Labeling them as "pengunjung unik" or "unique visitors" would mislead couples.
+3. Object-level authorization: Non-owners attempting to access analytics for another invitation must unconditionally receive 404 (zero IDOR tolerance).
+
+**Decisions**
+1. **Unified analytics summary endpoint (`GET /api/v1/invitations/:id/analytics`)**:
+   - Controller `OwnerAnalyticsController` mounted at `/api/v1/invitations/:id/analytics`, protected by `requireAuth()`.
+   - Requires valid tenant scope (`tenantScope(user.id)`). Validates invitation ownership via `RsvpRepository.ownsInvitation(scope, id)`. Returns 404 if not owned or soft-deleted.
+   - Aggregates three data groups in parallel: page views (`AnalyticsRepository.getViewSummary`), RSVPs (`RsvpRepository.getRsvpSummaryForOwner`), and guestbook entries (`GuestbookRepository.getGuestbookSummaryForOwner`).
+   - Merges unflushed today's in-memory Redis views from `analytics:views:pending` so owners see near real-time updates.
+2. **Brief Redis caching (`30s TTL`)**:
+   - Cache key `analytics:${invitationId}` via `CachePort.setJson` with 30-second TTL.
+   - Fails open on Redis cache error, directly querying database repositories.
+3. **Dedicated frontend dashboard (`/dashboard/[invitationId]/analytics`)**:
+   - Clean, accessible page with honest labeling note: *"Angka di atas adalah total berapa kali halaman dibuka, bukan jumlah orang atau tamu unik."*
+   - Displays daily visit breakdown (last 14 days), RSVP status counters + total attending guest count, and guestbook status badges.
+   - Accessible "Statistik" link added to `InvitationCard`.
+
+**Consequences** — Protects database from dashboard refresh storms; enforces strict tenant isolation; transparently informs couples of what is measured without false claims of uniqueness.
+
 
 
 

@@ -11,6 +11,13 @@ import type { TenantScope } from "./tenant-scope";
 
 export type GuestbookEntryStatus = "pending" | "approved" | "rejected";
 
+export interface GuestbookSummary {
+  readonly total: number;
+  readonly pending: number;
+  readonly approved: number;
+  readonly rejected: number;
+}
+
 export interface PublishedGuestbookTarget {
   readonly invitationId: string;
   readonly guestbookEnabled: boolean;
@@ -393,6 +400,35 @@ export class GuestbookRepository {
       deleted: true,
       slug: inv.slug,
       previousStatus: existing.status as GuestbookEntryStatus,
+    };
+  }
+
+  /**
+   * Aggregated guestbook summary computed directly in SQL (P4-10).
+   * Scoped to owner. Returns null if the invitation is not owned by the tenant.
+   */
+  async getGuestbookSummaryForOwner(
+    scope: TenantScope,
+    invitationId: string,
+  ): Promise<GuestbookSummary | null> {
+    const inv = await this.getInvitationOwnerScope(scope, invitationId);
+    if (!inv) return null;
+
+    const [summary] = await this.db
+      .select({
+        total: count(invitationGuestbook.id),
+        pending: sql<number>`count(case when ${invitationGuestbook.status} = 'pending' then 1 end)::int`,
+        approved: sql<number>`count(case when ${invitationGuestbook.status} = 'approved' then 1 end)::int`,
+        rejected: sql<number>`count(case when ${invitationGuestbook.status} = 'rejected' then 1 end)::int`,
+      })
+      .from(invitationGuestbook)
+      .where(eq(invitationGuestbook.invitationId, invitationId));
+
+    return {
+      total: Number(summary?.total ?? 0),
+      pending: Number(summary?.pending ?? 0),
+      approved: Number(summary?.approved ?? 0),
+      rejected: Number(summary?.rejected ?? 0),
     };
   }
 }

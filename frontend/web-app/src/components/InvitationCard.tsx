@@ -137,6 +137,14 @@ export function InvitationCard({
           </a>
         )}
 
+        <a
+          className="focus-ring rounded-md border border-border px-3 py-1.5 text-sm font-medium text-text hover:bg-surface-sunken"
+          href={`/dashboard/${invitation.id}/analytics`}
+          aria-label={`Statistik ${name}`}
+        >
+          Statistik
+        </a>
+
         {onDelete !== undefined && (
           <button
             type="button"

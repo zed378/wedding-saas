@@ -10,6 +10,16 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-19 — Owner analytics summary
+
+**Added** — owner analytics summary endpoint and dashboard page ([P4-10](./records/2026-10-19-P4-10-owner-analytics-summary.md))
+
+- Implemented `GET /api/v1/invitations/:id/analytics` in NestJS `OwnerAnalyticsController` and `AnalyticsService`, protected with ownership-based authorization (404 for non-owners).
+- Cached analytics responses for 30 seconds via Redis `CachePort` to protect the database against refresh storms from anxious couples.
+- Aggregated parallel metrics: total and daily page opens (merging in-memory unflushed counts), RSVP status breakdown (attending, declined, tentative, awaiting) with total attending headcount, and guestbook moderation status counts.
+- Created accessible, responsive analytics dashboard page in `frontend/web-app` at `/dashboard/[invitationId]/analytics` with honest metric labeling (distinguishing "page opens" from "unique guests") and linked via `InvitationCard`.
+- Added unit tests for backend service and controller (`analytics.spec.ts`), frontend API client and dashboard rendering (`analytics-dashboard.spec.tsx`), and verified IDOR sweep.
+
 ### 2026-10-19 — Page view counter with write-behind flush
 
 **Added** — page view counter with in-memory Redis write-behind, atomic batching, and privacy-preserving daily aggregation ([P4-09](./records/2026-10-19-P4-09-page-view-counter.md))
