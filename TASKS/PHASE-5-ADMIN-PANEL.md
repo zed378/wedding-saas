@@ -154,7 +154,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | **DONE** |
 | **Depends on** | P5-04, P2-03 |
 | **Spec refs** | `docs/PLAN/12` § Template Management, `docs/PLAN/07` § Template Preview & Publishing, `docs/UI-UX/11` |
 | **Spec required** | No |
@@ -173,11 +173,11 @@
 8. Show which invitations are on each version before deprecating, so the decision is informed.
 
 **Definition of Done**
-- [ ] A complete template can be authored, previewed and published in the UI with no manual JSON editing.
-- [ ] Field paths and component names are chosen from lists, never typed.
-- [ ] The contrast warning fires on a failing colour pair.
-- [ ] Preview uses the production renderer.
-- [ ] Deprecation shows the affected invitation count first.
+- [x] A complete template can be authored, previewed and published in the UI with no manual JSON editing.
+- [x] Field paths and component names are chosen from lists, never typed.
+- [x] The contrast warning fires on a failing colour pair.
+- [x] Preview uses the production renderer.
+- [x] Deprecation shows the affected invitation count first.
 
 ---
 

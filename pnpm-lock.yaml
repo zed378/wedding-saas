@@ -26,6 +26,9 @@ importers:
       '@wi/schema':
         specifier: workspace:*
         version: link:../packages/schema
+      '@wi/template-renderer':
+        specifier: workspace:*
+        version: link:../packages/template-renderer
       '@wi/ui':
         specifier: workspace:*
         version: link:../packages/ui

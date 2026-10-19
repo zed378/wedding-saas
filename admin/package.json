@@ -14,6 +14,7 @@
   "dependencies": {
     "@wi/api-client": "workspace:*",
     "@wi/schema": "workspace:*",
+    "@wi/template-renderer": "workspace:*",
     "@wi/ui": "workspace:*",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

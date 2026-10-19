@@ -49,10 +49,31 @@ export class AdminTemplatesService {
       .from(templateVersions)
       .orderBy(desc(templateVersions.createdAt));
 
-    const versionsByTemplate = new Map<string, typeof versionRows>();
+    const versionIds = versionRows.map((v) => v.id);
+    const countsByVersion = new Map<string, number>();
+    if (versionIds.length > 0) {
+      const usage = await this.db
+        .select({
+          versionId: invitations.templateVersionId,
+          total: count(),
+        })
+        .from(invitations)
+        .where(inArray(invitations.templateVersionId, versionIds))
+        .groupBy(invitations.templateVersionId);
+      for (const u of usage) {
+        if (u.versionId) {
+          countsByVersion.set(u.versionId, Number(u.total));
+        }
+      }
+    }
+
+    const versionsByTemplate = new Map<string, Array<(typeof versionRows)[0] & { invitation_count: number }>>();
     for (const v of versionRows) {
       const list = versionsByTemplate.get(v.templateId) ?? [];
-      list.push(v);
+      list.push({
+        ...v,
+        invitation_count: countsByVersion.get(v.id) ?? 0,
+      });
       versionsByTemplate.set(v.templateId, list);
     }
 
@@ -73,11 +94,34 @@ export class AdminTemplatesService {
       throw new NotFoundError(`Template "${id}" not found.`);
     }
 
-    const versions = await this.db
+    const versionRows = await this.db
       .select()
       .from(templateVersions)
       .where(eq(templateVersions.templateId, template.id))
       .orderBy(desc(templateVersions.createdAt));
+
+    const versionIds = versionRows.map((v) => v.id);
+    const countsByVersion = new Map<string, number>();
+    if (versionIds.length > 0) {
+      const usage = await this.db
+        .select({
+          versionId: invitations.templateVersionId,
+          total: count(),
+        })
+        .from(invitations)
+        .where(inArray(invitations.templateVersionId, versionIds))
+        .groupBy(invitations.templateVersionId);
+      for (const u of usage) {
+        if (u.versionId) {
+          countsByVersion.set(u.versionId, Number(u.total));
+        }
+      }
+    }
+
+    const versions = versionRows.map((v) => ({
+      ...v,
+      invitation_count: countsByVersion.get(v.id) ?? 0,
+    }));
 
     return {
       ...template,

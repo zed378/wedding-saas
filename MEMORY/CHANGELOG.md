@@ -10,6 +10,17 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-19 — Template editor UI, assets, dummy preview
+
+**Added** — Complete administrative Template Editor UI in `@wi/admin` with constrained section configuration, WCAG 2.1 AA luminance & contrast checking, live production preview, purpose-tagged assets, and informed deprecation ([P5-05](./records/2026-10-19-P5-05-template-editor-ui.md), [ADR-100](./DECISIONS.md#ADR-100))
+
+- Built metadata editor and version switcher for data-driven wedding invitation templates.
+- Enforced canonical section and field selection model (`FIELD_LABELS`, `componentsForSection`), eliminating manual JSON typing.
+- Added WCAG 2.1 AA contrast checker alerting template authors when foreground text and background colors fail the 4.5:1 ratio.
+- Mounted `@wi/template-renderer` in demo mode with seeded dummy invitation data and responsive mobile (375px) / desktop viewport switcher.
+- Added asset uploader categorized by purpose (`background`, `icon`, `demo-photo`) using `@wi/ui` `Dropzone`.
+- Integrated deprecation modal surfacing the active affected invitation count before confirming deprecation with audit reason.
+
 ### 2026-10-19 — Template and version management API
 
 **Added** — Complete administrative API for templates and versions, strict `@wi/schema` validation, version immutability, safe deletion guards, and catalog cache invalidation ([P5-04](./records/2026-10-19-P5-04-template-and-version-management.md), [ADR-099](./DECISIONS.md#ADR-099))

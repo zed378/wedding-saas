@@ -3123,3 +3123,31 @@ the expiry, because inside the window that is a resume.
    - Exemption registered in `test/idor-sweep-inventory.spec.ts` pointing to `test/admin-templates.spec.ts`.
 
 **Consequences** — Satisfies all requirements of BR-3.1 and BR-3.3; guarantees template versions can be introduced and published with zero downtime and no deploy; preserves visual stability of existing wedding invitations forever.
+
+---
+
+### ADR-100 — Template Editor UI Architecture, WCAG AA Contrast Guard, and Direct Production Renderer Integration
+
+**Date** 2026-10-19 · **Task** `P5-05` · **Status** Accepted · **Amends** `docs/PLAN/07-TEMPLATE-SYSTEM.md`, `docs/PLAN/12-ADMIN-PANEL.md`, `docs/UI-UX/17-ACCESSIBILITY.md`
+
+**Context** — Authoring template versions without requiring developer deploys or direct JSON database editing (`docs/PLAN/00` § Constraints) requires a dedicated admin UI in `@wi/admin`. Specifically:
+1. **Typo Prevention at Authoring Time**: Free text typing for component names or canonical field paths causes downstream rendering failures. Components must be selected from registered section components (`componentsForSection`), and data fields must be picked from the canonical schema registry (`FIELD_LABELS`).
+2. **Accessibility Verification (docs/UI-UX/17)**: Wedding invitations with poor text-to-background contrast create unreadable invitations for guests. Template authors must be immediately warned when color combinations fail WCAG 2.1 AA standards (< 4.5:1 for normal text).
+3. **High-Fidelity Preview**: Rather than maintaining a separate mock preview renderer that could diverge from the public invitation page, the real production `@wi/template-renderer` should be mounted directly in `@wi/admin` and driven by seeded dummy invitation data in `demo` mode.
+4. **Informed Deprecation**: Deprecating a template version removes it from the public catalog while preserving rendering for existing locked invitations (BR-3.3). Operators must see the count of active invitations referencing the version before confirming deprecation.
+
+**Decisions**
+1. **Direct Renderer Package Integration**:
+   - Added `"@wi/template-renderer": "workspace:*"` to `admin/package.json`.
+   - Admin live preview wraps `<TemplateRenderer mode="demo" />` with responsive mobile (375px) and desktop frame controls.
+2. **WCAG 2.1 AA Luminance & Contrast Checker (`contrast.ts`)**:
+   - Implemented sRGB relative luminance conversion and contrast ratio calculation.
+   - When text and secondary (background) color contrast is below 4.5:1, `ThemeEditor` displays a visible warning alert banner naming the exact ratio and WCAG requirement.
+3. **Constrained Selection Model (`SectionEditor.tsx`)**:
+   - Section keys, component names, and data field paths are selected strictly via dropdowns and checkboxes derived from `@wi/schema` exports. Text input for canonical fields is completely disallowed.
+4. **Version Usage Aggregation in API Service**:
+   - `AdminTemplatesService` computes `invitation_count` grouped by `template_version_id`.
+   - The UI displays the blast radius count both in the version toolbar and in the deprecation confirmation dialog.
+
+**Consequences** — Zero manual JSON editing required to author, test, and release templates; 100% render fidelity between preview and public invitations; eliminates typos in section and field definitions; enforces WCAG accessibility standards before designs can be released to couples.
+

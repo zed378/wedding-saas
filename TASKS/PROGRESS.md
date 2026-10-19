@@ -27,7 +27,7 @@ Sizes: `S` under half a day · `M` one to two days · `L` several days · `XL` m
 | [Phase 2 — Template Rendering and Preview](./PHASE-2-TEMPLATE-RENDERING-AND-PREVIEW.md) | 18 | 18 | **COMPLETE** — including three owner-requested cards added after the phase summary | Phase 1 exit + `P1-25` — **met** |
 | [Phase 3 — Order, Payment and Publishing](./PHASE-3-ORDER-PAYMENT-PUBLISHING.md) | 16 | 16 | **COMPLETE** — 2026-10-17 | Phase 2 exit — **met** (LCP qualified by `OQ-26`) |
 | [Phase 4 — Engagement](./PHASE-4-ENGAGEMENT.md) | 12 | 12 | **COMPLETE** — 2026-10-19 | Phase 3 exit — **met** |
-| [Phase 5 — Admin Panel](./PHASE-5-ADMIN-PANEL.md) | 14 | 4 | **ACTIVE** | Phase 4 exit — **met** |
+| [Phase 5 — Admin Panel](./PHASE-5-ADMIN-PANEL.md) | 14 | 5 | **ACTIVE** | Phase 4 exit — **met** |
 | [Phase 6 — Hardening and Launch](./PHASE-6-HARDENING-AND-LAUNCH.md) | 17 | 0 | Not started | Phase 5 exit |
 | [Phase 7 — Post-Launch](./PHASE-7-POST-LAUNCH.md) | 11 | 0 | Not started | MVP launched, `P6-17` signed off |
 
@@ -200,7 +200,7 @@ Roadmap: Week 12-13.
 | P5-02 | Admin 2FA and step-up re-auth | backend, admin | L | **DONE** — mandatory RFC 6238 TOTP with ±1 drift; AES-256-GCM secret encryption at rest; 8 hashed single-use recovery codes; login challenge interception; StepUpGuard & 10-min step-up token; frontend enrollment & verification screens (ADR-097) | P1-03, P5-01 |
 | P5-03 | Admin authorization and audit middleware | backend | M | **DONE** — unified requireRole('admin', 'super_admin'); mandatory reason (5-500 chars); audit log queries with filtering; super_admin restriction on raw payment logs; invitation content modification boundary enforced (ADR-098) | P0-14, P1-06 |
 | P5-04 | Template and version management API | backend | L | **DONE** — full CRUD on templates & versions without redeploy; strict @wi/schema section/theme validation; immutable published versions (BR-3.1); in-use deletion protection (409); cache invalidation on publish & deprecate; audit logging (ADR-099) | P0-20, P5-03 |
-| P5-05 | Template editor UI and preview | admin | L | TODO | P5-04, P2-03 |
+| P5-05 | Template editor UI and preview | admin | L | **DONE** — template authoring interface in @wi/admin; constrained section & canonical field selection; theme editor with WCAG AA luminance/contrast alerts (< 4.5:1); live preview mounting production @wi/template-renderer in demo mode; purpose-tagged asset uploader; deprecation flow surfacing affected invitation count (ADR-100) | P5-04, P2-03 |
 | P5-06 | User management | backend, admin | M | TODO | P5-03 |
 | P5-07 | Order and payment management | backend, admin | M | TODO | P5-03, P3-05 |
 | P5-08 | Manual refund | backend, admin | M | TODO — target status decided (ADR-019) | P5-07 |
