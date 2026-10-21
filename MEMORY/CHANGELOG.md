@@ -10,6 +10,14 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-10-21 — Admin invitation overview API
+
+**Added** — Read-only administrative invitation overview API (`P5-10`) with operational index and audited detail read ([record](./records/2026-10-21-P5-10-admin-invitation-overview-api.md))
+
+- `GET /api/v1/admin/invitations` — Paginated administrative listing with optional search by slug or user name. Returns operational data only (no couple names, sections, or media); includes the latest paid order per invitation via a batched subquery to avoid N+1.
+- `GET /api/v1/admin/invitations/:id` — Audited detail read bypassing tenancy via `InvitationRepository.adminFindInvitationBypassingOwnership`. Returns owner, latest paid order, status history. Requires `reason` query (defaults to "Admin read via overview page").
+- All endpoints guarded by `requireAuth()`, `requireRole("admin", "super_admin")`, and `rateLimit("general-authenticated")`.
+
 ### 2026-10-19 — Moderation queue
 
 **Added** — Platform moderation queue in `@wi/admin`, backend API, and public guest reporting endpoint with instant edge cache invalidation ([P5-09](./records/2026-10-19-P5-09-moderation-queue.md), [ADR-104](./DECISIONS.md#ADR-104))
