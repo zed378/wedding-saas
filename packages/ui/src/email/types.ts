@@ -159,4 +159,3 @@ export interface RenderedEmail {
   readonly html: string;
   readonly text: string;
 }
-

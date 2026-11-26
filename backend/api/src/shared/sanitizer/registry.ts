@@ -93,10 +93,12 @@ export const NOT_USER_TEXT: Readonly<Record<string, string>> = {
     "an array of single-use recovery code strings; never rendered (P5-02)",
   reason:
     "an internal administrative reason stored in audit_logs; never rendered on public pages (P5-03)",
-  admin_id: "a UUID, validated by `z.uuid()`; used for audit log filtering (P5-03)",
+  admin_id:
+    "a UUID, validated by `z.uuid()`; used for audit log filtering (P5-03)",
   resource_type:
     "a closed or bounded audit resource identifier; used for filtering (P5-03)",
-  date_from: "an ISO date string; query filter, never stored or rendered (P5-03)",
+  date_from:
+    "an ISO date string; query filter, never stored or rendered (P5-03)",
   date_to: "an ISO date string; query filter, never stored or rendered (P5-03)",
   thumbnail_url:
     "an absolute HTTP/HTTPS URL, format-validated; rendered in img src, not raw html (P5-04)",

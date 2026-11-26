@@ -21,6 +21,10 @@ import { AdminInvitationsService } from "./admin-invitations.service";
 
 import { AdminDashboardController } from "./admin-dashboard.controller";
 import { AdminDashboardService } from "./admin-dashboard.service";
+import { InvitationModule } from "../invitation/invitation.module";
+import { AdminSlugBlocklistController } from "./admin-slug-blocklist.controller";
+import { AdminSlugBlocklistService } from "./admin-slug-blocklist.service";
+import { AdminSlugBlocklistRepository } from "./admin-slug-blocklist.repository";
 
 /**
  * P5-03, P5-04, P5-06, P5-07, P5-09, P5-10: Administrative module.
@@ -29,7 +33,7 @@ import { AdminDashboardService } from "./admin-dashboard.service";
  * (admin / super_admin) and audited in the same database transaction.
  */
 @Module({
-  imports: [AuthModule, AuditModule, TemplateModule],
+  imports: [AuthModule, AuditModule, TemplateModule, InvitationModule],
   controllers: [
     AdminAuditLogsController,
     AdminModerationController,
@@ -39,6 +43,7 @@ import { AdminDashboardService } from "./admin-dashboard.service";
     AdminUsersController,
     AdminInvitationsController,
     AdminDashboardController,
+    AdminSlugBlocklistController,
   ],
   providers: [
     AdminAuditLogService,
@@ -48,6 +53,8 @@ import { AdminDashboardService } from "./admin-dashboard.service";
     AdminUsersService,
     AdminInvitationsService,
     AdminDashboardService,
+    AdminSlugBlocklistService,
+    AdminSlugBlocklistRepository,
   ],
   exports: [
     AdminAuditLogService,

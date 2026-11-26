@@ -32,7 +32,12 @@ describe("public RSVP submission (P4-01)", () => {
   let pool: Pool;
   let redis: Redis;
   let user: TestUser;
-  let enqueued: { poolName: string; jobName: string; data: unknown; key?: string }[];
+  let enqueued: {
+    poolName: string;
+    jobName: string;
+    data: unknown;
+    key?: string;
+  }[];
 
   const queueMock: JobQueue = {
     enqueue: async (poolName, jobName, data, options) => {
@@ -65,7 +70,11 @@ describe("public RSVP submission (P4-01)", () => {
     const stale = await redis.keys("rl:*");
     if (stale.length > 0) await redis.del(...stale);
 
-    pool = await connect(["invitations", "invitation_settings", "invitation_guests"]);
+    pool = await connect([
+      "invitations",
+      "invitation_settings",
+      "invitation_guests",
+    ]);
 
     const { AppModule } = await import("../../src/app.module.ts");
 
@@ -94,12 +103,14 @@ describe("public RSVP submission (P4-01)", () => {
     enqueued = [];
   });
 
-  async function createInvitation(options: {
-    status?: string;
-    slug?: string;
-    rsvpEnabled?: boolean;
-    deleted?: boolean;
-  } = {}): Promise<TestInvitation> {
+  async function createInvitation(
+    options: {
+      status?: string;
+      slug?: string;
+      rsvpEnabled?: boolean;
+      deleted?: boolean;
+    } = {},
+  ): Promise<TestInvitation> {
     const inv = await createTestInvitation(pool, {
       owner: user,
       status: options.status ?? "published",
@@ -153,7 +164,9 @@ describe("public RSVP submission (P4-01)", () => {
       guest_count: number;
       message: string;
       submitted_ip_hash: string;
-    }>("SELECT guest_name, attendance_status, guest_count, message, submitted_ip_hash FROM invitation_guests");
+    }>(
+      "SELECT guest_name, attendance_status, guest_count, message, submitted_ip_hash FROM invitation_guests",
+    );
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
@@ -185,7 +198,11 @@ describe("public RSVP submission (P4-01)", () => {
     await createInvitation({ status: "draft", slug: "draft-wedding" });
     await createInvitation({ status: "paid", slug: "unpublished-wedding" });
     await createInvitation({ status: "expired", slug: "expired-wedding" });
-    await createInvitation({ status: "published", slug: "deleted-wedding", deleted: true });
+    await createInvitation({
+      status: "published",
+      slug: "deleted-wedding",
+      deleted: true,
+    });
 
     for (const slug of [
       "draft-wedding",
@@ -243,7 +260,8 @@ describe("public RSVP submission (P4-01)", () => {
         guest_name: "<script>alert('xss')</script>Citra",
         attendance_status: "attending",
         guest_count: 1,
-        message: "<img src=x onerror=alert(1)>Samawa ya <a href='javascript:void(0)'>teman</a>",
+        message:
+          "<img src=x onerror=alert(1)>Samawa ya <a href='javascript:void(0)'>teman</a>",
       });
 
     expect(res.status).toBe(201);

@@ -6,7 +6,7 @@ import type { Pool } from "pg";
 import Redis from "ioredis";
 
 import { JOB_QUEUE, type JobQueue } from "../../src/infra/queue/queue.module";
-import { RateLimiter, RATE_LIMIT_REDIS } from "../../src/shared/rate-limit/rate-limiter";
+import { RateLimiter } from "../../src/shared/rate-limit/rate-limiter";
 import { RATE_LIMITER } from "../../src/shared/rate-limit/rate-limit.guard";
 import { DEFAULT_POLICIES } from "../../src/shared/rate-limit/policies";
 import { ProfanityService } from "../../src/shared/abuse/profanity.service";
@@ -262,7 +262,9 @@ describe("public abuse controls and adaptive CAPTCHA (P4-05)", () => {
     });
 
     // Seed a profanity term in slug_blocklist
-    await pool.query("DELETE FROM slug_blocklist WHERE lower(term) = 'kasarkata'");
+    await pool.query(
+      "DELETE FROM slug_blocklist WHERE lower(term) = 'kasarkata'",
+    );
     await pool.query(
       `INSERT INTO slug_blocklist (term, category, match_type, reason)
        VALUES ('kasarkata', 'profanity', 'substring', 'Profanity test term')`,
@@ -297,7 +299,9 @@ describe("public abuse controls and adaptive CAPTCHA (P4-05)", () => {
       guestbookModeration: false,
     });
 
-    await pool.query("DELETE FROM slug_blocklist WHERE lower(term) = 'kasarkata'");
+    await pool.query(
+      "DELETE FROM slug_blocklist WHERE lower(term) = 'kasarkata'",
+    );
     await pool.query(
       `INSERT INTO slug_blocklist (term, category, match_type, reason)
        VALUES ('kasarkata', 'profanity', 'substring', 'Profanity test term')`,

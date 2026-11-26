@@ -12,6 +12,7 @@ import { Pool } from "pg";
  */
 
 export const DATABASE_URL =
+  process.env["TEST_DATABASE_URL"] ??
   process.env["MIGRATION_DATABASE_URL"] ??
   "postgres://wedding_owner:wedding_owner_dev@localhost:5432/wedding";
 

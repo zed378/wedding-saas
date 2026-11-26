@@ -59,9 +59,11 @@ The full table with versions is in `CLAUDE.md` § Dev environment. Every choice 
 ```bash
 pnpm install          # workspace install
 pnpm typecheck        # type check every package
-pnpm lint             # lint
+pnpm lint             # Oxlint correctness rules across source, tests and tooling
 pnpm test             # unit tests
 pnpm build            # build every surface
+pnpm check:sast       # checked-in Semgrep rules + rule tests; requires Docker
+pnpm verify           # full local gates, including integration, coverage and audit
 ```
 
 Local services (PostgreSQL, Redis, MinIO, Mailpit, ClamAV) come up with Docker Compose — see `deploy/README.md`. Copy `.env.example` to `.env` first; `.env` is git-ignored and must stay that way.

@@ -112,4 +112,3 @@ groups:
         annotations:
           summary: "Spike in email bounces or complaints detected ({{ $labels.type }})"
           runbook: "docs/DEVOPS/07-ALERTING.md; check email_bounces table and provider reputation dashboard"
-

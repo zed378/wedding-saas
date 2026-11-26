@@ -164,7 +164,8 @@ export const CRON_JOBS = {
     attempts: 3,
     backoff: { type: "fixed", delay: 60_000 },
     deadLetter: true,
-    description: "Send daily aggregated RSVP summary emails for opted-in invitations",
+    description:
+      "Send daily aggregated RSVP summary emails for opted-in invitations",
     pattern: "0 9 * * *",
   },
   /**

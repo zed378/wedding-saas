@@ -24,7 +24,12 @@ const submitRsvpSchema = z
       .max(150, "Nama tamu maksimal 150 karakter"),
     attendance_status: z.enum(["attending", "not_attending", "maybe"]),
     guest_count: z.number().int().min(1).max(10).optional(),
-    message: z.string().trim().max(1000, "Pesan maksimal 1000 karakter").nullable().optional(),
+    message: z
+      .string()
+      .trim()
+      .max(1000, "Pesan maksimal 1000 karakter")
+      .nullable()
+      .optional(),
     captcha_token: z.string().trim().max(2048).optional(),
   })
   .strict();
@@ -56,7 +61,11 @@ export class PublicRsvpController {
     }
 
     const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
-    const result = await this.service.submitRsvp(slug, parsed.data as SubmitRsvpDto, ip);
+    const result = await this.service.submitRsvp(
+      slug,
+      parsed.data as SubmitRsvpDto,
+      ip,
+    );
     return ok(result);
   }
 }

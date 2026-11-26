@@ -76,9 +76,7 @@ describe("PaymentStatusBanner", () => {
   });
 
   it("does NOT show a retry button for 'success' status", () => {
-    render(
-      <PaymentStatusBanner status="success" onRetry={vi.fn()} />,
-    );
+    render(<PaymentStatusBanner status="success" onRetry={vi.fn()} />);
     expect(
       screen.queryByRole("button", { name: /coba lagi/i }),
     ).not.toBeInTheDocument();

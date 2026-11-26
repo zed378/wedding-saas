@@ -1,5 +1,5 @@
 import { Inject, Injectable, Optional } from "@nestjs/common";
-import { and, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, or } from "drizzle-orm";
 
 import { DB, type Database } from "../../infra/db/client";
 import {
@@ -14,10 +14,12 @@ import { NotFoundError, ValidationError } from "../../http/errors";
 import { JOB_QUEUE, type JobQueue } from "../../infra/queue/queue.module";
 import type { CurrentUser } from "../../shared/auth-middleware/current-user";
 import { PublicInvitationCache } from "../publishing/public-invitation-cache";
-import type {
-  AdminDeleteActionDto,
-  AdminModerateActionDto,
-  AdminModerationQueryDto,
+import {
+  adminDeleteActionSchema,
+  adminModerateActionSchema,
+  type AdminDeleteActionDto,
+  type AdminModerateActionDto,
+  type AdminModerationQueryDto,
 } from "./schemas/admin-moderation.schema";
 
 const UUID_REGEX =
@@ -47,7 +49,8 @@ export interface AdminModerationListItem {
     readonly reason: string | null;
     readonly createdAt: string;
   }[];
-  readonly flagSource: "reported" | "auto_flagged" | "owner_moderation" | "standard";
+  readonly flagSource:
+    "reported" | "auto_flagged" | "owner_moderation" | "standard";
   readonly flagLabel: string;
 }
 
@@ -80,10 +83,15 @@ export class AdminModerationService {
     if (query.invitation_id) {
       if (!UUID_REGEX.test(query.invitation_id)) {
         throw new ValidationError([
-          { field: "invitation_id", message: "invitation_id harus berupa UUID valid." },
+          {
+            field: "invitation_id",
+            message: "invitation_id harus berupa UUID valid.",
+          },
         ]);
       }
-      conditions.push(eq(invitationGuestbook.invitationId, query.invitation_id));
+      conditions.push(
+        eq(invitationGuestbook.invitationId, query.invitation_id),
+      );
     }
 
     if (query.search && query.search.trim()) {
@@ -103,7 +111,10 @@ export class AdminModerationService {
     const [totalRow] = await this.db
       .select({ total: count() })
       .from(invitationGuestbook)
-      .leftJoin(invitations, eq(invitationGuestbook.invitationId, invitations.id))
+      .leftJoin(
+        invitations,
+        eq(invitationGuestbook.invitationId, invitations.id),
+      )
       .where(whereClause);
 
     const total = Number(totalRow?.total ?? 0);
@@ -129,8 +140,14 @@ export class AdminModerationService {
         ownerFullName: users.fullName,
       })
       .from(invitationGuestbook)
-      .leftJoin(invitations, eq(invitationGuestbook.invitationId, invitations.id))
-      .leftJoin(invitationSettings, eq(invitations.id, invitationSettings.invitationId))
+      .leftJoin(
+        invitations,
+        eq(invitationGuestbook.invitationId, invitations.id),
+      )
+      .leftJoin(
+        invitationSettings,
+        eq(invitations.id, invitationSettings.invitationId),
+      )
       .leftJoin(users, eq(invitations.ownerId, users.id))
       .where(whereClause)
       .orderBy(desc(invitationGuestbook.createdAt))
@@ -172,7 +189,8 @@ export class AdminModerationService {
       const reports = reportsMap.get(r.id) ?? [];
       const reportCount = reports.length;
 
-      let flagSource: "reported" | "auto_flagged" | "owner_moderation" | "standard" =
+      let flagSource:
+        "reported" | "auto_flagged" | "owner_moderation" | "standard" =
         "standard";
       let flagLabel = "Standar";
 
@@ -220,7 +238,9 @@ export class AdminModerationService {
       data = data.filter((item) => item.reportCount > 0);
     } else if (query.flag_source === "auto_flagged") {
       data = data.filter(
-        (item) => item.flagSource === "auto_flagged" || item.flagSource === "owner_moderation",
+        (item) =>
+          item.flagSource === "auto_flagged" ||
+          item.flagSource === "owner_moderation",
       );
     }
 
@@ -243,35 +263,45 @@ export class AdminModerationService {
     id: string,
     dto: AdminModerateActionDto,
   ) {
+    const parsed = adminModerateActionSchema.safeParse(dto);
+    if (!parsed.success)
+      throw new ValidationError([
+        {
+          field: "reason",
+          message: "Alasan moderasi wajib diisi (5–500 karakter).",
+        },
+      ]);
+    dto = parsed.data;
     if (!UUID_REGEX.test(id)) {
       throw new NotFoundError(`Pesan buku tamu "${id}" tidak ditemukan.`);
     }
 
-    const [existing] = await this.db
-      .select({
-        id: invitationGuestbook.id,
-        invitationId: invitationGuestbook.invitationId,
-        guestName: invitationGuestbook.guestName,
-        message: invitationGuestbook.message,
-        status: invitationGuestbook.status,
-        invitationSlug: invitations.slug,
-        invitationStatus: invitations.status,
-      })
-      .from(invitationGuestbook)
-      .leftJoin(invitations, eq(invitationGuestbook.invitationId, invitations.id))
-      .where(eq(invitationGuestbook.id, id))
-      .limit(1);
-
-    if (!existing) {
-      throw new NotFoundError(`Pesan buku tamu "${id}" tidak ditemukan.`);
-    }
-
-    const previousStatus = existing.status;
     const now = new Date();
-    const actionReason =
-      dto.reason?.trim() || `Admin moderation decision: ${dto.status}`;
+    // Lock before reading the audit snapshot so concurrent decisions serialize.
+    const existing = await this.db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({
+          id: invitationGuestbook.id,
+          invitationId: invitationGuestbook.invitationId,
+          guestName: invitationGuestbook.guestName,
+          message: invitationGuestbook.message,
+          status: invitationGuestbook.status,
+          invitationSlug: invitations.slug,
+          invitationStatus: invitations.status,
+        })
+        .from(invitationGuestbook)
+        .leftJoin(
+          invitations,
+          eq(invitationGuestbook.invitationId, invitations.id),
+        )
+        .where(eq(invitationGuestbook.id, id))
+        .limit(1)
+        .for("update", { of: invitationGuestbook });
 
-    await this.db.transaction(async (tx) => {
+      if (!existing) {
+        throw new NotFoundError(`Pesan buku tamu "${id}" tidak ditemukan.`);
+      }
+
       await tx
         .update(invitationGuestbook)
         .set({
@@ -286,9 +316,9 @@ export class AdminModerationService {
         action: "guestbook.moderate",
         resourceType: "guestbook_entry",
         resourceId: id,
-        reason: actionReason,
+        reason: dto.reason,
         beforeState: {
-          status: previousStatus,
+          status: existing.status,
           guest_name: existing.guestName,
           invitation_id: existing.invitationId,
         },
@@ -298,6 +328,7 @@ export class AdminModerationService {
           moderated_at: now.toISOString(),
         },
       });
+      return existing;
     });
 
     // Invalidate public edge cache if published
@@ -337,34 +368,46 @@ export class AdminModerationService {
   async deleteGuestbook(
     admin: CurrentUser,
     id: string,
-    dto?: AdminDeleteActionDto,
+    dto: AdminDeleteActionDto,
   ) {
+    const parsed = adminDeleteActionSchema.safeParse(dto);
+    if (!parsed.success)
+      throw new ValidationError([
+        {
+          field: "reason",
+          message: "Alasan penghapusan wajib diisi (5–500 karakter).",
+        },
+      ]);
+    dto = parsed.data;
     if (!UUID_REGEX.test(id)) {
       throw new NotFoundError(`Pesan buku tamu "${id}" tidak ditemukan.`);
     }
 
-    const [existing] = await this.db
-      .select({
-        id: invitationGuestbook.id,
-        invitationId: invitationGuestbook.invitationId,
-        guestName: invitationGuestbook.guestName,
-        message: invitationGuestbook.message,
-        status: invitationGuestbook.status,
-        invitationSlug: invitations.slug,
-        invitationStatus: invitations.status,
-      })
-      .from(invitationGuestbook)
-      .leftJoin(invitations, eq(invitationGuestbook.invitationId, invitations.id))
-      .where(eq(invitationGuestbook.id, id))
-      .limit(1);
+    // A competing delete must observe absence, not audit a second deletion.
+    const existing = await this.db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({
+          id: invitationGuestbook.id,
+          invitationId: invitationGuestbook.invitationId,
+          guestName: invitationGuestbook.guestName,
+          message: invitationGuestbook.message,
+          status: invitationGuestbook.status,
+          invitationSlug: invitations.slug,
+          invitationStatus: invitations.status,
+        })
+        .from(invitationGuestbook)
+        .leftJoin(
+          invitations,
+          eq(invitationGuestbook.invitationId, invitations.id),
+        )
+        .where(eq(invitationGuestbook.id, id))
+        .limit(1)
+        .for("update", { of: invitationGuestbook });
 
-    if (!existing) {
-      throw new NotFoundError(`Pesan buku tamu "${id}" tidak ditemukan.`);
-    }
+      if (!existing) {
+        throw new NotFoundError(`Pesan buku tamu "${id}" tidak ditemukan.`);
+      }
 
-    const actionReason = dto?.reason?.trim() || "Admin deleted guestbook entry";
-
-    await this.db.transaction(async (tx) => {
       await tx
         .delete(invitationGuestbook)
         .where(eq(invitationGuestbook.id, id));
@@ -374,7 +417,7 @@ export class AdminModerationService {
         action: "guestbook.delete",
         resourceType: "guestbook_entry",
         resourceId: id,
-        reason: actionReason,
+        reason: dto.reason,
         beforeState: {
           id: existing.id,
           invitation_id: existing.invitationId,
@@ -384,6 +427,7 @@ export class AdminModerationService {
         },
         afterState: null,
       });
+      return existing;
     });
 
     if (existing.invitationStatus === "published" && existing.invitationSlug) {

@@ -11,7 +11,8 @@ export const DUMMY_INVITATION_DATA: Record<string, unknown> = {
       mother_name: "Ibu Sri Rahayu",
       child_order: "Putra pertama",
       instagram: "budisantoso",
-      photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
+      photo:
+        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
     },
     bride: {
       nickname: "Siti",
@@ -20,7 +21,8 @@ export const DUMMY_INVITATION_DATA: Record<string, unknown> = {
       mother_name: "Ibu Hj. Dewi Lestari",
       child_order: "Putri kedua",
       instagram: "sitinurhaliza",
-      photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&q=80",
+      photo:
+        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&q=80",
     },
   },
   events: [

@@ -2,7 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 
 import { JOB_QUEUE, type JobQueue } from "../../infra/queue/queue.module";
 import { logger } from "../../shared/logging/logger";
-import { metrics } from "../../shared/metrics/metrics";
+
 import { InvitationRepository } from "../../shared/tenancy/invitation-repository";
 
 export interface ReminderSweepResult {

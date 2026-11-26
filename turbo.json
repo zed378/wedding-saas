@@ -16,7 +16,24 @@
     },
     "test:integration": {
       "dependsOn": ["^build"],
-      "cache": false
+      "cache": false,
+      "passThroughEnv": [
+        "TEST_DATABASE_URL",
+        "MIGRATION_DATABASE_URL",
+        "DATABASE_URL",
+        "TEST_REDIS_URL",
+        "REDIS_URL",
+        "STORAGE_ENDPOINT",
+        "STORAGE_ACCESS_KEY_ID",
+        "STORAGE_SECRET_ACCESS_KEY",
+        "CLAMAV_HOST",
+        "CLAMAV_PORT",
+        "DOCKER_HOST",
+        "DOCKER_TLS_VERIFY",
+        "DOCKER_CERT_PATH",
+        "TESTCONTAINERS_HOST_OVERRIDE",
+        "TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE"
+      ]
     },
     "dev": {
       "cache": false,

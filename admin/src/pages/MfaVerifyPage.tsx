@@ -37,8 +37,14 @@ export function MfaVerifyPage() {
     setIsLoading(true);
 
     try {
+      if (!ticket)
+        throw new Error("Sesi verifikasi tidak tersedia. Masuk kembali.");
       if (ticket) {
-        const payload: { mfa_ticket: string; code?: string; recovery_code?: string } = {
+        const payload: {
+          mfa_ticket: string;
+          code?: string;
+          recovery_code?: string;
+        } = {
           mfa_ticket: ticket,
         };
 
@@ -52,6 +58,7 @@ export function MfaVerifyPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
+          credentials: "include",
         });
 
         const data = await res.json();
@@ -63,16 +70,6 @@ export function MfaVerifyPage() {
         navigate("/");
         return;
       }
-
-      // Mock / fallback completion
-      const mockToken = `admin_token_verified_${Date.now()}`;
-      login(mockToken, {
-        id: "admin-1",
-        email: "admin@vizunicum.my.id",
-        role: "admin",
-        name: "Administrator",
-      });
-      navigate("/");
     } catch (err: unknown) {
       setError(
         err instanceof Error
@@ -99,7 +96,11 @@ export function MfaVerifyPage() {
 
         <Card>
           <CardHeader
-            title={useRecovery ? "Gunakan Kode Pemulihan" : "Masukkan Kode Authenticator"}
+            title={
+              useRecovery
+                ? "Gunakan Kode Pemulihan"
+                : "Masukkan Kode Authenticator"
+            }
             description={
               useRecovery
                 ? "Masukkan salah satu kode pemulihan cadangan 8 karakter."

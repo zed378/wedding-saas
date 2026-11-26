@@ -152,7 +152,7 @@ describe("Admin Order and Payment Management API (P5-07)", () => {
       throw new NotFoundError(`Order "${id}" tidak ditemukan.`);
     }),
 
-    refundOrder: vi.fn(async (_admin: any, id: string, reason: string) => {
+    refundOrder: vi.fn(async (_admin: any, id: string, _reason: string) => {
       if (id === ORDER_2_ID) {
         throw new ConflictError(
           "ORDER_NOT_PAID",
@@ -177,12 +177,14 @@ describe("Admin Order and Payment Management API (P5-07)", () => {
   };
 
   const mockMfaService = {
-    verifyStepUpToken: vi.fn(async (token: string, userId: string) => {
+    verifyStepUpToken: vi.fn(async (token: string, _userId: string) => {
       return token === "valid-step-up-token";
     }),
-    verifyCodeOrRecovery: vi.fn(async (userId: string, body: { code: string }) => {
-      return { success: body.code === "123456" };
-    }),
+    verifyCodeOrRecovery: vi.fn(
+      async (userId: string, body: { code: string }) => {
+        return { success: body.code === "123456" };
+      },
+    ),
   };
 
   const mockSessionService = {

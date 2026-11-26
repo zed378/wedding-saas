@@ -1,14 +1,18 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Redis } from "ioredis";
 import { createHash } from "node:crypto";
 
-import { sanitizePlainText, sanitizeRichText } from "../src/shared/sanitizer/sanitize";
+import { sanitizePlainText } from "../src/shared/sanitizer/sanitize";
 import { TEXT_FIELDS } from "../src/shared/sanitizer/registry";
-import { AnalyticsService, PENDING_VIEWS_HASH } from "../src/modules/analytics/analytics.service";
+import {
+  AnalyticsService,
+  PENDING_VIEWS_HASH,
+} from "../src/modules/analytics/analytics.service";
 import type { AnalyticsRepository } from "../src/shared/tenancy/analytics-repository";
 import type { PublicInvitationRepository } from "../src/shared/tenancy/public-invitation-repository";
 
-const hashIp = (ip: string): string => createHash("sha256").update(ip).digest("hex");
+const hashIp = (ip: string): string =>
+  createHash("sha256").update(ip).digest("hex");
 
 /**
  * P4-12 — Phase 4 Test Suite and Acceptance.
@@ -25,7 +29,10 @@ const hashIp = (ip: string): string => createHash("sha256").update(ip).digest("h
 
 const XSS_PAYLOADS: readonly [string, string][] = [
   ["bare script tag", "<script>alert(1)</script>"],
-  ["script with attributes", '<script type="text/javascript">alert(1)</script>'],
+  [
+    "script with attributes",
+    '<script type="text/javascript">alert(1)</script>',
+  ],
   ["image onerror", '<img src=x onerror="alert(1)">'],
   ["svg onload", "<svg/onload=alert(1)>"],
   ["body onload", "<body onload=alert(1)>"],
@@ -33,8 +40,14 @@ const XSS_PAYLOADS: readonly [string, string][] = [
   ["data URI link", '<a href="data:text/html,<script>alert(1)</script>">x</a>'],
   ["iframe tag", '<iframe src="https://evil.test"></iframe>'],
   ["style expression", '<div style="width:expression(alert(1))">x</div>'],
-  ["mutation XSS", '<noscript><p title="</noscript><img src=x onerror=alert(1)>">'],
-  ["math/mtext payload", "<math><mtext><table><mglyph><style><img src=x onerror=alert(1)>"],
+  [
+    "mutation XSS",
+    '<noscript><p title="</noscript><img src=x onerror=alert(1)>">',
+  ],
+  [
+    "math/mtext payload",
+    "<math><mtext><table><mglyph><style><img src=x onerror=alert(1)>",
+  ],
 ];
 
 describe("P4-12 — Phase 4 Test Suite and Acceptance", () => {
@@ -96,7 +109,9 @@ describe("P4-12 — Phase 4 Test Suite and Acceptance", () => {
 
       // Assert: Rejected entry never appears on public wall
       expect(publicWall.some((e) => e.id === "msg-2")).toBe(false);
-      expect(ownerDashboard.find((e) => e.id === "msg-2")?.status).toBe("rejected");
+      expect(ownerDashboard.find((e) => e.id === "msg-2")?.status).toBe(
+        "rejected",
+      );
     });
 
     it("verifies public RSVP records response and updates owner headcount summary", () => {
@@ -122,11 +137,15 @@ describe("P4-12 — Phase 4 Test Suite and Acceptance", () => {
 
       // Compute summary
       const totalResponses = rsvps.length;
-      const attendingCount = rsvps.filter((r) => r.attendance_status === "attending").length;
+      const attendingCount = rsvps.filter(
+        (r) => r.attendance_status === "attending",
+      ).length;
       const totalAttendingGuests = rsvps
         .filter((r) => r.attendance_status === "attending")
         .reduce((sum, r) => sum + r.guest_count, 0);
-      const declinedCount = rsvps.filter((r) => r.attendance_status === "declined").length;
+      const declinedCount = rsvps.filter(
+        (r) => r.attendance_status === "declined",
+      ).length;
 
       expect(totalResponses).toBe(2);
       expect(attendingCount).toBe(1);
@@ -147,20 +166,45 @@ describe("P4-12 — Phase 4 Test Suite and Acceptance", () => {
         const sanitizedMessage = sanitizePlainText(payload);
 
         // Plain text sanitizer must strip all tags and never contain angle brackets
-        expect(sanitizedName, `XSS test failed for name on payload: ${name}`).not.toContain("<script");
-        expect(sanitizedName, `XSS test failed for name on payload: ${name}`).not.toContain("onerror");
-        expect(sanitizedName, `XSS test failed for name on payload: ${name}`).not.toContain("javascript:");
-        expect(sanitizedName, `XSS test failed for name on payload: ${name}`).not.toContain("<iframe");
+        expect(
+          sanitizedName,
+          `XSS test failed for name on payload: ${name}`,
+        ).not.toContain("<script");
+        expect(
+          sanitizedName,
+          `XSS test failed for name on payload: ${name}`,
+        ).not.toContain("onerror");
+        expect(
+          sanitizedName,
+          `XSS test failed for name on payload: ${name}`,
+        ).not.toContain("javascript:");
+        expect(
+          sanitizedName,
+          `XSS test failed for name on payload: ${name}`,
+        ).not.toContain("<iframe");
 
-        expect(sanitizedMessage, `XSS test failed for message on payload: ${name}`).not.toContain("<script");
-        expect(sanitizedMessage, `XSS test failed for message on payload: ${name}`).not.toContain("onerror");
-        expect(sanitizedMessage, `XSS test failed for message on payload: ${name}`).not.toContain("javascript:");
-        expect(sanitizedMessage, `XSS test failed for message on payload: ${name}`).not.toContain("<iframe");
+        expect(
+          sanitizedMessage,
+          `XSS test failed for message on payload: ${name}`,
+        ).not.toContain("<script");
+        expect(
+          sanitizedMessage,
+          `XSS test failed for message on payload: ${name}`,
+        ).not.toContain("onerror");
+        expect(
+          sanitizedMessage,
+          `XSS test failed for message on payload: ${name}`,
+        ).not.toContain("javascript:");
+        expect(
+          sanitizedMessage,
+          `XSS test failed for message on payload: ${name}`,
+        ).not.toContain("<iframe");
       }
     });
 
     it("preserves legitimate text while removing tags", () => {
-      const input = "Selamat ya! Semoga bahagia selalu <script>alert('pwn')</script> & berkah.";
+      const input =
+        "Selamat ya! Semoga bahagia selalu <script>alert('pwn')</script> & berkah.";
       const cleaned = sanitizePlainText(input);
       expect(cleaned).toBe("Selamat ya! Semoga bahagia selalu  & berkah.");
     });
@@ -233,8 +277,26 @@ describe("P4-12 — Phase 4 Test Suite and Acceptance", () => {
     });
 
     it("confirms database tables rsvps and guestbook_entries store submitted_ip_hash and NO raw ip columns", () => {
-      const rsvpColumns = ["id", "invitation_id", "guest_name", "attendance_status", "guest_count", "message", "submitted_ip_hash", "created_at"];
-      const guestbookColumns = ["id", "invitation_id", "guest_name", "message", "status", "submitted_ip_hash", "created_at", "updated_at"];
+      const rsvpColumns = [
+        "id",
+        "invitation_id",
+        "guest_name",
+        "attendance_status",
+        "guest_count",
+        "message",
+        "submitted_ip_hash",
+        "created_at",
+      ];
+      const guestbookColumns = [
+        "id",
+        "invitation_id",
+        "guest_name",
+        "message",
+        "status",
+        "submitted_ip_hash",
+        "created_at",
+        "updated_at",
+      ];
 
       expect(rsvpColumns.includes("ip")).toBe(false);
       expect(rsvpColumns.includes("ip_address")).toBe(false);
@@ -248,24 +310,35 @@ describe("P4-12 — Phase 4 Test Suite and Acceptance", () => {
 
   describe("5. Notification Delivery & Preference Gating (`docs/ARCHITECTURE/07`)", () => {
     it("respects user notification preferences for RSVP and guestbook alerts", () => {
-      const shouldSendRsvpEmail = (prefs: { rsvp_email: boolean; rsvp_digest: boolean }) => {
+      const shouldSendRsvpEmail = (prefs: {
+        rsvp_email: boolean;
+        rsvp_digest: boolean;
+      }) => {
         // Individual email is only sent if rsvp_email is true AND rsvp_digest is false
         return prefs.rsvp_email && !prefs.rsvp_digest;
       };
 
-      const shouldSendGuestbookEmail = (prefs: { guestbook_email: boolean }) => {
+      const shouldSendGuestbookEmail = (prefs: {
+        guestbook_email: boolean;
+      }) => {
         return prefs.guestbook_email;
       };
 
       // Default preferences: instant email enabled, digest disabled
-      expect(shouldSendRsvpEmail({ rsvp_email: true, rsvp_digest: false })).toBe(true);
+      expect(
+        shouldSendRsvpEmail({ rsvp_email: true, rsvp_digest: false }),
+      ).toBe(true);
       expect(shouldSendGuestbookEmail({ guestbook_email: true })).toBe(true);
 
       // User chose daily digest: instant email must NOT be sent
-      expect(shouldSendRsvpEmail({ rsvp_email: true, rsvp_digest: true })).toBe(false);
+      expect(shouldSendRsvpEmail({ rsvp_email: true, rsvp_digest: true })).toBe(
+        false,
+      );
 
       // User disabled RSVP emails: no email
-      expect(shouldSendRsvpEmail({ rsvp_email: false, rsvp_digest: false })).toBe(false);
+      expect(
+        shouldSendRsvpEmail({ rsvp_email: false, rsvp_digest: false }),
+      ).toBe(false);
 
       // User disabled guestbook emails: no email
       expect(shouldSendGuestbookEmail({ guestbook_email: false })).toBe(false);
@@ -294,13 +367,14 @@ describe("P4-12 — Phase 4 Test Suite and Acceptance", () => {
   describe("6. In-Memory Page Views Write-Behind Under Load (`docs/PLAN/14`)", () => {
     it("performs zero synchronous primary database writes on visitor page views", async () => {
       let sqlWriteCount = 0;
-      const mockSqlDb = {
+      const _mockSqlDb = {
         query: () => {
           sqlWriteCount++;
         },
       };
 
-      const redisCalls: { key: string; field: string; increment: number }[] = [];
+      const redisCalls: { key: string; field: string; increment: number }[] =
+        [];
       const mockRedis = {
         hincrby: vi.fn().mockImplementation((key, field, inc) => {
           redisCalls.push({ key, field, increment: inc });

@@ -155,11 +155,13 @@ describe("settings and slug rules", () => {
         "enabled_sections",
         "guestbook_enabled",
         "guestbook_moderation",
+        "profanity_filter_enabled",
         "rsvp_enabled",
         "seo_indexable",
         "slug",
         "theme_override",
       ]);
+      expect(settings.profanity_filter_enabled).toBe(false);
     });
 
     it("writes the toggles", async () => {

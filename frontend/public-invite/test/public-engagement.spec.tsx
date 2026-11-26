@@ -8,7 +8,9 @@ describe("P4-11 — Public RSVP Form Component", () => {
   beforeEach(() => {
     // Set up window.location
     delete (window as unknown as { location?: unknown }).location;
-    window.location = new URL("https://invitation.test/budi-ani") as unknown as Location;
+    window.location = new URL(
+      "https://invitation.test/budi-ani",
+    ) as unknown as Location;
   });
 
   afterEach(() => {
@@ -26,7 +28,9 @@ describe("P4-11 — Public RSVP Form Component", () => {
       />,
     );
 
-    expect(screen.getByText("Formulir ini dinonaktifkan dalam mode pratinjau.")).toBeDefined();
+    expect(
+      screen.getByText("Formulir ini dinonaktifkan dalam mode pratinjau."),
+    ).toBeDefined();
     const input = screen.getByRole("textbox");
     expect(input.hasAttribute("disabled")).toBe(true);
   });
@@ -112,7 +116,9 @@ describe("P4-11 — Public RSVP Form Component", () => {
 describe("P4-11 — Public Guestbook Wall Component", () => {
   beforeEach(() => {
     delete (window as unknown as { location?: unknown }).location;
-    window.location = new URL("https://invitation.test/budi-ani") as unknown as Location;
+    window.location = new URL(
+      "https://invitation.test/budi-ani",
+    ) as unknown as Location;
   });
 
   afterEach(() => {
@@ -130,7 +136,9 @@ describe("P4-11 — Public Guestbook Wall Component", () => {
       />,
     );
 
-    expect(screen.getByText("Buku tamu dinonaktifkan dalam mode pratinjau.")).toBeDefined();
+    expect(
+      screen.getByText("Buku tamu dinonaktifkan dalam mode pratinjau."),
+    ).toBeDefined();
     const input = screen.getByRole("textbox");
     expect(input.hasAttribute("disabled")).toBe(true);
   });
@@ -179,7 +187,9 @@ describe("P4-11 — Public Guestbook Wall Component", () => {
     const submitBtn = screen.getByRole("button", { name: "Kirim Ucapan" });
     fireEvent.click(submitBtn);
 
-    expect(await screen.findByText("Ucapan Anda berhasil dikirim!")).toBeDefined();
+    expect(
+      await screen.findByText("Ucapan Anda berhasil dikirim!"),
+    ).toBeDefined();
     expect(screen.getByText(/Selamat ya!/)).toBeDefined();
   });
 

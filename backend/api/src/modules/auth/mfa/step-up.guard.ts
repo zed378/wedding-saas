@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  CanActivate,
-  ExecutionContext,
-  Inject,
-} from "@nestjs/common";
+import { Injectable, CanActivate, ExecutionContext } from "@nestjs/common";
 import { ForbiddenError } from "../../../http/errors";
 import { maybeCurrentUser } from "../../../shared/auth-middleware/current-user";
 import { MfaService } from "./mfa.service";

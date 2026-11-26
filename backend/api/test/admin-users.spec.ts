@@ -7,9 +7,9 @@ import request from "supertest";
 import { AppExceptionFilter } from "../src/http/exception.filter";
 import { AdminUsersController } from "../src/modules/admin/admin-users.controller";
 import { AdminUsersService } from "../src/modules/admin/admin-users.service";
+import { MfaService } from "../src/modules/auth/mfa/mfa.service";
 import { SessionService } from "../src/modules/auth/session.service";
-import { DB } from "../src/infra/db/client";
-import { AuditLogService } from "../src/shared/audit/audit-log.service";
+
 import { NotFoundError, UnauthenticatedError } from "../src/http/errors";
 
 describe("Admin User Management API (P5-06)", () => {
@@ -83,8 +83,7 @@ describe("Admin User Management API (P5-06)", () => {
       if (query.search) {
         filtered = filtered.filter(
           (u) =>
-            u.email.includes(query.search) ||
-            u.fullName.includes(query.search),
+            u.email.includes(query.search) || u.fullName.includes(query.search),
         );
       }
       return {
@@ -98,7 +97,7 @@ describe("Admin User Management API (P5-06)", () => {
       throw new NotFoundError(`User "${id}" not found.`);
     }),
 
-    suspendUser: vi.fn(async (_admin: any, id: string, reason: string) => {
+    suspendUser: vi.fn(async (_admin: any, id: string, _reason: string) => {
       if (id !== USER_1_ID && id !== USER_2_ID) {
         throw new NotFoundError(`User "${id}" not found.`);
       }
@@ -112,7 +111,7 @@ describe("Admin User Management API (P5-06)", () => {
       };
     }),
 
-    unsuspendUser: vi.fn(async (_admin: any, id: string, reason: string) => {
+    unsuspendUser: vi.fn(async (_admin: any, id: string, _reason: string) => {
       if (id !== USER_1_ID && id !== USER_2_ID) {
         throw new NotFoundError(`User "${id}" not found.`);
       }
@@ -158,6 +157,12 @@ describe("Admin User Management API (P5-06)", () => {
       providers: [
         { provide: AdminUsersService, useValue: mockAdminUsersService },
         { provide: SessionService, useValue: mockSessionService },
+        {
+          provide: MfaService,
+          useValue: {
+            verifyStepUpToken: async (token: string) => token === "fresh-proof",
+          },
+        },
         { provide: APP_FILTER, useClass: AppExceptionFilter },
       ],
     }).compile();
@@ -172,9 +177,7 @@ describe("Admin User Management API (P5-06)", () => {
 
   describe("Access Control & Role Gating (docs/SECURITY/04)", () => {
     it("rejects unauthenticated requests with 401", async () => {
-      const res = await request(app.getHttpServer()).get(
-        "/api/v1/admin/users",
-      );
+      const res = await request(app.getHttpServer()).get("/api/v1/admin/users");
       expect(res.status).toBe(401);
       expect(res.body.error.code).toBe("UNAUTHENTICATED");
     });
@@ -266,6 +269,7 @@ describe("Admin User Management API (P5-06)", () => {
       const res = await request(app.getHttpServer())
         .patch(`/api/v1/admin/users/${USER_1_ID}/suspend`)
         .set("Authorization", "Bearer admin-token")
+        .set("X-MFA-Step-Up", "fresh-proof")
         .send({ reason: "bad" });
 
       expect(res.status).toBe(400);
@@ -276,6 +280,7 @@ describe("Admin User Management API (P5-06)", () => {
       const res = await request(app.getHttpServer())
         .patch(`/api/v1/admin/users/${USER_1_ID}/suspend`)
         .set("Authorization", "Bearer admin-token")
+        .set("X-MFA-Step-Up", "fresh-proof")
         .send({ reason: "Suspicious abuse detected from IP" });
 
       expect(res.status).toBe(200);
@@ -316,7 +321,9 @@ describe("Admin User Management API (P5-06)", () => {
       };
 
       expect(realSessionServiceBehavior({ status: "active" })).toBeDefined();
-      expect(realSessionServiceBehavior({ status: "suspended" })).toBeUndefined();
+      expect(
+        realSessionServiceBehavior({ status: "suspended" }),
+      ).toBeUndefined();
     });
 
     it("proves published invitations remain published and accessible when owner is suspended (BR-Admin.6)", () => {
@@ -329,7 +336,7 @@ describe("Admin User Management API (P5-06)", () => {
       };
 
       // Owner suspended
-      const user = { id: "u-1", status: "suspended" };
+      const _user = { id: "u-1", status: "suspended" };
 
       // Public invitation resolver checks `invitation.status === 'published'`
       const isPubliclyAccessible = (inv: typeof invitation) =>

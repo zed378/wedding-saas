@@ -33,17 +33,26 @@ export function UnauthorizedPage() {
             <p className="text-body text-text-muted">
               Akun Anda{" "}
               {user?.email ? (
-                <strong className="text-text font-semibold">{user.email}</strong>
+                <strong className="text-text font-semibold">
+                  {user.email}
+                </strong>
               ) : (
                 "saat ini"
               )}{" "}
               terautentikasi sebagai pengguna biasa, namun tidak memiliki peran{" "}
-              <code className="text-primary-600 font-mono text-body-sm">admin</code> atau{" "}
-              <code className="text-primary-600 font-mono text-body-sm">super_admin</code>.
+              <code className="text-primary-600 font-mono text-body-sm">
+                admin
+              </code>{" "}
+              atau{" "}
+              <code className="text-primary-600 font-mono text-body-sm">
+                super_admin
+              </code>
+              .
             </p>
             <p className="text-body text-text-muted">
-              Panel administrasi Vizunicum berada di batas keamanan tersendiri (Trust Boundary
-              3→4) dan hanya dapat diakses oleh personel staf terotorisasi.
+              Panel administrasi Vizunicum berada di batas keamanan tersendiri
+              (Trust Boundary 3→4) dan hanya dapat diakses oleh personel staf
+              terotorisasi.
             </p>
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <a

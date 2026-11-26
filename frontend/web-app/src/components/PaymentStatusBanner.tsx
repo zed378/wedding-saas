@@ -11,11 +11,7 @@
 import { Spinner } from "@wi/ui";
 
 export type PaymentStatusKind =
-  | "checking"
-  | "pending"
-  | "success"
-  | "failed"
-  | "expired";
+  "checking" | "pending" | "success" | "failed" | "expired";
 
 export interface PaymentStatusBannerProps {
   readonly status: PaymentStatusKind;
@@ -80,9 +76,7 @@ export function PaymentStatusBanner({
       aria-live="polite"
       className={`flex items-center gap-3 rounded-lg border px-4 py-3 ${config.bg} ${config.border}`}
     >
-      {config.showSpinner === true && (
-        <Spinner className="size-4 shrink-0" />
-      )}
+      {config.showSpinner === true && <Spinner className="size-4 shrink-0" />}
 
       {status === "success" && (
         <span aria-hidden="true" className="text-lg">
@@ -94,15 +88,16 @@ export function PaymentStatusBanner({
         {config.label}
       </span>
 
-      {(status === "failed" || status === "expired") && onRetry !== undefined && (
-        <button
-          type="button"
-          className="focus-ring ml-auto rounded-md border border-border bg-surface px-3 py-1 text-sm font-medium text-text hover:bg-surface-sunken"
-          onClick={onRetry}
-        >
-          Coba Lagi
-        </button>
-      )}
+      {(status === "failed" || status === "expired") &&
+        onRetry !== undefined && (
+          <button
+            type="button"
+            className="focus-ring ml-auto rounded-md border border-border bg-surface px-3 py-1 text-sm font-medium text-text hover:bg-surface-sunken"
+            onClick={onRetry}
+          >
+            Coba Lagi
+          </button>
+        )}
     </div>
   );
 }

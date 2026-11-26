@@ -59,14 +59,23 @@ export class EmailWebhookController {
       const recipients = data?.to ?? [];
 
       logger.info(
-        { context: { event: "email_webhook.received", provider, type: eventType } },
+        {
+          context: {
+            event: "email_webhook.received",
+            provider,
+            type: eventType,
+          },
+        },
         "processing email provider webhook",
       );
 
       if (eventType === "email.bounced") {
         const bounceSubType = data?.bounce?.type ?? "hard_bounce";
-        const isHard = bounceSubType.toLowerCase().includes("hard") || bounceSubType === "suppressed";
-        const message = data?.bounce?.message ?? "Delivery bounced by recipient mailserver";
+        const isHard =
+          bounceSubType.toLowerCase().includes("hard") ||
+          bounceSubType === "suppressed";
+        const message =
+          data?.bounce?.message ?? "Delivery bounced by recipient mailserver";
 
         if (isHard) {
           for (const recipient of recipients) {
@@ -84,7 +93,8 @@ export class EmailWebhookController {
           await this.bounceService.recordBounce({
             email: recipient,
             bounceType: "complaint",
-            message: data?.complaint?.message ?? "Recipient marked message as spam",
+            message:
+              data?.complaint?.message ?? "Recipient marked message as spam",
             provider,
             providerEmailId: data?.email_id,
           });

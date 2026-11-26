@@ -2,7 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { sql } from "drizzle-orm";
 
 import { DB, type Database } from "../../infra/db/client";
-import { invitationViewCounts, invitations } from "../../infra/db/schema/invitations";
+import {} from "../../infra/db/schema/invitations";
 import type { TenantScope } from "./tenant-scope";
 
 export interface ViewCountEntry {
@@ -13,7 +13,10 @@ export interface ViewCountEntry {
 
 export interface InvitationViewSummary {
   readonly totalViews: number;
-  readonly dailyViews: ReadonlyArray<{ readonly date: string; readonly count: number }>;
+  readonly dailyViews: ReadonlyArray<{
+    readonly date: string;
+    readonly count: number;
+  }>;
 }
 
 /**
@@ -62,7 +65,10 @@ export class AnalyticsRepository {
     scope: TenantScope,
     invitationId: string,
   ): Promise<InvitationViewSummary> {
-    const query = await this.db.execute<{ view_date: string; view_count: string }>(sql`
+    const query = await this.db.execute<{
+      view_date: string;
+      view_count: string;
+    }>(sql`
       SELECT vc.view_date::text, vc.view_count
       FROM invitation_view_counts vc
       JOIN invitations i ON i.id = vc.invitation_id

@@ -12,12 +12,11 @@ import { SignJWT, jwtVerify } from "jose";
 import { ENV } from "../../../config/config.module";
 import type { Env } from "../../../config/env.schema";
 import { DB, type Database } from "../../../infra/db/client";
-import { userMfaFactors, userRecoveryCodes, users } from "../../../infra/db/schema/users";
 import {
-  ForbiddenError,
-  UnauthenticatedError,
-  ValidationError,
-} from "../../../http/errors";
+  userMfaFactors,
+  userRecoveryCodes,
+} from "../../../infra/db/schema/users";
+import { UnauthenticatedError, ValidationError } from "../../../http/errors";
 import { logSecurityEvent } from "../../../shared/logging/logger";
 
 // Base32 alphabet for RFC 3548 / 4648
@@ -65,7 +64,11 @@ export function base32Decode(input: string): Buffer {
 }
 
 /** RFC 6238 TOTP computation using HMAC-SHA1 */
-export function computeTotp(secretBase32: string, timestampSeconds: number, stepSeconds = 30): string {
+export function computeTotp(
+  secretBase32: string,
+  timestampSeconds: number,
+  stepSeconds = 30,
+): string {
   const secretBytes = base32Decode(secretBase32);
   const counter = Math.floor(timestampSeconds / stepSeconds);
 
@@ -94,7 +97,11 @@ export function verifyTotpCode(
 
   // Check current counter and ±1 step (30s drift window)
   for (const drift of [0, -1, 1]) {
-    const code = computeTotp(secretBase32, nowSeconds + drift * stepSeconds, stepSeconds);
+    const code = computeTotp(
+      secretBase32,
+      nowSeconds + drift * stepSeconds,
+      stepSeconds,
+    );
     if (code === candidateCode) return true;
   }
   return false;
@@ -130,7 +137,10 @@ export class MfaService {
   encryptSecret(secret: string): Buffer {
     const iv = randomBytes(12);
     const cipher = createCipheriv("aes-256-gcm", this.encryptionKey, iv);
-    const ciphertext = Buffer.concat([cipher.update(secret, "utf8"), cipher.final()]);
+    const ciphertext = Buffer.concat([
+      cipher.update(secret, "utf8"),
+      cipher.final(),
+    ]);
     const authTag = cipher.getAuthTag();
 
     // Stored layout: [12 bytes IV] + [16 bytes AuthTag] + [Ciphertext]
@@ -149,7 +159,10 @@ export class MfaService {
 
     const decipher = createDecipheriv("aes-256-gcm", this.encryptionKey, iv);
     decipher.setAuthTag(authTag);
-    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    const decrypted = Buffer.concat([
+      decipher.update(ciphertext),
+      decipher.final(),
+    ]);
     return decrypted.toString("utf8");
   }
 
@@ -166,11 +179,16 @@ export class MfaService {
         ),
       );
 
-    const confirmed = rows.some(() => true); // check confirmation in query
+    const _confirmed = rows.some(() => true); // check confirmation in query
     const factor = await this.db
-      .select({ id: userMfaFactors.id, confirmedAt: userMfaFactors.confirmedAt })
+      .select({
+        id: userMfaFactors.id,
+        confirmedAt: userMfaFactors.confirmedAt,
+      })
       .from(userMfaFactors)
-      .where(and(eq(userMfaFactors.userId, userId), eq(userMfaFactors.type, "totp")))
+      .where(
+        and(eq(userMfaFactors.userId, userId), eq(userMfaFactors.type, "totp")),
+      )
       .limit(1);
 
     return factor.length > 0 && factor[0]!.confirmedAt !== null;
@@ -230,7 +248,11 @@ export class MfaService {
   }
 
   /** Confirm enrollment with first valid code */
-  async confirmTotp(userId: string, code: string, recoveryCodes: string[]): Promise<boolean> {
+  async confirmTotp(
+    userId: string,
+    code: string,
+    recoveryCodes: string[],
+  ): Promise<boolean> {
     // Find unconfirmed factor
     const factors = await this.db
       .select({
@@ -250,19 +272,31 @@ export class MfaService {
 
     if (factors.length === 0) {
       throw new ValidationError(
-        [{ field: "code", message: "Tidak ada sesi pendaftaran 2FA yang aktif." }],
+        [
+          {
+            field: "code",
+            message: "Tidak ada sesi pendaftaran 2FA yang aktif.",
+          },
+        ],
         "Tidak ada sesi pendaftaran 2FA aktif.",
       );
     }
 
     const factor = factors[0]!;
-    const secretBase32 = this.decryptSecret(Buffer.from(factor.secretEncrypted));
+    const secretBase32 = this.decryptSecret(
+      Buffer.from(factor.secretEncrypted),
+    );
 
     const isValid = verifyTotpCode(secretBase32, code.trim());
     if (!isValid) {
       logSecurityEvent("auth.mfa_confirm_failed", { user_id: userId });
       throw new ValidationError(
-        [{ field: "code", message: "Kode 2FA tidak valid. Periksa jam perangkat Anda." }],
+        [
+          {
+            field: "code",
+            message: "Kode 2FA tidak valid. Periksa jam perangkat Anda.",
+          },
+        ],
         "Kode 2FA tidak valid.",
       );
     }
@@ -274,7 +308,9 @@ export class MfaService {
       .where(eq(userMfaFactors.id, factor.id));
 
     // Clear old recovery codes if any, and insert new hashed ones
-    await this.db.delete(userRecoveryCodes).where(eq(userRecoveryCodes.userId, userId));
+    await this.db
+      .delete(userRecoveryCodes)
+      .where(eq(userRecoveryCodes.userId, userId));
 
     for (const recCode of recoveryCodes) {
       await this.db.insert(userRecoveryCodes).values({
@@ -312,7 +348,9 @@ export class MfaService {
 
       const factor = factors[0];
       if (factor && factor.confirmedAt) {
-        const secretBase32 = this.decryptSecret(Buffer.from(factor.secretEncrypted));
+        const secretBase32 = this.decryptSecret(
+          Buffer.from(factor.secretEncrypted),
+        );
         const ok = verifyTotpCode(secretBase32, candidate.code.trim());
         if (ok) {
           await this.db
@@ -402,7 +440,9 @@ export class MfaService {
         role: payload.role as string,
       };
     } catch {
-      throw new UnauthenticatedError("Tiket MFA tidak valid atau telah kedaluwarsa.");
+      throw new UnauthenticatedError(
+        "Tiket MFA tidak valid atau telah kedaluwarsa.",
+      );
     }
   }
 

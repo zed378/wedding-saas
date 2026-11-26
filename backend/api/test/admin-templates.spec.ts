@@ -8,10 +8,9 @@ import { AppExceptionFilter } from "../src/http/exception.filter";
 import { AdminTemplatesController } from "../src/modules/admin/admin-templates.controller";
 import { AdminTemplatesService } from "../src/modules/admin/admin-templates.service";
 import { SessionService } from "../src/modules/auth/session.service";
-import { DB } from "../src/infra/db/client";
-import { templates, templateVersions } from "../src/infra/db/schema/templates";
-import { AuditLogService } from "../src/shared/audit/audit-log.service";
-import { TemplateService } from "../src/modules/template/template.service";
+
+import { templates } from "../src/infra/db/schema/templates";
+
 import {
   ConflictError,
   NotFoundError,
@@ -496,36 +495,28 @@ describe("Admin Template and Version Management API (P5-04)", () => {
 
       // 1. Invalid payload rejected by real @wi/schema validateTemplateVersion
       await expect(
-        service.createVersion(
-          { id: "admin-1" },
-          "tpl-1",
-          {
-            version: "2.0.0",
-            sections: [
-              {
-                section_key: "hero",
-                component: "NonExistentComponent",
-              },
-            ],
-            theme: VALID_THEME,
-            customizable_theme_keys: [],
-            reason: "Valid reason for invalid component",
-          },
-        ),
+        service.createVersion({ id: "admin-1" }, "tpl-1", {
+          version: "2.0.0",
+          sections: [
+            {
+              section_key: "hero",
+              component: "NonExistentComponent",
+            },
+          ],
+          theme: VALID_THEME,
+          customizable_theme_keys: [],
+          reason: "Valid reason for invalid component",
+        }),
       ).rejects.toThrow(ValidationError);
 
       // 2. Valid payload accepted and saved
-      const created = await service.createVersion(
-        { id: "admin-1" },
-        "tpl-1",
-        {
-          version: "2.0.0",
-          sections: VALID_SECTIONS,
-          theme: VALID_THEME,
-          customizable_theme_keys: ["colors.primary"],
-          reason: "Valid version 2.0.0",
-        },
-      );
+      const created = await service.createVersion({ id: "admin-1" }, "tpl-1", {
+        version: "2.0.0",
+        sections: VALID_SECTIONS,
+        theme: VALID_THEME,
+        customizable_theme_keys: ["colors.primary"],
+        reason: "Valid version 2.0.0",
+      });
 
       expect(created?.version).toBe("2.0.0");
       expect(mockAudit.record).toHaveBeenCalledWith(

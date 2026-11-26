@@ -40,7 +40,9 @@ export interface HandlerDeps {
  * turns a rolling deploy into a stuck one.
  */
 export function createHandlerDeps(env: WorkerEnv): HandlerDeps {
-  const pg = env.databaseUrl ? new PgPool({ connectionString: env.databaseUrl, max: 4 }) : undefined;
+  const pg = env.databaseUrl
+    ? new PgPool({ connectionString: env.databaseUrl, max: 4 })
+    : undefined;
   const storage = env.storage.endpoint
     ? new S3Storage({
         endpoint: env.storage.endpoint,

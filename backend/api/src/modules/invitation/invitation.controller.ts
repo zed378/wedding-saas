@@ -21,7 +21,7 @@ import {
   type CurrentUser,
 } from "../../shared/auth-middleware";
 import { rateLimit } from "../../shared/rate-limit";
-import { requireVerifiedEmail } from "../auth/require-verified-email";
+
 import { InvitationCreateService } from "./invitation-create.service";
 import { InvitationService } from "./invitation.service";
 import { CoupleService, type PersonRole } from "./couple.service";

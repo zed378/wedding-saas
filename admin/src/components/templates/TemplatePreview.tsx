@@ -28,8 +28,10 @@ export function TemplatePreview({
       configurable: s.configurable,
     };
     if (s.max_items !== undefined) item.max_items = s.max_items;
-    if (s.required_fields !== undefined) item.required_fields = s.required_fields;
-    if (s.optional_fields !== undefined) item.optional_fields = s.optional_fields;
+    if (s.required_fields !== undefined)
+      item.required_fields = s.required_fields;
+    if (s.optional_fields !== undefined)
+      item.optional_fields = s.optional_fields;
     if (s.layout_variant !== undefined) item.layout_variant = s.layout_variant;
     if (s.layout_options !== undefined) item.layout_options = s.layout_options;
     return item as unknown as RendererSectionDefinition;

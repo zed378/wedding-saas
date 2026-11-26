@@ -230,7 +230,7 @@ describe("login, refresh and logout", () => {
 
     it("lives 30 days", async () => {
       await register();
-      const session = await logins.login("budi@example.test", PASSWORD);
+      const _session = await logins.login("budi@example.test", PASSWORD);
       const [row] = await harness.db.select().from(refreshTokens);
 
       const lifetime = row!.expiresAt.getTime() - row!.createdAt.getTime();
@@ -275,7 +275,7 @@ describe("login, refresh and logout", () => {
       expect(await liveTokenCount(user.id)).toBe(1);
     });
 
-    it("mints a new access token carrying the current role", async () => {
+    it("requires MFA login when a regular session's account becomes an admin", async () => {
       const user = await register();
       const first = await logins.login("budi@example.test", PASSWORD);
 
@@ -284,8 +284,9 @@ describe("login, refresh and logout", () => {
         .set({ role: "admin" })
         .where(eq(users.id, user.id));
 
-      const second = await logins.refresh(first.refresh.token);
-      expect(second.user.role).toBe("admin");
+      await expect(logins.refresh(first.refresh.token)).rejects.toMatchObject({
+        status: 401,
+      });
     });
 
     it("refuses an unknown token", async () => {

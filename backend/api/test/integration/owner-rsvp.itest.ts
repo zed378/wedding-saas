@@ -83,6 +83,11 @@ describe("owner RSVP management and export (P4-02)", () => {
 
     alice = await createPhaseOneTenant(pool, SIGNING_KEY, "Alice");
     mallory = await createPhaseOneTenant(pool, SIGNING_KEY, "Mallory");
+    // This suite supplies its own counted RSVPs; retain the other weddings' rows
+    // so list and summary assertions still detect missing invitation scoping.
+    await pool.query("DELETE FROM invitation_guests WHERE id = $1", [
+      alice.rsvpId,
+    ]);
   });
 
   async function insertRsvp(params: {
@@ -286,9 +291,9 @@ describe("owner RSVP management and export (P4-02)", () => {
 
       // Verify formula injection prepends single quote
       expect(csv).toContain("\"'=cmd|' /C calc'!A0\"");
-      expect(csv).toContain("\"'+123456789\"");
-      expect(csv).toContain("\"'-SUM(1+1)\"");
-      expect(csv).toContain("\"'@evil_formula\"");
+      expect(csv).toContain('"\'+123456789"');
+      expect(csv).toContain('"\'-SUM(1+1)"');
+      expect(csv).toContain('"\'@evil_formula"');
 
       // Normal text remains unescaped by formula prefix
       expect(csv).toContain('"Budi & Ani"');

@@ -173,7 +173,9 @@ describe("public guestbook submission and listing (P4-03)", () => {
       message: string;
       status: string;
       submitted_ip_hash: string;
-    }>("SELECT guest_name, message, status, submitted_ip_hash FROM invitation_guestbook");
+    }>(
+      "SELECT guest_name, message, status, submitted_ip_hash FROM invitation_guestbook",
+    );
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({

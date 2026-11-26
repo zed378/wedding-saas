@@ -603,7 +603,9 @@ describe("Notification Send Handler (P4-06)", () => {
         }
         if (sql.includes("FROM user_notification_preferences")) {
           return {
-            rows: [{ rsvp_email: true, rsvp_digest: true, guestbook_email: true }],
+            rows: [
+              { rsvp_email: true, rsvp_digest: true, guestbook_email: true },
+            ],
           };
         }
         return { rows: [] };
@@ -670,10 +672,14 @@ describe("Notification Send Handler (P4-06)", () => {
     expect(sent).toHaveLength(1);
     const first = sent[0]!;
     expect(first.to).toBe("dimas@example.com");
-    expect(first.subject).toContain("Ringkasan RSVP Harian: Pernikahan Maya & Dimas");
+    expect(first.subject).toContain(
+      "Ringkasan RSVP Harian: Pernikahan Maya & Dimas",
+    );
     expect(first.html).toContain("10 konfirmasi");
     expect(first.html).toContain("Budi Santoso");
-    expect(first.idempotencyKey).toContain("rsvp-daily-digest:inv-1:17 Oktober 2026");
+    expect(first.idempotencyKey).toContain(
+      "rsvp-daily-digest:inv-1:17 Oktober 2026",
+    );
   });
 
   it("suppresses email dispatch when recipient address is in email_bounces table (hard_bounce or complaint)", async () => {

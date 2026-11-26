@@ -226,7 +226,8 @@ export function toInvitationDetail(
       rsvp_enabled: aggregate.settings?.rsvpEnabled ?? true,
       guestbook_enabled: aggregate.settings?.guestbookEnabled ?? true,
       guestbook_moderation: aggregate.settings?.guestbookModeration ?? false,
-      profanity_filter_enabled: aggregate.settings?.profanityFilterEnabled ?? false,
+      profanity_filter_enabled:
+        aggregate.settings?.profanityFilterEnabled ?? false,
       seo_indexable: aggregate.settings?.seoIndexable ?? false,
     },
   };

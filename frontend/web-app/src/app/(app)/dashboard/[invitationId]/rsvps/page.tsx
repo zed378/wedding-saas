@@ -79,10 +79,15 @@ export default function RsvpsDashboardPage({
       const headers: Record<string, string> = {};
       if (token) headers["authorization"] = `Bearer ${token}`;
 
-      const baseUrl = process.env["NEXT_PUBLIC_API_BASE_URL"] ?? "http://localhost:3000/api/v1";
-      const res = await fetch(`${baseUrl}/invitations/${encodeURIComponent(invitationId)}/rsvps/export`, {
-        headers,
-      });
+      const baseUrl =
+        process.env["NEXT_PUBLIC_API_BASE_URL"] ??
+        "http://localhost:3000/api/v1";
+      const res = await fetch(
+        `${baseUrl}/invitations/${encodeURIComponent(invitationId)}/rsvps/export`,
+        {
+          headers,
+        },
+      );
 
       if (!res.ok) {
         throw new Error("Gagal mengunduh file CSV.");
@@ -130,14 +135,17 @@ export default function RsvpsDashboardPage({
           Daftar Konfirmasi Kehadiran
         </h1>
         <p className="mt-2 text-sm text-text-muted">
-          Pantau konfirmasi kehadiran dan jumlah tamu dari undangan digital Anda.
+          Pantau konfirmasi kehadiran dan jumlah tamu dari undangan digital
+          Anda.
         </p>
       </header>
 
       {/* Content */}
       {state.kind === "loading" && (
         <div className="flex h-64 items-center justify-center rounded-lg border border-dashed border-border">
-          <p className="text-sm text-text-muted">Memuat data konfirmasi RSVP...</p>
+          <p className="text-sm text-text-muted">
+            Memuat data konfirmasi RSVP...
+          </p>
         </div>
       )}
 

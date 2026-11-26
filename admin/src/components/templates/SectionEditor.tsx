@@ -6,7 +6,7 @@ import {
   type SectionKey,
   type SectionDefinition,
 } from "@wi/schema";
-import { Button, Card, CardHeader, Input, Badge } from "@wi/ui";
+import { Button, Card, Input, Badge } from "@wi/ui";
 
 interface SectionEditorProps {
   sections: SectionDefinition[];
@@ -92,9 +92,12 @@ export function SectionEditor({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg bg-surface-subtle p-4 border border-border">
         <div>
-          <h3 className="text-body-lg font-semibold">Struktur & Bagian Undangan</h3>
+          <h3 className="text-body-lg font-semibold">
+            Struktur & Bagian Undangan
+          </h3>
           <p className="text-body-sm text-text-muted">
-            Atur urutan bagian, komponen renderer resmi, serta pemetaan field data kanonikal
+            Atur urutan bagian, komponen renderer resmi, serta pemetaan field
+            data kanonikal
           </p>
         </div>
 
@@ -103,7 +106,9 @@ export function SectionEditor({
             <select
               aria-label="Pilih jenis bagian untuk ditambahkan"
               value={selectedKeyToAdd}
-              onChange={(e) => setSelectedKeyToAdd(e.target.value as SectionKey)}
+              onChange={(e) =>
+                setSelectedKeyToAdd(e.target.value as SectionKey)
+              }
               className="rounded-md border border-border bg-surface px-3 py-1.5 text-body-sm focus:border-primary focus:outline-none"
             >
               {SECTION_KEYS.map((key) => (
@@ -121,7 +126,8 @@ export function SectionEditor({
 
       {sections.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border p-8 text-center text-text-muted">
-          Belum ada bagian yang dikonfigurasi. Pilih jenis bagian di atas dan klik Tambah Bagian.
+          Belum ada bagian yang dikonfigurasi. Pilih jenis bagian di atas dan
+          klik Tambah Bagian.
         </div>
       ) : (
         <div className="space-y-4">
@@ -215,7 +221,9 @@ export function SectionEditor({
                     <Input
                       label="Max Items (opsional)"
                       type="number"
-                      value={sec.max_items !== undefined ? String(sec.max_items) : ""}
+                      value={
+                        sec.max_items !== undefined ? String(sec.max_items) : ""
+                      }
                       disabled={disabled}
                       placeholder="e.g. 20"
                       onChange={(e) =>
@@ -264,20 +272,26 @@ export function SectionEditor({
                 {/* Field mappings selected from canonical registry */}
                 <div className="mt-4 border-t border-border pt-3">
                   <div className="text-body-xs font-semibold text-text-muted mb-2">
-                    Pemetaan Field Kanonikal (Dipilih dari daftar resmi, bukan teks bebas)
+                    Pemetaan Field Kanonikal (Dipilih dari daftar resmi, bukan
+                    teks bebas)
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="rounded-md border border-border p-3 bg-surface-subtle">
                       <div className="text-body-xs font-semibold mb-1.5 flex items-center justify-between">
                         <span>Wajib Diisi (Required Fields)</span>
-                        <span className="text-text-muted">{reqFields.length} dipilih</span>
+                        <span className="text-text-muted">
+                          {reqFields.length} dipilih
+                        </span>
                       </div>
                       <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
-                        {AVAILABLE_FIELDS.filter((f) =>
-                          f.startsWith(sec.section_key) ||
-                          (sec.section_key === "event" && f.startsWith("events")) ||
-                          (sec.section_key === "closing" && f.startsWith("couple")),
+                        {AVAILABLE_FIELDS.filter(
+                          (f) =>
+                            f.startsWith(sec.section_key) ||
+                            (sec.section_key === "event" &&
+                              f.startsWith("events")) ||
+                            (sec.section_key === "closing" &&
+                              f.startsWith("couple")),
                         ).map((fieldPath) => {
                           const checked = reqFields.includes(fieldPath);
                           return (
@@ -294,9 +308,15 @@ export function SectionEditor({
                                 }
                                 className="rounded text-primary"
                               />
-                              <span className="font-mono text-text">{fieldPath}</span>
+                              <span className="font-mono text-text">
+                                {fieldPath}
+                              </span>
                               <span className="text-text-muted ml-auto truncate">
-                                {FIELD_LABELS[fieldPath as keyof typeof FIELD_LABELS]}
+                                {
+                                  FIELD_LABELS[
+                                    fieldPath as keyof typeof FIELD_LABELS
+                                  ]
+                                }
                               </span>
                             </label>
                           );
@@ -307,13 +327,18 @@ export function SectionEditor({
                     <div className="rounded-md border border-border p-3 bg-surface-subtle">
                       <div className="text-body-xs font-semibold mb-1.5 flex items-center justify-between">
                         <span>Opsional (Optional Fields)</span>
-                        <span className="text-text-muted">{optFields.length} dipilih</span>
+                        <span className="text-text-muted">
+                          {optFields.length} dipilih
+                        </span>
                       </div>
                       <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
-                        {AVAILABLE_FIELDS.filter((f) =>
-                          f.startsWith(sec.section_key) ||
-                          (sec.section_key === "event" && f.startsWith("events")) ||
-                          (sec.section_key === "closing" && f.startsWith("couple")),
+                        {AVAILABLE_FIELDS.filter(
+                          (f) =>
+                            f.startsWith(sec.section_key) ||
+                            (sec.section_key === "event" &&
+                              f.startsWith("events")) ||
+                            (sec.section_key === "closing" &&
+                              f.startsWith("couple")),
                         ).map((fieldPath) => {
                           const checked = optFields.includes(fieldPath);
                           return (
@@ -330,9 +355,15 @@ export function SectionEditor({
                                 }
                                 className="rounded text-primary"
                               />
-                              <span className="font-mono text-text">{fieldPath}</span>
+                              <span className="font-mono text-text">
+                                {fieldPath}
+                              </span>
                               <span className="text-text-muted ml-auto truncate">
-                                {FIELD_LABELS[fieldPath as keyof typeof FIELD_LABELS]}
+                                {
+                                  FIELD_LABELS[
+                                    fieldPath as keyof typeof FIELD_LABELS
+                                  ]
+                                }
                               </span>
                             </label>
                           );

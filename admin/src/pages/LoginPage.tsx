@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Button, Card, CardHeader, Field, Input } from "@wi/ui";
+import { Button, Card, CardHeader, Input } from "@wi/ui";
 import { useAdminAuth } from "../auth/admin-auth.js";
 import { useRouter } from "../router.js";
 
@@ -17,62 +17,65 @@ export function LoginPage() {
     setIsLoading(true);
 
     try {
-      // Direct mock/API login handler for admin shell
       if (!email.trim() || !password.trim()) {
         setError("Email dan kata sandi wajib diisi.");
         setIsLoading(false);
         return;
       }
 
-      // Attempt API login first
-      try {
-        const res = await fetch("/api/v1/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: email.trim(), password }),
-        });
+      const res = await fetch("/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), password }),
+        credentials: "include",
+      });
 
-        if (res.ok) {
-          const body = await res.json();
-          if (body?.data?.requires_mfa_setup) {
-            navigate(`/mfa/enroll?ticket=${encodeURIComponent(body.data.setup_ticket)}`);
-            return;
-          }
-          if (body?.data?.requires_mfa) {
-            navigate(`/mfa/verify?ticket=${encodeURIComponent(body.data.mfa_ticket)}`);
-            return;
-          }
-          if (body?.data?.user?.role !== "admin" && body?.data?.user?.role !== "super_admin") {
-            navigate("/unauthorized");
-            return;
-          }
-          login(body.data.access_token, body.data.user);
-          navigate("/");
+      if (!res.ok) {
+        const failure = await res.json().catch(() => null);
+        throw new Error(
+          failure?.error?.message ??
+            "Autentikasi gagal. Periksa kembali kredensial Anda.",
+        );
+      }
+
+      if (res.ok) {
+        const body = await res.json();
+        if (body?.data?.requires_mfa_setup) {
+          if (
+            typeof body.data.setup_ticket !== "string" ||
+            !body.data.setup_ticket
+          )
+            throw new Error("Tiket pendaftaran tidak tersedia.");
+          navigate(
+            `/mfa/enroll?ticket=${encodeURIComponent(body.data.setup_ticket)}`,
+          );
           return;
         }
-      } catch {
-        // Fall through to local simulation for test/demo environments
-      }
-
-      // Check if user is entering a non-admin role in demo/test or proceed with token
-      const isSuper = email.includes("super");
-      const isStandardUser = email.includes("user");
-      const isEnrollTest = email.includes("setup") || email.includes("enroll");
-
-      if (isStandardUser) {
-        navigate("/unauthorized");
+        if (body?.data?.requires_mfa) {
+          if (typeof body.data.mfa_ticket !== "string" || !body.data.mfa_ticket)
+            throw new Error("Tiket verifikasi tidak tersedia.");
+          navigate(
+            `/mfa/verify?ticket=${encodeURIComponent(body.data.mfa_ticket)}`,
+          );
+          return;
+        }
+        if (
+          body?.data?.user?.role !== "admin" &&
+          body?.data?.user?.role !== "super_admin"
+        ) {
+          navigate("/unauthorized");
+          return;
+        }
+        login(body.data.access_token, body.data.user);
+        navigate("/");
         return;
       }
-
-      if (isEnrollTest) {
-        navigate("/mfa/enroll?ticket=mock_setup_ticket");
-        return;
-      }
-
-      // Mandatory 2FA verification challenge for admin/super_admin
-      navigate("/mfa/verify?ticket=mock_mfa_ticket");
-    } catch {
-      setError("Autentikasi gagal. Periksa kembali kredensial Anda.");
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Autentikasi gagal. Periksa kembali kredensial Anda.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -129,7 +132,12 @@ export function LoginPage() {
             />
 
             <div className="pt-2">
-              <Button type="submit" variant="primary" className="w-full" loading={isLoading}>
+              <Button
+                type="submit"
+                variant="primary"
+                className="w-full"
+                loading={isLoading}
+              >
                 Masuk ke Panel Admin
               </Button>
             </div>

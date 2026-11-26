@@ -96,7 +96,10 @@ export function PropertiesPanel() {
         const regionPath = regionPathBeside(pinPath);
         const current = getAtPath(store.getState().data, regionPath);
         const chosen = typeof current === "string" ? current : "";
-        if (located.province?.code && (chosen === "" || !chosen.startsWith(located.province.code))) {
+        if (
+          located.province?.code &&
+          (chosen === "" || !chosen.startsWith(located.province.code))
+        ) {
           edit(regionPath, located.regency?.code ?? located.province.code);
         }
       });
@@ -349,15 +352,17 @@ export function PropertiesPanel() {
               </label>
               <p className="mt-1 text-xs text-text-muted">
                 Jika diaktifkan, setiap ucapan baru yang dikirimkan tamu harus
-                disetujui terlebih dahulu oleh Anda di panel moderasi sebelum tampil
-                di undangan.
+                disetujui terlebih dahulu oleh Anda di panel moderasi sebelum
+                tampil di undangan.
               </p>
             </div>
             <input
               id="setting-guestbook-moderation"
               type="checkbox"
               className="focus-ring mt-1 h-5 w-5 rounded border-border"
-              checked={getAtPath(data, "settings.guestbook_moderation") === true}
+              checked={
+                getAtPath(data, "settings.guestbook_moderation") === true
+              }
               onChange={(e) => {
                 edit("settings.guestbook_moderation", e.target.checked);
               }}
@@ -375,15 +380,17 @@ export function PropertiesPanel() {
                 Filter Kata Kasar Otomatis
               </label>
               <p className="mt-1 text-xs text-text-muted">
-                Ucapan yang terdeteksi mengandung kata-kata tidak pantas akan secara
-                otomatis dialihkan ke antrean moderasi Anda.
+                Ucapan yang terdeteksi mengandung kata-kata tidak pantas akan
+                secara otomatis dialihkan ke antrean moderasi Anda.
               </p>
             </div>
             <input
               id="setting-profanity-filter"
               type="checkbox"
               className="focus-ring mt-1 h-5 w-5 rounded border-border"
-              checked={getAtPath(data, "settings.profanity_filter_enabled") === true}
+              checked={
+                getAtPath(data, "settings.profanity_filter_enabled") === true
+              }
               onChange={(e) => {
                 edit("settings.profanity_filter_enabled", e.target.checked);
               }}

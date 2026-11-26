@@ -46,12 +46,15 @@ CREATE TABLE refresh_tokens (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   token_hash          VARCHAR(255) NOT NULL,
+  mfa_verified_at     TIMESTAMPTZ,
   expires_at          TIMESTAMPTZ NOT NULL,
   revoked_at          TIMESTAMPTZ,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_refresh_tokens_user ON refresh_tokens(user_id);
 ```
+
+`mfa_verified_at` records session-level factor verification, not enrollment. It is nullable for ordinary and legacy sessions. Admin refresh requires this proof within four hours; rotation preserves the original timestamp and absolute expiry. Migration `0018` adds it without backfilling unverified legacy sessions (P5-14).
 
 ## Single-Use Token Table
 

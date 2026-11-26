@@ -1,4 +1,6 @@
-import { useState, useEffect, useId } from "react";
+import { useState, useEffect, useId, useRef } from "react";
+import { accessTokenStore } from "@wi/api-client";
+import { StepUpModal } from "../components/StepUpModal";
 import {
   Button,
   Card,
@@ -48,116 +50,9 @@ export interface AdminUserDetailItem extends AdminUserSummaryItem {
   orders: AdminUserOrderItem[];
 }
 
-const INITIAL_MOCK_USERS: AdminUserSummaryItem[] = [
-  {
-    id: "11111111-1111-4111-8111-111111111111",
-    email: "budi.santoso@example.com",
-    fullName: "Budi Santoso",
-    phone: "08123456789",
-    role: "user",
-    status: "active",
-    emailVerified: true,
-    createdAt: "2026-01-10T08:00:00.000Z",
-    updatedAt: "2026-01-10T08:00:00.000Z",
-    invitationCount: 2,
-    orderCount: 1,
-  },
-  {
-    id: "22222222-2222-4222-8222-222222222222",
-    email: "siti.nurhaliza@example.com",
-    fullName: "Siti Nurhaliza",
-    phone: "08987654321",
-    role: "user",
-    status: "suspended",
-    emailVerified: true,
-    createdAt: "2026-01-15T10:30:00.000Z",
-    updatedAt: "2026-02-01T14:20:00.000Z",
-    invitationCount: 1,
-    orderCount: 1,
-  },
-  {
-    id: "33333333-3333-4333-8333-333333333333",
-    email: "andi.pratama@example.com",
-    fullName: "Andi Pratama",
-    phone: "08567890123",
-    role: "user",
-    status: "active",
-    emailVerified: false,
-    createdAt: "2026-02-05T09:15:00.000Z",
-    updatedAt: "2026-02-05T09:15:00.000Z",
-    invitationCount: 0,
-    orderCount: 0,
-  },
-];
-
-const INITIAL_MOCK_DETAILS: Record<string, AdminUserDetailItem> = {
-  "11111111-1111-4111-8111-111111111111": {
-    ...INITIAL_MOCK_USERS[0]!,
-    invitations: [
-      {
-        id: "inv-budi-1",
-        slug: "budi-and-ratna",
-        internalName: "Pernikahan Budi & Ratna (Resepsi)",
-        status: "published",
-        templateId: "tpl-javanese-classic",
-        templateVersionId: "ver-100",
-        publishedAt: "2026-01-12T10:00:00.000Z",
-        createdAt: "2026-01-10T09:00:00.000Z",
-      },
-      {
-        id: "inv-budi-2",
-        slug: "budi-ratna-unduh-mantu",
-        internalName: "Unduh Mantu Solo",
-        status: "draft",
-        templateId: "tpl-modern-minimalist",
-        templateVersionId: "ver-100",
-        publishedAt: null,
-        createdAt: "2026-01-14T11:00:00.000Z",
-      },
-    ],
-    orders: [
-      {
-        id: "ord-budi-1",
-        packageId: "standard",
-        amountTotal: "149000",
-        status: "paid",
-        createdAt: "2026-01-11T14:30:00.000Z",
-      },
-    ],
-  },
-  "22222222-2222-4222-8222-222222222222": {
-    ...INITIAL_MOCK_USERS[1]!,
-    invitations: [
-      {
-        id: "inv-siti-1",
-        slug: "siti-dan-fajar",
-        internalName: "Walimatul Ursy Siti & Fajar",
-        status: "published",
-        templateId: "tpl-sundanese-romantic",
-        templateVersionId: "ver-100",
-        publishedAt: "2026-01-20T08:00:00.000Z",
-        createdAt: "2026-01-15T11:00:00.000Z",
-      },
-    ],
-    orders: [
-      {
-        id: "ord-siti-1",
-        packageId: "premium",
-        amountTotal: "249000",
-        status: "paid",
-        createdAt: "2026-01-16T15:00:00.000Z",
-      },
-    ],
-  },
-  "33333333-3333-4333-8333-333333333333": {
-    ...INITIAL_MOCK_USERS[2]!,
-    invitations: [],
-    orders: [],
-  },
-};
-
 function formatCurrency(amount: string | number): string {
-  const numeric = typeof amount === "string" ? Number.parseInt(amount, 10) : amount;
+  const numeric =
+    typeof amount === "string" ? Number.parseInt(amount, 10) : amount;
   if (Number.isNaN(numeric)) return "Rp 0";
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -182,27 +77,35 @@ export function UsersPage() {
   const searchInputId = useId();
   const statusSelectId = useId();
 
-  const [usersList, setUsersList] = useState<AdminUserSummaryItem[]>(INITIAL_MOCK_USERS);
+  const [usersList, setUsersList] = useState<AdminUserSummaryItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Detail Modal State
-  const [selectedUserDetail, setSelectedUserDetail] = useState<AdminUserDetailItem | null>(null);
+  const [selectedUserDetail, setSelectedUserDetail] =
+    useState<AdminUserDetailItem | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
   // Suspend / Unsuspend Modal State
-  const [targetUser, setTargetUser] = useState<AdminUserSummaryItem | null>(null);
+  const [targetUser, setTargetUser] = useState<AdminUserSummaryItem | null>(
+    null,
+  );
   const [isSuspendModalOpen, setIsSuspendModalOpen] = useState(false);
+  const [isStepUpOpen, setIsStepUpOpen] = useState(false);
   const [isUnsuspendModalOpen, setIsUnsuspendModalOpen] = useState(false);
   const [actionReason, setActionReason] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
 
+  const requestVersion = useRef(0);
+  const [detailError, setDetailError] = useState<string | null>(null);
+
   // Fetch users from API
   const loadUsers = async () => {
+    const version = ++requestVersion.current;
     setIsLoading(true);
     setFetchError(null);
     try {
@@ -210,58 +113,61 @@ export function UsersPage() {
       if (searchQuery.trim()) params.set("search", searchQuery.trim());
       if (statusFilter !== "all") params.set("status", statusFilter);
 
-      const res = await fetch(`/api/v1/admin/users?${params.toString()}`);
+      const res = await fetch(`/api/v1/admin/users?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${accessTokenStore.get() ?? ""}` },
+        credentials: "include",
+      });
       if (!res.ok) {
         throw new Error(`Gagal memuat pengguna (HTTP ${res.status})`);
       }
       const json = await res.json();
-      if (json.data && Array.isArray(json.data)) {
-        setUsersList(json.data);
+      if (json.success !== true || !Array.isArray(json.data))
+        throw new Error("Respons daftar pengguna tidak valid.");
+      if (version === requestVersion.current) setUsersList(json.data);
+    } catch (error) {
+      if (version === requestVersion.current) {
+        setUsersList([]);
+        setFetchError(
+          error instanceof Error ? error.message : "Gagal memuat pengguna.",
+        );
       }
-    } catch {
-      // In local dev without backend running or in tests, fallback to local filtering
-      const filtered = INITIAL_MOCK_USERS.filter((u) => {
-        const matchesSearch =
-          !searchQuery.trim() ||
-          u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          u.fullName.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesStatus = statusFilter === "all" || u.status === statusFilter;
-        return matchesSearch && matchesStatus;
-      });
-      setUsersList(filtered);
     } finally {
-      setIsLoading(false);
+      if (version === requestVersion.current) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadUsers();
+    void loadUsers();
+    return () => {
+      requestVersion.current++;
+    };
   }, [searchQuery, statusFilter]);
 
   // Open detail modal
   const handleOpenDetail = async (user: AdminUserSummaryItem) => {
     setIsLoadingDetail(true);
+    setDetailError(null);
     setSelectedUserDetail(null);
     setIsDetailModalOpen(true);
 
     try {
-      const res = await fetch(`/api/v1/admin/users/${user.id}`);
+      const res = await fetch(`/api/v1/admin/users/${user.id}`, {
+        headers: { Authorization: `Bearer ${accessTokenStore.get() ?? ""}` },
+        credentials: "include",
+      });
       if (!res.ok) {
         throw new Error(`Gagal memuat detail pengguna (HTTP ${res.status})`);
       }
       const json = await res.json();
-      if (json.data) {
-        setSelectedUserDetail(json.data);
-        return;
-      }
-    } catch {
-      // Fallback fixture
-      const fallback = INITIAL_MOCK_DETAILS[user.id] || {
-        ...user,
-        invitations: [],
-        orders: [],
-      };
-      setSelectedUserDetail(fallback);
+      if (json.success !== true || !json.data)
+        throw new Error("Respons detail pengguna tidak valid.");
+      setSelectedUserDetail(json.data);
+    } catch (error) {
+      setDetailError(
+        error instanceof Error
+          ? error.message
+          : "Gagal memuat detail pengguna.",
+      );
     } finally {
       setIsLoadingDetail(false);
     }
@@ -284,11 +190,13 @@ export function UsersPage() {
   };
 
   // Submit Suspend
-  const handleConfirmSuspend = async () => {
+  const handleConfirmSuspend = async (stepUpToken: string) => {
     if (!targetUser) return;
     setActionError(null);
     if (actionReason.trim().length < 5) {
-      setActionError("Alasan penangguhan wajib diisi minimal 5 karakter untuk audit.");
+      setActionError(
+        "Alasan penangguhan wajib diisi minimal 5 karakter untuk audit.",
+      );
       return;
     }
 
@@ -296,35 +204,42 @@ export function UsersPage() {
     try {
       const res = await fetch(`/api/v1/admin/users/${targetUser.id}/suspend`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessTokenStore.get() ?? ""}`,
+          "X-MFA-Step-Up": stepUpToken,
+        },
         body: JSON.stringify({ reason: actionReason.trim() }),
       });
 
       if (!res.ok) {
         const errorJson = await res.json().catch(() => ({}));
         throw new Error(
-          errorJson?.error?.message || `Gagal menangguhkan akun (HTTP ${res.status})`,
+          errorJson?.error?.message ||
+            `Gagal menangguhkan akun (HTTP ${res.status})`,
         );
       }
 
+      const result = await res.json();
+      if (result.success !== true)
+        throw new Error(result.error?.message || "Perubahan akun ditolak.");
+
       // Update state locally
       setUsersList((prev) =>
-        prev.map((u) => (u.id === targetUser.id ? { ...u, status: "suspended" } : u)),
+        prev.map((u) =>
+          u.id === targetUser.id ? { ...u, status: "suspended" } : u,
+        ),
       );
       if (selectedUserDetail?.id === targetUser.id) {
-        setSelectedUserDetail((prev) => (prev ? { ...prev, status: "suspended" } : null));
+        setSelectedUserDetail((prev) =>
+          prev ? { ...prev, status: "suspended" } : null,
+        );
       }
       setIsSuspendModalOpen(false);
     } catch (err: any) {
-      // If simulated/test without live backend
-      if (process.env.NODE_ENV === "test") {
-        setUsersList((prev) =>
-          prev.map((u) => (u.id === targetUser.id ? { ...u, status: "suspended" } : u)),
-        );
-        setIsSuspendModalOpen(false);
-        return;
-      }
-      setActionError(err?.message || "Terjadi kesalahan saat memproses penangguhan.");
+      setActionError(
+        err?.message || "Terjadi kesalahan saat memproses penangguhan.",
+      );
     } finally {
       setIsSubmittingAction(false);
     }
@@ -335,42 +250,54 @@ export function UsersPage() {
     if (!targetUser) return;
     setActionError(null);
     if (actionReason.trim().length < 5) {
-      setActionError("Alasan pengaktifan kembali wajib diisi minimal 5 karakter untuk audit.");
+      setActionError(
+        "Alasan pengaktifan kembali wajib diisi minimal 5 karakter untuk audit.",
+      );
       return;
     }
 
     setIsSubmittingAction(true);
     try {
-      const res = await fetch(`/api/v1/admin/users/${targetUser.id}/unsuspend`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: actionReason.trim() }),
-      });
+      const res = await fetch(
+        `/api/v1/admin/users/${targetUser.id}/unsuspend`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessTokenStore.get() ?? ""}`,
+          },
+          body: JSON.stringify({ reason: actionReason.trim() }),
+        },
+      );
 
       if (!res.ok) {
         const errorJson = await res.json().catch(() => ({}));
         throw new Error(
-          errorJson?.error?.message || `Gagal mengaktifkan kembali akun (HTTP ${res.status})`,
+          errorJson?.error?.message ||
+            `Gagal mengaktifkan kembali akun (HTTP ${res.status})`,
         );
       }
 
+      const result = await res.json();
+      if (result.success !== true)
+        throw new Error(result.error?.message || "Perubahan akun ditolak.");
+
       // Update state locally
       setUsersList((prev) =>
-        prev.map((u) => (u.id === targetUser.id ? { ...u, status: "active" } : u)),
+        prev.map((u) =>
+          u.id === targetUser.id ? { ...u, status: "active" } : u,
+        ),
       );
       if (selectedUserDetail?.id === targetUser.id) {
-        setSelectedUserDetail((prev) => (prev ? { ...prev, status: "active" } : null));
+        setSelectedUserDetail((prev) =>
+          prev ? { ...prev, status: "active" } : null,
+        );
       }
       setIsUnsuspendModalOpen(false);
     } catch (err: any) {
-      if (process.env.NODE_ENV === "test") {
-        setUsersList((prev) =>
-          prev.map((u) => (u.id === targetUser.id ? { ...u, status: "active" } : u)),
-        );
-        setIsUnsuspendModalOpen(false);
-        return;
-      }
-      setActionError(err?.message || "Terjadi kesalahan saat mengaktifkan kembali akun.");
+      setActionError(
+        err?.message || "Terjadi kesalahan saat mengaktifkan kembali akun.",
+      );
     } finally {
       setIsSubmittingAction(false);
     }
@@ -383,11 +310,13 @@ export function UsersPage() {
         <div>
           <h1 className="text-display font-bold">Manajemen Pengguna</h1>
           <p className="mt-1 text-body text-text-muted">
-            Pencarian akun pengguna, peninjauan undangan & pesanan, serta manajemen penangguhan akses.
+            Pencarian akun pengguna, peninjauan undangan & pesanan, serta
+            manajemen penangguhan akses.
           </p>
         </div>
         <div className="text-sm text-text-muted">
-          Total Pengguna: <span className="font-semibold text-text">{usersList.length}</span>
+          Total Pengguna:{" "}
+          <span className="font-semibold text-text">{usersList.length}</span>
         </div>
       </div>
 
@@ -418,6 +347,9 @@ export function UsersPage() {
           </div>
         </div>
       </Card>
+
+      {fetchError && <p role="alert">{fetchError}</p>}
+      {isLoading && <p role="status">Memuat pengguna...</p>}
 
       {/* Users Table */}
       <Card>
@@ -458,7 +390,9 @@ export function UsersPage() {
                     data-testid={`user-row-${user.id}`}
                   >
                     <td className="py-3 px-4">
-                      <div className="font-semibold text-text">{user.fullName}</div>
+                      <div className="font-semibold text-text">
+                        {user.fullName}
+                      </div>
                       <div className="text-xs text-text-muted flex items-center gap-1.5">
                         <span>{user.email}</span>
                         {user.emailVerified ? (
@@ -499,10 +433,16 @@ export function UsersPage() {
                     <td className="py-3 px-4">
                       <div className="text-xs text-text-muted space-y-0.5">
                         <div>
-                          <span className="font-medium text-text">{user.invitationCount}</span> Undangan
+                          <span className="font-medium text-text">
+                            {user.invitationCount}
+                          </span>{" "}
+                          Undangan
                         </div>
                         <div>
-                          <span className="font-medium text-text">{user.orderCount}</span> Pesanan
+                          <span className="font-medium text-text">
+                            {user.orderCount}
+                          </span>{" "}
+                          Pesanan
                         </div>
                       </div>
                     </td>
@@ -554,41 +494,62 @@ export function UsersPage() {
         size="form"
       >
         <div className="space-y-6 pt-2">
-          {isLoadingDetail || !selectedUserDetail ? (
-            <div className="py-8 text-center text-text-muted">Memuat detail akun...</div>
+          {detailError ? (
+            <p role="alert">{detailError}</p>
+          ) : isLoadingDetail || !selectedUserDetail ? (
+            <div className="py-8 text-center text-text-muted">
+              Memuat detail akun...
+            </div>
           ) : (
             <>
               {/* Account Overview Cards */}
               <div className="grid grid-cols-2 gap-4 rounded-lg border border-border bg-surface-subtle/30 p-4 text-sm">
                 <div>
                   <div className="text-xs text-text-muted">Nama Lengkap</div>
-                  <div className="font-semibold text-text">{selectedUserDetail.fullName}</div>
+                  <div className="font-semibold text-text">
+                    {selectedUserDetail.fullName}
+                  </div>
                 </div>
                 <div>
                   <div className="text-xs text-text-muted">Email</div>
-                  <div className="font-medium text-text">{selectedUserDetail.email}</div>
+                  <div className="font-medium text-text">
+                    {selectedUserDetail.email}
+                  </div>
                 </div>
                 <div>
                   <div className="text-xs text-text-muted">Nomor Telepon</div>
-                  <div className="text-text">{selectedUserDetail.phone || "-"}</div>
+                  <div className="text-text">
+                    {selectedUserDetail.phone || "-"}
+                  </div>
                 </div>
                 <div>
                   <div className="text-xs text-text-muted">Status Akun</div>
                   <div className="mt-0.5">
                     <Badge
-                      tone={selectedUserDetail.status === "active" ? "success" : "danger"}
+                      tone={
+                        selectedUserDetail.status === "active"
+                          ? "success"
+                          : "danger"
+                      }
                     >
-                      {selectedUserDetail.status === "active" ? "Aktif" : "Ditangguhkan"}
+                      {selectedUserDetail.status === "active"
+                        ? "Aktif"
+                        : "Ditangguhkan"}
                     </Badge>
                   </div>
                 </div>
                 <div>
                   <div className="text-xs text-text-muted">Terdaftar Sejak</div>
-                  <div className="text-text">{formatDate(selectedUserDetail.createdAt)}</div>
+                  <div className="text-text">
+                    {formatDate(selectedUserDetail.createdAt)}
+                  </div>
                 </div>
                 <div>
                   <div className="text-xs text-text-muted">ID Pengguna</div>
-                  <div className="font-mono text-xs text-text-muted truncate" title={selectedUserDetail.id}>
+                  <div
+                    className="font-mono text-xs text-text-muted truncate"
+                    title={selectedUserDetail.id}
+                  >
                     {selectedUserDetail.id}
                   </div>
                 </div>
@@ -597,7 +558,9 @@ export function UsersPage() {
               {/* Associated Invitations */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-text">Daftar Undangan Pernikahan</h4>
+                  <h4 className="font-semibold text-text">
+                    Daftar Undangan Pernikahan
+                  </h4>
                   <Badge tone="neutral">
                     {selectedUserDetail.invitations.length} Undangan
                   </Badge>
@@ -618,7 +581,8 @@ export function UsersPage() {
                             {inv.internalName || inv.slug}
                           </div>
                           <div className="text-xs text-text-muted">
-                            Slug: <span className="font-mono">/{inv.slug}</span> • Templat: {inv.templateId}
+                            Slug: <span className="font-mono">/{inv.slug}</span>{" "}
+                            • Templat: {inv.templateId}
                           </div>
                         </div>
                         <div className="text-right">
@@ -627,8 +591,8 @@ export function UsersPage() {
                               inv.status === "published"
                                 ? "success"
                                 : inv.status === "draft"
-                                ? "neutral"
-                                : "warning"
+                                  ? "neutral"
+                                  : "warning"
                             }
                           >
                             {inv.status}
@@ -646,7 +610,9 @@ export function UsersPage() {
               {/* Order History */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-text">Riwayat Transaksi Pesanan</h4>
+                  <h4 className="font-semibold text-text">
+                    Riwayat Transaksi Pesanan
+                  </h4>
                   <Badge tone="neutral">
                     {selectedUserDetail.orders.length} Pesanan
                   </Badge>
@@ -676,7 +642,9 @@ export function UsersPage() {
                           </div>
                           <div className="mt-0.5">
                             <Badge
-                              tone={ord.status === "paid" ? "success" : "neutral"}
+                              tone={
+                                ord.status === "paid" ? "success" : "neutral"
+                              }
                             >
                               {ord.status}
                             </Badge>
@@ -740,7 +708,9 @@ export function UsersPage() {
         <div className="space-y-4 pt-2">
           {/* Important business rule notice */}
           <div className="rounded-md border border-amber-300 bg-amber-50 p-3.5 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
-            <span className="font-bold">Perhatian:</span> Menangguhkan akun akan menghentikan akses login pengguna. Undangan yang sudah terbit tetap aktif dan dapat diakses tamu (BR-Admin.6).
+            <span className="font-bold">Perhatian:</span> Menangguhkan akun akan
+            menghentikan akses login pengguna. Undangan yang sudah terbit tetap
+            aktif dan dapat diakses tamu (BR-Admin.6).
           </div>
 
           <Textarea
@@ -767,16 +737,26 @@ export function UsersPage() {
             </Button>
             <Button
               variant="danger"
-              onClick={handleConfirmSuspend}
+              onClick={() => setIsStepUpOpen(true)}
               disabled={isSubmittingAction || actionReason.trim().length < 5}
             >
-              {isSubmittingAction ? "Menangguhkan..." : "Konfirmasi Penangguhan"}
+              {isSubmittingAction
+                ? "Menangguhkan..."
+                : "Konfirmasi Penangguhan"}
             </Button>
           </div>
         </div>
       </Modal>
 
       {/* Unsuspend Confirmation Modal */}
+      {isStepUpOpen && (
+        <StepUpModal
+          open
+          onClose={() => setIsStepUpOpen(false)}
+          actionTitle="Penangguhan Akun"
+          onSuccess={(token) => void handleConfirmSuspend(token)}
+        />
+      )}
       <Modal
         open={isUnsuspendModalOpen}
         onClose={() => !isSubmittingAction && setIsUnsuspendModalOpen(false)}
@@ -790,7 +770,8 @@ export function UsersPage() {
       >
         <div className="space-y-4 pt-2">
           <p className="text-sm text-text-muted">
-            Pengguna akan dapat kembali melakukan autentikasi login dan mengelola undangan mereka pada platform.
+            Pengguna akan dapat kembali melakukan autentikasi login dan
+            mengelola undangan mereka pada platform.
           </p>
 
           <Textarea
@@ -820,7 +801,9 @@ export function UsersPage() {
               onClick={handleConfirmUnsuspend}
               disabled={isSubmittingAction || actionReason.trim().length < 5}
             >
-              {isSubmittingAction ? "Memproses..." : "Konfirmasi Aktifkan Kembali"}
+              {isSubmittingAction
+                ? "Memproses..."
+                : "Konfirmasi Aktifkan Kembali"}
             </Button>
           </div>
         </div>

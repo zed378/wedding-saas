@@ -19,3 +19,7 @@ TOTP is mandatory, and refunds and suspensions require a fresh factor even insid
 session (`docs/SECURITY/03`).
 
 Commands are wired in `P0-22`; the surface itself is Phase 5.
+
+For local development, run the API on `http://localhost:3000` and the admin app
+on `http://localhost:3300`. Vite forwards `/api` requests to the API so login,
+MFA and same-origin administrative requests use the local backend.

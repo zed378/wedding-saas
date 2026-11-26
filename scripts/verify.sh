@@ -11,6 +11,8 @@
 # Usage:
 #   scripts/verify.sh          full run
 #   scripts/verify.sh --fast   skip the slow steps (what pre-push runs)
+# Full mode needs isolated test Postgres/Redis, MinIO, ClamAV and Docker for SAST.
+# Configure the test URLs before running; see backend/api/test/README.md.
 set -uo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -67,6 +69,7 @@ step "design tokens, not literals" node scripts/check-design-tokens.mjs
 step "sources are plain text" node scripts/check-text-sources.mjs
 step "no hard-coded section or field" node scripts/check-no-hardcoded-fields.mjs
 step "the renderer knows no template" node scripts/check-renderer-is-generic.mjs
+step "public routes have reserved slugs" node scripts/check-public-route-reservations.mjs
 step "every request text field is sanitized or exempt" node scripts/check-sanitized-fields.mjs
 
 # docs/SECURITY/07 § Pricing: the amount comes from the packages and addons rows. A price typed
@@ -106,6 +109,10 @@ fi
 
 if [ "$FAST" -eq 0 ]; then
   # Slow steps: skipped by pre-push, required before a merge to main.
+  step "integration tests against Postgres and Redis" pnpm -w run test:integration
+  step "service-layer coverage thresholds" pnpm --filter @wi/api run test:coverage
+  step "dependency vulnerability audit" pnpm audit --audit-level=low
+  step "static security analysis" node scripts/check-sast.mjs
   step "build" pnpm -w run build
 
   # P2-08. The public invitation's claim -- that the whole page and its sharing meta tags
@@ -124,10 +131,10 @@ if [ ${#failed[@]} -eq 0 ]; then
     printf 'all checks passed.\n'
   fi
   printf '\n'
-  printf 'Not covered here, and not covered anywhere until P0-17 ships a pipeline:\n'
-  printf '  - integration tests against real Postgres and Redis (P0-19)\n'
-  printf '  - service-layer coverage gate, 80%% (docs/BACKEND/09)\n'
-  printf '  - SAST and dependency CVE scanning (docs/SECURITY/11)\n'
+  if [ "$FAST" -eq 1 ]; then
+    printf 'Fast mode omits integration, coverage, dependency audit, SAST, build and SSR.\n'
+  fi
+  printf 'Still not automated until P0-17 ships a pipeline:\n'
   printf '  - required reviewer approval before merge (docs/DEVOPS/01)\n'
   printf 'and none of this runs on a clean checkout, or at all if someone passes\n'
   printf -- '--no-verify. A local hook is a reminder with teeth, not a gate.\n'

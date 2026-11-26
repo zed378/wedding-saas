@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sanitizePlainText } from "../../../shared/sanitizer/sanitize";
 
 /**
  * P5-10: Admin Invitation Search and Detail Schema.
@@ -11,10 +12,20 @@ export const adminInvitationQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-export type AdminInvitationQueryDto = z.infer<typeof adminInvitationQuerySchema>;
+export type AdminInvitationQueryDto = z.infer<
+  typeof adminInvitationQuerySchema
+>;
 
 export const adminInvitationDetailSchema = z.object({
-  reason: z.string().trim().min(5).max(500).optional(),
+  reason: z
+    .string()
+    .trim()
+    .max(500)
+    .transform(sanitizePlainText)
+    .pipe(z.string().trim().min(5))
+    .optional(),
 });
 
-export type AdminInvitationDetailDto = z.infer<typeof adminInvitationDetailSchema>;
+export type AdminInvitationDetailDto = z.infer<
+  typeof adminInvitationDetailSchema
+>;

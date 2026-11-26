@@ -62,9 +62,7 @@ export type CreateTemplateVersionDto = z.infer<
 export const updateTemplateVersionSchema = z.object({
   sections: z.unknown().optional(),
   theme: z.unknown().optional(),
-  customizable_theme_keys: z
-    .array(z.string().trim().min(1).max(60))
-    .optional(),
+  customizable_theme_keys: z.array(z.string().trim().min(1).max(60)).optional(),
   changelog: z.string().trim().max(5000).nullable().optional(),
   reason: z.string().trim().min(5).max(500),
 });

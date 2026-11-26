@@ -5,6 +5,12 @@ packages:
   - "e2e"
   - "packages/*"
 
+overrides:
+  "@esbuild-kit/core-utils>esbuild": 0.25.4
+  "dockerode>uuid": 11.1.1
+  "archiver-utils>glob": 14.0.2
+  "glob>minimatch": 11.0.1
+
 # Install scripts are blocked by default: a postinstall is arbitrary code execution at
 # install time, and this repository will handle payment secrets and user uploads. Every
 # package is therefore decided one at a time here, rather than the protection being
@@ -43,3 +49,7 @@ minimumReleaseAgeExclude:
   - react-dom@19.3.0
   - react@19.3.0
   - scheduler@0.28.0
+  - "@nestjs/common@12.6.2"
+  - "@nestjs/core@12.6.2"
+  - "@nestjs/platform-express@12.6.2"
+  - "@nestjs/testing@12.6.2"

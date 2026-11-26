@@ -3,7 +3,15 @@ import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { Pool } from "pg";
 import Redis from "ioredis";
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+  vi,
+} from "vitest";
 
 import { connect, resetTenantData } from "./helpers.ts";
 import {
@@ -126,7 +134,10 @@ describe("P3-12 — Public Page Caching and Invalidation", () => {
 
     const invitation = await createTestInvitation(owner, {
       owner: alice,
-      template: { templateId: templateId ?? "test-template", versionId: templateVersionId },
+      template: {
+        templateId: templateId ?? "test-template",
+        versionId: templateVersionId,
+      },
       status: options.status ?? "published",
       slug,
       internalName: "Pernikahan Alice Cache Test",
@@ -256,7 +267,9 @@ describe("P3-12 — Public Page Caching and Invalidation", () => {
     // Subsequent read returns fresh data
     const resUpdated = await get(inv.slug);
     expect(resUpdated.status).toBe(200);
-    expect(resUpdated.body.data.invitation.couple.groom.nickname).toBe("Budi Baru");
+    expect(resUpdated.body.data.invitation.couple.groom.nickname).toBe(
+      "Budi Baru",
+    );
   });
 
   it("public page 404s immediately after unpublish through the cache layer (DoD 5, P3-10 obligation)", async () => {
@@ -288,7 +301,9 @@ describe("P3-12 — Public Page Caching and Invalidation", () => {
     const inv = await publishInvitation();
 
     // Mock cache.get to throw an unexpected Redis error
-    const spy = vi.spyOn(cache, "get").mockRejectedValueOnce(new Error("Redis connection refused"));
+    const spy = vi
+      .spyOn(cache, "get")
+      .mockRejectedValueOnce(new Error("Redis connection refused"));
 
     const res = await get(inv.slug);
     expect(res.status).toBe(200);

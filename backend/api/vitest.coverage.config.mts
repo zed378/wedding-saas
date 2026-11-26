@@ -5,8 +5,8 @@ import { defineConfig } from "vitest/config";
  * P1-25 — the service-layer coverage measurement.
  *
  * `docs/BACKEND/09` § Coverage asks for "a minimum of 80% line coverage" on the service
- * layer, and `P1-25`'s DoD asks for it to be met. `P0-17` will turn it into a gate; until
- * then this is the command that produces the number.
+ * layer, and `P1-25`'s DoD asks for it to be met. The full local verification command
+ * enforces these thresholds; automated CI remains deferred under `P0-17`.
  *
  * ## Why it is a third config rather than a flag
  *

@@ -235,7 +235,7 @@ describe("order expiry (P3-07)", () => {
 
   it("a late success after the job ran is honoured and flagged", async () => {
     // Card DoD 2 against the real sweep: the scheduler ran first, the customer paid anyway.
-    const { user, invitation, order } = await checkout();
+    const { user, order } = await checkout();
     await payments.initiate(
       { scope: user.scope, fullName: "Budi", email: user.email },
       order.id,

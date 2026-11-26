@@ -83,9 +83,7 @@ function makeClient(respond: (call: ApiCall) => Response) {
 function renderWithClient(node: React.ReactNode, client: ApiClient) {
   return render(
     <AuthProvider client={client} restoreSession={false}>
-      <Suspense fallback={<div>Memuat...</div>}>
-        {node}
-      </Suspense>
+      <Suspense fallback={<div>Memuat...</div>}>{node}</Suspense>
     </AuthProvider>,
   );
 }
@@ -241,9 +239,8 @@ describe("getPaymentStatus API wrapper (SECURITY: server is authoritative)", () 
 
 describe("checkout page", () => {
   it("shows the package card with price and features", async () => {
-    const { default: CheckoutPage } = await import(
-      "../src/app/(app)/checkout/[invitationId]/page"
-    );
+    const { default: CheckoutPage } =
+      await import("../src/app/(app)/checkout/[invitationId]/page");
 
     const { client } = makeClient(() => ok({}));
 
@@ -258,9 +255,8 @@ describe("checkout page", () => {
   });
 
   it("shows the Bayar Sekarang button", async () => {
-    const { default: CheckoutPage } = await import(
-      "../src/app/(app)/checkout/[invitationId]/page"
-    );
+    const { default: CheckoutPage } =
+      await import("../src/app/(app)/checkout/[invitationId]/page");
 
     const { client } = makeClient(() => ok({}));
 
@@ -275,9 +271,8 @@ describe("checkout page", () => {
   });
 
   it("creates an order on button click and navigates to payment page", async () => {
-    const { default: CheckoutPage } = await import(
-      "../src/app/(app)/checkout/[invitationId]/page"
-    );
+    const { default: CheckoutPage } =
+      await import("../src/app/(app)/checkout/[invitationId]/page");
 
     pushMock.mockClear();
 
@@ -319,15 +314,11 @@ describe("payment page: URL parameter security (SECURITY/07 Golden Rule)", () =>
    */
 
   it("shows the order summary without claiming success based on URL", async () => {
-    const { default: PaymentPage } = await import(
-      "../src/app/(app)/checkout/[invitationId]/payment/[orderId]/page"
-    );
+    const { default: PaymentPage } =
+      await import("../src/app/(app)/checkout/[invitationId]/payment/[orderId]/page");
 
     const { client } = makeClient((call) => {
-      if (
-        call.method === "GET" &&
-        call.pathname.includes("/payment/status")
-      ) {
+      if (call.method === "GET" && call.pathname.includes("/payment/status")) {
         // Server says pending — payment NOT done.
         return ok({
           order_status: "pending",
@@ -352,9 +343,7 @@ describe("payment page: URL parameter security (SECURITY/07 Golden Rule)", () =>
     await screen.findAllByText(/Rp 139\.000/);
 
     // Must NOT show success state — server said pending.
-    expect(
-      screen.queryByText(/pembayaran berhasil/i),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/pembayaran berhasil/i)).not.toBeInTheDocument();
 
     // Must NOT show a "Lanjutkan ke Terbitkan" link based solely on URL params.
     expect(
@@ -363,9 +352,8 @@ describe("payment page: URL parameter security (SECURITY/07 Golden Rule)", () =>
   });
 
   it("shows success ONLY after server confirms payment_status === 'success'", async () => {
-    const { default: PaymentPage } = await import(
-      "../src/app/(app)/checkout/[invitationId]/payment/[orderId]/page"
-    );
+    const { default: PaymentPage } =
+      await import("../src/app/(app)/checkout/[invitationId]/payment/[orderId]/page");
 
     let pollCount = 0;
 
@@ -387,10 +375,7 @@ describe("payment page: URL parameter security (SECURITY/07 Golden Rule)", () =>
           },
         });
       }
-      if (
-        call.method === "GET" &&
-        call.pathname.includes("/payment/status")
-      ) {
+      if (call.method === "GET" && call.pathname.includes("/payment/status")) {
         pollCount++;
         if (pollCount >= 1) {
           return ok({
@@ -427,9 +412,7 @@ describe("payment page: URL parameter security (SECURITY/07 Golden Rule)", () =>
     // After server confirms success, the success banner appears.
     await waitFor(
       () => {
-        expect(
-          screen.getByText(/pembayaran berhasil/i),
-        ).toBeInTheDocument();
+        expect(screen.getByText(/pembayaran berhasil/i)).toBeInTheDocument();
       },
       { timeout: 15_000 },
     );
@@ -445,9 +428,8 @@ describe("payment page: URL parameter security (SECURITY/07 Golden Rule)", () =>
      * Additional tamper-proof test: expired order never shows success, regardless of
      * what the URL might contain.
      */
-    const { default: PaymentPage } = await import(
-      "../src/app/(app)/checkout/[invitationId]/payment/[orderId]/page"
-    );
+    const { default: PaymentPage } =
+      await import("../src/app/(app)/checkout/[invitationId]/payment/[orderId]/page");
 
     const { client } = makeClient(() =>
       ok({ ...orderDetail, status: "expired" }),
@@ -469,9 +451,7 @@ describe("payment page: URL parameter security (SECURITY/07 Golden Rule)", () =>
     expect(screen.getByText(/pesanan kedaluwarsa/i)).toBeInTheDocument();
 
     // NOT success.
-    expect(
-      screen.queryByText(/pembayaran berhasil/i),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/pembayaran berhasil/i)).not.toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: /lanjutkan ke terbitkan/i }),
     ).not.toBeInTheDocument();
@@ -496,18 +476,12 @@ describe("InvitationCard: payment actions", () => {
 
     const { client } = makeClient(() => ok({}));
     renderWithClient(
-      <InvitationCard
-        invitation={inv}
-        publicHost="https://invitation.test"
-      />,
+      <InvitationCard invitation={inv} publicHost="https://invitation.test" />,
       client,
     );
 
     const bayarLink = screen.getByRole("link", { name: /bayar budi & ani/i });
-    expect(bayarLink).toHaveAttribute(
-      "href",
-      `/checkout/${INVITATION_ID}`,
-    );
+    expect(bayarLink).toHaveAttribute("href", `/checkout/${INVITATION_ID}`);
   });
 
   it("shows 'Perbarui' button for expired invitations", () => {
@@ -525,10 +499,7 @@ describe("InvitationCard: payment actions", () => {
 
     const { client } = makeClient(() => ok({}));
     renderWithClient(
-      <InvitationCard
-        invitation={inv}
-        publicHost="https://invitation.test"
-      />,
+      <InvitationCard invitation={inv} publicHost="https://invitation.test" />,
       client,
     );
 
@@ -553,14 +524,15 @@ describe("InvitationCard: payment actions", () => {
 
     const { client } = makeClient(() => ok({}));
     renderWithClient(
-      <InvitationCard
-        invitation={inv}
-        publicHost="https://invitation.test"
-      />,
+      <InvitationCard invitation={inv} publicHost="https://invitation.test" />,
       client,
     );
 
-    expect(screen.queryByRole("link", { name: /bayar/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /perbarui/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /bayar/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /perbarui/i }),
+    ).not.toBeInTheDocument();
   });
 });

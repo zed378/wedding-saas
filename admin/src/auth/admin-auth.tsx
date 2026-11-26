@@ -74,6 +74,8 @@ export function AdminAuthProvider({
   }, []);
 
   const login = useCallback((token: string, newUser: AdminUser) => {
+    if (typeof token !== "string" || !token || !newUser?.id || !newUser.role)
+      throw new Error("Respons sesi tidak valid. Masuk kembali.");
     accessTokenStore.set(token);
     const expiresAt = Date.now() + MAX_ADMIN_SESSION_MS;
     setUser(newUser);
@@ -91,16 +93,13 @@ export function AdminAuthProvider({
       }
 
       const client = new ApiClient({
-        baseUrl:
-          typeof window !== "undefined" && window.location.hostname === "localhost"
-            ? "http://localhost:3000"
-            : "",
+        baseUrl: "",
         tokenStore: accessTokenStore,
       });
 
-      const res = await client.get<AdminUser>("/api/v1/auth/me");
-      if (res && res.data) {
-        setUser(res.data);
+      const res = await client.get<{ user: AdminUser }>("/api/v1/auth/me");
+      if (res.data?.user?.id && res.data.user.role) {
+        setUser(res.data.user);
         if (!sessionExpiresAt) {
           setSessionExpiresAt(Date.now() + MAX_ADMIN_SESSION_MS);
         }

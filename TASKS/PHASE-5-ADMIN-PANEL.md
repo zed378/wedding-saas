@@ -8,6 +8,14 @@
 
 **Roadmap reference**: `docs/PLAN/16-IMPLEMENTATION-ROADMAP.md` § Phase 5 (Week 12-13).
 
+**Latest 2026-11-26 continuation**: production audit32→0, global formatter green, full API1,004/admin84 tests and workspace build/types/SSR37 pass after actual dependency installation. Node24 Chromium template/public-moderation acceptance passes with inspected screenshots; sidebar compression is fixed and tested. P5-14 is WIP and its no-deploy/escalation checks now have explicit evidence. P5-10–13 remain REVIEW; remaining global gates and phase summary are unwaived. [Latest record](../MEMORY/records/2026-11-26-P5-14-parallel-gate-remediation.md).
+
+**2026-11-26 focused parallel coverage recheck**: orders/users 24 tests pass at 100% service branch coverage; moderation/templates 41 tests pass at 97.43%/97.61%; MFA/notification 49 tests pass. Workspace lint/types/format, dependency audit, SAST, route and tenant guards pass. Combined coverage rerun stopped before a report, so the previous complete 69.82% branch result remains the latest aggregate. P5-14 remains WIP. [Evidence](../MEMORY/records/2026-11-26-P5-14-parallel-branch-coverage-review.md).
+
+**Final unit verification 2026-11-26**: full API 56 files / 1,004 tests and full admin 15 files / 82 tests passed. Broader integration, browser acceptance and global gate limitations below remain unwaived.
+
+**2026-11-26 verification**: parallel continuation corrected local admin API routing and concurrent moderation audit snapshots. Workspace types/build, public SSR (37 cases), nine auth/admin SQL files (82 cases), and a final moderation/count SQL run (4 cases) passed. P5-10–13 remain REVIEW; P5-14 remains incomplete because rendered browser acceptance and global gates remain outstanding. Full verification evidence: [record](../MEMORY/records/2026-11-26-P5-14-parallel-acceptance-verification.md).
+
 ---
 
 ## Task Summary
@@ -300,7 +308,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | REVIEW — implementation complete; final verification pending |
 | **Depends on** | P5-03 |
 | **Spec refs** | `docs/API/09-ADMIN-API.md` § Invitation Overview, `docs/PLAN/12` § Invitation Overview, `docs/SECURITY/05` § Special Case |
 | **Spec required** | Yes — authorization |
@@ -327,7 +335,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | REVIEW — implementation complete; final verification pending |
 | **Depends on** | P5-03 |
 | **Spec refs** | `docs/API/09` § Dashboard, `docs/PLAN/12` § Dashboard, `docs/PLAN/14` § Phase 2 funnel |
 | **Spec required** | No |
@@ -354,7 +362,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | REVIEW — implementation complete; final verification pending |
 | **Depends on** | P5-03 |
 | **Spec refs** | `docs/API/09` § Audit Log, `docs/DATABASE/10-AUDIT-LOGS.md`, `docs/SECURITY/12-INCIDENT-RESPONSE.md` |
 | **Spec required** | No |
@@ -381,7 +389,7 @@
 
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | REVIEW — implementation complete; final verification pending |
 | **Depends on** | P5-03, P1-09 |
 | **Spec refs** | `docs/SECURITY/10-ABUSE-PREVENTION.md` § Slug Blocklist, `docs/PLAN/10` § Subdomain, `docs/PLAN/18` R7 |
 | **Spec required** | Yes — abuse prevention |
@@ -408,9 +416,11 @@
 
 ## P5-14 — Phase 5 Test Suite and Acceptance
 
+2026-11-26: the owner requested committing the existing snapshot and integrating it into main. This does not close the combined coverage gate or mark phase acceptance complete; see the [integration record](../MEMORY/records/2026-11-26-P5-14-main-integration.md).
+
 | | |
 |---|---|
-| **Status** | TODO |
+| **Status** | WIP — browser/count-based audit acceptance and lint/SAST pass; focused branch suites pass, but combined rerun is incomplete; dependency audit currently reports zero advisories; final reviews remain |
 | **Depends on** | all Phase 5 tasks |
 | **Spec refs** | `docs/PLAN/17-ACCEPTANCE-CRITERIA.md`, `docs/TESTING/03-E2E-TESTING.md` § 6, `docs/SECURITY/04`, `docs/SECURITY/05` |
 | **Spec required** | No |
@@ -428,7 +438,7 @@
 7. Write the phase summary record.
 
 **Definition of Done**
-- [ ] The no-deploy template flow works end to end.
-- [ ] Privilege escalation attempts all fail.
-- [ ] Audit coverage of admin writes is complete, verified by count comparison rather than spot checks.
+- [x] The no-deploy template flow works end to end — Node 24 Chromium admin author/publish and user API creation, with stored version and audit assertions (2026-11-26).
+- [x] Privilege escalation attempts all fail — full 1,004-test API run includes `admin-phase5-authorization.spec.ts` and `admin-mfa-session.spec.ts` (2026-11-26); this does not waive broader security gates.
+- [x] Audit coverage of admin writes is verified by complete actor-session count/action/resource reconciliation: nine support/moderation/refund/blocklist actions and eight template actions in `admin-phase5-write-audit.itest.ts` and `admin-phase5-template-flow.itest.ts`, passing in the full 2,174-test Node 24 run (2026-11-26).
 - [ ] The phase summary exists in `MEMORY/records/`.

@@ -3,24 +3,22 @@ import { Redis } from "ioredis";
 import { Queue } from "bullmq";
 import type { Pool as PgPool } from "pg";
 
-import {
-  JobRunner,
-  DLQ_NAME,
-  deadLetterDepth,
-  type JobPayload,
-} from "../src/runner.js";
+import { JobRunner, type JobPayload } from "../src/runner.js";
 import { policyFor } from "../src/jobs.js";
 import { makeNotificationSendHandler } from "../src/handlers/notification-send.handler.js";
 import { MemoryEmailAdapter } from "../src/email/index.js";
 import type { WorkerEnv } from "../src/env.js";
 
-const REDIS_URL = process.env["TEST_REDIS_URL"] ?? process.env["REDIS_URL"] ?? "redis://localhost:6379";
+const REDIS_URL =
+  process.env["TEST_REDIS_URL"] ??
+  process.env["REDIS_URL"] ??
+  "redis://localhost:6379";
 const TEST_DB = 9;
 
 let redis: Redis;
 let connection: { url: string };
 
-const uniq = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const _uniq = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 async function until(
   check: () => boolean | Promise<boolean>,
@@ -36,38 +34,41 @@ async function until(
 }
 
 describe("notification.send integration (P4-06)", () => {
-  let skipAll = false;
-
   beforeAll(async () => {
+    const url = new URL(REDIS_URL);
+    url.pathname = `/${TEST_DB}`;
+    connection = { url: url.toString() };
+    redis = new Redis(connection.url, {
+      maxRetriesPerRequest: null,
+      connectTimeout: 3_000,
+      lazyConnect: true,
+      retryStrategy: () => null,
+    });
     try {
-      const url = new URL(REDIS_URL);
-      url.pathname = `/${TEST_DB}`;
-      connection = { url: url.toString() };
-
-      redis = new Redis(connection.url, { maxRetriesPerRequest: null });
+      await redis.connect();
       await redis.ping();
-    } catch {
-      skipAll = true;
+    } catch (cause) {
+      redis.disconnect();
+      throw new Error(
+        "Notification integration requires a reachable test Redis.",
+        {
+          cause,
+        },
+      );
     }
   });
 
   afterAll(async () => {
-    if (redis) {
+    if (redis?.status === "ready") {
       await redis.quit();
     }
   });
 
   beforeEach(async () => {
-    if (skipAll || !redis) return;
     await redis.flushdb();
   });
 
   it("processes notification.send job from BullMQ queue to MemoryEmailAdapter", async () => {
-    if (skipAll) {
-      console.warn("Redis not running; skipping live integration test");
-      return;
-    }
-
     const memoryEmail = new MemoryEmailAdapter();
     const mockPg = {
       query: async (sql: string) => {

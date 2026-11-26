@@ -255,7 +255,10 @@ export class AuthController {
 
     const parsed = mfaSetupSchema.safeParse(body ?? {});
     if (parsed.success && parsed.data.setup_ticket) {
-      const payload = await this.mfa.verifyMfaTicket(parsed.data.setup_ticket, "setup");
+      const payload = await this.mfa.verifyMfaTicket(
+        parsed.data.setup_ticket,
+        "setup",
+      );
       userId = payload.userId;
       email = payload.email;
     } else if (authorization) {
@@ -285,7 +288,10 @@ export class AuthController {
     let userId: string;
 
     if (input.setup_ticket) {
-      const payload = await this.mfa.verifyMfaTicket(input.setup_ticket, "setup");
+      const payload = await this.mfa.verifyMfaTicket(
+        input.setup_ticket,
+        "setup",
+      );
       userId = payload.userId;
     } else if (authorization) {
       const user = await this.sessions.authenticate(authorization);
@@ -310,12 +316,20 @@ export class AuthController {
     const input = parse(mfaVerifySchema, body);
     if (!input.code && !input.recovery_code) {
       throw new ValidationError(
-        [{ field: "code", message: "Kode 2FA atau kode pemulihan harus diisi." }],
+        [
+          {
+            field: "code",
+            message: "Kode 2FA atau kode pemulihan harus diisi.",
+          },
+        ],
         "Kode 2FA atau kode pemulihan harus diisi.",
       );
     }
 
-    const payload = await this.mfa.verifyMfaTicket(input.mfa_ticket, "challenge");
+    const payload = await this.mfa.verifyMfaTicket(
+      input.mfa_ticket,
+      "challenge",
+    );
     const result = await this.mfa.verifyCodeOrRecovery(payload.userId, {
       code: input.code,
       recoveryCode: input.recovery_code,
@@ -323,7 +337,12 @@ export class AuthController {
 
     if (!result.success) {
       throw new ValidationError(
-        [{ field: "code", message: "Kode 2FA atau kode pemulihan tidak valid." }],
+        [
+          {
+            field: "code",
+            message: "Kode 2FA atau kode pemulihan tidak valid.",
+          },
+        ],
         "Kode 2FA tidak valid.",
       );
     }
@@ -347,7 +366,12 @@ export class AuthController {
 
     if (!input.code && !input.recovery_code) {
       throw new ValidationError(
-        [{ field: "code", message: "Kode 2FA atau kode pemulihan harus diisi." }],
+        [
+          {
+            field: "code",
+            message: "Kode 2FA atau kode pemulihan harus diisi.",
+          },
+        ],
         "Kode 2FA atau kode pemulihan harus diisi.",
       );
     }
@@ -359,7 +383,12 @@ export class AuthController {
 
     if (!result.success) {
       throw new ValidationError(
-        [{ field: "code", message: "Kode 2FA atau kode pemulihan tidak valid." }],
+        [
+          {
+            field: "code",
+            message: "Kode 2FA atau kode pemulihan tidak valid.",
+          },
+        ],
         "Kode 2FA tidak valid.",
       );
     }
@@ -393,7 +422,13 @@ export class AuthController {
   ) {
     const input = parse(googleSchema, body);
     const { session } = await this.google.authenticate(input.id_token);
-
+    if (session.requiresMfa) {
+      return ok(
+        session.isEnrolled
+          ? { requires_mfa: true, mfa_ticket: session.ticket }
+          : { requires_mfa_setup: true, setup_ticket: session.ticket },
+      );
+    }
     return this.respondWithSession(res, session);
   }
 

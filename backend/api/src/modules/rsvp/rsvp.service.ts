@@ -8,7 +8,6 @@ import {
   RsvpRepository,
   type AttendanceStatus,
   type FindRsvpsOptions,
-  type RsvpRow,
   type RsvpSummary,
 } from "../../shared/tenancy/rsvp-repository";
 import type { TenantScope } from "../../shared/tenancy/tenant-scope";
@@ -37,7 +36,9 @@ export interface RsvpResponse {
  * Escape a CSV cell, mitigating spreadsheet formula injection (OWASP).
  * Prepends a single quote if the value begins with '=', '+', '-', '@', '\t', or '\r'.
  */
-export function escapeCsvCell(value: string | number | null | undefined): string {
+export function escapeCsvCell(
+  value: string | number | null | undefined,
+): string {
   if (value === null || value === undefined) {
     return '""';
   }
@@ -77,7 +78,9 @@ export class RsvpService {
   ): Promise<RsvpResponse> {
     const target = await this.rsvpRepository.findPublishedRsvpTarget(slug);
     if (!target) {
-      throw new NotFoundError("Undangan tidak ditemukan atau belum dipublikasikan.");
+      throw new NotFoundError(
+        "Undangan tidak ditemukan atau belum dipublikasikan.",
+      );
     }
 
     if (!target.rsvpEnabled) {

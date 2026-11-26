@@ -441,6 +441,53 @@ describe("the map picker (card DoD 4)", () => {
     );
 
     expect(seen.at(-1)!.latitude).toBeCloseTo(-6.2088, 4);
+    expect(screen.getByRole("spinbutton", { name: /lintang/i })).toHaveValue(
+      -6.2088,
+    );
+    const longitude = screen.getByRole("spinbutton", { name: /bujur/i });
+    await userEvent.clear(longitude);
+    await userEvent.type(longitude, "106.0800");
+    expect(longitude).toHaveDisplayValue("106.0800");
+    await userEvent.type(longitude, "8");
+
+    expect(seen.at(-1)).toEqual({ latitude: -6.2088, longitude: 106.08008 });
+    expect(longitude).toHaveValue(106.08008);
+  });
+
+  it("updates both manual inputs when external coordinates change", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <MapPicker latitude={-6.2} longitude={106.8} onChange={onChange} />,
+    );
+    rerender(
+      <MapPicker
+        latitude={-7.250445}
+        longitude={112.768845}
+        onChange={onChange}
+      />,
+    );
+
+    expect(screen.getByRole("spinbutton", { name: /lintang/i })).toHaveValue(
+      -7.250445,
+    );
+    expect(screen.getByRole("spinbutton", { name: /bujur/i })).toHaveValue(
+      112.768845,
+    );
+    expect(onChange).not.toHaveBeenCalled();
+
+    rerender(
+      <MapPicker
+        latitude={undefined}
+        longitude={undefined}
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getByRole("spinbutton", { name: /lintang/i })).toHaveValue(
+      null,
+    );
+    expect(screen.getByRole("spinbutton", { name: /bujur/i })).toHaveValue(
+      null,
+    );
   });
 
   it("labels both coordinate inputs", () => {

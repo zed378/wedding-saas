@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Redis } from "ioredis";
 
-import { AnalyticsService, PENDING_VIEWS_HASH } from "../src/modules/analytics/analytics.service";
+import {
+  AnalyticsService,
+  PENDING_VIEWS_HASH,
+} from "../src/modules/analytics/analytics.service";
 import { PublicViewController } from "../src/modules/analytics/public-view.controller";
 import { OwnerAnalyticsController } from "../src/modules/analytics/owner-analytics.controller";
 import type { AnalyticsRepository } from "../src/shared/tenancy/analytics-repository";
@@ -37,7 +40,9 @@ describe("AnalyticsService (P4-09)", () => {
 
     const result = await service.recordView("romeo-juliet");
     expect(result).toEqual({ recorded: true });
-    expect(mockPublicInvitationRepo.findPublishedBySlug).toHaveBeenCalledWith("romeo-juliet");
+    expect(mockPublicInvitationRepo.findPublishedBySlug).toHaveBeenCalledWith(
+      "romeo-juliet",
+    );
     expect(mockRedis.hincrby).toHaveBeenCalledTimes(1);
 
     const callArgs = (mockRedis.hincrby as any).mock.calls[0];
@@ -66,7 +71,9 @@ describe("AnalyticsService (P4-09)", () => {
       {} as any,
     );
 
-    await expect(service.recordView("unpublished-slug")).rejects.toThrow(NotFoundError);
+    await expect(service.recordView("unpublished-slug")).rejects.toThrow(
+      NotFoundError,
+    );
     expect(mockRedis.hincrby).not.toHaveBeenCalled();
   });
 
@@ -111,7 +118,8 @@ describe("AnalyticsService (P4-09)", () => {
       recordBatch: vi.fn().mockResolvedValue(52),
     } as unknown as AnalyticsRepository;
 
-    const mockPublicInvitationRepo = {} as unknown as PublicInvitationRepository;
+    const mockPublicInvitationRepo =
+      {} as unknown as PublicInvitationRepository;
 
     const service = new AnalyticsService(
       mockRedis,
@@ -143,7 +151,8 @@ describe("AnalyticsService (P4-09)", () => {
       recordBatch: vi.fn(),
     } as unknown as AnalyticsRepository;
 
-    const mockPublicInvitationRepo = {} as unknown as PublicInvitationRepository;
+    const mockPublicInvitationRepo =
+      {} as unknown as PublicInvitationRepository;
 
     const service = new AnalyticsService(
       mockRedis,
@@ -167,10 +176,13 @@ describe("AnalyticsService (P4-09)", () => {
     } as unknown as Redis;
 
     const mockAnalyticsRepo = {
-      recordBatch: vi.fn().mockRejectedValue(new Error("Postgres connection timeout")),
+      recordBatch: vi
+        .fn()
+        .mockRejectedValue(new Error("Postgres connection timeout")),
     } as unknown as AnalyticsRepository;
 
-    const mockPublicInvitationRepo = {} as unknown as PublicInvitationRepository;
+    const mockPublicInvitationRepo =
+      {} as unknown as PublicInvitationRepository;
 
     const service = new AnalyticsService(
       mockRedis,
@@ -222,7 +234,13 @@ describe("AnalyticsService - getAnalyticsSummary (P4-10)", () => {
     const mockCache = {
       getJson: vi.fn().mockResolvedValue({
         views: { total: 100, daily: [] },
-        rsvps: { total_responses: 5, attending: 4, not_attending: 1, maybe: 0, total_attending_guests: 6 },
+        rsvps: {
+          total_responses: 5,
+          attending: 4,
+          not_attending: 1,
+          maybe: 0,
+          total_attending_guests: 6,
+        },
         guestbook: { total: 3, pending: 1, approved: 2, rejected: 0 },
       }),
       setJson: vi.fn(),
@@ -266,9 +284,9 @@ describe("AnalyticsService - getAnalyticsSummary (P4-10)", () => {
       {} as any,
     );
 
-    await expect(service.getAnalyticsSummary(scope, "inv-stranger")).rejects.toThrow(
-      NotFoundError,
-    );
+    await expect(
+      service.getAnalyticsSummary(scope, "inv-stranger"),
+    ).rejects.toThrow(NotFoundError);
   });
 
   it("aggregates views, rsvps, guestbook, and pending Redis views for owner", async () => {
@@ -340,7 +358,13 @@ describe("OwnerAnalyticsController (P4-10)", () => {
     const mockService = {
       getAnalyticsSummary: vi.fn().mockResolvedValue({
         views: { total: 42, daily: [] },
-        rsvps: { total_responses: 3, attending: 2, not_attending: 1, maybe: 0, total_attending_guests: 4 },
+        rsvps: {
+          total_responses: 3,
+          attending: 2,
+          not_attending: 1,
+          maybe: 0,
+          total_attending_guests: 4,
+        },
         guestbook: { total: 2, pending: 0, approved: 2, rejected: 0 },
       }),
     } as unknown as AnalyticsService;
@@ -361,10 +385,19 @@ describe("OwnerAnalyticsController (P4-10)", () => {
       success: true,
       data: {
         views: { total: 42, daily: [] },
-        rsvps: { total_responses: 3, attending: 2, not_attending: 1, maybe: 0, total_attending_guests: 4 },
+        rsvps: {
+          total_responses: 3,
+          attending: 2,
+          not_attending: 1,
+          maybe: 0,
+          total_attending_guests: 4,
+        },
         guestbook: { total: 2, pending: 0, approved: 2, rejected: 0 },
       },
     });
-    expect(mockService.getAnalyticsSummary).toHaveBeenCalledWith(aliceId, "inv-123");
+    expect(mockService.getAnalyticsSummary).toHaveBeenCalledWith(
+      aliceId,
+      "inv-123",
+    );
   });
 });

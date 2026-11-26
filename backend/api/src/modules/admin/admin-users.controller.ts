@@ -17,6 +17,7 @@ import { ValidationError } from "../../http/errors";
 import { currentUser } from "../../shared/auth-middleware/current-user";
 import { requireAuth, requireRole } from "../../shared/auth-middleware/guards";
 import { AdminUsersService } from "./admin-users.service";
+import { StepUpGuard } from "../auth/mfa/step-up.guard";
 import {
   adminUserActionReasonSchema,
   adminUserQuerySchema,
@@ -59,6 +60,7 @@ export class AdminUsersController {
   }
 
   @Patch(":id/suspend")
+  @UseGuards(StepUpGuard)
   @HttpCode(200)
   async suspend(
     @Param("id") id: string,

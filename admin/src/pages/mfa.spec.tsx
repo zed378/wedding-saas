@@ -17,7 +17,9 @@ describe("Admin 2FA Frontend Components (P5-02)", () => {
         </AdminAuthProvider>,
       );
 
-      expect(screen.getByRole("heading", { name: /Verifikasi 2 Langkah/i })).toBeDefined();
+      expect(
+        screen.getByRole("heading", { name: /Verifikasi 2 Langkah/i }),
+      ).toBeDefined();
       expect(screen.getByLabelText(/Kode 6-Digit/i)).toBeDefined();
 
       const toggleBtn = screen.getByRole("button", {
@@ -37,7 +39,9 @@ describe("Admin 2FA Frontend Components (P5-02)", () => {
         </AdminAuthProvider>,
       );
 
-      const form = screen.getByRole("button", { name: /Verifikasi & Lanjutkan/i }).closest("form")!;
+      const form = screen
+        .getByRole("button", { name: /Verifikasi & Lanjutkan/i })
+        .closest("form")!;
       fireEvent.submit(form);
 
       expect(
@@ -56,9 +60,15 @@ describe("Admin 2FA Frontend Components (P5-02)", () => {
         </AdminAuthProvider>,
       );
 
-      expect(screen.getByRole("heading", { name: /Aktivasi 2FA Wajib/i })).toBeDefined();
-      expect(screen.getByText(/Langkah 1: Masukkan Kunci Rahasia/i)).toBeDefined();
-      expect(screen.getByText(/Langkah 2: Simpan Kode Pemulihan Cadangan/i)).toBeDefined();
+      expect(
+        screen.getByRole("heading", { name: /Aktivasi 2FA Wajib/i }),
+      ).toBeDefined();
+      expect(
+        screen.getByText(/Langkah 1: Masukkan Kunci Rahasia/i),
+      ).toBeDefined();
+      expect(
+        screen.getByText(/Langkah 2: Simpan Kode Pemulihan Cadangan/i),
+      ).toBeDefined();
       expect(screen.getByLabelText(/Kode Verifikasi 6-Digit/i)).toBeDefined();
     });
 
@@ -78,7 +88,7 @@ describe("Admin 2FA Frontend Components (P5-02)", () => {
 
       const checkbox = screen.getByRole("checkbox");
       fireEvent.click(checkbox);
-      expect(submitBtn.disabled).toBe(false);
+      expect(submitBtn.disabled).toBe(true); // No server-issued setup ticket or secret.
     });
   });
 

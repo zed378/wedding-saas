@@ -13,10 +13,37 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { name: "Dashboard", href: "/", icon: "📊" },
   { name: "Pengguna", href: "/users", matchPrefix: "/users", icon: "👥" },
-  { name: "Templat", href: "/templates", matchPrefix: "/templates", icon: "🎨" },
+  {
+    name: "Undangan",
+    href: "/invitations",
+    matchPrefix: "/invitations",
+    icon: "✉",
+  },
+  {
+    name: "Templat",
+    href: "/templates",
+    matchPrefix: "/templates",
+    icon: "🎨",
+  },
   { name: "Pesanan", href: "/orders", matchPrefix: "/orders", icon: "💳" },
-  { name: "Moderasi", href: "/moderation", matchPrefix: "/moderation", icon: "🛡️" },
-  { name: "Log Audit", href: "/audit-logs", matchPrefix: "/audit-logs", icon: "📜" },
+  {
+    name: "Moderasi",
+    href: "/moderation",
+    matchPrefix: "/moderation",
+    icon: "🛡️",
+  },
+  {
+    name: "Log Audit",
+    href: "/audit-logs",
+    matchPrefix: "/audit-logs",
+    icon: "📜",
+  },
+  {
+    name: "Blocklist Slug",
+    href: "/slug-blocklist",
+    matchPrefix: "/slug-blocklist",
+    icon: "⊘",
+  },
 ];
 
 export function AdminLayout({ children }: { children: ReactNode }) {
@@ -44,7 +71,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       {/* Desktop Sidebar (docs/UI-UX/15 § Admin Panel: desktop-first) */}
       <aside
         aria-label="Navigasi Admin"
-        className="hidden w-64 flex-col border-r border-border bg-surface-raised md:flex"
+        className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface-raised md:flex"
       >
         {/* Brand header */}
         <div className="flex h-16 items-center gap-3 border-b border-border px-6">
@@ -52,8 +79,12 @@ export function AdminLayout({ children }: { children: ReactNode }) {
             V
           </div>
           <div className="flex flex-col">
-            <span className="text-body font-bold text-text">Vizunicum Admin</span>
-            <span className="text-body-sm text-text-muted">Panel Manajemen</span>
+            <span className="text-body font-bold text-text">
+              Vizunicum Admin
+            </span>
+            <span className="text-body-sm text-text-muted">
+              Panel Manajemen
+            </span>
           </div>
         </div>
 
@@ -104,7 +135,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         {/* Top Header */}
         <header className="flex h-16 items-center justify-between border-b border-border bg-surface-raised px-6">
           {/* Breadcrumb or current area info */}
@@ -123,17 +154,18 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           {/* User profile and actions */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
-              <Avatar
-                name={user?.name || user?.email || "Admin"}
-                size="sm"
-              />
+              <Avatar name={user?.name || user?.email || "Admin"} size="sm" />
               <div className="hidden flex-col sm:flex">
                 <span className="text-body-sm font-medium text-text">
                   {user?.name || user?.email}
                 </span>
-                <span className="text-body-sm text-text-muted">{user?.email}</span>
+                <span className="text-body-sm text-text-muted">
+                  {user?.email}
+                </span>
               </div>
-              <Badge tone={user?.role === "super_admin" ? "warning" : "primary"}>
+              <Badge
+                tone={user?.role === "super_admin" ? "warning" : "primary"}
+              >
                 {user?.role === "super_admin" ? "Super Admin" : "Admin"}
               </Badge>
             </div>

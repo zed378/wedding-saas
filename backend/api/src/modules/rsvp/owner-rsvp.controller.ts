@@ -27,7 +27,9 @@ const listRsvpsQuerySchema = z
     per_page: z.coerce.number().int().positive().max(100).optional(),
     limit: z.coerce.number().int().positive().max(100).optional(),
     status: z.enum(["attending", "not_attending", "maybe"]).optional(),
-    attendance_status: z.enum(["attending", "not_attending", "maybe"]).optional(),
+    attendance_status: z
+      .enum(["attending", "not_attending", "maybe"])
+      .optional(),
   })
   .strict();
 

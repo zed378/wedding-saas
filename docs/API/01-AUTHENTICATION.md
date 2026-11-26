@@ -1,5 +1,7 @@
 # 01 - Authentication API
 
+Administrative accounts receive the same MFA challenge/setup response after password or Google authentication. No refresh cookie is issued until factor confirmation/verification succeeds. Admin refresh requires session-level MFA proof and cannot extend the four-hour absolute lifetime; legacy unverified admin sessions must log in again after migration `0018`.
+
 ## Endpoints
 ```
 POST   /api/v1/auth/register          { email, password, full_name }

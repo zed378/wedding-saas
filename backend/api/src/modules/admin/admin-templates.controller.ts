@@ -95,7 +95,11 @@ export class AdminTemplatesController {
   ) {
     const parsed = parse(deleteTemplateSchema, body);
     const admin = currentUser(req);
-    const result = await this.templates.deleteTemplate(admin, id, parsed.reason);
+    const result = await this.templates.deleteTemplate(
+      admin,
+      id,
+      parsed.reason,
+    );
     return ok(result);
   }
 
@@ -122,12 +126,7 @@ export class AdminTemplatesController {
   ) {
     const parsed = parse(updateTemplateVersionSchema, body);
     const admin = currentUser(req);
-    const updated = await this.templates.updateVersion(
-      admin,
-      id,
-      vid,
-      parsed,
-    );
+    const updated = await this.templates.updateVersion(admin, id, vid, parsed);
     return ok(updated);
   }
 

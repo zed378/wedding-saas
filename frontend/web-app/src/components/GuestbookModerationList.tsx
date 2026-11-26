@@ -65,7 +65,6 @@ function formatTimestamp(isoString: string): string {
 }
 
 export function GuestbookModerationList({
-  invitationId,
   entries,
   summary,
   currentFilter,
@@ -105,10 +104,11 @@ export function GuestbookModerationList({
       {/* Moderation Explanation Banner */}
       <div className="rounded-lg border border-border bg-surface-sunken p-4 text-xs text-text-muted">
         <p>
-          Ucapan dengan status <strong className="text-emerald-700">Disetujui</strong>{" "}
-          akan langsung tampil di buku tamu undangan Anda. Ucapan{" "}
-          <strong className="text-amber-700">Menunggu</strong> membutuhkan persetujuan
-          sebelum dapat dilihat oleh publik.
+          Ucapan dengan status{" "}
+          <strong className="text-emerald-700">Disetujui</strong> akan langsung
+          tampil di buku tamu undangan Anda. Ucapan{" "}
+          <strong className="text-amber-700">Menunggu</strong> membutuhkan
+          persetujuan sebelum dapat dilihat oleh publik.
         </p>
       </div>
 
@@ -174,7 +174,9 @@ export function GuestbookModerationList({
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <h4 className="font-semibold text-text">{entry.guest_name}</h4>
+                    <h4 className="font-semibold text-text">
+                      {entry.guest_name}
+                    </h4>
                     <p className="mt-0.5 text-xs text-text-muted">
                       {formatTimestamp(entry.created_at)}
                     </p>
@@ -183,7 +185,9 @@ export function GuestbookModerationList({
                 </div>
 
                 <div className="mt-3 rounded-md bg-surface-sunken p-3 text-sm text-text">
-                  <p className="whitespace-pre-wrap">&ldquo;{entry.message}&rdquo;</p>
+                  <p className="whitespace-pre-wrap">
+                    &ldquo;{entry.message}&rdquo;
+                  </p>
                 </div>
 
                 {/* 1-Click Action Controls */}
@@ -192,7 +196,9 @@ export function GuestbookModerationList({
                     {entry.status !== "approved" && onModerate && (
                       <button
                         type="button"
-                        onClick={() => void handleModerate(entry.id, "approved")}
+                        onClick={() =>
+                          void handleModerate(entry.id, "approved")
+                        }
                         disabled={isProcessing}
                         className="focus-ring rounded border border-emerald-600 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
                         aria-label={`Setujui ucapan dari ${entry.guest_name}`}
@@ -203,7 +209,9 @@ export function GuestbookModerationList({
                     {entry.status !== "rejected" && onModerate && (
                       <button
                         type="button"
-                        onClick={() => void handleModerate(entry.id, "rejected")}
+                        onClick={() =>
+                          void handleModerate(entry.id, "rejected")
+                        }
                         disabled={isProcessing}
                         className="focus-ring rounded border border-amber-600 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
                         aria-label={`Tolak ucapan dari ${entry.guest_name}`}

@@ -38,16 +38,13 @@ export function PublishSuccessModal({
     } catch {
       // Clipboard API may be blocked (e.g., in non-secure contexts). Select-text
       // fallback so the user can copy manually.
-      const input = document.querySelector<HTMLInputElement>(
-        "[data-public-url]",
-      );
+      const input =
+        document.querySelector<HTMLInputElement>("[data-public-url]");
       input?.select();
     }
   }
 
-  const waText = encodeURIComponent(
-    `Undangan pernikahan kami: ${publicUrl}`,
-  );
+  const waText = encodeURIComponent(`Undangan pernikahan kami: ${publicUrl}`);
   const waUrl = `https://wa.me/?text=${waText}`;
 
   return (

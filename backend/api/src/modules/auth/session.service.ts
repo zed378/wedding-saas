@@ -68,6 +68,15 @@ export class SessionService {
     const user = await this.loadActiveUser(claims.userId);
     if (user === undefined) throw new UnauthenticatedError();
 
+    // Check the current database role: a pre-promotion session has no MFA proof.
+    if (
+      (user.role === "admin" || user.role === "super_admin") &&
+      (claims.mfaVerifiedAt === undefined ||
+        Date.now() / 1000 - claims.mfaVerifiedAt >= 4 * 60 * 60)
+    ) {
+      throw new UnauthenticatedError();
+    }
+
     return user;
   }
 

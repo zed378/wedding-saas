@@ -47,6 +47,32 @@ export function MapPicker({
 }: MapPickerProps) {
   const container = useRef<HTMLDivElement | null>(null);
   const [mapFailed, setMapFailed] = useState(false);
+  const [latitudeInput, setLatitudeInput] = useState(
+    latitude === undefined ? "" : String(latitude),
+  );
+  const [longitudeInput, setLongitudeInput] = useState(
+    longitude === undefined ? "" : String(longitude),
+  );
+
+  // Preserve intermediate decimals such as -6.20 when the parent echoes -6.2.
+  useEffect(() => {
+    setLatitudeInput((current) =>
+      latitude === undefined
+        ? ""
+        : current !== "" && Number(current) === latitude
+          ? current
+          : String(latitude),
+    );
+  }, [latitude]);
+  useEffect(() => {
+    setLongitudeInput((current) =>
+      longitude === undefined
+        ? ""
+        : current !== "" && Number(current) === longitude
+          ? current
+          : String(longitude),
+    );
+  }, [longitude]);
 
   useEffect(() => {
     if (container.current === null) return;
@@ -140,10 +166,12 @@ export function MapPicker({
           type="number"
           step="0.000001"
           name="latitude"
-          value={latitude === undefined ? "" : String(latitude)}
+          value={latitudeInput}
           onChange={(e) => {
-            const value = Number(e.target.value);
-            if (!Number.isNaN(value)) {
+            const input = e.target.value;
+            setLatitudeInput(input);
+            const value = Number(input);
+            if (input !== "" && Number.isFinite(value)) {
               onChange({ latitude: value, longitude: longitude ?? 0 });
             }
           }}
@@ -153,10 +181,12 @@ export function MapPicker({
           type="number"
           step="0.000001"
           name="longitude"
-          value={longitude === undefined ? "" : String(longitude)}
+          value={longitudeInput}
           onChange={(e) => {
-            const value = Number(e.target.value);
-            if (!Number.isNaN(value)) {
+            const input = e.target.value;
+            setLongitudeInput(input);
+            const value = Number(input);
+            if (input !== "" && Number.isFinite(value)) {
               onChange({ latitude: latitude ?? 0, longitude: value });
             }
           }}

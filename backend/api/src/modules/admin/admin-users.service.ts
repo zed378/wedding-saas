@@ -33,10 +33,7 @@ export class AdminUsersService {
     if (query.search && query.search.trim().length > 0) {
       const pattern = `%${query.search.trim()}%`;
       conditions.push(
-        or(
-          ilike(users.email, pattern),
-          ilike(users.fullName, pattern),
-        )!,
+        or(ilike(users.email, pattern), ilike(users.fullName, pattern))!,
       );
     }
 
@@ -160,12 +157,7 @@ export class AdminUsersService {
         createdAt: invitations.createdAt,
       })
       .from(invitations)
-      .where(
-        and(
-          eq(invitations.ownerId, id),
-          isNull(invitations.deletedAt),
-        ),
-      )
+      .where(and(eq(invitations.ownerId, id), isNull(invitations.deletedAt)))
       .orderBy(desc(invitations.createdAt));
 
     const userOrders = await this.db
@@ -190,11 +182,7 @@ export class AdminUsersService {
     };
   }
 
-  async suspendUser(
-    adminUser: { id: string },
-    id: string,
-    reason: string,
-  ) {
+  async suspendUser(adminUser: { id: string }, id: string, reason: string) {
     return await this.db.transaction(async (tx) => {
       const [existing] = await tx
         .select({
@@ -235,10 +223,7 @@ export class AdminUsersService {
           revokedAt: new Date(),
         })
         .where(
-          and(
-            eq(refreshTokens.userId, id),
-            isNull(refreshTokens.revokedAt),
-          ),
+          and(eq(refreshTokens.userId, id), isNull(refreshTokens.revokedAt)),
         );
 
       await this.auditLogs.record(tx, {
@@ -255,11 +240,7 @@ export class AdminUsersService {
     });
   }
 
-  async unsuspendUser(
-    adminUser: { id: string },
-    id: string,
-    reason: string,
-  ) {
+  async unsuspendUser(adminUser: { id: string }, id: string, reason: string) {
     return await this.db.transaction(async (tx) => {
       const [existing] = await tx
         .select({

@@ -1,9 +1,14 @@
 import { Inject, Injectable } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
 import { and, count, desc, eq, gte, lte } from "drizzle-orm";
+import { redact } from "@wi/logging";
 
 import { DB, type Database } from "../../infra/db/client";
 import { auditLogs, users } from "../../infra/db/schema/index";
 import type { AuditLogQueryDto } from "./schemas/admin-action.schema";
+import type { Transaction } from "../../shared/db/transaction";
+import { AuditLogService } from "../../shared/audit/audit-log.service";
+import { ValidationError } from "../../http/errors";
 
 export interface AuditLogItem {
   readonly id: string;
@@ -29,9 +34,56 @@ export interface PaginatedAuditLogs {
 
 @Injectable()
 export class AdminAuditLogService {
-  constructor(@Inject(DB) private readonly db: Database) {}
+  constructor(
+    @Inject(DB) private readonly db: Database,
+    private readonly audit: AuditLogService,
+  ) {}
+
+  async export(adminId: string, query: AuditLogQueryDto) {
+    return this.db.transaction(
+      async (tx) => {
+        const result = await this.read(
+          { ...query, page: 1, limit: 10_000 },
+          tx,
+        );
+        if (result.total > 10_000) {
+          throw new ValidationError([
+            {
+              field: "query",
+              message:
+                "Export is limited to 10000 rows. Narrow the date range or resource filters.",
+            },
+          ]);
+        }
+        const exportId = randomUUID();
+        const { page: _page, limit: _limit, ...filters } = query;
+        await this.audit.record(tx, {
+          adminId,
+          action: "audit_log.export",
+          resourceType: "audit_log_export",
+          resourceId: exportId,
+          reason: "Incident investigation audit export",
+          afterState: { filters, row_count: result.items.length },
+        });
+        return {
+          export_id: exportId,
+          exported_at: new Date().toISOString(),
+          items: result.items,
+          total: result.total,
+        };
+      },
+      { isolationLevel: "repeatable read" },
+    );
+  }
 
   async list(query: AuditLogQueryDto): Promise<PaginatedAuditLogs> {
+    return this.read(query, this.db);
+  }
+
+  private async read(
+    query: AuditLogQueryDto,
+    db: Database | Transaction,
+  ): Promise<PaginatedAuditLogs> {
     const conditions = [];
 
     if (query.admin_id) {
@@ -40,6 +92,10 @@ export class AdminAuditLogService {
 
     if (query.resource_type) {
       conditions.push(eq(auditLogs.resourceType, query.resource_type));
+    }
+
+    if (query.resource_id) {
+      conditions.push(eq(auditLogs.resourceId, query.resource_id));
     }
 
     if (query.date_from) {
@@ -53,7 +109,7 @@ export class AdminAuditLogService {
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
     // Total count
-    const [countResult] = await this.db
+    const [countResult] = await db
       .select({ total: count() })
       .from(auditLogs)
       .where(whereClause);
@@ -62,7 +118,7 @@ export class AdminAuditLogService {
     const offset = (query.page - 1) * query.limit;
 
     // Paginated query joined with admin user details
-    const rows = await this.db
+    const rows = await db
       .select({
         id: auditLogs.id,
         adminId: auditLogs.adminId,
@@ -79,7 +135,7 @@ export class AdminAuditLogService {
       .from(auditLogs)
       .leftJoin(users, eq(auditLogs.adminId, users.id))
       .where(whereClause)
-      .orderBy(desc(auditLogs.createdAt))
+      .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
       .limit(query.limit)
       .offset(offset);
 
@@ -91,8 +147,12 @@ export class AdminAuditLogService {
       resource_type: r.resourceType,
       resource_id: r.resourceId,
       reason: r.reason,
-      before_state: (r.beforeState as Record<string, unknown>) ?? null,
-      after_state: (r.afterState as Record<string, unknown>) ?? null,
+      before_state: r.beforeState
+        ? (redact(r.beforeState) as Record<string, unknown>)
+        : null,
+      after_state: r.afterState
+        ? (redact(r.afterState) as Record<string, unknown>)
+        : null,
       ip_address: r.ipAddress,
       created_at: r.createdAt.toISOString(),
     }));

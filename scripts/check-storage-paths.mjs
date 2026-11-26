@@ -15,7 +15,7 @@
  */
 
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { join, sep } from "node:path";
 
 const ROOTS = ["backend/api/src", "backend/worker/src", "packages"];
 
@@ -23,7 +23,10 @@ const ROOTS = ["backend/api/src", "backend/worker/src", "packages"];
 const ALLOWED = ["packages/storage/src/"];
 
 const PATTERNS = [
-  { re: /\bas\s+StorageKey\b/, what: "a cast to StorageKey, which bypasses the builders" },
+  {
+    re: /\bas\s+StorageKey\b/,
+    what: "a cast to StorageKey, which bypasses the builders",
+  },
   {
     re: /["'`](?:user-media|template-assets|staging)\/[^"'`]*\$\{/,
     what: "a hand-assembled bucket path with interpolation",
@@ -81,9 +84,15 @@ for (const o of offenders) {
   console.error(`      ${o.what}`);
 }
 console.error("");
-console.error("  docs/ARCHITECTURE/05: the path carries invitation_id for isolation and");
-console.error("  audit. A path assembled at a call site is a path where the wrong id can be");
-console.error("  interpolated -- one couple's photos filed under another couple's");
+console.error(
+  "  docs/ARCHITECTURE/05: the path carries invitation_id for isolation and",
+);
+console.error(
+  "  audit. A path assembled at a call site is a path where the wrong id can be",
+);
+console.error(
+  "  interpolated -- one couple's photos filed under another couple's",
+);
 console.error("  invitation, found months later or never.");
 console.error("");
 console.error("  Use the builders instead:");

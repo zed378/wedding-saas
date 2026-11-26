@@ -1,13 +1,4 @@
 import { z } from "zod";
-
-/**
- * P5-11: Dashboard Metrics Schema.
- * docs/API/09-ADMIN-API.md § Dashboard
- */
-export const adminDashboardQuerySchema = z.object({
-  date_from: z.string().datetime().optional(),
-  date_to: z.string().datetime().optional(),
-});
-
+/** Fixed UTC periods; arbitrary filters are not part of API/09. */
+export const adminDashboardQuerySchema = z.strictObject({});
 export type AdminDashboardQueryDto = z.infer<typeof adminDashboardQuerySchema>;
-

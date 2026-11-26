@@ -21,7 +21,9 @@ describe("AdminAuthProvider and useAdminAuth", () => {
 
   it("initializes with unauthenticated state when no initial user is provided", () => {
     const { result } = renderHook(() => useAdminAuth(), {
-      wrapper: ({ children }) => <AdminAuthProvider>{children}</AdminAuthProvider>,
+      wrapper: ({ children }) => (
+        <AdminAuthProvider>{children}</AdminAuthProvider>
+      ),
     });
 
     expect(result.current.isAuthenticated).toBe(false);
@@ -39,7 +41,10 @@ describe("AdminAuthProvider and useAdminAuth", () => {
 
     const { result } = renderHook(() => useAdminAuth(), {
       wrapper: ({ children }) => (
-        <AdminAuthProvider initialUser={adminUser} initialSessionExpiresAt={Date.now() + 10000}>
+        <AdminAuthProvider
+          initialUser={adminUser}
+          initialSessionExpiresAt={Date.now() + 10000}
+        >
           {children}
         </AdminAuthProvider>
       ),
@@ -59,7 +64,10 @@ describe("AdminAuthProvider and useAdminAuth", () => {
 
     const { result } = renderHook(() => useAdminAuth(), {
       wrapper: ({ children }) => (
-        <AdminAuthProvider initialUser={superAdmin} initialSessionExpiresAt={Date.now() + 10000}>
+        <AdminAuthProvider
+          initialUser={superAdmin}
+          initialSessionExpiresAt={Date.now() + 10000}
+        >
           {children}
         </AdminAuthProvider>
       ),
@@ -79,7 +87,10 @@ describe("AdminAuthProvider and useAdminAuth", () => {
 
     const { result } = renderHook(() => useAdminAuth(), {
       wrapper: ({ children }) => (
-        <AdminAuthProvider initialUser={regularUser} initialSessionExpiresAt={Date.now() + 10000}>
+        <AdminAuthProvider
+          initialUser={regularUser}
+          initialSessionExpiresAt={Date.now() + 10000}
+        >
           {children}
         </AdminAuthProvider>
       ),
@@ -92,7 +103,9 @@ describe("AdminAuthProvider and useAdminAuth", () => {
 
   it("enforces 4-hour max session lifetime on login (docs/SECURITY/03)", () => {
     const { result } = renderHook(() => useAdminAuth(), {
-      wrapper: ({ children }) => <AdminAuthProvider>{children}</AdminAuthProvider>,
+      wrapper: ({ children }) => (
+        <AdminAuthProvider>{children}</AdminAuthProvider>
+      ),
     });
 
     const now = Date.now();
@@ -128,7 +141,9 @@ describe("AdminAuthProvider and useAdminAuth", () => {
     };
 
     const { result } = renderHook(() => useAdminAuth(), {
-      wrapper: ({ children }) => <AdminAuthProvider>{children}</AdminAuthProvider>,
+      wrapper: ({ children }) => (
+        <AdminAuthProvider>{children}</AdminAuthProvider>
+      ),
     });
 
     act(() => {

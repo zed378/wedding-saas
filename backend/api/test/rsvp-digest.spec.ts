@@ -23,10 +23,15 @@ describe("RsvpDigestService (P4-08)", () => {
     const mockDb = {
       execute: vi.fn().mockImplementation(async (query: any) => {
         const sqlText = query.queryChunks
-          ? query.queryChunks.map((c: any) => (typeof c === "string" ? c : c?.value ?? "")).join(" ")
+          ? query.queryChunks
+              .map((c: any) => (typeof c === "string" ? c : (c?.value ?? "")))
+              .join(" ")
           : String(query);
 
-        if (sqlText.includes("FROM invitations i") || sqlText.includes("COUNT(g.id)")) {
+        if (
+          sqlText.includes("FROM invitations i") ||
+          sqlText.includes("COUNT(g.id)")
+        ) {
           return {
             rows: [
               {
@@ -106,16 +111,20 @@ describe("RsvpDigestService (P4-08)", () => {
     const enqueuedKeys: string[] = [];
 
     const mockQueue: JobQueue = {
-      enqueue: vi.fn().mockImplementation(async (_pool, _name, _data, options) => {
-        enqueuedKeys.push(options?.idempotencyKey ?? "");
-      }),
+      enqueue: vi
+        .fn()
+        .mockImplementation(async (_pool, _name, _data, options) => {
+          enqueuedKeys.push(options?.idempotencyKey ?? "");
+        }),
       close: vi.fn(),
     };
 
     const mockDb = {
       execute: vi.fn().mockImplementation(async (query: any) => {
         const sqlText = query.queryChunks
-          ? query.queryChunks.map((c: any) => (typeof c === "string" ? c : c?.value ?? "")).join(" ")
+          ? query.queryChunks
+              .map((c: any) => (typeof c === "string" ? c : (c?.value ?? "")))
+              .join(" ")
           : String(query);
 
         if (sqlText.includes("COUNT(g.id)")) {

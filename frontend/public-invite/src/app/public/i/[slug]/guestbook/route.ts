@@ -29,7 +29,10 @@ export async function POST(
     return new Response(
       JSON.stringify({
         success: false,
-        error: { code: "PAYLOAD_TOO_LARGE", message: "Ukuran data melebihi batas" },
+        error: {
+          code: "PAYLOAD_TOO_LARGE",
+          message: "Ukuran data melebihi batas",
+        },
       }),
       { status: 413, headers: { "content-type": "application/json" } },
     );
@@ -53,7 +56,8 @@ export async function POST(
     return new Response(data, {
       status: upstream.status,
       headers: {
-        "content-type": upstream.headers.get("content-type") ?? "application/json",
+        "content-type":
+          upstream.headers.get("content-type") ?? "application/json",
       },
     });
   } catch {
@@ -97,7 +101,8 @@ export async function GET(
     return new Response(data, {
       status: upstream.status,
       headers: {
-        "content-type": upstream.headers.get("content-type") ?? "application/json",
+        "content-type":
+          upstream.headers.get("content-type") ?? "application/json",
       },
     });
   } catch {

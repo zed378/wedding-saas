@@ -1,6 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, count, desc, eq, ilike, inArray, isNull, or } from "drizzle-orm";
-
+import { and, count, desc, eq, ilike, isNull, or } from "drizzle-orm";
 import { DB, type Database } from "../../infra/db/client";
 import { users } from "../../infra/db/schema/users";
 import {
@@ -9,231 +8,188 @@ import {
 } from "../../infra/db/schema/invitations";
 import { templates, templateVersions } from "../../infra/db/schema/templates";
 import { orders } from "../../infra/db/schema/orders";
-import { adminBypass } from "../../shared/tenancy/tenant-scope";
+import { auditLogs } from "../../infra/db/schema/index";
+import { adminBypass, tenantScope } from "../../shared/tenancy/tenant-scope";
 import { InvitationRepository } from "../../shared/tenancy/invitation-repository";
 import { NotFoundError } from "../../http/errors";
 import type { AdminInvitationQueryDto } from "./schemas/admin-invitation.schema";
+import { PublishCheckService } from "../invitation/publish-check.service";
 
-/**
- * P5-10: Administrative Invitation Overview Service.
- *
- * READ-ONLY surface for support. No write methods exist (architectural absence).
- * Detail reads go through the audited bypass; the list is an operational index
- * that returns no invitation content.
- *
- * docs/API/09-ADMIN-API.md § Invitation Overview
- */
 @Injectable()
 export class AdminInvitationsService {
   constructor(
     @Inject(DB) private readonly db: Database,
     private readonly repo: InvitationRepository,
+    private readonly publishCheck: PublishCheckService,
   ) {}
 
-  /**
-   * List invitations with optional search by slug or user.
-   * Returns operational data only — no personal invitation content.
-   */
-  async listInvitations(query: AdminInvitationQueryDto) {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
-    const offset = (page - 1) * limit;
-
-    const conditions = [isNull(invitations.deletedAt)];
-
-    if (query.search_slug && query.search_slug.trim().length > 0) {
-      const pattern = `%${query.search_slug.trim()}%`;
-      conditions.push(ilike(invitations.slug, pattern));
-    }
-
-    if (query.search_user && query.search_user.trim().length > 0) {
-      const pattern = `%${query.search_user.trim()}%`;
-      conditions.push(
-        or(ilike(users.email, pattern), ilike(users.fullName, pattern))!,
-      );
-    }
-
-    const whereClause = and(...conditions);
-
-    const [totalRow] = await this.db
-      .select({ count: count() })
-      .from(invitations)
-      .leftJoin(users, eq(invitations.ownerId, users.id))
-      .where(whereClause);
-
-    const total = Number(totalRow?.count ?? 0);
-
-    const rows = await this.db
-      .select({
-        id: invitations.id,
-        slug: invitations.slug,
-        status: invitations.status,
-        ownerId: invitations.ownerId,
-        templateVersionId: invitations.templateVersionId,
-        publishedAt: invitations.publishedAt,
-        expiryDate: invitations.expiryDate,
-        createdAt: invitations.createdAt,
-        updatedAt: invitations.updatedAt,
-        ownerEmail: users.email,
-        ownerFullName: users.fullName,
-        templateName: templates.name,
-        templateVersionString: templateVersions.version,
-      })
-      .from(invitations)
-      .leftJoin(users, eq(invitations.ownerId, users.id))
-      .leftJoin(templateVersions, eq(invitations.templateVersionId, templateVersions.id))
-      .leftJoin(templates, eq(templateVersions.templateId, templates.id))
-      .where(whereClause)
-      .orderBy(desc(invitations.createdAt))
-      .limit(limit)
-      .offset(offset);
-
-    // The latest order per invitation, resolved in one query rather than N.
-    const latestOrderByInvitation = await this.latestOrders(
-      rows.map((r) => r.id),
-    );
-
-    const data = rows.map((row) => ({
-      id: row.id,
-      slug: row.slug,
-      status: row.status,
-      owner: {
-        id: row.ownerId,
-        email: row.ownerEmail,
-        fullName: row.ownerFullName,
-      },
-      templateVersion: {
-        id: row.templateVersionId,
-        name: row.templateName ?? null,
-        version: row.templateVersionString ?? null,
-      },
-      publishedAt: row.publishedAt,
-      expiryDate: row.expiryDate,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      latestOrder: latestOrderByInvitation.get(row.id) ?? null,
-    }));
-
-    return {
-      data,
-      meta: {
-        page,
-        per_page: limit,
-        total,
-      },
-    };
+  async listInvitations(adminId: string, query: AdminInvitationQueryDto) {
+    return this.adminFindInvitationsBypassingOwnership(adminId, query);
   }
 
-
-  /** Batch-fetch the latest paid order for each invitation in the set. */
-  private async latestOrders(invitationIds: string[]) {
-    const out = new Map<string, { id: string; packageId: string; amountTotal: string }>();
-    if (invitationIds.length === 0) return out;
-
-    // Two-pass: find max(createdAt) per invitationId for paid orders, then join back.
-    const byId = await this.db
-      .select({
-        invitationId: orders.invitationId,
-        id: orders.id,
-        packageId: orders.packageId,
-        amountTotal: orders.amountTotal,
-        createdAt: orders.createdAt,
-      })
-      .from(orders)
-      .where(
-        and(
-          inArray(orders.invitationId, invitationIds),
-          eq(orders.status, "paid"),
-        ),
-      )
-      .orderBy(desc(orders.createdAt));
-
-    for (const o of byId) {
-      if (!out.has(o.invitationId)) {
-        out.set(o.invitationId, {
-          id: o.id,
-          packageId: o.packageId,
-          amountTotal: o.amountTotal.toString(),
-        });
-      }
-    }
-    return out;
+  /** SECURITY/05: no result leaves the transaction before its bypass is audited. */
+  private async adminFindInvitationsBypassingOwnership(
+    adminId: string,
+    query: AdminInvitationQueryDto,
+  ) {
+    const bypass = adminBypass(adminId, "Support invitation search");
+    return this.db.transaction(async (tx) => {
+      const conditions = [isNull(invitations.deletedAt)];
+      if (query.search_slug)
+        conditions.push(ilike(invitations.slug, `%${query.search_slug}%`));
+      if (query.search_user)
+        conditions.push(
+          or(
+            ilike(users.email, `%${query.search_user}%`),
+            ilike(users.fullName, `%${query.search_user}%`),
+          )!,
+        );
+      const predicate = and(...conditions);
+      const [total] = await tx
+        .select({ count: count() })
+        .from(invitations)
+        .leftJoin(users, eq(invitations.ownerId, users.id))
+        .where(predicate);
+      const rows = await tx
+        .select({
+          id: invitations.id,
+          slug: invitations.slug,
+          status: invitations.status,
+          owner_id: invitations.ownerId,
+          owner_email: users.email,
+          owner_name: users.fullName,
+          template_version_id: invitations.templateVersionId,
+          template_name: templates.name,
+          version: templateVersions.version,
+          published_at: invitations.publishedAt,
+          expiry_date: invitations.expiryDate,
+          created_at: invitations.createdAt,
+        })
+        .from(invitations)
+        .leftJoin(users, eq(invitations.ownerId, users.id))
+        .leftJoin(
+          templateVersions,
+          eq(invitations.templateVersionId, templateVersions.id),
+        )
+        .leftJoin(templates, eq(templateVersions.templateId, templates.id))
+        .where(predicate)
+        .orderBy(desc(invitations.createdAt), invitations.id)
+        .limit(query.limit)
+        .offset((query.page - 1) * query.limit);
+      await tx.insert(auditLogs).values([
+        {
+          adminId: bypass.adminId,
+          action: "invitation.admin_search",
+          resourceType: "invitation_search",
+          resourceId: bypass.adminId,
+          reason: bypass.reason,
+          afterState: {
+            page: query.page,
+            count: rows.length,
+            total: Number(total?.count ?? 0),
+          },
+        },
+        ...rows.map((row) => ({
+          adminId: bypass.adminId,
+          action: "invitation.admin_read",
+          resourceType: "invitation",
+          resourceId: row.id,
+          reason: bypass.reason,
+          afterState: { surface: "list" },
+        })),
+      ]);
+      return {
+        data: rows,
+        meta: {
+          page: query.page,
+          per_page: query.limit,
+          total: Number(total?.count ?? 0),
+        },
+      };
+    });
   }
 
-  /**
-   * Detail view — audited cross-tenant read via the repo bypass.
-   * Throws NotFoundError if the invitation does not exist.
-   */
-  async getInvitationById(adminId: string, reason: string, invitationId: string) {
+  async getInvitationById(
+    adminId: string,
+    reason: string,
+    invitationId: string,
+  ) {
     const invitation = await this.repo.adminFindInvitationBypassingOwnership(
       invitationId,
       adminBypass(adminId, reason),
     );
-
-    if (!invitation) {
-      throw new NotFoundError(`Invitation "${invitationId}" not found.`);
-    }
-
-    // Fetch owner, latest paid order, and status history in parallel.
-    const [owner, [latestOrder], statusHistory] = await Promise.all([
-      this.db
-        .select({
-          email: users.email,
-          fullName: users.fullName,
-        })
-        .from(users)
-        .where(eq(users.id, invitation.ownerId))
-        .limit(1),
-      this.db
-        .select({
-          id: orders.id,
-          packageId: orders.packageId,
-          amountTotal: orders.amountTotal,
-        })
-        .from(orders)
-        .where(
-          and(
-            eq(orders.invitationId, invitationId),
-            eq(orders.status, "paid"),
-          ),
-        )
-        .orderBy(desc(orders.createdAt))
-        .limit(1),
-      this.db
-        .select({
-          fromStatus: invitationStatusHistory.fromStatus,
-          toStatus: invitationStatusHistory.toStatus,
-          changedAt: invitationStatusHistory.createdAt,
-        })
-        .from(invitationStatusHistory)
-        .where(eq(invitationStatusHistory.invitationId, invitationId))
-        .orderBy(invitationStatusHistory.createdAt),
-    ]);
-
+    if (!invitation) throw new NotFoundError("Undangan tidak ditemukan.");
+    const [owner, version, orderHistory, statusHistory, completeness] =
+      await Promise.all([
+        this.db
+          .select({ email: users.email, full_name: users.fullName })
+          .from(users)
+          .where(eq(users.id, invitation.ownerId))
+          .limit(1),
+        this.db
+          .select({
+            id: templateVersions.id,
+            version: templateVersions.version,
+            name: templates.name,
+          })
+          .from(templateVersions)
+          .leftJoin(templates, eq(templateVersions.templateId, templates.id))
+          .where(eq(templateVersions.id, invitation.templateVersionId))
+          .limit(1),
+        this.db
+          .select({
+            id: orders.id,
+            package_id: orders.packageId,
+            amount_total: orders.amountTotal,
+            status: orders.status,
+            created_at: orders.createdAt,
+          })
+          .from(orders)
+          .where(eq(orders.invitationId, invitationId))
+          .orderBy(desc(orders.createdAt), orders.id),
+        this.db
+          .select({
+            from_status: invitationStatusHistory.fromStatus,
+            to_status: invitationStatusHistory.toStatus,
+            changed_at: invitationStatusHistory.createdAt,
+          })
+          .from(invitationStatusHistory)
+          .where(eq(invitationStatusHistory.invitationId, invitationId))
+          .orderBy(invitationStatusHistory.createdAt),
+        // The owner scope is derived only from the invitation already read through
+        // the audited admin bypass. Return completeness metadata, never its content.
+        this.publishCheck.check(tenantScope(invitation.ownerId), invitationId, {
+          strict: true,
+        }),
+      ]);
     return {
       id: invitation.id,
       slug: invitation.slug,
       status: invitation.status,
       owner: {
         id: invitation.ownerId,
-        email: owner?.[0]?.email ?? null,
-        fullName: owner?.[0]?.fullName ?? null,
+        email: owner[0]?.email ?? null,
+        full_name: owner[0]?.full_name ?? null,
       },
-      templateVersion: {
+      template_version: version[0] ?? {
         id: invitation.templateVersionId,
+        version: null,
+        name: null,
       },
-      publishedAt: invitation.publishedAt,
-      expiryDate: invitation.expiryDate,
-      createdAt: invitation.createdAt,
-      updatedAt: invitation.updatedAt,
-      latestOrder: latestOrder
-        ? {
-            id: latestOrder.id,
-            packageId: latestOrder.packageId,
-            amountTotal: latestOrder.amountTotal.toString(),
-          }
-        : null,
-      statusHistory,
+      published_at: invitation.publishedAt,
+      expiry_date: invitation.expiryDate,
+      created_at: invitation.createdAt,
+      updated_at: invitation.updatedAt,
+      order_history: orderHistory.map((order) => ({
+        ...order,
+        amount_total: order.amount_total.toString(),
+      })),
+      status_history: statusHistory,
+      validation_summary: {
+        ready: completeness.ready,
+        missing_required_fields: completeness.details.length,
+        incomplete_sections: completeness.incomplete_sections,
+      },
     };
   }
 }

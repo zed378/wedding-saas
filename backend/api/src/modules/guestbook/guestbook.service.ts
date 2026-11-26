@@ -9,7 +9,6 @@ import {
   type FindGuestbookOptions,
   type FindOwnerGuestbookOptions,
   type GuestbookEntryStatus,
-  type GuestbookRow,
 } from "../../shared/tenancy/guestbook-repository";
 export type { GuestbookEntryStatus };
 import type { TenantScope } from "../../shared/tenancy/tenant-scope";
@@ -268,9 +267,7 @@ export class GuestbookService {
       );
 
     if (!result) {
-      throw new NotFoundError(
-        "Undangan atau pesan buku tamu tidak ditemukan.",
-      );
+      throw new NotFoundError("Undangan atau pesan buku tamu tidak ditemukan.");
     }
 
     // Invalidate public page cache if entry was approved or became approved
@@ -321,9 +318,7 @@ export class GuestbookService {
     );
 
     if (!result) {
-      throw new NotFoundError(
-        "Undangan atau pesan buku tamu tidak ditemukan.",
-      );
+      throw new NotFoundError("Undangan atau pesan buku tamu tidak ditemukan.");
     }
 
     if (result.slug && result.previousStatus === "approved") {
@@ -393,4 +388,3 @@ export class GuestbookService {
     };
   }
 }
-

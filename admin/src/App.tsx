@@ -11,6 +11,8 @@ import { TemplatesPage } from "./pages/TemplatesPage.js";
 import { OrdersPage } from "./pages/OrdersPage.js";
 import { ModerationPage } from "./pages/ModerationPage.js";
 import { AuditLogsPage } from "./pages/AuditLogsPage.js";
+import { InvitationsPage } from "./pages/InvitationsPage.js";
+import { SlugBlocklistPage } from "./pages/SlugBlocklistPage.js";
 
 /**
  * P0-22 / P5-01 — The admin application shell.
@@ -44,7 +46,11 @@ export function AppRoutes() {
   // All administrative routes wrapped in RequireAdmin guard
   return (
     <RequireAdmin>
-      {path === "/users" || path.startsWith("/users/") ? (
+      {path === "/invitations" || path.startsWith("/invitations/") ? (
+        <InvitationsPage />
+      ) : path === "/slug-blocklist" ? (
+        <SlugBlocklistPage />
+      ) : path === "/users" || path.startsWith("/users/") ? (
         <UsersPage />
       ) : path === "/templates" || path.startsWith("/templates/") ? (
         <TemplatesPage />

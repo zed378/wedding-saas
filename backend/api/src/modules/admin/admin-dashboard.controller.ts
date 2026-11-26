@@ -45,4 +45,3 @@ export class AdminDashboardController {
     return ok(result);
   }
 }
-

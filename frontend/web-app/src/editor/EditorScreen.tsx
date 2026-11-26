@@ -210,20 +210,6 @@ export function EditorScreen({
 }
 
 /**
- * `P2-05` builds the live preview, and `P2-02` the renderer it needs.
- *
- * A placeholder that says so, rather than an empty div: an editor with a blank centre column
- * reads as broken, and the person most likely to see this is whoever picks up the next card.
- */
-function PreviewPlaceholder() {
-  return (
-    <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-text-muted">
-      Pratinjau langsung akan tersedia setelah komponen template siap.
-    </div>
-  );
-}
-
-/**
  * `P2-15` — the sections this invitation shows, not the ones its template starts with.
  *
  * `toDefinition` derives `enabledSections` from the template's `enabled_by_default`, and the

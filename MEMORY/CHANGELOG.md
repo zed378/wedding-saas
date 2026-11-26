@@ -10,6 +10,36 @@ Format follows Keep a Changelog conventions, grouped by release once releases ex
 
 ## Unreleased
 
+### 2026-11-26 — User-requested main integration
+
+Prepared the existing Phase 5 implementation and verification snapshot for commit, merge into main, and push at the owner's request. This integration does not complete Phase 5 acceptance; combined coverage and final reviews remain open. See [integration record](./records/2026-11-26-P5-14-main-integration.md).
+
+### 2026-11-26 — Parallel P5-14 branch review
+
+Three focused service-coverage lanes confirmed the existing orders, users, moderation, templates, MFA and DLQ scenarios pass without duplicate tests. Workspace lint, types, formatting, SAST, route/tenant guards and the current dependency audit pass. A combined coverage retry stopped before producing a report, so the prior failing aggregate remains the latest completed result and Phase 5 stays open. See [parallel branch-coverage review](./records/2026-11-26-P5-14-parallel-branch-coverage-review.md).
+
+### 2026-11-26 — Parallel cache, coordinate and acceptance corrections
+
+Fixed a concurrent admin blocklist edit race that could cache an intermediate term list under a restored state's fingerprint; SQL and JavaScript now derive matching SHA-256 keys from the actual fetched rows. Fixed manual map coordinate typing that lost decimal zeroes, with complete web-app regression passing 410 cases. Added 37 meaningful admin/MFA/notification unit cases and removed a notification integration path that silently returned success without Redis. Current all-dependency and production audits both report zero; inherited overrides have explicit consumer compatibility evidence (ADR-109). Complete worker integration (48 cases, real ClamAV), pinned official MinIO storage integration (nine cases), and rebuilt Chromium admin template/moderation acceptance pass. Final combined API SQL/coverage is recorded separately; no phase-completion or production-release claim is implied by this entry. See [cache correction](./records/2026-11-26-P5-13-blocklist-cache-race.md), [coordinate correction](./records/2026-11-26-P5-14-map-picker-regression.md), and linked verification records in the index.
+
+### 2026-11-26 — Effective local lint and acceptance enforcement
+
+Replaced root/thirteen workspace lint placeholders with Oxlint correctness checks and corrected unused-code diagnostics. Full local verification now invokes serial workspace integration with scoped connection passthrough, existing service-coverage thresholds, all-dependency audit and checked-in Semgrep rules; fast mode reports its omissions. ADR-108 records the tooling choice and unchanged hosted-CI deferral. Node 24 types/build, 3,474 combined unit/SQL/SSR tests, formatting/static guards and SAST425files/7rule suites pass. Exact admin audit9+8action reconciliation passes. Coverage still exits1 on branches69.82%<75% (lines82.73% pass); full dependency audit exposes43 development advisories despite production zero. Phase 5 remains incomplete; see [effective local gates](./records/2026-11-26-P5-14-effective-local-gates.md).
+
+### 2026-11-26 — Phase 5 dependency, formatting and browser acceptance gates
+
+Updated existing production dependencies within their approved majors; the installed production graph now returns zero advisories, down from 32. Corrected 95 mechanical formatter failures and passed the global format gate. Real Chromium acceptance on Node 24 proves admin moderation reaches the public guestbook and browser-authored templates can immediately back user invitations without deployment. Fixed moderation's shrinking desktop sidebar and added layout/visible-message assertions; E2E setup checks application credentials before fixture writes. Full API1,004/admin84 tests, workspace build/types, other workspace test tasks and public SSR37 pass after dependency installation. ADR-107 records the Zod minor selection and bounded Nest release-age exceptions. SQL bootstrap and final integration evidence are recorded separately; Phase 5 stays incomplete pending remaining reviews/effective lint/SAST/coverage/runtime gates. [Record](./records/2026-11-26-P5-14-parallel-gate-remediation.md).
+
+### 2026-11-26 — Parallel admin acceptance continuation
+
+Admin development now proxies `/api` to the local backend. Moderation takes its audit snapshot under a transaction row lock, preventing stale before-state and duplicate deletion audit under concurrent actions. Added failure-path and exact audit-count regressions; corrected asynchronous template UI fixtures. Workspace types/build and public SSR passed; Phase 5 remains under review pending browser acceptance and remaining global checks. See [verification record](./records/2026-11-26-P5-14-parallel-acceptance-verification.md).
+
+### 2026-11-25 — Operational admin implementation under review
+
+Implemented invitation support views, dashboard metrics, audit filtering/export and mutable slug blocklist administration (P5-10–13). Parallel review added safe invitation completeness metadata, pending-form consistency and Next parallel-slot route reservations. These tasks remain REVIEW pending complete verification.
+
+Corrected admin session MFA provenance across password/Google login, current-role authentication and refresh rotation; additive migration `0018` is required before deployment and old admin sessions require MFA login again. Phase acceptance is incomplete; see the [security review record](./records/2026-11-25-P5-14-admin-session-provenance.md).
+
 ### 2026-10-21 — Admin invitation overview API
 
 **Added** — Read-only administrative invitation overview API (`P5-10`) with operational index and audited detail read ([record](./records/2026-10-21-P5-10-admin-invitation-overview-api.md))

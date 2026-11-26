@@ -8,7 +8,7 @@ import { AuthProvider } from "../src/lib/auth";
 import { EditorProvider } from "../src/editor/EditorProvider";
 import { PublishCta } from "../src/editor/PublishCta";
 import { UnpublishAction } from "../src/editor/UnpublishAction";
-import { EditorShell } from "../src/editor/EditorShell";
+
 import type { TemplateDefinition } from "../src/editor/store";
 
 const DEFINITION: TemplateDefinition = {
@@ -39,7 +39,10 @@ const COMPLETE_DATA = {
 };
 
 function createMockClient(
-  handler: (path: string, options?: RequestInit) => Response | Promise<Response>,
+  handler: (
+    path: string,
+    options?: RequestInit,
+  ) => Response | Promise<Response>,
 ) {
   return new ApiClient({
     baseUrl: "http://api.test/v1",
@@ -65,7 +68,7 @@ describe("P3-15 — Publish and Unpublish Flow", () => {
   describe("DoD 1: Missing-field errors are navigable — clicking one lands on the field", () => {
     it("opens missing-fields modal when server reports incomplete data and navigates to section", async () => {
       const user = userEvent.setup();
-      let activeSection = "couple";
+      let _activeSection = "couple";
 
       const client = createMockClient((path) => {
         if (path === "/invitations/inv-1/publish-check") {
@@ -191,7 +194,9 @@ describe("P3-15 — Publish and Unpublish Flow", () => {
       ).toBeVisible();
 
       // Click confirm "Terbitkan"
-      const confirmBtn = screen.getAllByRole("button", { name: "Terbitkan" })[1];
+      const confirmBtn = screen.getAllByRole("button", {
+        name: "Terbitkan",
+      })[1];
       await user.click(confirmBtn!);
 
       // Payment required modal appears
@@ -261,7 +266,9 @@ describe("P3-15 — Publish and Unpublish Flow", () => {
       await user.click(screen.getByRole("button", { name: "Terbitkan" }));
 
       // Confirm in slug modal
-      const confirmBtn = (await screen.findAllByRole("button", { name: "Terbitkan" }))[1];
+      const confirmBtn = (
+        await screen.findAllByRole("button", { name: "Terbitkan" })
+      )[1];
       await user.click(confirmBtn!);
 
       // Publish success modal is displayed
@@ -334,7 +341,10 @@ describe("P3-15 — Publish and Unpublish Flow", () => {
             { status: 200, headers: { "content-type": "application/json" } },
           );
         }
-        if (path === "/invitations/inv-1/settings" && init?.method === "PATCH") {
+        if (
+          path === "/invitations/inv-1/settings" &&
+          init?.method === "PATCH"
+        ) {
           patchSettingsCalled = true;
           const body = JSON.parse(init.body as string);
           finalSlugUsed = body.slug;
@@ -369,7 +379,9 @@ describe("P3-15 — Publish and Unpublish Flow", () => {
       await user.click(screen.getByRole("button", { name: "Terbitkan" }));
 
       // Confirm in slug modal
-      const confirmBtn = (await screen.findAllByRole("button", { name: "Terbitkan" }))[1];
+      const confirmBtn = (
+        await screen.findAllByRole("button", { name: "Terbitkan" })
+      )[1];
       await user.click(confirmBtn!);
 
       // Shows slug conflict state inline
@@ -390,7 +402,9 @@ describe("P3-15 — Publish and Unpublish Flow", () => {
       expect(input).toHaveValue("budi-dan-siti-1");
 
       // Click "Gunakan Alamat Ini"
-      const retryBtn = screen.getByRole("button", { name: "Gunakan Alamat Ini" });
+      const retryBtn = screen.getByRole("button", {
+        name: "Gunakan Alamat Ini",
+      });
       await user.click(retryBtn);
 
       // Now successfully published without leaving the modal flow
@@ -413,7 +427,10 @@ describe("P3-15 — Publish and Unpublish Flow", () => {
       const onUnpublishedMock = vi.fn();
 
       const client = createMockClient((path, init) => {
-        if (path === "/invitations/inv-1/unpublish" && init?.method === "POST") {
+        if (
+          path === "/invitations/inv-1/unpublish" &&
+          init?.method === "POST"
+        ) {
           unpublishCalled = true;
           return new Response(
             JSON.stringify({
@@ -477,7 +494,10 @@ describe("P3-15 — Publish and Unpublish Flow", () => {
       let unpublishCalled = false;
 
       const client = createMockClient((path, init) => {
-        if (path === "/invitations/inv-1/unpublish" && init?.method === "POST") {
+        if (
+          path === "/invitations/inv-1/unpublish" &&
+          init?.method === "POST"
+        ) {
           unpublishCalled = true;
         }
         return new Response(JSON.stringify({ success: true, data: {} }), {
@@ -509,7 +529,9 @@ describe("P3-15 — Publish and Unpublish Flow", () => {
 
       await waitFor(() => {
         expect(
-          screen.queryByRole("dialog", { name: "Batalkan publikasi undangan?" }),
+          screen.queryByRole("dialog", {
+            name: "Batalkan publikasi undangan?",
+          }),
         ).not.toBeInTheDocument();
       });
       expect(unpublishCalled).toBe(false);

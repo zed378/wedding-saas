@@ -44,6 +44,7 @@ const ISSUER = "wedding-invitation";
 const AUDIENCE = "wedding-invitation-api";
 
 export interface AccessTokenClaims {
+  readonly mfaVerifiedAt?: number;
   /** `sub`. The user's UUID. */
   readonly userId: string;
   readonly role: string;
@@ -87,6 +88,9 @@ export async function signAccessToken(
     // snake_case in the token, matching `docs/API/01`'s field naming for the wire.
     role: claims.role,
     email_verified: claims.emailVerified,
+    ...(claims.mfaVerifiedAt === undefined
+      ? {}
+      : { mfa_verified_at: claims.mfaVerifiedAt }),
   })
     .setProtectedHeader({ alg: ALGORITHM, typ: "JWT" })
     .setSubject(claims.userId)
@@ -136,7 +140,12 @@ export async function verifyAccessToken(
   // type -- a token signed with this key by an older version of this code would pass every
   // check above and then produce `role: undefined`, which is not a role anyone reasoned
   // about.
-  const { sub, role, email_verified: emailVerified } = payload;
+  const {
+    sub,
+    role,
+    email_verified: emailVerified,
+    mfa_verified_at: mfaVerifiedAt,
+  } = payload;
 
   if (typeof sub !== "string" || sub.length === 0) {
     throw new InvalidAccessTokenError("missing_subject");
@@ -148,5 +157,19 @@ export async function verifyAccessToken(
     throw new InvalidAccessTokenError("missing_email_verified");
   }
 
-  return { userId: sub, role, emailVerified };
+  if (
+    mfaVerifiedAt !== undefined &&
+    (typeof mfaVerifiedAt !== "number" ||
+      !Number.isSafeInteger(mfaVerifiedAt) ||
+      mfaVerifiedAt <= 0 ||
+      mfaVerifiedAt > Math.floor(now.getTime() / 1000))
+  ) {
+    throw new InvalidAccessTokenError("invalid_mfa_verified_at");
+  }
+  return {
+    userId: sub,
+    role,
+    emailVerified,
+    ...(mfaVerifiedAt === undefined ? {} : { mfaVerifiedAt }),
+  };
 }

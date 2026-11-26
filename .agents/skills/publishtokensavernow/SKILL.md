@@ -24,10 +24,12 @@ When `/publishtokensavernow` is triggered:
 
 3. **Execute Automation Script**:
    Run the project publishing script via terminal:
+
    ```powershell
    powershell -ExecutionPolicy Bypass -File scripts/publish-tokensaver.ps1 -CustomVersion <version>
    ```
-   *(Or with bump type: `powershell -ExecutionPolicy Bypass -File scripts/publish-tokensaver.ps1 -BumpType minor`)*
+
+   _(Or with bump type: `powershell -ExecutionPolicy Bypass -File scripts/publish-tokensaver.ps1 -BumpType minor`)_
 
 4. **Verify Pipeline Status**:
    - Confirm the new git tag `v<version>` was pushed to `origin main`.
@@ -36,6 +38,7 @@ When `/publishtokensavernow` is triggered:
      - 📦 **Open VSX Extension Page**: `https://open-vsx.org/extension/terenceooi/token-saver-rtk-ide`
 
 ## ⚠️ Critical Release Guardrails
+
 1. **Always Update CHANGELOG.md First**: Every release tag must be accompanied by an up-to-date entry in `CHANGELOG.md`.
 2. **Never use `[skip ci]` on Release Commits**:
    - When tagging a commit for CI-based publishing (Open VSX / GitHub Releases), the commit message must NOT contain `[skip ci]` or `[ci skip]`, otherwise GitHub Actions completely ignores the tag push.

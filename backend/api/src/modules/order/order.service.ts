@@ -396,7 +396,12 @@ export class OrderService {
       }
     }
 
-    return { result, becamePaid: true, needsReview, invitationId: order.invitationId };
+    return {
+      result,
+      becamePaid: true,
+      needsReview,
+      invitationId: order.invitationId,
+    };
   }
 
   /**

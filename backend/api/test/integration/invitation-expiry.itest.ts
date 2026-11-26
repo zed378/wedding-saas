@@ -130,7 +130,8 @@ describe("invitation expiry, renewal and retention (P3-13)", () => {
       );
 
       // Verify that public read finds the invitation (requests never mutate status)
-      const readBefore = await publicRepo.findPublishedBySlug("overdue-wedding");
+      const readBefore =
+        await publicRepo.findPublishedBySlug("overdue-wedding");
       expect(readBefore).not.toBeNull();
 
       // Verify status is STILL 'published' in database after public read
@@ -276,9 +277,7 @@ describe("invitation expiry, renewal and retention (P3-13)", () => {
       }>(
         "SELECT ((now() AT TIME ZONE 'Asia/Jakarta')::date + interval '12 months')::date::text as expected_date",
       );
-      expect(invRows[0]!.expiry_date).toBe(
-        expectedDateRows[0]!.expected_date,
-      );
+      expect(invRows[0]!.expiry_date).toBe(expectedDateRows[0]!.expected_date);
 
       // Verify status history shows SYSTEM renewal
       const { rows: history } = await harness.pool.query<{
@@ -363,9 +362,7 @@ describe("invitation expiry, renewal and retention (P3-13)", () => {
       }>(
         "SELECT (((now() AT TIME ZONE 'Asia/Jakarta')::date + interval '60 days')::date + interval '12 months')::date::text as expected_date",
       );
-      expect(invRows[0]!.expiry_date).toBe(
-        expectedDateRows[0]!.expected_date,
-      );
+      expect(invRows[0]!.expiry_date).toBe(expectedDateRows[0]!.expected_date);
     });
   });
 
@@ -378,11 +375,14 @@ describe("invitation expiry, renewal and retention (P3-13)", () => {
         slug: "expired-public-link",
       });
 
-      const expiredResult = await publicRepo.findPublishedBySlug("expired-public-link");
+      const expiredResult = await publicRepo.findPublishedBySlug(
+        "expired-public-link",
+      );
       expect(expiredResult).toBeNull();
 
       // Compare with non-existent or unpublished slug - both return null identically
-      const nonExistentResult = await publicRepo.findPublishedBySlug("never-existed-slug");
+      const nonExistentResult =
+        await publicRepo.findPublishedBySlug("never-existed-slug");
       expect(nonExistentResult).toBeNull();
     });
   });

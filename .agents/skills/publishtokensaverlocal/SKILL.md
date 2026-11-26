@@ -14,6 +14,7 @@ Compiles the extension locally into `latestvsixfile/token-saver-rtk-ide.vsix` an
 ## Execution Steps
 
 1. **Run Local Packaging Script**:
+
    ```powershell
    rtk powershell -ExecutionPolicy Bypass -File scripts/package-vsix.ps1
    ```

@@ -14,7 +14,10 @@ import {
   type PaymentStatus,
 } from "../../../../../../lib/invitations";
 import { PaymentStatusBanner } from "../../../../../../components/PaymentStatusBanner";
-import { isInAppBrowser, getBrowserName } from "../../../../../../lib/in-app-browser";
+import {
+  isInAppBrowser,
+  getBrowserName,
+} from "../../../../../../lib/in-app-browser";
 
 /**
  * P3-14 — `/checkout/[invitationId]/payment/[orderId]`.
@@ -141,7 +144,11 @@ export default function PaymentPage({
 
       void (async () => {
         try {
-          const status: PaymentStatus = await getPaymentStatus(api, orderId, signal);
+          const status: PaymentStatus = await getPaymentStatus(
+            api,
+            orderId,
+            signal,
+          );
 
           // Expired order.
           if (status.order_status === "expired") {
@@ -260,8 +267,7 @@ export default function PaymentPage({
     pollState.kind === "resolved" && pollState.paymentStatus === "success";
   const isFailed =
     pollState.kind === "resolved" && pollState.paymentStatus === "failed";
-  const isExpired =
-    pollState.kind === "expired" || order.status === "expired";
+  const isExpired = pollState.kind === "expired" || order.status === "expired";
   const isTimeout = pollState.kind === "timeout";
 
   return (

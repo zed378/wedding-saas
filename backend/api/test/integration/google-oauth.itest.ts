@@ -79,9 +79,12 @@ describe("google sign-in", () => {
     next = async () => identity();
   });
 
-  const signIn = (over: Partial<GoogleIdentity> = {}) => {
+  const signIn = async (over: Partial<GoogleIdentity> = {}) => {
     next = async () => identity(over);
-    return oauth.authenticate("an-opaque-id-token");
+    const result = await oauth.authenticate("an-opaque-id-token");
+    if (result.session.requiresMfa)
+      throw new Error("Expected an ordinary user session");
+    return { ...result, session: result.session };
   };
 
   const rowFor = async (email: string) => {

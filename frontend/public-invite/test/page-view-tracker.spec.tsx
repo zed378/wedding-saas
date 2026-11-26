@@ -27,7 +27,9 @@ describe("PageViewTracker (P4-09)", () => {
 
   it("falls back to fetch with keepalive when sendBeacon returns false", () => {
     const sendBeacon = vi.fn(() => false);
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 200 }));
     vi.stubGlobal("navigator", { sendBeacon });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -72,7 +74,9 @@ describe("the same-origin view forward route (P4-09)", () => {
     });
 
   it("forwards the beacon to the API with x-forwarded-for headers", async () => {
-    const upstream = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    const upstream = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 200 }));
     vi.stubGlobal("fetch", upstream);
 
     const response = await POST(

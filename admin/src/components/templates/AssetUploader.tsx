@@ -15,7 +15,10 @@ interface AssetUploaderProps {
   disabled?: boolean;
 }
 
-const PURPOSE_OPTIONS: { value: TemplateAssetItem["purpose"]; label: string }[] = [
+const PURPOSE_OPTIONS: {
+  value: TemplateAssetItem["purpose"];
+  label: string;
+}[] = [
   { value: "background", label: "Background (Latar Belakang)" },
   { value: "icon", label: "Icon / Ornamen Dekorasi" },
   { value: "demo-photo", label: "Demo Photo (Foto Contoh)" },
@@ -54,9 +57,12 @@ export function AssetUploader({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-body-lg font-semibold">Aset Grafis & Media Templat</h3>
+        <h3 className="text-body-lg font-semibold">
+          Aset Grafis & Media Templat
+        </h3>
         <p className="text-body-sm text-text-muted">
-          Unggah elemen dekoratif, tekstur latar, dan foto sampel melalui pipeline media tervalidasi
+          Unggah elemen dekoratif, tekstur latar, dan foto sampel melalui
+          pipeline media tervalidasi
         </p>
       </div>
 
@@ -145,9 +151,7 @@ export function AssetUploader({
                       {asset.asset_name}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <Badge tone="info">
-                        {asset.purpose}
-                      </Badge>
+                      <Badge tone="info">{asset.purpose}</Badge>
                       {asset.file && (
                         <span className="text-xs text-text-muted font-mono">
                           {(asset.file.size / 1024).toFixed(0)} KB

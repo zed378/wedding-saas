@@ -348,6 +348,40 @@ describe("401 (docs/FRONTEND/08: refresh or redirect)", () => {
 });
 
 describe("request construction", () => {
+  it("resolves same-origin browser requests and query parameters against the admin host", async () => {
+    vi.stubGlobal("location", { origin: "https://admin.example.test" });
+    try {
+      const fetch = vi.fn().mockResolvedValue(ok([]));
+      const client = new ApiClient({
+        baseUrl: "",
+        fetch,
+        tokenStore: createTokenStore(),
+      });
+      await expect(
+        client.get("/api/v1/admin/orders", { query: { page: 2 } }),
+      ).resolves.toMatchObject({ data: [] });
+      expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+        "https://admin.example.test/api/v1/admin/orders?page=2",
+      ]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("preserves an absolute API base when the browser has a different origin", async () => {
+    vi.stubGlobal("location", { origin: "https://admin.example.test" });
+    try {
+      const fetch = vi.fn().mockResolvedValue(ok([]));
+      await new ApiClient({ baseUrl: BASE, fetch }).get("/invitations");
+      expect(fetch).toHaveBeenCalledWith(
+        `${BASE}/invitations`,
+        expect.anything(),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("sends the bearer token when there is one", async () => {
     const tokens = createTokenStore();
     tokens.set("abc");

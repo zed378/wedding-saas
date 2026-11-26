@@ -1,4 +1,13 @@
-import { Controller, Get, HttpCode, Param, ParseUUIDPipe, Query, UseGuards, Req } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Query,
+  UseGuards,
+  Req,
+} from "@nestjs/common";
 import type { Request } from "express";
 import type { z } from "zod";
 
@@ -44,15 +53,21 @@ export class AdminInvitationsController {
 
   @Get()
   @HttpCode(200)
-  async listAdminInvitations(@Query() query: unknown) {
+  async listAdminInvitations(@Query() query: unknown, @Req() req: Request) {
     const parsed = parse(adminInvitationQuerySchema, query);
-    const result = await this.service.listInvitations(parsed);
+    const result = await this.service.listInvitations(
+      currentUser(req).id,
+      parsed,
+    );
     return ok(result.data, result.meta);
   }
 
   @Get(":id")
   @HttpCode(200)
-  async getAdminInvitationById(@Param("id") id: string, @Req() req: Request) {
+  async getAdminInvitationById(
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Req() req: Request,
+  ) {
     const admin = currentUser(req);
     const { reason } = parse(adminInvitationDetailSchema, req.query);
     const invitation = await this.service.getInvitationById(

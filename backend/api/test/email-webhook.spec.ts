@@ -23,7 +23,8 @@ describe("Email delivery monitoring & bounce handling (P4-08)", () => {
           limit: vi.fn().mockImplementation(async () => {
             function findEmail(obj: any, depth = 0): string | undefined {
               if (!obj || depth > 5) return undefined;
-              if (typeof obj.value === "string" && obj.value.includes("@")) return obj.value;
+              if (typeof obj.value === "string" && obj.value.includes("@"))
+                return obj.value;
               if (Array.isArray(obj.queryChunks)) {
                 for (const chunk of obj.queryChunks) {
                   const found = findEmail(chunk, depth + 1);
@@ -36,7 +37,8 @@ describe("Email delivery monitoring & bounce handling (P4-08)", () => {
             const hasSuppressed = insertedBounces.some(
               (b) =>
                 b["email"] === queriedEmail &&
-                (b["bounceType"] === "hard_bounce" || b["bounceType"] === "complaint"),
+                (b["bounceType"] === "hard_bounce" ||
+                  b["bounceType"] === "complaint"),
             );
             return hasSuppressed ? [{ id: "mock-id" }] : [];
           }),

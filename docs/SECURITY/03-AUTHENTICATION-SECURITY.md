@@ -25,6 +25,8 @@
 
 ## Admin Session
 - 2FA (TOTP) is MANDATORY for the `admin`/`super_admin` role.
+- Password and Google authentication return the same MFA challenge/setup flow before issuing an admin session. Admin access tokens carry signed `mfa_verified_at` proof, checked against the current database role. Legacy and pre-promotion sessions cannot acquire admin authority without MFA.
+- Admin refresh preserves the original verification time across rotation, with a four-hour absolute lifetime. Legacy unverified admin refresh tokens require login again; enrollment alone is not session proof.
 - Admin session expiry is shorter (e.g., 4 hours) than a regular user's, and re-authentication is required for highly sensitive actions (large refunds, suspending a user).
 
 ## Logging & Monitoring

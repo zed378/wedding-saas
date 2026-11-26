@@ -91,7 +91,9 @@ export class RsvpRepository {
    * Resolve an invitation by slug for public RSVP submission.
    * Only returns the target if the invitation is currently published.
    */
-  async findPublishedRsvpTarget(slug: string): Promise<PublishedRsvpTarget | null> {
+  async findPublishedRsvpTarget(
+    slug: string,
+  ): Promise<PublishedRsvpTarget | null> {
     const rows = await this.db
       .select({
         invitationId: invitations.id,

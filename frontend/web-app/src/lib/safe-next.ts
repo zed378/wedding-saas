@@ -48,6 +48,7 @@ export function safeNext(
   // URL, so `/\tjavascript:…` and `/%0A/evil` must never reach the checks below intact.
   // The class is written with escape sequences, not literal characters: a source file
   // containing a real NUL byte is one git classifies as binary and stops diffing.
+  // oxlint-disable-next-line no-control-regex -- Reject controls before browsers normalize them.
   if (/[\u0000-\u001F\u007F\s]/.test(raw)) return fallback;
 
   // Exactly one leading slash, and nothing that could introduce an authority.

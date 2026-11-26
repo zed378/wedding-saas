@@ -31,7 +31,8 @@ export async function GET(
     return new Response(data, {
       status: upstream.status,
       headers: {
-        "content-type": upstream.headers.get("content-type") ?? "application/json",
+        "content-type":
+          upstream.headers.get("content-type") ?? "application/json",
       },
     });
   } catch {

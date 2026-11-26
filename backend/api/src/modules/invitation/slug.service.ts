@@ -1,9 +1,11 @@
-import { Inject, Injectable } from "@nestjs/common";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { Inject, Injectable, Optional } from "@nestjs/common";
+import { createHash } from "node:crypto";
+import { and, eq, sql } from "drizzle-orm";
 
 import { DB, type Database } from "../../infra/db/client";
 import { slugBlocklist } from "../../infra/db/schema/templates";
 import { InvitationRepository } from "../../shared/tenancy/invitation-repository";
+import { CACHE, type CachePort } from "../../infra/cache/cache.port";
 
 /**
  * P1-09 — slug validation. `docs/PLAN/10` § Subdomain and `docs/SECURITY/10` § Slug
@@ -89,6 +91,7 @@ export class SlugService {
   constructor(
     @Inject(DB) private readonly db: Database,
     private readonly invitations: InvitationRepository,
+    @Optional() @Inject(CACHE) private readonly cache?: CachePort,
   ) {}
 
   /**
@@ -148,6 +151,66 @@ export class SlugService {
    */
   async findBlockingTerm(slug: string): Promise<string | undefined> {
     const normalised = slug.trim().toLowerCase();
+
+    if (this.cache) {
+      // The DB fingerprint is authoritative, including after failed Redis invalidation.
+      // A cached list can never hide a term added by another API instance.
+      const [version] = await this.db
+        .select({
+          fingerprint: sql<string>`encode(sha256(convert_to(coalesce(string_agg(
+        ${slugBlocklist.id}::text || ':' || ${slugBlocklist.term} || ':' || ${slugBlocklist.matchType},
+        ',' order by ${slugBlocklist.id}), ''), 'UTF8')), 'hex')`,
+        })
+        .from(slugBlocklist);
+      if (version?.fingerprint) {
+        type Term = { term: string; matchType: string };
+        let terms = await this.cache.getJson<Term[]>(
+          "slug-blocklist",
+          version.fingerprint,
+        );
+        if (
+          !Array.isArray(terms) ||
+          !terms.every(
+            (row) =>
+              typeof row?.term === "string" &&
+              ["exact", "substring"].includes(row.matchType),
+          )
+        ) {
+          const rows = await this.db
+            .select({
+              id: slugBlocklist.id,
+              term: slugBlocklist.term,
+              matchType: slugBlocklist.matchType,
+            })
+            .from(slugBlocklist);
+          terms = rows.map(({ term, matchType }) => ({ term, matchType }));
+          // A concurrent edit can change the list after the fingerprint query.
+          // Derive its key from this one SELECT's snapshot, using the same canonical
+          // serialization as SQL, so another version can never trust these terms.
+          const fingerprint = createHash("sha256")
+            .update(
+              rows
+                .map((row) => `${row.id}:${row.term}:${row.matchType}`)
+                .sort()
+                .join(","),
+            )
+            .digest("hex");
+          await this.cache.setJson("slug-blocklist", fingerprint, terms, 60);
+        }
+        return (
+          terms.find(
+            (row) =>
+              row.matchType === "exact" &&
+              row.term.toLowerCase() === normalised,
+          )?.term ??
+          terms.find(
+            (row) =>
+              row.matchType === "substring" &&
+              foldLeet(normalised).includes(foldLeet(row.term.toLowerCase())),
+          )?.term
+        );
+      }
+    }
 
     const [exact] = await this.db
       .select({ term: slugBlocklist.term })

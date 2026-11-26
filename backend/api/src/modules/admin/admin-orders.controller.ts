@@ -79,4 +79,3 @@ export class AdminOrdersController {
     return ok(result);
   }
 }
-

@@ -22,7 +22,7 @@ interface GuestbookEntry {
   readonly created_at?: string;
 }
 
-export function PublicGuestbookWall({ mode, data }: SectionProps) {
+export function PublicGuestbookWall({ mode }: SectionProps) {
   const [entries, setEntries] = useState<readonly GuestbookEntry[]>([]);
   const [guestName, setGuestName] = useState("");
   const [message, setMessage] = useState("");
@@ -114,14 +114,17 @@ export function PublicGuestbookWall({ mode, data }: SectionProps) {
 
     setIsSubmitting(true);
     try {
-      const res = await fetch(`/public/i/${encodeURIComponent(slug)}/guestbook`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          guest_name: guestName.trim(),
-          message: message.trim(),
-        }),
-      });
+      const res = await fetch(
+        `/public/i/${encodeURIComponent(slug)}/guestbook`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            guest_name: guestName.trim(),
+            message: message.trim(),
+          }),
+        },
+      );
 
       const body = await res.json().catch(() => null);
 
@@ -154,7 +157,9 @@ export function PublicGuestbookWall({ mode, data }: SectionProps) {
 
       setMessage("");
     } catch {
-      setErrorMessage("Koneksi gagal. Silakan periksa jaringan internet Anda dan coba lagi.");
+      setErrorMessage(
+        "Koneksi gagal. Silakan periksa jaringan internet Anda dan coba lagi.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -173,7 +178,10 @@ export function PublicGuestbookWall({ mode, data }: SectionProps) {
       <h2 className="wi-center">Buku Tamu & Ucapan</h2>
 
       {/* Guestbook Submission Form */}
-      <form className="wi-stack max-w-md mx-auto text-base mb-8" onSubmit={handleSubmit}>
+      <form
+        className="wi-stack max-w-md mx-auto text-base mb-8"
+        onSubmit={handleSubmit}
+      >
         {feedbackNotice && (
           <div
             role="status"
@@ -246,8 +254,12 @@ export function PublicGuestbookWall({ mode, data }: SectionProps) {
           <ul className="wi-stack" aria-label="Daftar ucapan tamu">
             {entries.map((item, idx) => (
               <li key={item.id ?? idx} className="wi-card">
-                <p className="text-base whitespace-pre-wrap">&ldquo;{item.message}&rdquo;</p>
-                <p className="wi-muted mt-2 text-sm font-medium">— {item.guest_name}</p>
+                <p className="text-base whitespace-pre-wrap">
+                  &ldquo;{item.message}&rdquo;
+                </p>
+                <p className="wi-muted mt-2 text-sm font-medium">
+                  — {item.guest_name}
+                </p>
               </li>
             ))}
           </ul>

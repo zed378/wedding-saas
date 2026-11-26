@@ -66,7 +66,7 @@ export interface RequestOptions {
 }
 
 export interface ApiClientConfig {
-  /** e.g. `https://app.vizunicum.my.id/api/v1`. From an env var, never hard-coded. */
+  /** Absolute API base, or an empty/path base for the current browser origin. */
   readonly baseUrl: string;
   readonly tokenStore?: TokenStore;
   readonly fetch?: typeof globalThis.fetch;
@@ -333,7 +333,10 @@ export class ApiClient {
   #url(path: string, query: RequestOptions["query"]): string {
     const base = this.#config.baseUrl.replace(/\/+$/, "");
     const suffix = path.startsWith("/") ? path : `/${path}`;
-    const url = new URL(`${base}${suffix}`);
+    const url = new URL(
+      `${base}${suffix}`,
+      typeof location === "undefined" ? undefined : location.origin,
+    );
 
     for (const [key, value] of Object.entries(query ?? {})) {
       if (value === undefined) continue;

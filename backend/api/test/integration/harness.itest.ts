@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 
 import {
   startHarness,
@@ -45,6 +46,63 @@ beforeEach(async () => {
 });
 
 describe("the harness itself", () => {
+  it("bootstraps disposable application privileges before migration restrictions", async () => {
+    const existing = process.env["TEST_DATABASE_URL"];
+    const migration = process.env["MIGRATION_DATABASE_URL"];
+    let fresh: Harness | undefined;
+    let app: Pool | undefined;
+    try {
+      delete process.env["TEST_DATABASE_URL"];
+      delete process.env["MIGRATION_DATABASE_URL"];
+      fresh = await startHarness();
+      app = new Pool({
+        connectionString: fresh.databaseUrl.replace(
+          /\/\/[^@]+@/,
+          "//wedding_app:wedding_app_dev@",
+        ),
+      });
+      await expect(
+        app.query("SELECT id FROM users LIMIT 1"),
+      ).resolves.toBeTruthy();
+      const { rows } = await app.query(`SELECT
+        (has_table_privilege(current_user, 'users', 'INSERT')
+          AND has_table_privilege(current_user, 'users', 'UPDATE')
+          AND has_table_privilege(current_user, 'users', 'DELETE')) AS ordinary_writes,
+        has_table_privilege(current_user, 'audit_logs', 'INSERT') AS audit_insert,
+        has_table_privilege(current_user, 'audit_logs', 'UPDATE, DELETE') AS audit_mutation,
+        has_table_privilege(current_user, 'invoices', 'UPDATE, DELETE') AS invoice_mutation,
+        has_column_privilege(current_user, 'payment_notifications', 'result', 'UPDATE') AS result_update,
+        has_column_privilege(current_user, 'payment_notifications', 'raw_payload', 'UPDATE') AS raw_update,
+        has_table_privilege(current_user, 'payment_notifications', 'DELETE') AS notification_delete,
+        has_table_privilege(current_user, 'regions', 'SELECT') AS regions_read,
+        has_table_privilege(current_user, 'regions', 'INSERT, UPDATE, DELETE') AS regions_write,
+        rolsuper, rolcreatedb, rolcreaterole, rolbypassrls
+        FROM pg_roles WHERE rolname = current_user`);
+      expect(rows[0]).toEqual({
+        ordinary_writes: true,
+        audit_insert: true,
+        audit_mutation: false,
+        invoice_mutation: false,
+        result_update: true,
+        raw_update: false,
+        notification_delete: false,
+        regions_read: true,
+        regions_write: false,
+        rolsuper: false,
+        rolcreatedb: false,
+        rolcreaterole: false,
+        rolbypassrls: false,
+      });
+    } finally {
+      if (existing === undefined) delete process.env["TEST_DATABASE_URL"];
+      else process.env["TEST_DATABASE_URL"] = existing;
+      if (migration === undefined) delete process.env["MIGRATION_DATABASE_URL"];
+      else process.env["MIGRATION_DATABASE_URL"] = migration;
+      await app?.end();
+      await fresh?.stop();
+    }
+  }, 120_000);
+
   it("applies every migration in the journal", async () => {
     // A suite running one migration behind produces failures that look like bugs in the
     // code under test, and the hour is spent in the wrong file.

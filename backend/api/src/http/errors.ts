@@ -90,7 +90,8 @@ export class ForbiddenError extends AppError {
   readonly code: string;
 
   constructor(
-    code: "FORBIDDEN" | "EMAIL_NOT_VERIFIED" | "MFA_STEP_UP_REQUIRED" = "FORBIDDEN",
+    code:
+      "FORBIDDEN" | "EMAIL_NOT_VERIFIED" | "MFA_STEP_UP_REQUIRED" = "FORBIDDEN",
     message?: string,
   ) {
     super(

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 
 import { RsvpTable } from "../src/components/RsvpTable";
 import type { RsvpItem, RsvpSummary } from "../src/lib/invitations";
@@ -19,7 +19,8 @@ const MOCK_RSVPS: readonly RsvpItem[] = [
     guest_name: "Budi Santoso",
     attendance_status: "attending",
     guest_count: 3,
-    message: "Selamat menempuh hidup baru! Semoga bahagia selalu sampai akhir hayat.",
+    message:
+      "Selamat menempuh hidup baru! Semoga bahagia selalu sampai akhir hayat.",
     created_at: "2026-10-18T10:00:00.000Z",
   },
   {
@@ -137,7 +138,9 @@ describe("P4-11 — Owner RSVP Table and Card Stack", () => {
       />,
     );
 
-    const deleteButtons = screen.getAllByLabelText("Hapus RSVP dari Budi Santoso");
+    const deleteButtons = screen.getAllByLabelText(
+      "Hapus RSVP dari Budi Santoso",
+    );
     fireEvent.click(deleteButtons[0]!);
 
     expect(window.confirm).toHaveBeenCalled();

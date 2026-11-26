@@ -7,18 +7,9 @@ export function MfaEnrollPage() {
   const { login } = useAdminAuth();
   const { navigate } = useRouter();
   const [ticket, setTicket] = useState<string>("");
-  const [secret, setSecret] = useState<string>("JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP");
+  const [secret, setSecret] = useState<string>("");
   const [qrUri, setQrUri] = useState<string>("");
-  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([
-    "A1B2-C3D4",
-    "E5F6-G7H8",
-    "I9J0-K1L2",
-    "M3N4-O5P6",
-    "Q7R8-S9T0",
-    "U1V2-W3X4",
-    "Y5Z6-A7B8",
-    "C9D0-E1F2",
-  ]);
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [code, setCode] = useState("");
   const [savedCodes, setSavedCodes] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -37,8 +28,14 @@ export function MfaEnrollPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ setup_ticket: t }),
+          credentials: "include",
         })
-          .then((res) => res.json())
+          .then(async (res) => {
+            const body = await res.json();
+            if (!res.ok)
+              throw new Error(body?.error?.message ?? "Pendaftaran 2FA gagal.");
+            return body;
+          })
           .then((data) => {
             if (data?.data?.secret) {
               setSecret(data.data.secret);
@@ -48,9 +45,13 @@ export function MfaEnrollPage() {
               }
             }
           })
-          .catch(() => {
-            // Keep fallback/demo values
+          .catch((error: unknown) => {
+            setError(
+              error instanceof Error ? error.message : "Pendaftaran 2FA gagal.",
+            );
           });
+      } else {
+        setError("Sesi pendaftaran tidak tersedia. Masuk kembali.");
       }
     }
   }, []);
@@ -80,13 +81,17 @@ export function MfaEnrollPage() {
     }
 
     if (!savedCodes) {
-      setError("Anda wajib mencatat dan menyimpan kode pemulihan sebelum melanjutkan.");
+      setError(
+        "Anda wajib mencatat dan menyimpan kode pemulihan sebelum melanjutkan.",
+      );
       return;
     }
 
     setIsLoading(true);
 
     try {
+      if (!ticket || !secret || recoveryCodes.length === 0)
+        throw new Error("Sesi pendaftaran tidak tersedia. Masuk kembali.");
       if (ticket) {
         const res = await fetch("/api/v1/auth/mfa/confirm", {
           method: "POST",
@@ -96,6 +101,7 @@ export function MfaEnrollPage() {
             code: code.trim(),
             recovery_codes: recoveryCodes,
           }),
+          credentials: "include",
         });
 
         const data = await res.json();
@@ -107,18 +113,10 @@ export function MfaEnrollPage() {
         navigate("/");
         return;
       }
-
-      // Mock / fallback completion
-      const mockToken = `admin_token_2fa_${Date.now()}`;
-      login(mockToken, {
-        id: "admin-1",
-        email: "admin@vizunicum.my.id",
-        role: "admin",
-        name: "Administrator",
-      });
-      navigate("/");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Konfirmasi kode 2FA gagal.");
+      setError(
+        err instanceof Error ? err.message : "Konfirmasi kode 2FA gagal.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -133,7 +131,8 @@ export function MfaEnrollPage() {
         <div className="mb-6 text-center">
           <h1 className="text-display font-bold">Aktivasi 2FA Wajib</h1>
           <p className="mt-1 text-body text-text-muted">
-            Akun administrator memerlukan Two-Factor Authentication (TOTP) aktif.
+            Akun administrator memerlukan Two-Factor Authentication (TOTP)
+            aktif.
           </p>
         </div>
 
@@ -157,7 +156,8 @@ export function MfaEnrollPage() {
                 Langkah 1: Masukkan Kunci Rahasia ke Authenticator
               </span>
               <p className="text-caption text-text-muted">
-                Buka Google Authenticator atau aplikasi TOTP serupa, lalu masukkan kunci rahasia berikut:
+                Buka Google Authenticator atau aplikasi TOTP serupa, lalu
+                masukkan kunci rahasia berikut:
               </p>
               <div className="flex items-center gap-2">
                 <code className="flex-1 rounded border border-border bg-surface p-2 font-mono text-body-sm tracking-wider">
@@ -174,7 +174,10 @@ export function MfaEnrollPage() {
               </div>
               {qrUri && (
                 <p className="mt-1 text-caption text-text-muted">
-                  URI Autentikasi: <span className="font-mono text-xs">{qrUri.slice(0, 40)}...</span>
+                  URI Autentikasi:{" "}
+                  <span className="font-mono text-xs">
+                    {qrUri.slice(0, 40)}...
+                  </span>
                 </p>
               )}
             </div>
@@ -194,7 +197,8 @@ export function MfaEnrollPage() {
                 </Button>
               </div>
               <p className="text-caption text-text-muted">
-                Simpan 8 kode ini di tempat yang aman. Setiap kode hanya dapat digunakan 1 kali jika Anda kehilangan perangkat:
+                Simpan 8 kode ini di tempat yang aman. Setiap kode hanya dapat
+                digunakan 1 kali jika Anda kehilangan perangkat:
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {recoveryCodes.map((c, i) => (
@@ -239,7 +243,13 @@ export function MfaEnrollPage() {
               type="submit"
               variant="primary"
               className="w-full"
-              disabled={isLoading || !savedCodes}
+              disabled={
+                isLoading ||
+                !savedCodes ||
+                !ticket ||
+                !secret ||
+                recoveryCodes.length === 0
+              }
             >
               {isLoading ? "Memverifikasi..." : "Aktivasi & Masuk ke Dashboard"}
             </Button>

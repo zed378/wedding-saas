@@ -15,9 +15,11 @@ function resolveSlug(): string {
   return "";
 }
 
-export function PublicRsvpForm({ mode, data }: SectionProps) {
+export function PublicRsvpForm({ mode }: SectionProps) {
   const [guestName, setGuestName] = useState("");
-  const [attendance, setAttendance] = useState<"attending" | "not_attending" | "maybe">("attending");
+  const [attendance, setAttendance] = useState<
+    "attending" | "not_attending" | "maybe"
+  >("attending");
   const [guestCount, setGuestCount] = useState(1);
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -93,7 +95,9 @@ export function PublicRsvpForm({ mode, data }: SectionProps) {
 
       setIsSubmitted(true);
     } catch {
-      setErrorMessage("Koneksi gagal. Silakan periksa jaringan internet Anda dan coba lagi.");
+      setErrorMessage(
+        "Koneksi gagal. Silakan periksa jaringan internet Anda dan coba lagi.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -111,11 +115,15 @@ export function PublicRsvpForm({ mode, data }: SectionProps) {
         >
           <h3 className="text-xl font-bold">Terima Kasih!</h3>
           <p className="mt-2 text-base">
-            Konfirmasi kehadiran atas nama <strong>{guestName}</strong> telah berhasil dicatat.
+            Konfirmasi kehadiran atas nama <strong>{guestName}</strong> telah
+            berhasil dicatat.
           </p>
         </div>
       ) : (
-        <form className="wi-stack max-w-md mx-auto text-base" onSubmit={handleSubmit}>
+        <form
+          className="wi-stack max-w-md mx-auto text-base"
+          onSubmit={handleSubmit}
+        >
           {errorMessage && (
             <div
               role="alert"
@@ -144,7 +152,9 @@ export function PublicRsvpForm({ mode, data }: SectionProps) {
           </div>
 
           <fieldset className="wi-field">
-            <legend className="text-base font-medium">Konfirmasi Kehadiran</legend>
+            <legend className="text-base font-medium">
+              Konfirmasi Kehadiran
+            </legend>
             <div className="mt-1 flex flex-wrap gap-4">
               {[
                 ["attending", "Hadir"],
@@ -163,7 +173,9 @@ export function PublicRsvpForm({ mode, data }: SectionProps) {
                     value={value}
                     checked={attendance === value}
                     onChange={() =>
-                      setAttendance(value as "attending" | "not_attending" | "maybe")
+                      setAttendance(
+                        value as "attending" | "not_attending" | "maybe",
+                      )
                     }
                     className="h-5 w-5"
                   />
@@ -175,7 +187,10 @@ export function PublicRsvpForm({ mode, data }: SectionProps) {
 
           {attendance === "attending" && (
             <div className="wi-field">
-              <label htmlFor="public-rsvp-count" className="text-base font-medium">
+              <label
+                htmlFor="public-rsvp-count"
+                className="text-base font-medium"
+              >
                 Jumlah Tamu Hadir
               </label>
               <select
@@ -195,7 +210,10 @@ export function PublicRsvpForm({ mode, data }: SectionProps) {
           )}
 
           <div className="wi-field">
-            <label htmlFor="public-rsvp-message" className="text-base font-medium">
+            <label
+              htmlFor="public-rsvp-message"
+              className="text-base font-medium"
+            >
               Ucapan / Doa (Opsional)
             </label>
             <textarea

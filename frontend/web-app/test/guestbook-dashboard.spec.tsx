@@ -15,7 +15,8 @@ const MOCK_ENTRIES: readonly GuestbookItem[] = [
   {
     id: "gb-1",
     guest_name: "Rina Wijaya",
-    message: "Barakallahu lakuma wa baraka alaikuma! Bahagia selalu untuk kedua mempelai.",
+    message:
+      "Barakallahu lakuma wa baraka alaikuma! Bahagia selalu untuk kedua mempelai.",
     status: "pending",
     created_at: "2026-10-18T14:00:00.000Z",
   },

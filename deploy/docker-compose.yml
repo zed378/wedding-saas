@@ -249,8 +249,8 @@ services:
       dockerfile: deploy/caddy/Dockerfile
     restart: unless-stopped
     ports:
-      - "80:80"    # HTTP (ACME HTTP-01 challenge)
-      - "443:443"  # HTTPS
+      - "80:80" # HTTP (ACME HTTP-01 challenge)
+      - "443:443" # HTTPS
     volumes:
       - ./Caddyfile.production:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

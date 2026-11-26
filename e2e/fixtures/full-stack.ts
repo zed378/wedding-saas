@@ -84,6 +84,20 @@ export async function startFullStack(
   options: { readonly publicInvite?: boolean } = {},
 ): Promise<FullStack> {
   const migrationUrl = process.env["MIGRATION_DATABASE_URL"]!;
+  const applicationUrl =
+    process.env["TEST_APPLICATION_DATABASE_URL"] ??
+    migrationUrl.replace(/\/\/[^@]+@/, "//wedding_app:wedding_app_dev@");
+  const owner = new URL(migrationUrl);
+  const application = new URL(applicationUrl);
+  if (
+    application.username === owner.username ||
+    application.host !== owner.host ||
+    application.pathname !== owner.pathname
+  ) {
+    throw new Error(
+      "E2E application and migration URLs must use separate roles on the same test database.",
+    );
+  }
   const redisUrl = process.env["TEST_REDIS_URL"] ?? "redis://localhost:56279";
 
   for (const [what, path] of [
@@ -117,6 +131,22 @@ export async function startFullStack(
     }
   }
 
+  const { Pool } = fromApi("pg") as {
+    Pool: new (options: { connectionString: string }) => PgPool;
+  };
+  // Fail before migrations and seeding when the external test role is misconfigured.
+  const applicationProbe = new Pool({ connectionString: applicationUrl });
+  try {
+    await applicationProbe.query("SELECT 1");
+  } catch (cause) {
+    throw new Error(
+      "Cannot connect as the E2E application role. Set TEST_APPLICATION_DATABASE_URL to the non-owner test role credentials.",
+      { cause },
+    );
+  } finally {
+    await applicationProbe.end();
+  }
+
   const env = { ...process.env, MIGRATION_DATABASE_URL: migrationUrl };
   for (const script of ["src/infra/db/migrate.mts", "src/infra/db/seed.mts"]) {
     const run = spawnSync(process.execPath, [script], {
@@ -129,9 +159,6 @@ export async function startFullStack(
     }
   }
 
-  const { Pool } = fromApi("pg") as {
-    Pool: new (options: { connectionString: string }) => PgPool;
-  };
   const pool = new Pool({ connectionString: migrationUrl });
   let referenceTemplateId: string;
   let minimalTemplateId: string;
@@ -241,10 +268,7 @@ export async function startFullStack(
         APP_ORIGIN: WEB_APP_ORIGIN,
         PUBLIC_INVITE_ORIGIN: "http://localhost:3200",
         ADMIN_ORIGIN: "http://localhost:3300",
-        DATABASE_URL: migrationUrl.replace(
-          /\/\/[^@]+@/,
-          "//wedding_app:wedding_app_dev@",
-        ),
+        DATABASE_URL: applicationUrl,
         MIGRATION_DATABASE_URL: migrationUrl,
         REDIS_URL: redisUrl,
         JWT_SIGNING_KEY: "e2e-full-stack-signing-key-000000000000",

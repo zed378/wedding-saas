@@ -134,6 +134,7 @@ export const refreshTokens = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     tokenHash: varchar("token_hash", { length: 255 }).notNull(),
+    mfaVerifiedAt: timestamp("mfa_verified_at", { withTimezone: true }),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -270,4 +271,3 @@ export const emailBounces = pgTable(
   },
   (t) => [index("idx_email_bounces_email").on(t.email)],
 );
-

@@ -98,7 +98,9 @@ describe("Admin Moderation Queue API (P5-09)", () => {
         filtered = filtered.filter((i) => i.flagSource === "auto_flagged");
       }
       if (query.invitation_id) {
-        filtered = filtered.filter((i) => i.invitationId === query.invitation_id);
+        filtered = filtered.filter(
+          (i) => i.invitationId === query.invitation_id,
+        );
       }
       if (query.search) {
         filtered = filtered.filter(
@@ -138,17 +140,20 @@ describe("Admin Moderation Queue API (P5-09)", () => {
   };
 
   const mockGuestbookService = {
-    reportEntry: vi.fn(async (slug: string, entryId: string, _reason: string | undefined) => {
-      if (slug !== "budi-and-ratna") {
-        throw new NotFoundError(`Undangan "${slug}" tidak ditemukan.`);
-      }
-      if (entryId !== ENTRY_1_ID) {
-        throw new NotFoundError("Pesan buku tamu tidak ditemukan.");
-      }
-      return {
-        message: "Laporan berhasil diterima dan akan ditinjau oleh tim moderasi.",
-      };
-    }),
+    reportEntry: vi.fn(
+      async (slug: string, entryId: string, _reason: string | undefined) => {
+        if (slug !== "budi-and-ratna") {
+          throw new NotFoundError(`Undangan "${slug}" tidak ditemukan.`);
+        }
+        if (entryId !== ENTRY_1_ID) {
+          throw new NotFoundError("Pesan buku tamu tidak ditemukan.");
+        }
+        return {
+          message:
+            "Laporan berhasil diterima dan akan ditinjau oleh tim moderasi.",
+        };
+      },
+    ),
     submitEntry: vi.fn(),
     listApprovedEntries: vi.fn(),
     isCaptchaRequired: vi.fn(async () => false),
@@ -183,7 +188,10 @@ describe("Admin Moderation Queue API (P5-09)", () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [AdminModerationController, PublicGuestbookController],
       providers: [
-        { provide: AdminModerationService, useValue: mockAdminModerationService },
+        {
+          provide: AdminModerationService,
+          useValue: mockAdminModerationService,
+        },
         { provide: GuestbookService, useValue: mockGuestbookService },
         { provide: SessionService, useValue: mockSessionService },
         { provide: APP_FILTER, useClass: AppExceptionFilter },
@@ -237,7 +245,9 @@ describe("Admin Moderation Queue API (P5-09)", () => {
 
     it("returns 404 when entry ID does not exist", async () => {
       const res = await request(app.getHttpServer())
-        .post("/public/i/budi-and-ratna/guestbook/99999999-9999-4999-8999-999999999999/report")
+        .post(
+          "/public/i/budi-and-ratna/guestbook/99999999-9999-4999-8999-999999999999/report",
+        )
         .send({ reason: "Spam" });
 
       expect(res.status).toBe(404);
@@ -279,8 +289,12 @@ describe("Admin Moderation Queue API (P5-09)", () => {
       expect(res.status).toBe(200);
       expect(res.body.data).toHaveLength(2);
 
-      const reportedEntry = res.body.data.find((e: any) => e.flagSource === "reported");
-      const autoFlaggedEntry = res.body.data.find((e: any) => e.flagSource === "auto_flagged");
+      const reportedEntry = res.body.data.find(
+        (e: any) => e.flagSource === "reported",
+      );
+      const autoFlaggedEntry = res.body.data.find(
+        (e: any) => e.flagSource === "auto_flagged",
+      );
 
       expect(reportedEntry).toBeDefined();
       expect(reportedEntry.reportCount).toBe(2);
@@ -312,7 +326,9 @@ describe("Admin Moderation Queue API (P5-09)", () => {
 
     it("filters queue per invitation ID", async () => {
       const res = await request(app.getHttpServer())
-        .get(`/api/v1/admin/moderation/guestbook?invitation_id=${INVITATION_1_ID}`)
+        .get(
+          `/api/v1/admin/moderation/guestbook?invitation_id=${INVITATION_1_ID}`,
+        )
         .set("Authorization", "Bearer admin-token");
 
       expect(res.status).toBe(200);
@@ -334,11 +350,58 @@ describe("Admin Moderation Queue API (P5-09)", () => {
   });
 
   describe("Admin Moderation Decisions (PATCH & DELETE)", () => {
+    it("rejects absent, empty, sanitized-away reasons and unknown fields before moderation", async () => {
+      for (const body of [
+        { status: "approved" },
+        { status: "approved", reason: "   " },
+        { status: "approved", reason: "<script>alert(1)</script>" },
+        {
+          status: "approved",
+          reason: "Manual review accepted",
+          owner_id: ADMIN_ID,
+        },
+      ]) {
+        const response = await request(app.getHttpServer())
+          .patch(`/api/v1/admin/moderation/guestbook/${ENTRY_1_ID}`)
+          .set("Authorization", "Bearer admin-token")
+          .send(body);
+        expect(response.status).toBe(400);
+      }
+      for (const body of [
+        {},
+        { reason: " " },
+        { reason: "<script>alert(1)</script>" },
+      ]) {
+        const response = await request(app.getHttpServer())
+          .delete(`/api/v1/admin/moderation/guestbook/${ENTRY_1_ID}`)
+          .set("Authorization", "Bearer admin-token")
+          .send(body);
+        expect(response.status).toBe(400);
+      }
+    });
+
+    it("sanitizes the required moderation reason before passing it to storage", async () => {
+      await request(app.getHttpServer())
+        .patch(`/api/v1/admin/moderation/guestbook/${ENTRY_1_ID}`)
+        .set("Authorization", "Bearer admin-token")
+        .send({ status: "approved", reason: "<b>Reviewed safe content</b>" })
+        .expect(200);
+      expect(
+        mockAdminModerationService.moderateGuestbook,
+      ).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: ADMIN_ID }),
+        ENTRY_1_ID,
+        { status: "approved", reason: "Reviewed safe content" },
+      );
+    });
     it("approves a pending guestbook entry (DoD 2)", async () => {
       const res = await request(app.getHttpServer())
         .patch(`/api/v1/admin/moderation/guestbook/${ENTRY_1_ID}`)
         .set("Authorization", "Bearer admin-token")
-        .send({ status: "approved", reason: "Tinjauan manual menyatakan pesan aman" });
+        .send({
+          status: "approved",
+          reason: "Tinjauan manual menyatakan pesan aman",
+        });
 
       expect(res.status).toBe(200);
       expect(res.body.data.status).toBe("approved");
@@ -380,15 +443,19 @@ describe("Admin Moderation Queue API (P5-09)", () => {
       expect(mockAdminModerationService.deleteGuestbook).toHaveBeenCalledWith(
         expect.objectContaining({ id: ADMIN_ID }),
         ENTRY_1_ID,
-        expect.objectContaining({ reason: "Pelanggaran berat ketentuan layanan" }),
+        expect.objectContaining({
+          reason: "Pelanggaran berat ketentuan layanan",
+        }),
       );
     });
 
     it("returns 404 when moderating unknown entry", async () => {
       const res = await request(app.getHttpServer())
-        .patch("/api/v1/admin/moderation/guestbook/99999999-9999-4999-8999-999999999999")
+        .patch(
+          "/api/v1/admin/moderation/guestbook/99999999-9999-4999-8999-999999999999",
+        )
         .set("Authorization", "Bearer admin-token")
-        .send({ status: "rejected" });
+        .send({ status: "rejected", reason: "Review unknown resource" });
 
       expect(res.status).toBe(404);
       expect(res.body.error.code).toBe("NOT_FOUND");

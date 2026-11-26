@@ -17,7 +17,10 @@ import tailwindcss from "@tailwindcss/vite";
  */
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: { port: 3300 },
+  server: {
+    port: 3300,
+    proxy: { "/api": "http://localhost:3000" },
+  },
   build: { outDir: "dist", sourcemap: true },
   test: {
     globals: true,

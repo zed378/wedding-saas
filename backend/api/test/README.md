@@ -5,7 +5,21 @@ Two suites, two commands, one rule about the database.
 ```bash
 pnpm --filter @wi/api test              # unit — no database, no network
 pnpm --filter @wi/api test:integration  # integration — a real PostgreSQL
+pnpm --filter @wi/api test:coverage     # unit + integration; enforced service thresholds
 ```
+
+The full root `pnpm verify` also runs workspace integration tests, this combined
+coverage gate, a dependency audit (including development dependencies), and
+`pnpm check:sast`. The SAST runner needs Docker and uses a digest-pinned image
+with checked-in rules; after the first image pull the scan runs without network
+access. Worker/storage integration requires isolated Redis, PostgreSQL, MinIO
+and ClamAV in addition to the API dependencies. `pnpm verify --fast` omits these
+slow checks and is not complete acceptance. CI remains deferred under `P0-17`.
+Root workspace integration runs serially because API fixtures truncate shared
+tables and worker media fixtures may use the same isolated test database.
+Turbo passes the named test database, Redis, storage, scanner and Docker connection
+variables through only to integration tasks; strict environment filtering remains
+enabled for the rest of the task graph.
 
 ## The database the integration suite needs
 

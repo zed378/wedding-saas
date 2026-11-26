@@ -1,5 +1,14 @@
 import { Inject, Injectable, Optional } from "@nestjs/common";
-import { and, count, desc, eq, ilike, inArray, isNull, or, type SQL } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  or,
+  type SQL,
+} from "drizzle-orm";
 
 import { DB, type Database } from "../../infra/db/client";
 import {
@@ -11,7 +20,11 @@ import {
   payments,
   users,
 } from "../../infra/db/schema/index";
-import { ConflictError, NotFoundError, ValidationError } from "../../http/errors";
+import {
+  ConflictError,
+  NotFoundError,
+  ValidationError,
+} from "../../http/errors";
 import type { PageMeta } from "../../http/envelope";
 import { JOB_QUEUE, type JobQueue } from "../../infra/queue/queue.module";
 import type { CurrentUser } from "../../shared/auth-middleware/current-user";
@@ -291,14 +304,20 @@ export class AdminOrdersService {
 
     // 2. Fetch payment notifications (timeline)
     const paymentIds = paymentRows.map((p) => p.id);
-    const providerRefs = paymentRows.map((p) => p.providerReferenceId).filter(Boolean);
+    const providerRefs = paymentRows
+      .map((p) => p.providerReferenceId)
+      .filter(Boolean);
 
     const notificationConditions: SQL[] = [];
     if (paymentIds.length > 0) {
-      notificationConditions.push(inArray(paymentNotifications.paymentId, paymentIds));
+      notificationConditions.push(
+        inArray(paymentNotifications.paymentId, paymentIds),
+      );
     }
     if (providerRefs.length > 0) {
-      notificationConditions.push(inArray(paymentNotifications.claimedReference, providerRefs));
+      notificationConditions.push(
+        inArray(paymentNotifications.claimedReference, providerRefs),
+      );
     }
 
     let notificationRows: any[] = [];
@@ -324,25 +343,28 @@ export class AdminOrdersService {
         .orderBy(paymentNotifications.receivedAt);
     }
 
-    const notificationItems: AdminPaymentNotificationItem[] = notificationRows.map((n) => ({
-      id: n.id,
-      source: n.source,
-      provider: n.provider,
-      claimedReference: n.claimedReference,
-      signatureValid: n.signatureValid,
-      rejectionReason: n.rejectionReason,
-      outcome: n.outcome,
-      providerStatus: n.providerStatus,
-      amount: n.amount != null ? n.amount.toString() : null,
-      result: n.result,
-      needsReview: n.needsReview,
-      receivedAt: n.receivedAt.toISOString(),
-      processedAt: n.processedAt ? n.processedAt.toISOString() : null,
-    }));
+    const notificationItems: AdminPaymentNotificationItem[] =
+      notificationRows.map((n) => ({
+        id: n.id,
+        source: n.source,
+        provider: n.provider,
+        claimedReference: n.claimedReference,
+        signatureValid: n.signatureValid,
+        rejectionReason: n.rejectionReason,
+        outcome: n.outcome,
+        providerStatus: n.providerStatus,
+        amount: n.amount != null ? n.amount.toString() : null,
+        result: n.result,
+        needsReview: n.needsReview,
+        receivedAt: n.receivedAt.toISOString(),
+        processedAt: n.processedAt ? n.processedAt.toISOString() : null,
+      }));
 
     // 3. Fraud check: any notification with signatureValid === false or signature_mismatch
     const hasFraudAlert = notificationItems.some(
-      (n) => n.signatureValid === false || n.rejectionReason === "signature_mismatch",
+      (n) =>
+        n.signatureValid === false ||
+        n.rejectionReason === "signature_mismatch",
     );
 
     // 4. Fetch invoice if generated
@@ -490,12 +512,15 @@ export class AdminOrdersService {
         previousInvitationStatus,
         moneyMovement: "manual" as const,
         message:
-          "Pesanan berhasil direfund di sistem dan status undangan dikembalikan ke draft. Pengembalian uang riil ke rekening/e-wallet pelanggan wajib diproses manual melalui dashboard gateway pembayaran (Midtrans).",
+          "Pesanan berhasil direfund di sistem dan status undangan dikembalikan ke draft. Pengembalian uang riil ke rekening/e-wallet pelanggan wajib diproses manual melalui dashboard gateway pembayaran.",
       };
     });
 
     // 7. Post-transaction cache invalidation if invitation was published
-    if (result.previousInvitationStatus === "published" && result.invitationSlug) {
+    if (
+      result.previousInvitationStatus === "published" &&
+      result.invitationSlug
+    ) {
       if (this.cache) {
         await this.cache.invalidate({
           slug: result.invitationSlug,

@@ -43,6 +43,7 @@ import { refreshTokens } from "../../../infra/db/schema/users";
 
 /** `docs/API/01`: "long expiry (30 days)". */
 export const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export const ADMIN_SESSION_TTL_MS = 4 * 60 * 60 * 1000;
 
 /** The cookie `docs/SECURITY/03` requires. Named here so the controller cannot drift. */
 export const REFRESH_COOKIE_NAME = "wi_refresh";
@@ -58,6 +59,7 @@ export type RotateResult =
       readonly status: "ok";
       readonly userId: string;
       readonly issued: IssuedRefreshToken;
+      readonly mfaVerifiedAt: Date | null;
     }
   /** Unknown or expired. Nothing to revoke, nothing to alarm about. */
   | { readonly status: "invalid" }
@@ -98,14 +100,20 @@ export async function issueRefreshToken(
   pepper: string,
   userId: string,
   now: Date = new Date(),
+  mfaVerifiedAt: Date | null = null,
 ): Promise<IssuedRefreshToken> {
   const token = generateToken();
-  const expiresAt = new Date(now.getTime() + REFRESH_TOKEN_TTL_MS);
+  const expiresAt = new Date(
+    mfaVerifiedAt === null
+      ? now.getTime() + REFRESH_TOKEN_TTL_MS
+      : mfaVerifiedAt.getTime() + ADMIN_SESSION_TTL_MS,
+  );
 
   await db.insert(refreshTokens).values({
     userId,
     tokenHash: hashRefreshToken(pepper, token),
     expiresAt,
+    mfaVerifiedAt,
   });
 
   return { token, expiresAt };
@@ -178,27 +186,41 @@ export async function rotateRefreshToken(
           sql`${refreshTokens.expiresAt} > ${now}`,
         ),
       )
-      .returning({ userId: refreshTokens.userId });
+      .returning({
+        userId: refreshTokens.userId,
+        mfaVerifiedAt: refreshTokens.mfaVerifiedAt,
+      });
 
     const row = rows[0];
     if (row === undefined) return undefined;
+
+    const successorExpiresAt =
+      row.mfaVerifiedAt == null
+        ? expiresAt
+        : new Date(row.mfaVerifiedAt.getTime() + ADMIN_SESSION_TTL_MS);
 
     // Same transaction as the revoke. A crash between the two would otherwise leave the
     // old token dead and no new one issued -- or, with the order reversed, two live.
     await tx.insert(refreshTokens).values({
       userId: row.userId,
       tokenHash: hashRefreshToken(pepper, successor),
-      expiresAt,
+      expiresAt: successorExpiresAt,
+      mfaVerifiedAt: row.mfaVerifiedAt ?? null,
     });
 
-    return row.userId;
+    return {
+      userId: row.userId,
+      mfaVerifiedAt: row.mfaVerifiedAt ?? null,
+      expiresAt: successorExpiresAt,
+    };
   });
 
   if (claimed !== undefined) {
     return {
       status: "ok",
-      userId: claimed,
-      issued: { token: successor, expiresAt },
+      userId: claimed.userId,
+      mfaVerifiedAt: claimed.mfaVerifiedAt,
+      issued: { token: successor, expiresAt: claimed.expiresAt },
     };
   }
 

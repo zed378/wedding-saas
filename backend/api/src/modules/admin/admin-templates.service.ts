@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, or } from "drizzle-orm";
 import { validateTemplateVersion } from "@wi/schema";
 
 import { DB, type Database } from "../../infra/db/client";
@@ -67,7 +67,10 @@ export class AdminTemplatesService {
       }
     }
 
-    const versionsByTemplate = new Map<string, Array<(typeof versionRows)[0] & { invitation_count: number }>>();
+    const versionsByTemplate = new Map<
+      string,
+      Array<(typeof versionRows)[0] & { invitation_count: number }>
+    >();
     for (const v of versionRows) {
       const list = versionsByTemplate.get(v.templateId) ?? [];
       list.push({
@@ -129,10 +132,7 @@ export class AdminTemplatesService {
     };
   }
 
-  async createTemplate(
-    adminUser: { id: string },
-    input: CreateTemplateDto,
-  ) {
+  async createTemplate(adminUser: { id: string }, input: CreateTemplateDto) {
     const [existing] = await this.db
       .select({ id: templates.id })
       .from(templates)
@@ -226,11 +226,7 @@ export class AdminTemplatesService {
     });
   }
 
-  async deleteTemplate(
-    adminUser: { id: string },
-    id: string,
-    reason: string,
-  ) {
+  async deleteTemplate(adminUser: { id: string }, id: string, reason: string) {
     const result = await this.db.transaction(async (tx) => {
       const [before] = await tx
         .select()

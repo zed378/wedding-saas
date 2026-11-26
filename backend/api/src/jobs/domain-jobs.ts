@@ -50,6 +50,5 @@ export const DOMAIN_JOBS: Readonly<Record<string, DomainJob>> = {
   // docs/PLAN/13: `rsvp_daily_digest`, daily 09:00 WIB (P4-08).
   rsvp_daily_digest: (app) => app.get(RsvpDigestService).sendDailyDigests(),
   // docs/ARCHITECTURE/07, docs/PLAN/13: `analytics_counter_flush`, every 1 minute (P4-09).
-  analytics_counter_flush: (app) =>
-    app.get(AnalyticsService).flushViewCounts(),
+  analytics_counter_flush: (app) => app.get(AnalyticsService).flushViewCounts(),
 };

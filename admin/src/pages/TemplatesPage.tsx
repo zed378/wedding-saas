@@ -1,13 +1,6 @@
-import { useState, useEffect } from "react";
-import {
-  Button,
-  Card,
-  CardHeader,
-  Badge,
-  Input,
-  Modal,
-  Tabs,
-} from "@wi/ui";
+import { useState, useEffect, useMemo } from "react";
+import { ApiClient, accessTokenStore } from "@wi/api-client";
+import { Button, Card, Badge, Input, Modal } from "@wi/ui";
 import { SectionEditor } from "../components/templates/SectionEditor.js";
 import { ThemeEditor } from "../components/templates/ThemeEditor.js";
 import { TemplatePreview } from "../components/templates/TemplatePreview.js";
@@ -71,23 +64,23 @@ const DEFAULT_SECTIONS: SectionDefinition[] = [
   },
   {
     section_key: "couple",
-    component: "CoupleClassic",
+    component: "CoupleProfile",
     enabled_by_default: true,
     configurable: true,
-    required_fields: ["couple.groom.name", "couple.bride.name"],
+    required_fields: ["couple.groom.full_name", "couple.bride.full_name"],
     optional_fields: [],
   },
   {
     section_key: "event",
-    component: "EventCards",
+    component: "EventCardDouble",
     enabled_by_default: true,
     configurable: true,
-    required_fields: ["events.akad.date", "events.resepsi.date"],
-    optional_fields: [],
+    required_fields: ["events.*.date"],
+    optional_fields: ["events.*.timezone"],
   },
   {
     section_key: "rsvp",
-    component: "RsvpStandard",
+    component: "RsvpForm",
     enabled_by_default: true,
     configurable: false,
     required_fields: [],
@@ -95,87 +88,25 @@ const DEFAULT_SECTIONS: SectionDefinition[] = [
   },
 ];
 
-const INITIAL_MOCK_TEMPLATES: TemplateRecord[] = [
-  {
-    id: "tpl-javanese-classic",
-    slug: "javanese-classic",
-    name: "Javanese Classic Elegance",
-    category: ["traditional", "javanese", "floral"],
-    isPremium: true,
-    thumbnailUrl: "https://images.unsplash.com/photo-1519741497674-611481863552?w=400",
-    status: "published",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    versions: [
-      {
-        id: "ver-100",
-        templateId: "tpl-javanese-classic",
-        version: "1.0.0",
-        sections: DEFAULT_SECTIONS,
-        theme: DEFAULT_THEME,
-        customizableThemeKeys: ["colors.primary", "colors.secondary", "spacing"],
-        changelog: "Rilis publik pertama templat Jawa Klasik",
-        status: "published",
-        releasedAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        invitation_count: 12,
-      },
-      {
-        id: "ver-110",
-        templateId: "tpl-javanese-classic",
-        version: "1.1.0-draft",
-        sections: DEFAULT_SECTIONS,
-        theme: {
-          ...DEFAULT_THEME,
-          colors: { ...DEFAULT_THEME.colors, accent: "#D4AF37" },
-        },
-        customizableThemeKeys: ["colors.primary", "colors.secondary"],
-        changelog: "Penambahan ornamen emas dan optimasi tipografi",
-        status: "draft",
-        createdAt: new Date().toISOString(),
-        invitation_count: 0,
-      },
-    ],
-  },
-  {
-    id: "tpl-sundanese-romantic",
-    slug: "sundanese-romantic",
-    name: "Sundanese Romantic Garden",
-    category: ["traditional", "sundanese", "botanical"],
-    isPremium: false,
-    thumbnailUrl: "https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?w=400",
-    status: "draft",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    versions: [
-      {
-        id: "ver-090",
-        templateId: "tpl-sundanese-romantic",
-        version: "0.9.0",
-        sections: DEFAULT_SECTIONS,
-        theme: {
-          ...DEFAULT_THEME,
-          colors: {
-            primary: "#2E5A44",
-            secondary: "#F2F7F4",
-            accent: "#8FAF9B",
-            text: "#1C2E24",
-          },
-        },
-        customizableThemeKeys: ["colors.primary", "colors.accent"],
-        changelog: "Versi draf internal untuk pengujian",
-        status: "draft",
-        createdAt: new Date().toISOString(),
-        invitation_count: 0,
-      },
-    ],
-  },
-];
-
 export function TemplatesPage() {
-  const [templatesList, setTemplatesList] = useState<TemplateRecord[]>(
-    INITIAL_MOCK_TEMPLATES,
+  const client = useMemo(
+    () =>
+      new ApiClient({
+        baseUrl:
+          window.location.hostname === "localhost"
+            ? "http://localhost:3000"
+            : window.location.origin,
+        tokenStore: accessTokenStore,
+      }),
+    [],
   );
+  const [templatesList, setTemplatesList] = useState<TemplateRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reload, setReload] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [saveReason, setSaveReason] = useState("");
+  const [saveMessage, setSaveMessage] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
     null,
   );
@@ -199,7 +130,9 @@ export function TemplatesPage() {
   // New Template form state
   const [newTplSlug, setNewTplSlug] = useState("");
   const [newTplName, setNewTplName] = useState("");
-  const [newTplCategories, setNewTplCategories] = useState("traditional, elegant");
+  const [newTplCategories, setNewTplCategories] = useState(
+    "traditional, elegant",
+  );
   const [newTplIsPremium, setNewTplIsPremium] = useState(false);
   const [newTplThumbnail, setNewTplThumbnail] = useState("");
 
@@ -208,36 +141,33 @@ export function TemplatesPage() {
   const [newVersionChangelog, setNewVersionChangelog] = useState("");
 
   // Version edit working state
-  const [workingSections, setWorkingSections] = useState<SectionDefinition[]>(
-    DEFAULT_SECTIONS,
-  );
+  const [workingSections, setWorkingSections] =
+    useState<SectionDefinition[]>(DEFAULT_SECTIONS);
   const [workingTheme, setWorkingTheme] = useState<Theme>(DEFAULT_THEME);
   const [workingCustomizableKeys, setWorkingCustomizableKeys] = useState<
     string[]
   >(["colors.primary", "colors.secondary"]);
   const [workingAssets, setWorkingAssets] = useState<TemplateAssetItem[]>([]);
 
-  // Fetch real templates if API is active
   useEffect(() => {
-    let isMounted = true;
-    async function loadTemplates() {
-      try {
-        const res = await fetch("/api/v1/admin/templates");
-        if (res.ok) {
-          const json = await res.json();
-          if (isMounted && Array.isArray(json?.data)) {
-            setTemplatesList(json.data);
-          }
-        }
-      } catch {
-        // Keep initial mock templates for demo/standalone test environments
-      }
-    }
-    loadTemplates();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    const abort = new AbortController();
+    setLoading(true);
+    setLoadError(false);
+    client
+      .get<TemplateRecord[]>("/api/v1/admin/templates", {
+        signal: abort.signal,
+      })
+      .then((result) => {
+        if (!abort.signal.aborted) setTemplatesList(result.data);
+      })
+      .catch(() => {
+        if (!abort.signal.aborted) setLoadError(true);
+      })
+      .finally(() => {
+        if (!abort.signal.aborted) setLoading(false);
+      });
+    return () => abort.abort();
+  }, [client, reload]);
 
   const selectedTemplate = templatesList.find(
     (t) => t.id === selectedTemplateId,
@@ -285,222 +215,177 @@ export function TemplatesPage() {
       .map((c) => c.trim())
       .filter(Boolean);
 
+    setSaving(true);
     try {
-      const res = await fetch("/api/v1/admin/templates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const result = await client.post<TemplateRecord>(
+        "/api/v1/admin/templates",
+        {
           slug: newTplSlug.trim(),
           name: newTplName.trim(),
           category: categoriesArray,
           is_premium: newTplIsPremium,
           thumbnail_url: newTplThumbnail.trim() || undefined,
           reason: actionReason.trim(),
-        }),
-      });
-
-      if (res.ok) {
-        const body = await res.json();
-        const created: TemplateRecord = {
-          ...body.data,
-          versions: [],
-        };
-        setTemplatesList([created, ...templatesList]);
-        setSelectedTemplateId(created.id);
-        setIsNewTemplateModalOpen(false);
-        setActionReason("");
-        return;
-      }
-    } catch {
-      // Local fallback
-    }
-
-    const localNewTpl: TemplateRecord = {
-      id: `tpl-${Date.now()}`,
-      slug: newTplSlug.trim(),
-      name: newTplName.trim(),
-      category: categoriesArray,
-      isPremium: newTplIsPremium,
-      thumbnailUrl: newTplThumbnail.trim() || undefined,
-      status: "draft",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      versions: [
-        {
-          id: `ver-${Date.now()}`,
-          templateId: `tpl-${Date.now()}`,
-          version: "1.0.0-draft",
-          sections: DEFAULT_SECTIONS,
-          theme: DEFAULT_THEME,
-          customizableThemeKeys: ["colors.primary", "colors.secondary"],
-          status: "draft",
-          createdAt: new Date().toISOString(),
-          invitation_count: 0,
         },
-      ],
-    };
-
-    setTemplatesList([localNewTpl, ...templatesList]);
-    setSelectedTemplateId(localNewTpl.id);
-    setSelectedVersionId(localNewTpl.versions[0]!.id);
-    setIsNewTemplateModalOpen(false);
-    setActionReason("");
+      );
+      const created = { ...result.data, versions: [] };
+      setTemplatesList((current) => [created, ...current]);
+      setSelectedTemplateId(created.id);
+      setSelectedVersionId(null);
+      setWorkingSections(DEFAULT_SECTIONS);
+      setWorkingTheme(DEFAULT_THEME);
+      setWorkingCustomizableKeys(["colors.primary", "colors.secondary"]);
+      setIsNewTemplateModalOpen(false);
+      setActionReason("");
+    } catch {
+      setActionError("Templat gagal dibuat. Periksa data lalu coba lagi.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCreateVersion = async () => {
     setActionError(null);
-    if (!newVersionNumber.trim()) {
-      setActionError("Nomor versi semver wajib diisi (misal: 1.1.0).");
+    if (
+      !selectedTemplateId ||
+      !newVersionNumber.trim() ||
+      actionReason.trim().length < 5
+    ) {
+      setActionError(
+        "Nomor versi dan alasan audit minimal 5 karakter wajib diisi.",
+      );
       return;
     }
-    if (actionReason.trim().length < 5) {
-      setActionError("Alasan audit wajib diisi minimal 5 karakter.");
-      return;
-    }
-
-    const payload = {
-      version: newVersionNumber.trim(),
-      sections: workingSections,
-      theme: workingTheme,
-      customizable_theme_keys: workingCustomizableKeys,
-      changelog: newVersionChangelog.trim() || undefined,
-      reason: actionReason.trim(),
-    };
-
+    setSaving(true);
     try {
-      const res = await fetch(
-        `/api/v1/admin/templates/${selectedTemplateId}/versions`,
+      const result = await client.post<TemplateVersionRecord>(
+        "/api/v1/admin/templates/" + selectedTemplateId + "/versions",
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          version: newVersionNumber.trim(),
+          sections: workingSections,
+          theme: workingTheme,
+          customizable_theme_keys: workingCustomizableKeys,
+          changelog: newVersionChangelog.trim() || undefined,
+          reason: actionReason.trim(),
         },
       );
-      if (res.ok) {
-        const body = await res.json();
-        const newVer: TemplateVersionRecord = {
-          ...body.data,
-          invitation_count: 0,
-        };
-        const updatedList = templatesList.map((t) =>
+      const version = { ...result.data, invitation_count: 0 };
+      setTemplatesList((current) =>
+        current.map((t) =>
           t.id === selectedTemplateId
-            ? { ...t, versions: [newVer, ...t.versions] }
+            ? { ...t, versions: [version, ...t.versions] }
             : t,
-        );
-        setTemplatesList(updatedList);
-        setSelectedVersionId(newVer.id);
-        setIsNewVersionModalOpen(false);
-        setActionReason("");
-        return;
-      }
+        ),
+      );
+      setSelectedVersionId(version.id);
+      setIsNewVersionModalOpen(false);
+      setActionReason("");
     } catch {
-      // Local fallback
+      setActionError(
+        "Versi gagal dibuat. Periksa nomor versi dan definisinya.",
+      );
+    } finally {
+      setSaving(false);
     }
-
-    const localVer: TemplateVersionRecord = {
-      id: `ver-${Date.now()}`,
-      templateId: selectedTemplateId!,
-      version: newVersionNumber.trim(),
-      sections: workingSections,
-      theme: workingTheme,
-      customizableThemeKeys: workingCustomizableKeys,
-      changelog: newVersionChangelog.trim() || undefined,
-      status: "draft",
-      createdAt: new Date().toISOString(),
-      invitation_count: 0,
-    };
-
-    const updated = templatesList.map((t) =>
-      t.id === selectedTemplateId
-        ? { ...t, versions: [localVer, ...t.versions] }
-        : t,
-    );
-    setTemplatesList(updated);
-    setSelectedVersionId(localVer.id);
-    setIsNewVersionModalOpen(false);
-    setActionReason("");
   };
 
-  const handlePublishVersion = async () => {
-    if (!selectedTemplate || !selectedVersion) return;
-    if (actionReason.trim().length < 5) {
-      setActionError("Alasan audit wajib diisi minimal 5 karakter.");
+  const handleSaveVersion = async () => {
+    if (
+      !selectedTemplate ||
+      !selectedVersion ||
+      selectedVersion.status !== "draft" ||
+      saveReason.trim().length < 5
+    )
       return;
-    }
-
+    setSaving(true);
+    setSaveMessage("");
     try {
-      await fetch(
-        `/api/v1/admin/templates/${selectedTemplate.id}/versions/${selectedVersion.id}/publish`,
+      const result = await client.patch<TemplateVersionRecord>(
+        "/api/v1/admin/templates/" +
+          selectedTemplate.id +
+          "/versions/" +
+          selectedVersion.id,
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reason: actionReason.trim() }),
+          sections: workingSections,
+          theme: workingTheme,
+          customizable_theme_keys: workingCustomizableKeys,
+          reason: saveReason.trim(),
         },
       );
-    } catch {
-      // Local state fallback
-    }
-
-    const updated = templatesList.map((t) => {
-      if (t.id !== selectedTemplate.id) return t;
-      return {
-        ...t,
-        status: "published" as const,
-        versions: t.versions.map((v) =>
-          v.id === selectedVersion.id
+      setTemplatesList((current) =>
+        current.map((t) =>
+          t.id === selectedTemplate.id
             ? {
-                ...v,
-                status: "published" as const,
-                releasedAt: new Date().toISOString(),
+                ...t,
+                versions: t.versions.map((v) =>
+                  v.id === selectedVersion.id
+                    ? { ...result.data, invitation_count: v.invitation_count }
+                    : v,
+                ),
               }
-            : v,
+            : t,
         ),
-      };
-    });
-    setTemplatesList(updated);
-    setIsPublishModalOpen(false);
-    setActionReason("");
+      );
+      setSaveMessage("Draf versi tersimpan.");
+    } catch {
+      setSaveMessage("Draf gagal disimpan. Perubahan lokal belum tersimpan.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDeprecateVersion = async () => {
+  const changeVersionStatus = async (action: "publish" | "deprecate") => {
     if (!selectedTemplate || !selectedVersion) return;
     if (actionReason.trim().length < 5) {
       setActionError("Alasan audit wajib diisi minimal 5 karakter.");
       return;
     }
-
+    setSaving(true);
+    setActionError(null);
     try {
-      await fetch(
-        `/api/v1/admin/templates/${selectedTemplate.id}/versions/${selectedVersion.id}/deprecate`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reason: actionReason.trim() }),
-        },
+      await client.post(
+        "/api/v1/admin/templates/" +
+          selectedTemplate.id +
+          "/versions/" +
+          selectedVersion.id +
+          "/" +
+          action,
+        { reason: actionReason.trim() },
       );
+      const result = await client.get<TemplateRecord>(
+        "/api/v1/admin/templates/" + selectedTemplate.id,
+      );
+      setTemplatesList((current) =>
+        current.map((t) => (t.id === result.data.id ? result.data : t)),
+      );
+      setIsPublishModalOpen(false);
+      setIsDeprecateModalOpen(false);
+      setActionReason("");
     } catch {
-      // Local state fallback
+      setActionError(
+        "Status versi gagal diperbarui. Periksa kondisi versi lalu coba lagi.",
+      );
+    } finally {
+      setSaving(false);
     }
-
-    const updated = templatesList.map((t) => {
-      if (t.id !== selectedTemplate.id) return t;
-      return {
-        ...t,
-        versions: t.versions.map((v) =>
-          v.id === selectedVersion.id
-            ? { ...v, status: "deprecated" as const }
-            : v,
-        ),
-      };
-    });
-    setTemplatesList(updated);
-    setIsDeprecateModalOpen(false);
-    setActionReason("");
   };
+  const handlePublishVersion = () => changeVersionStatus("publish");
+  const handleDeprecateVersion = () => changeVersionStatus("deprecate");
 
   const isSelectedVersionImmutable =
     selectedVersion?.status === "published" ||
     selectedVersion?.status === "deprecated";
+
+  if (loading) return <p role="status">Memuat katalog templat…</p>;
+  if (loadError)
+    return (
+      <div role="alert">
+        <p>Katalog templat gagal dimuat.</p>
+        <Button onClick={() => setReload((value) => value + 1)}>
+          Coba lagi
+        </Button>
+      </div>
+    );
 
   // Catalog View
   if (!selectedTemplate) {
@@ -510,7 +395,8 @@ export function TemplatesPage() {
           <div>
             <h1 className="text-display font-bold">Katalog Templat</h1>
             <p className="mt-1 text-body text-text-muted">
-              Manajemen templat data-driven, skema versi JSONB, dan rilis tanpa deploy
+              Manajemen templat data-driven, skema versi JSONB, dan rilis tanpa
+              deploy
             </p>
           </div>
           <Button
@@ -558,6 +444,9 @@ export function TemplatesPage() {
           </div>
         </div>
 
+        {filteredTemplates.length === 0 && (
+          <p>Belum ada templat yang sesuai.</p>
+        )}
         {/* Templates Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredTemplates.map((tpl) => (
@@ -592,7 +481,9 @@ export function TemplatesPage() {
 
               <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                 <div>
-                  <h3 className="font-bold text-body-lg text-text">{tpl.name}</h3>
+                  <h3 className="font-bold text-body-lg text-text">
+                    {tpl.name}
+                  </h3>
                   <p className="text-body-xs font-mono text-text-muted mt-0.5">
                     slug: {tpl.slug}
                   </p>
@@ -681,7 +572,10 @@ export function TemplatesPage() {
                   onChange={(e) => setNewTplIsPremium(e.target.checked)}
                   className="rounded border-border"
                 />
-                <label htmlFor="newTplIsPremium" className="text-sm font-medium">
+                <label
+                  htmlFor="newTplIsPremium"
+                  className="text-sm font-medium"
+                >
                   Templat Berbayar / Premium
                 </label>
               </div>
@@ -711,7 +605,11 @@ export function TemplatesPage() {
                 >
                   Batal
                 </Button>
-                <Button variant="primary" onClick={handleCreateTemplate}>
+                <Button
+                  variant="primary"
+                  onClick={handleCreateTemplate}
+                  disabled={saving}
+                >
                   Buat Templat
                 </Button>
               </div>
@@ -859,6 +757,23 @@ export function TemplatesPage() {
         </div>
       )}
 
+      {selectedVersion?.status === "draft" && (
+        <Card>
+          <Input
+            label="Alasan penyimpanan draf"
+            value={saveReason}
+            onChange={(event) => setSaveReason(event.target.value)}
+            maxLength={500}
+          />
+          <Button
+            onClick={handleSaveVersion}
+            disabled={saving || saveReason.trim().length < 5}
+          >
+            Simpan Draf Versi
+          </Button>
+          {saveMessage && <p role="status">{saveMessage}</p>}
+        </Card>
+      )}
       {/* Editor Tabs */}
       <div className="border-b border-border flex gap-4">
         <button
@@ -980,7 +895,11 @@ export function TemplatesPage() {
               >
                 Batal
               </Button>
-              <Button variant="primary" onClick={handlePublishVersion}>
+              <Button
+                variant="primary"
+                disabled={saving}
+                onClick={handlePublishVersion}
+              >
                 Ya, Publikasikan Sekarang
               </Button>
             </div>
@@ -1017,7 +936,8 @@ export function TemplatesPage() {
               <p className="text-xs text-red-800">
                 Sesuai aturan BR-3.3, undangan yang sudah ada akan tetap dapat
                 dirender dengan baik, namun versi ini akan dihapus dari katalog
-                publik dan tidak dapat dipilih lagi untuk pembuatan undangan baru.
+                publik dan tidak dapat dipilih lagi untuk pembuatan undangan
+                baru.
               </p>
             </div>
 
@@ -1037,7 +957,11 @@ export function TemplatesPage() {
               >
                 Batal
               </Button>
-              <Button variant="danger" onClick={handleDeprecateVersion}>
+              <Button
+                variant="danger"
+                disabled={saving}
+                onClick={handleDeprecateVersion}
+              >
                 Konfirmasi Depresiasi
               </Button>
             </div>
@@ -1094,7 +1018,11 @@ export function TemplatesPage() {
               >
                 Batal
               </Button>
-              <Button variant="primary" onClick={handleCreateVersion}>
+              <Button
+                variant="primary"
+                onClick={handleCreateVersion}
+                disabled={saving}
+              >
                 Buat Versi Draf
               </Button>
             </div>

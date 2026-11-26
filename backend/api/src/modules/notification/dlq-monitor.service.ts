@@ -41,8 +41,14 @@ export class DlqMonitorService {
     const dlq = new Queue("dead-letter", { connection });
 
     try {
-      const counts = await dlq.getJobCounts("wait", "delayed", "failed", "completed");
-      const totalDeadLettered = (counts.wait ?? 0) + (counts.delayed ?? 0) + (counts.failed ?? 0);
+      const counts = await dlq.getJobCounts(
+        "wait",
+        "delayed",
+        "failed",
+        "completed",
+      );
+      const totalDeadLettered =
+        (counts.wait ?? 0) + (counts.delayed ?? 0) + (counts.failed ?? 0);
 
       const jobs = await dlq.getJobs(["wait", "delayed", "failed"], 0, 50);
       let criticalFailuresFound = 0;

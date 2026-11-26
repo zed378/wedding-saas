@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@wi/ui/src/testing/setup.js";
@@ -46,10 +46,7 @@ describe("PublishSuccessModal", () => {
     );
 
     const waLink = await screen.findByRole("link", { name: /whatsapp/i });
-    expect(waLink).toHaveAttribute(
-      "href",
-      expect.stringContaining("wa.me"),
-    );
+    expect(waLink).toHaveAttribute("href", expect.stringContaining("wa.me"));
     expect(waLink).toHaveAttribute(
       "href",
       expect.stringContaining(encodeURIComponent(PUBLIC_URL)),
@@ -78,7 +75,9 @@ describe("PublishSuccessModal", () => {
       <PublishSuccessModal publicUrl={PUBLIC_URL} open onClose={vi.fn()} />,
     );
 
-    await userEvent.click(await screen.findByRole("button", { name: /salin/i }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: /salin/i }),
+    );
 
     expect(writeText).toHaveBeenCalledWith(PUBLIC_URL);
   });
@@ -93,16 +92,24 @@ describe("PublishSuccessModal", () => {
       <PublishSuccessModal publicUrl={PUBLIC_URL} open onClose={vi.fn()} />,
     );
 
-    await userEvent.click(await screen.findByRole("button", { name: /salin/i }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: /salin/i }),
+    );
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /tersalin/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /tersalin/i }),
+      ).toBeInTheDocument();
     });
   });
 
   it("does not render when open=false", () => {
     const { container } = render(
-      <PublishSuccessModal publicUrl={PUBLIC_URL} open={false} onClose={vi.fn()} />,
+      <PublishSuccessModal
+        publicUrl={PUBLIC_URL}
+        open={false}
+        onClose={vi.fn()}
+      />,
     );
 
     // dialog element is rendered but closed (not open attribute).

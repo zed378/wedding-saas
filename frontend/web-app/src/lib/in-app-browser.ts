@@ -15,7 +15,11 @@
 /** `true` if the current environment looks like a social-media in-app browser. */
 export function isInAppBrowser(): boolean {
   if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent || ("vendor" in navigator ? (navigator as { vendor?: string }).vendor ?? "" : "");
+  const ua =
+    navigator.userAgent ||
+    ("vendor" in navigator
+      ? ((navigator as { vendor?: string }).vendor ?? "")
+      : "");
   return /FBAN|FBAV|Instagram|Line\//.test(ua);
 }
 

@@ -87,18 +87,26 @@ export function loadWorkerEnv(
   // `media` processes files; `cron` runs the staging sweep, which also needs both.
   const needsMedia = pool === "media" || pool === "cron";
 
-  const databaseUrl = needsMedia ? required("DATABASE_URL") : (source["DATABASE_URL"] ?? "");
-  const endpoint = needsMedia ? required("STORAGE_ENDPOINT") : (source["STORAGE_ENDPOINT"] ?? "");
-  const accessKeyId = needsMedia ? required("STORAGE_ACCESS_KEY_ID") : (source["STORAGE_ACCESS_KEY_ID"] ?? "");
+  const databaseUrl = needsMedia
+    ? required("DATABASE_URL")
+    : (source["DATABASE_URL"] ?? "");
+  const endpoint = needsMedia
+    ? required("STORAGE_ENDPOINT")
+    : (source["STORAGE_ENDPOINT"] ?? "");
+  const accessKeyId = needsMedia
+    ? required("STORAGE_ACCESS_KEY_ID")
+    : (source["STORAGE_ACCESS_KEY_ID"] ?? "");
   const secretAccessKey = needsMedia
     ? required("STORAGE_SECRET_ACCESS_KEY")
     : (source["STORAGE_SECRET_ACCESS_KEY"] ?? "");
 
   const appOrigin = source["APP_ORIGIN"] ?? "http://localhost:3100";
-  const publicInviteOrigin = source["PUBLIC_INVITE_ORIGIN"] ?? "http://localhost:3200";
+  const publicInviteOrigin =
+    source["PUBLIC_INVITE_ORIGIN"] ?? "http://localhost:3200";
 
   const resendApiKey = source["RESEND_API_KEY"];
-  const emailFrom = source["EMAIL_FROM"] ?? "Momen Bahagia <halo@momenbahagia.id>";
+  const emailFrom =
+    source["EMAIL_FROM"] ?? "Momen Bahagia <halo@momenbahagia.id>";
 
   /**
    * The scanner, and the one place this file makes a security decision.
@@ -146,7 +154,8 @@ export function loadWorkerEnv(
     appOrigin,
     publicInviteOrigin,
     email: {
-      resendApiKey: resendApiKey && resendApiKey.length > 0 ? resendApiKey : undefined,
+      resendApiKey:
+        resendApiKey && resendApiKey.length > 0 ? resendApiKey : undefined,
       from: emailFrom,
     },
     storage: {

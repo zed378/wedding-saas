@@ -1,4 +1,4 @@
-import { Global, Module, Inject } from "@nestjs/common";
+import { Global, Module } from "@nestjs/common";
 import { S3Storage, InMemoryStorage, type StoragePort } from "@wi/storage";
 
 import { ENV } from "../../config/config.module";

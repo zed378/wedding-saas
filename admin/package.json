@@ -7,7 +7,7 @@
     "build": "tsc --noEmit -p tsconfig.json && vite build",
     "dev": "vite --port 3300",
     "preview": "vite preview --port 3300",
-    "lint": "echo \"[P0-17] lint not wired yet\"",
+    "lint": "oxlint --deny-warnings .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run"
   },
@@ -16,21 +16,21 @@
     "@wi/schema": "workspace:*",
     "@wi/template-renderer": "workspace:*",
     "@wi/ui": "workspace:*",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.3",
-    "@testing-library/jest-dom": "^6.9.1",
+    "@tailwindcss/vite": "^4.3.5",
+    "@testing-library/jest-dom": "^6.10.0",
     "@testing-library/react": "^16.3.3",
-    "@types/node": "^22.20.1",
-    "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.1.1",
-    "jsdom": "^30.0.1",
-    "tailwindcss": "^4.3.3",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.1",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "jsdom": "^30.1.3",
+    "tailwindcss": "^4.3.5",
     "typescript": "^7.0.2",
-    "vite": "^8.2.2",
-    "vitest": "^5.0.0"
+    "vite": "^8.3.8",
+    "vitest": "^5.1.1"
   }
 }

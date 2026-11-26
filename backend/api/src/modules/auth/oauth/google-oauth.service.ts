@@ -11,7 +11,7 @@ import { logSecurityEvent, logger } from "../../../shared/logging/logger";
 import {
   InvalidCredentialsError,
   LoginService,
-  type Session,
+  type LoginResult,
 } from "../login.service";
 import {
   GOOGLE_TOKEN_VERIFIER,
@@ -55,7 +55,7 @@ import {
 export type OAuthOutcome = "registered" | "matched" | "linked";
 
 export interface OAuthResult {
-  readonly session: Session;
+  readonly session: LoginResult;
   readonly outcome: OAuthOutcome;
 }
 
@@ -172,7 +172,7 @@ export class GoogleOAuthService {
     );
 
     return {
-      session: await this.logins.issueSession({
+      session: await this.logins.issueLogin({
         id: row.id,
         email: row.email,
         fullName: row.fullName,

@@ -6,7 +6,8 @@ import { UnauthorizedPage } from "../pages/UnauthorizedPage.js";
 import { AdminLayout } from "../components/AdminLayout.js";
 
 export function RequireAdmin({ children }: { children: ReactNode }) {
-  const { isLoading, isAuthenticated, isAdmin, isUnauthorized } = useAdminAuth();
+  const { isLoading, isAuthenticated, isAdmin, isUnauthorized } =
+    useAdminAuth();
 
   if (isLoading) {
     return (
@@ -17,7 +18,9 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
       >
         <div className="flex flex-col items-center gap-3">
           <Spinner />
-          <p className="text-body text-text-muted">Memverifikasi sesi administrator...</p>
+          <p className="text-body text-text-muted">
+            Memverifikasi sesi administrator...
+          </p>
         </div>
       </div>
     );

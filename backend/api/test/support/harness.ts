@@ -112,6 +112,24 @@ export async function startHarness(
   const pool = new Pool({ connectionString: databaseUrl, max: 5 });
   const db = drizzle(pool, { schema });
 
+  // A fresh container lacks the application role required by migration 0006.
+  // Never alter roles on an externally supplied database.
+  if (pgContainer !== undefined) {
+    await pool.query(
+      "CREATE ROLE wedding_app LOGIN PASSWORD 'wedding_app_dev' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS",
+    );
+    // Mirror deploy/postgres/init/01-app-role.sh before creating tables. Later
+    // migrations revoke sensitive writes; a blanket grant afterwards defeats them.
+    await pool.query("GRANT CONNECT ON DATABASE wedding_test TO wedding_app");
+    await pool.query("GRANT USAGE ON SCHEMA public TO wedding_app");
+    await pool.query(
+      "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO wedding_app",
+    );
+    await pool.query(
+      "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO wedding_app",
+    );
+  }
+
   // Applied every time. A suite running against a schema one migration behind produces
   // failures that look like bugs in the code under test, and the hour is spent in the
   // wrong file.

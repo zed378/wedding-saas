@@ -29,74 +29,61 @@ describe("Admin Invitation Overview API (P5-10)", () => {
         id: INV_1_ID,
         slug: "budi-and-ratna",
         status: "published",
-        ownerId: "owner-1",
-        ownerEmail: "budi@example.com",
-        ownerFullName: "Budi Santoso",
-        templateName: "Elegant Rose",
-        templateVersionString: "v2.1",
-        publishedAt: new Date("2026-09-01T00:00:00Z"),
-        expiryDate: new Date("2027-09-01T00:00:00Z"),
-        createdAt: new Date("2026-08-15T00:00:00Z"),
-        updatedAt: new Date("2026-09-01T00:00:00Z"),
-        latestOrder: {
-          id: "ord-1",
-          packageId: "premium",
-          amountTotal: "249000",
-        },
+        owner_id: USER_ID,
+        owner_email: "budi@example.com",
+        owner_name: "Budi Santoso",
+        template_name: "Elegant Rose",
+        version: "2.1.0",
+        expiry_date: "2027-09-01",
       },
       {
         id: INV_2_ID,
         slug: "siti-and-ahmad",
         status: "draft",
-        ownerId: "owner-2",
-        ownerEmail: "siti@example.com",
-        ownerFullName: "Siti Nurhaliza",
-        templateName: "Minimalist White",
-        templateVersionString: "v1.0",
-        publishedAt: null,
-        expiryDate: null,
-        createdAt: new Date("2026-10-01T00:00:00Z"),
-        updatedAt: new Date("2026-10-01T00:00:00Z"),
-        latestOrder: null,
+        owner_id: USER_ID,
+        owner_email: "siti@example.com",
+        owner_name: "Siti",
+        template_name: "Minimalist",
+        version: "1.0.0",
+        expiry_date: null,
       },
     ],
     meta: { page: 1, per_page: 20, total: 2 },
   };
-
   const mockDetailResult = {
     id: INV_1_ID,
     slug: "budi-and-ratna",
     status: "published",
     owner: {
-      id: "owner-1",
+      id: USER_ID,
       email: "budi@example.com",
-      fullName: "Budi Santoso",
+      full_name: "Budi Santoso",
     },
-    templateVersion: { id: "ver-1" },
-    publishedAt: new Date("2026-09-01T00:00:00Z"),
-    expiryDate: new Date("2027-09-01T00:00:00Z"),
-    createdAt: new Date("2026-08-15T00:00:00Z"),
-    updatedAt: new Date("2026-09-01T00:00:00Z"),
-    latestOrder: {
-      id: "ord-1",
-      packageId: "premium",
-      amountTotal: "249000",
+    template_version: {
+      id: "version-1",
+      name: "Elegant Rose",
+      version: "2.1.0",
     },
-    statusHistory: [
+    published_at: "2026-09-01T00:00:00.000Z",
+    expiry_date: "2027-09-01",
+    order_history: [{ id: "order-1", amount_total: "139000", status: "paid" }],
+    status_history: [
       {
-        fromStatus: "draft",
-        toStatus: "published",
-        changedAt: new Date("2026-09-01T00:00:00Z"),
+        from_status: "draft",
+        to_status: "published",
+        changed_at: "2026-09-01T00:00:00.000Z",
       },
     ],
   };
 
   const mockService = {
     listInvitations: vi.fn(async () => mockListResult),
-    getInvitationById: vi.fn(async (_adminId: string, _reason: string, id: string) => {
-      if (id === INV_1_ID) return mockDetailResult;
-      throw new NotFoundError(`Invitation "${id}" not found.`);
-    }),
+    getInvitationById: vi.fn(
+      async (_adminId: string, _reason: string, id: string) => {
+        if (id === INV_1_ID) return mockDetailResult;
+        throw new NotFoundError(`Invitation "${id}" not found.`);
+      },
+    ),
   };
 
   const mockSessions = {
@@ -106,10 +93,24 @@ describe("Admin Invitation Overview API (P5-10)", () => {
       }
       const token = authHeader.replace("Bearer ", "");
       if (token === "token_admin") {
-        return { id: ADMIN_ID, role: "admin", email: "admin@test.com", fullName: "Admin", status: "active", emailVerified: true };
+        return {
+          id: ADMIN_ID,
+          role: "admin",
+          email: "admin@test.com",
+          fullName: "Admin",
+          status: "active",
+          emailVerified: true,
+        };
       }
       if (token === "token_user") {
-        return { id: USER_ID, role: "user", email: "user@test.com", fullName: "User", status: "active", emailVerified: true };
+        return {
+          id: USER_ID,
+          role: "user",
+          email: "user@test.com",
+          fullName: "User",
+          status: "active",
+          emailVerified: true,
+        };
       }
       throw new UnauthenticatedError();
     }),
@@ -124,9 +125,19 @@ describe("Admin Invitation Overview API (P5-10)", () => {
         { provide: APP_FILTER, useClass: AppExceptionFilter },
         {
           provide: RATE_LIMITER,
-          useValue: { check: vi.fn().mockResolvedValue({ allowed: true, limit: 300, remaining: 299, resetAt: Date.now() + 60000 }) },
+          useValue: {
+            check: vi.fn().mockResolvedValue({
+              allowed: true,
+              limit: 300,
+              remaining: 299,
+              resetAt: Date.now() + 60000,
+            }),
+          },
         },
-        { provide: POLICY_REGISTRY, useValue: new PolicyRegistry() },
+        {
+          provide: POLICY_REGISTRY,
+          useValue: new PolicyRegistry(undefined, undefined),
+        },
       ],
     }).compile();
 
@@ -140,7 +151,9 @@ describe("Admin Invitation Overview API (P5-10)", () => {
 
   describe("GET /api/v1/admin/invitations", () => {
     it("rejects unauthenticated requests with 401", async () => {
-      const res = await request(app.getHttpServer()).get("/api/v1/admin/invitations");
+      const res = await request(app.getHttpServer()).get(
+        "/api/v1/admin/invitations",
+      );
       expect(res.status).toBe(401);
       expect(res.body.error.code).toBe("UNAUTHENTICATED");
     });
@@ -171,6 +184,7 @@ describe("Admin Invitation Overview API (P5-10)", () => {
 
       expect(res.status).toBe(200);
       expect(mockService.listInvitations).toHaveBeenCalledWith(
+        ADMIN_ID,
         expect.objectContaining({ search_slug: "budi" }),
       );
     });
@@ -182,6 +196,7 @@ describe("Admin Invitation Overview API (P5-10)", () => {
 
       expect(res.status).toBe(200);
       expect(mockService.listInvitations).toHaveBeenCalledWith(
+        ADMIN_ID,
         expect.objectContaining({ search_user: "siti" }),
       );
     });
@@ -196,8 +211,8 @@ describe("Admin Invitation Overview API (P5-10)", () => {
       expect(res.status).toBe(200);
       expect(res.body.data.id).toBe(INV_1_ID);
       expect(res.body.data.owner.email).toBe("budi@example.com");
-      expect(res.body.data.latestOrder.amountTotal).toBe("249000");
-      expect(res.body.data.statusHistory).toHaveLength(1);
+      expect(res.body.data.order_history[0].amount_total).toBe("139000");
+      expect(res.body.data.status_history).toHaveLength(1);
       expect(mockService.getInvitationById).toHaveBeenCalledWith(
         ADMIN_ID,
         "Support ticket 123",
@@ -220,7 +235,9 @@ describe("Admin Invitation Overview API (P5-10)", () => {
 
     it("returns 404 for unknown invitation (DoD 1)", async () => {
       const res = await request(app.getHttpServer())
-        .get("/api/v1/admin/invitations/99999999-9999-4999-8999-999999999999?reason=Support+ticket+404")
+        .get(
+          "/api/v1/admin/invitations/99999999-9999-4999-8999-999999999999?reason=Support+ticket+404",
+        )
         .set("Authorization", "Bearer token_admin");
 
       expect(res.status).toBe(404);
@@ -228,8 +245,9 @@ describe("Admin Invitation Overview API (P5-10)", () => {
     });
 
     it("rejects unauthenticated detail request with 401", async () => {
-      const res = await request(app.getHttpServer())
-        .get(`/api/v1/admin/invitations/${INV_1_ID}`);
+      const res = await request(app.getHttpServer()).get(
+        `/api/v1/admin/invitations/${INV_1_ID}`,
+      );
       expect(res.status).toBe(401);
     });
 
@@ -239,5 +257,60 @@ describe("Admin Invitation Overview API (P5-10)", () => {
         .set("Authorization", "Bearer token_user");
       expect(res.status).toBe(403);
     });
+  });
+
+  it("rejects malformed UUIDs before the service or PostgreSQL query", async () => {
+    const before = mockService.getInvitationById.mock.calls.length;
+    const res = await request(app.getHttpServer())
+      .get("/api/v1/admin/invitations/not-a-uuid")
+      .set("Authorization", "Bearer token_admin");
+    expect(res.status).toBe(400);
+    expect(mockService.getInvitationById.mock.calls.length).toBe(before);
+  });
+  it("provides no invitation-content mutation endpoint", async () => {
+    for (const method of ["patch", "post", "delete"] as const) {
+      const res = await request(app.getHttpServer())
+        [method](`/api/v1/admin/invitations/${INV_1_ID}`)
+        .set("Authorization", "Bearer token_admin")
+        .send({ status: "published", owner_id: ADMIN_ID });
+      expect(res.status).toBe(404);
+    }
+  });
+  it("rejects invalid pagination and sanitized-away audit reasons", async () => {
+    expect(
+      (
+        await request(app.getHttpServer())
+          .get("/api/v1/admin/invitations?limit=101")
+          .set("Authorization", "Bearer token_admin")
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app.getHttpServer())
+          .get(`/api/v1/admin/invitations/${INV_1_ID}`)
+          .query({ reason: "<script>alert(1)</script>" })
+          .set("Authorization", "Bearer token_admin")
+      ).status,
+    ).toBe(400);
+  });
+
+  it("rate limits repeated admin enumeration before exposing any invitation", async () => {
+    const limiter = app.get<{ check: ReturnType<typeof vi.fn> }>(RATE_LIMITER);
+    limiter.check.mockResolvedValueOnce({
+      allowed: false,
+      blocked: true,
+      limit: 300,
+      remaining: 0,
+      resetAt: Date.now() + 60000,
+      retryAfterSeconds: 60,
+    });
+    const before = mockService.listInvitations.mock.calls.length;
+    const res = await request(app.getHttpServer())
+      .get("/api/v1/admin/invitations")
+      .set("Authorization", "Bearer token_admin");
+    expect(res.status).toBe(429);
+    expect(res.headers["retry-after"]).toBe("60");
+    expect(mockService.listInvitations.mock.calls.length).toBe(before);
+    expect(JSON.stringify(res.body)).not.toContain("budi@example.com");
   });
 });

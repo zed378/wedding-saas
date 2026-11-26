@@ -33,7 +33,9 @@ export default function GuestbookDashboardPage({
 
   const [state, setState] = useState<PageState>({ kind: "loading" });
   const [entries, setEntries] = useState<readonly GuestbookItem[]>([]);
-  const [summary, setSummary] = useState<GuestbookSummary | undefined>(undefined);
+  const [summary, setSummary] = useState<GuestbookSummary | undefined>(
+    undefined,
+  );
   const [filter, setFilter] = useState<GuestbookStatus | "all">("pending");
   const [page, setPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
@@ -105,7 +107,8 @@ export default function GuestbookDashboardPage({
           Moderasi Buku Tamu
         </h1>
         <p className="mt-2 text-sm text-text-muted">
-          Kelola doa dan ucapan dari para tamu undangan sebelum ditampilkan ke publik.
+          Kelola doa dan ucapan dari para tamu undangan sebelum ditampilkan ke
+          publik.
         </p>
       </header>
 

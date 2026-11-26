@@ -1,0 +1,103 @@
+rules:
+  - id: dynamic-code-execution
+    message: Do not execute strings as JavaScript; use structured data and explicit dispatch.
+    languages: [javascript, typescript]
+    severity: ERROR
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+      - pattern: Function(...)
+
+  - id: shell-command-string
+    message: Use execFile/spawn with a fixed executable and separate argument array instead of a shell command string.
+    languages: [javascript, typescript]
+    severity: ERROR
+    pattern-either:
+      - pattern: import { ..., exec as $EXEC, ... } from "node:child_process";
+      - pattern: import { ..., execSync as $EXEC, ... } from "node:child_process";
+      - pattern: import { ..., exec as $EXEC, ... } from "child_process";
+      - pattern: import { ..., execSync as $EXEC, ... } from "child_process";
+      - pattern: require("child_process").exec(...)
+      - pattern: require("node:child_process").exec(...)
+      - pattern: require("child_process").execSync(...)
+      - pattern: require("node:child_process").execSync(...)
+      - patterns:
+          - pattern-inside: |
+              import * as $CP from "node:child_process";
+              ...
+          - pattern-either:
+              - pattern: $CP.exec(...)
+              - pattern: $CP.execSync(...)
+      - patterns:
+          - pattern-inside: |
+              import $CP from "node:child_process";
+              ...
+          - pattern-either:
+              - pattern: $CP.exec(...)
+              - pattern: $CP.execSync(...)
+
+  - id: disabled-tls-verification
+    message: TLS certificate verification must remain enabled.
+    languages: [javascript, typescript]
+    severity: ERROR
+    pattern-either:
+      - pattern: "{..., rejectUnauthorized: false, ...}"
+      - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
+      - pattern: process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0"
+
+  - id: unsigned-jwt
+    message: Do not permit unsigned JWTs; verify tokens with an explicit signed algorithm.
+    languages: [javascript, typescript]
+    severity: ERROR
+    pattern-either:
+      - pattern: "{..., algorithms: [..., 'none', ...], ...}"
+      - pattern: "{..., algorithm: 'none', ...}"
+
+  - id: weak-md5-digest
+    message: MD5 is unsuitable for security decisions; use SHA-256 or an appropriate password KDF.
+    languages: [javascript, typescript]
+    severity: ERROR
+    pattern-either:
+      - pattern: createHash("md5", ...)
+      - pattern: $CRYPTO.createHash("md5", ...)
+
+  - id: request-data-to-raw-sql
+    message: Bind request values as SQL parameters instead of interpolating them into raw SQL.
+    languages: [javascript, typescript]
+    severity: ERROR
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQ.body
+          - pattern: $REQ.query
+          - pattern: $REQ.params
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: sql.raw($DATA)
+              - pattern: $DB.query($DATA, ...)
+              - pattern: $DB.execute($DATA, ...)
+          - focus-metavariable: $DATA
+
+  - id: request-data-to-dom-html
+    message: Render request data as text; raw HTML requires an explicitly reviewed sanitizer.
+    languages: [javascript, typescript]
+    severity: ERROR
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQ.body
+          - pattern: $REQ.query
+          - pattern: $REQ.params
+          - pattern: location.search
+          - pattern: window.location.search
+          - pattern: location.hash
+          - pattern: window.location.hash
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $EL.innerHTML = $DATA
+              - pattern: $EL.outerHTML = $DATA
+              - pattern: document.write($DATA)
+              - pattern: "{__html: $DATA}"
+          - focus-metavariable: $DATA

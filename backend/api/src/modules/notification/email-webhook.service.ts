@@ -1,12 +1,12 @@
 import { Inject, Injectable, BadRequestException } from "@nestjs/common";
-import { sql } from "drizzle-orm";
 
 import { DB, type Database } from "../../infra/db/client";
 import { emailBounces } from "../../infra/db/schema/users";
 import { logger } from "../../shared/logging/logger";
 import { metrics } from "../../shared/metrics/metrics";
 
-export type NormalizedBounceType = "hard_bounce" | "soft_bounce" | "complaint" | "delivered" | "other";
+export type NormalizedBounceType =
+  "hard_bounce" | "soft_bounce" | "complaint" | "delivered" | "other";
 
 export interface EmailWebhookResult {
   readonly received: boolean;
@@ -40,7 +40,9 @@ export class EmailWebhookService {
 
     // Parse event type and email from provider payload
     const rawType = String(p["type"] ?? p["event"] ?? "").toLowerCase();
-    const dataObj = (p["data"] && typeof p["data"] === "object" ? p["data"] : p) as Record<string, unknown>;
+    const dataObj = (
+      p["data"] && typeof p["data"] === "object" ? p["data"] : p
+    ) as Record<string, unknown>;
 
     let email = "";
     if (typeof dataObj["to"] === "string") {
@@ -71,17 +73,19 @@ export class EmailWebhookService {
       bounceType = "delivered";
     }
 
-    const providerEmailId = typeof dataObj["email_id"] === "string"
-      ? dataObj["email_id"]
-      : typeof dataObj["id"] === "string"
-        ? dataObj["id"]
-        : undefined;
+    const providerEmailId =
+      typeof dataObj["email_id"] === "string"
+        ? dataObj["email_id"]
+        : typeof dataObj["id"] === "string"
+          ? dataObj["id"]
+          : undefined;
 
-    const message = typeof dataObj["message"] === "string"
-      ? dataObj["message"]
-      : typeof (dataObj["bounce"] as any)?.message === "string"
-        ? (dataObj["bounce"] as any).message
-        : undefined;
+    const message =
+      typeof dataObj["message"] === "string"
+        ? dataObj["message"]
+        : typeof (dataObj["bounce"] as any)?.message === "string"
+          ? (dataObj["bounce"] as any).message
+          : undefined;
 
     // Track delivery and bounce metrics
     metrics.emailBounces.inc({
@@ -89,7 +93,8 @@ export class EmailWebhookService {
       type: bounceType,
     });
 
-    const isSuppressed = bounceType === "hard_bounce" || bounceType === "complaint";
+    const isSuppressed =
+      bounceType === "hard_bounce" || bounceType === "complaint";
 
     if (isSuppressed && email) {
       await this.db

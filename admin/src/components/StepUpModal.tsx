@@ -39,6 +39,7 @@ export function StepUpModal({
     setIsLoading(true);
 
     try {
+      if (!token) throw new Error("Sesi admin tidak tersedia. Masuk kembali.");
       const payload = useRecovery
         ? { recovery_code: recoveryCode.trim() }
         : { code: code.trim() };
@@ -54,20 +55,16 @@ export function StepUpModal({
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data?.error?.message ?? "Verifikasi autentikasi ulang gagal.");
+        throw new Error(
+          data?.error?.message ?? "Verifikasi autentikasi ulang gagal.",
+        );
       }
 
-      const stepUpToken = data.data.step_up_token;
+      const stepUpToken = data.data?.step_up_token;
+      if (!stepUpToken) throw new Error("Verifikasi autentikasi ulang gagal.");
       onSuccess(stepUpToken);
       onClose();
     } catch (err: unknown) {
-      // In mock/test environment without backend connection, allow mock step-up token
-      if (!token) {
-        const mockStepUp = `step_up_token_${Date.now()}`;
-        onSuccess(mockStepUp);
-        onClose();
-        return;
-      }
       setError(err instanceof Error ? err.message : "Verifikasi kode gagal.");
     } finally {
       setIsLoading(false);
@@ -94,7 +91,12 @@ export function StepUpModal({
             {useRecovery ? "Gunakan Authenticator" : "Gunakan Kode Pemulihan"}
           </button>
           <div className="flex gap-2">
-            <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onClose}
+              disabled={isLoading}
+            >
               Batal
             </Button>
             <Button
@@ -109,7 +111,11 @@ export function StepUpModal({
         </div>
       }
     >
-      <form id="step-up-form" onSubmit={handleSubmit} className="flex flex-col gap-4 py-2">
+      <form
+        id="step-up-form"
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-4 py-2"
+      >
         {error && (
           <div
             role="alert"

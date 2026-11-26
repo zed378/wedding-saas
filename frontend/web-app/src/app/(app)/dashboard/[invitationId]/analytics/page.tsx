@@ -56,7 +56,10 @@ export default function AnalyticsDashboardPage({
       <nav aria-label="Breadcrumb" className="mb-4 text-sm text-text-muted">
         <ol className="flex items-center space-x-2">
           <li>
-            <Link href="/dashboard" className="hover:text-text underline focus-ring rounded">
+            <Link
+              href="/dashboard"
+              className="hover:text-text underline focus-ring rounded"
+            >
               Dasbor
             </Link>
           </li>
@@ -117,7 +120,10 @@ export default function AnalyticsDashboardPage({
             className="rounded-xl border border-border bg-surface-raised p-6 shadow-xs"
           >
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 id="views-heading" className="text-lg font-semibold text-text">
+              <h2
+                id="views-heading"
+                className="text-lg font-semibold text-text"
+              >
                 Buka Halaman
               </h2>
               <span className="text-xs font-medium text-text-muted">
@@ -129,16 +135,20 @@ export default function AnalyticsDashboardPage({
               <span className="text-4xl font-extrabold tracking-tight text-text">
                 {state.data.views.total}
               </span>
-              <span className="text-sm font-medium text-text-muted">kali dibuka</span>
+              <span className="text-sm font-medium text-text-muted">
+                kali dibuka
+              </span>
             </div>
 
             {/* Honest labeling note per DoD */}
             <div className="mt-3 rounded-md bg-surface-sunken p-3 text-xs text-text-muted">
               <p className="font-medium text-text">Catatan Kejujuran Metrik:</p>
               <p className="mt-0.5">
-                Angka di atas adalah <strong>total berapa kali halaman dibuka</strong>, bukan
-                jumlah orang atau tamu unik. Platform kami menjaga privasi tanpa menyimpan IP,
-                cookie pengenal, atau data pribadi pengunjung pasif.
+                Angka di atas adalah{" "}
+                <strong>total berapa kali halaman dibuka</strong>, bukan jumlah
+                orang atau tamu unik. Platform kami menjaga privasi tanpa
+                menyimpan IP, cookie pengenal, atau data pribadi pengunjung
+                pasif.
               </p>
             </div>
 
@@ -149,7 +159,9 @@ export default function AnalyticsDashboardPage({
               </h3>
 
               {state.data.views.daily.length === 0 ? (
-                <p className="mt-2 text-sm text-text-muted">Belum ada kunjungan tercatat.</p>
+                <p className="mt-2 text-sm text-text-muted">
+                  Belum ada kunjungan tercatat.
+                </p>
               ) : (
                 <ul className="mt-3 space-y-2">
                   {state.data.views.daily.slice(0, 14).map((entry) => {
@@ -157,10 +169,16 @@ export default function AnalyticsDashboardPage({
                       1,
                       ...state.data.views.daily.map((d) => d.count),
                     );
-                    const percent = Math.min(100, Math.round((entry.count / maxCount) * 100));
+                    const percent = Math.min(
+                      100,
+                      Math.round((entry.count / maxCount) * 100),
+                    );
 
                     return (
-                      <li key={entry.date} className="flex items-center gap-3 text-sm">
+                      <li
+                        key={entry.date}
+                        className="flex items-center gap-3 text-sm"
+                      >
                         <span className="w-24 shrink-0 font-mono text-xs text-text-muted">
                           {entry.date}
                         </span>
@@ -200,21 +218,27 @@ export default function AnalyticsDashboardPage({
 
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-lg border border-border bg-surface-sunken p-3">
-                <span className="block text-xs font-medium text-text-muted">Hadir</span>
+                <span className="block text-xs font-medium text-text-muted">
+                  Hadir
+                </span>
                 <span className="mt-1 block text-2xl font-bold text-success-700">
                   {state.data.rsvps.attending}
                 </span>
               </div>
 
               <div className="rounded-lg border border-border bg-surface-sunken p-3">
-                <span className="block text-xs font-medium text-text-muted">Tidak Hadir</span>
+                <span className="block text-xs font-medium text-text-muted">
+                  Tidak Hadir
+                </span>
                 <span className="mt-1 block text-2xl font-bold text-text-muted">
                   {state.data.rsvps.not_attending}
                 </span>
               </div>
 
               <div className="rounded-lg border border-border bg-surface-sunken p-3">
-                <span className="block text-xs font-medium text-text-muted">Ragu-ragu</span>
+                <span className="block text-xs font-medium text-text-muted">
+                  Ragu-ragu
+                </span>
                 <span className="mt-1 block text-2xl font-bold text-warning-700">
                   {state.data.rsvps.maybe}
                 </span>
@@ -237,7 +261,10 @@ export default function AnalyticsDashboardPage({
             className="rounded-xl border border-border bg-surface-raised p-6 shadow-xs"
           >
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 id="guestbook-heading" className="text-lg font-semibold text-text">
+              <h2
+                id="guestbook-heading"
+                className="text-lg font-semibold text-text"
+              >
                 Buku Tamu & Ucapan
               </h2>
               <span className="text-sm font-medium text-text-muted">
@@ -247,7 +274,9 @@ export default function AnalyticsDashboardPage({
 
             <div className="mt-4 grid grid-cols-3 gap-3">
               <div className="rounded-lg border border-border bg-surface-sunken p-3">
-                <span className="block text-xs font-medium text-text-muted">Disetujui</span>
+                <span className="block text-xs font-medium text-text-muted">
+                  Disetujui
+                </span>
                 <span className="mt-1 block text-2xl font-bold text-success-700">
                   {state.data.guestbook.approved}
                 </span>
@@ -263,7 +292,9 @@ export default function AnalyticsDashboardPage({
               </div>
 
               <div className="rounded-lg border border-border bg-surface-sunken p-3">
-                <span className="block text-xs font-medium text-text-muted">Ditolak</span>
+                <span className="block text-xs font-medium text-text-muted">
+                  Ditolak
+                </span>
                 <span className="mt-1 block text-2xl font-bold text-danger-700">
                   {state.data.guestbook.rejected}
                 </span>

@@ -43,9 +43,7 @@ type PageState =
 export default function CheckoutPage({
   params,
 }: {
-  readonly params:
-    | Promise<{ invitationId: string }>
-    | { invitationId: string };
+  readonly params: Promise<{ invitationId: string }> | { invitationId: string };
 }) {
   const { invitationId } = "then" in params ? use(params) : params;
   const { api } = useAuth();
@@ -110,13 +108,18 @@ export default function CheckoutPage({
             <p className="text-sm text-text-muted">Aktif selama 12 bulan</p>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-bold text-text">{STANDARD_PRICE_LABEL}</p>
+            <p className="text-2xl font-bold text-text">
+              {STANDARD_PRICE_LABEL}
+            </p>
           </div>
         </div>
 
         <ul className="mb-6 flex flex-col gap-2">
           {FEATURES.map((feature) => (
-            <li key={feature} className="flex items-center gap-2 text-sm text-text">
+            <li
+              key={feature}
+              className="flex items-center gap-2 text-sm text-text"
+            >
               <span aria-hidden="true" className="text-success-600">
                 ✓
               </span>
@@ -129,11 +132,15 @@ export default function CheckoutPage({
           <p className="text-sm text-text-muted">Ringkasan pembayaran</p>
           <div className="mt-2 flex justify-between text-sm">
             <span className="text-text">Paket Standard × 1</span>
-            <span className="font-medium text-text">{STANDARD_PRICE_LABEL}</span>
+            <span className="font-medium text-text">
+              {STANDARD_PRICE_LABEL}
+            </span>
           </div>
           <div className="mt-2 flex justify-between border-t border-border pt-2 text-sm">
             <span className="font-semibold text-text">Total</span>
-            <span className="font-semibold text-text">{STANDARD_PRICE_LABEL}</span>
+            <span className="font-semibold text-text">
+              {STANDARD_PRICE_LABEL}
+            </span>
           </div>
         </div>
 

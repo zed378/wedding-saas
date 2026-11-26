@@ -1,171 +1,247 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import {
+  cleanup,
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from "@testing-library/react";
+import { accessTokenStore } from "@wi/api-client";
 import { OrdersPage } from "./OrdersPage.js";
 
-describe("Admin Order and Payment Management UI (P5-07)", () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("renders orders list with initial mock orders", () => {
-    render(<OrdersPage />);
-    expect(screen.getByText("Pesanan & Pembayaran")).toBeDefined();
-    expect(screen.getByText("Budi Santoso")).toBeDefined();
-    expect(screen.getByText("Siti Nurhaliza")).toBeDefined();
-    expect(screen.getByText("Andi Pratama")).toBeDefined();
-  });
-
-  it("filters orders by search query (user email, name, or slug)", async () => {
-    render(<OrdersPage />);
-    const searchInput = screen.getByLabelText(/Cari Pesanan/i);
-
-    fireEvent.change(searchInput, { target: { value: "siti" } });
-
-    await waitFor(() => {
-      expect(screen.getByText("Siti Nurhaliza")).toBeDefined();
-      expect(screen.queryByText("Budi Santoso")).toBeNull();
-      expect(screen.queryByText("Andi Pratama")).toBeNull();
-    });
-  });
-
-  it("filters orders by payment status", async () => {
-    render(<OrdersPage />);
-    const statusSelect = screen.getByLabelText(/Status Pembayaran/i);
-
-    fireEvent.change(statusSelect, { target: { value: "failed" } });
-
-    await waitFor(() => {
-      expect(screen.getByText("Andi Pratama")).toBeDefined();
-      expect(screen.queryByText("Budi Santoso")).toBeNull();
-      expect(screen.queryByText("Siti Nurhaliza")).toBeNull();
-    });
-  });
-
-  it("opens order detail modal showing customer, payment attempts, and timeline", async () => {
-    render(<OrdersPage />);
-
-    // Click "Detail" on Budi's order
-    const detailBtn = screen.getByRole("button", {
-      name: /Lihat detail pesanan 33333333-3333-4333-8333-333333333331/i,
-    });
-    fireEvent.click(detailBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText("Detail Transaksi Pesanan & Pembayaran")).toBeDefined();
-      expect(screen.getByText("Upaya Pembayaran (Gateway Attempts)")).toBeDefined();
-      expect(screen.getByText("Linimasa Notifikasi Webhook & Query")).toBeDefined();
-      expect(screen.getByText("Faktur Pembayaran (Invoice)")).toBeDefined();
-      expect(screen.getByText("INV-20260110-33333333")).toBeDefined();
-    });
-  });
-
-  it("surfaces prominent fraud alert banner when signature mismatch is present in timeline", async () => {
-    render(<OrdersPage />);
-
-    const detailBtn = screen.getByRole("button", {
-      name: /Lihat detail pesanan 33333333-3333-4333-8333-333333333331/i,
-    });
-    fireEvent.click(detailBtn);
-
-    await waitFor(() => {
-      const banner = screen.getByTestId("fraud-alert-banner");
-      expect(banner).toBeDefined();
-      expect(
-        screen.getByText(/Peringatan Keamanan: Percobaan Manipulasi Callback Terdeteksi/i),
-      ).toBeDefined();
-      expect(
-        screen.getByText(/Terdeteksi ketidakcocokan tanda tangan \(Signature Mismatch\)/i),
-      ).toBeDefined();
-    });
-  });
-
-  describe("Manual Refund UI Flow (P5-08)", () => {
-    it("opens refund modal displaying ADR-019 entitlement revocation and manual money movement warnings", async () => {
-      render(<OrdersPage />);
-
-      // Paid order (Budi Santoso) has a Refund button
-      const refundBtn = screen.getByRole("button", {
-        name: /Refund pesanan 33333333-3333-4333-8333-333333333331/i,
+const order = {
+  id: "33333333-3333-4333-8333-333333333331",
+  invitationId: "22222222-2222-4222-8222-222222222221",
+  userId: "11111111-1111-4111-8111-111111111111",
+  packageId: "package-id",
+  addonIds: [],
+  amountTotal: "139000",
+  status: "paid",
+  orderType: "new_publish",
+  userEmail: "budi@example.test",
+  userFullName: "Budi Santoso",
+  invitationSlug: "budi-ratna",
+  createdAt: "2026-01-01T00:00:00Z",
+  expiredAt: "2026-01-02T00:00:00Z",
+  paymentCount: 1,
+};
+const detail = {
+  ...order,
+  updatedAt: order.createdAt,
+  user: {
+    id: order.userId,
+    email: order.userEmail,
+    fullName: order.userFullName,
+    phone: null,
+  },
+  invitation: {
+    id: order.invitationId,
+    slug: order.invitationSlug,
+    internalName: null,
+  },
+  payments: [
+    {
+      id: "payment-1",
+      provider: "midtrans",
+      providerReferenceId: "reference-1",
+      method: "bank_transfer",
+      amount: "139000",
+      status: "paid",
+      signatureValid: true,
+      verifiedAt: order.createdAt,
+      createdAt: order.createdAt,
+    },
+  ],
+  notifications: [],
+  hasFraudAlert: true,
+  invoice: { number: "INV-TEST-1", generatedAt: order.createdAt },
+};
+const response = (data: unknown, status = 200) =>
+  new Response(
+    JSON.stringify({
+      success: status < 400,
+      data,
+      error:
+        status >= 400
+          ? { code: "FORBIDDEN", message: "Akses ditolak" }
+          : undefined,
+    }),
+    { status, headers: { "Content-Type": "application/json" } },
+  );
+let fetchMock: ReturnType<typeof vi.fn>;
+beforeEach(() => {
+  accessTokenStore.set("admin-access-token");
+  fetchMock = vi.fn(async (input: string) => {
+    const url = new URL(input, "https://admin.test");
+    if (url.pathname.endsWith("/mfa/step-up"))
+      return response({ step_up_token: "verified-step-up" });
+    if (url.pathname.endsWith("/refund"))
+      return response({
+        message: "Refund tercatat. Dana riil wajib dikembalikan manual.",
       });
-      fireEvent.click(refundBtn);
+    if (url.pathname === "/api/v1/admin/orders")
+      return response(url.search ? [] : [order]);
+    return response(detail);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+});
+afterEach(() => {
+  cleanup();
+  accessTokenStore.clear();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+async function openRefund() {
+  render(<OrdersPage />);
+  fireEvent.click(
+    await screen.findByRole("button", { name: `Refund pesanan ${order.id}` }),
+  );
+  fireEvent.change(screen.getByLabelText(/Alasan Refund/), {
+    target: { value: "Pembatalan acara pernikahan" },
+  });
+  fireEvent.change(screen.getByLabelText(/Kode 2FA/), {
+    target: { value: "123456" },
+  });
+}
 
-      await waitFor(() => {
-        expect(screen.getByText("Proses Refund Pesanan (Manual)")).toBeDefined();
-        expect(screen.getByText(/Perhatian \(ADR-019 & Kebijakan Entitlement\):/i)).toBeDefined();
-        expect(screen.getByText(/Peringatan Aliran Dana \(Manual\):/i)).toBeDefined();
-      });
-    });
-
-    it("keeps confirmation button disabled until reason is at least 5 characters", async () => {
-      render(<OrdersPage />);
-
-      const refundBtn = screen.getByRole("button", {
-        name: /Refund pesanan 33333333-3333-4333-8333-333333333331/i,
-      });
-      fireEvent.click(refundBtn);
-
-      await waitFor(() => {
-        expect(screen.getByText("Proses Refund Pesanan (Manual)")).toBeDefined();
-      });
-
-      const confirmBtn = screen.getByRole("button", { name: "Konfirmasi Refund" }) as HTMLButtonElement;
-      expect(confirmBtn.disabled).toBe(true);
-
-      const reasonInput = screen.getByLabelText(/Alasan Refund/i);
-      fireEvent.change(reasonInput, { target: { value: "test" } });
-      expect(confirmBtn.disabled).toBe(true);
-
-      fireEvent.change(reasonInput, { target: { value: "Permintaan resmi pembatalan" } });
-      expect(confirmBtn.disabled).toBe(false);
-    });
-
-    it("submits refund request with reason and TOTP code and displays success", async () => {
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          status: "success",
-          data: {
-            orderId: "33333333-3333-4333-8333-333333333331",
-            status: "refunded",
-            invitationStatus: "draft",
-            moneyMovement: "manual",
-            message: "Pesanan berhasil direfund di sistem dan status undangan dikembalikan ke draft.",
-          },
+describe("P5-07 authenticated order management", () => {
+  it("loads API data with bearer authentication", async () => {
+    render(<OrdersPage />);
+    expect(await screen.findByText("Budi Santoso")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/admin/orders?"),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer admin-access-token",
         }),
-      });
-      global.fetch = mockFetch as any;
-
-      render(<OrdersPage />);
-
-      const refundBtn = screen.getByRole("button", {
-        name: /Refund pesanan 33333333-3333-4333-8333-333333333331/i,
-      });
-      fireEvent.click(refundBtn);
-
-      const reasonInput = screen.getByLabelText(/Alasan Refund/i);
-      const codeInput = screen.getByLabelText(/Kode 2FA \/ TOTP Authenticator/i);
-
-      fireEvent.change(reasonInput, { target: { value: "Pembatalan acara pernikahan" } });
-      fireEvent.change(codeInput, { target: { value: "123456" } });
-
-      const confirmBtn = screen.getByRole("button", { name: "Konfirmasi Refund" });
-      fireEvent.click(confirmBtn);
-
-      await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith(
-          "/api/v1/admin/orders/33333333-3333-4333-8333-333333333331/refund",
-          expect.objectContaining({
-            method: "POST",
-            body: JSON.stringify({
-              reason: "Pembatalan acara pernikahan",
-              step_up_code: "123456",
-            }),
-          }),
-        );
-        expect(
-          screen.getByText(/Pesanan berhasil direfund di sistem dan status undangan dikembalikan ke draft/i),
-        ).toBeDefined();
-      });
+      }),
+    );
+  });
+  it("sends search and status filters to the server", async () => {
+    render(<OrdersPage />);
+    await screen.findByText("Budi Santoso");
+    fireEvent.change(screen.getByLabelText(/Cari Pesanan/), {
+      target: { value: "siti" },
     });
+    await screen.findByText("Tidak ada pesanan yang sesuai dengan filter.");
+    fireEvent.change(screen.getByLabelText(/Status Pembayaran/), {
+      target: { value: "failed" },
+    });
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        expect.stringContaining("search=siti&status=failed"),
+        expect.anything(),
+      ),
+    );
+  });
+  it("shows payment attempts, reconciliation timeline and fraud evidence from API detail", async () => {
+    render(<OrdersPage />);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: `Lihat detail pesanan ${order.id}`,
+      }),
+    );
+    expect(
+      await screen.findByText("Upaya Pembayaran (Gateway Attempts)"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Linimasa Notifikasi Webhook & Query"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("fraud-alert-banner")).toBeInTheDocument();
+    expect(screen.getByText("INV-TEST-1")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/api/v1/admin/orders/${order.id}`),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer admin-access-token",
+        }),
+      }),
+    );
+  });
+  it("shows a retryable list failure without fabricated orders", async () => {
+    fetchMock.mockRejectedValue(new Error("offline"));
+    render(<OrdersPage />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Daftar pesanan gagal dimuat",
+    );
+    expect(screen.queryByText("Budi Santoso")).not.toBeInTheDocument();
+    fetchMock.mockImplementation(async () => response([]));
+    fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
+    expect(
+      await screen.findByText("Tidak ada pesanan yang sesuai dengan filter."),
+    ).toBeInTheDocument();
+  });
+  it("shows detail failure without fabricating financial history", async () => {
+    render(<OrdersPage />);
+    const button = await screen.findByRole("button", {
+      name: `Lihat detail pesanan ${order.id}`,
+    });
+    fetchMock.mockRejectedValue(new Error("offline"));
+    fireEvent.click(button);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Detail pesanan gagal dimuat",
+    );
+    expect(screen.queryByText("INV-TEST-1")).not.toBeInTheDocument();
+  });
+});
+describe("P5-08 verified manual refund", () => {
+  it("requires an audit reason and six digit factor and retains the manual money notice", async () => {
+    render(<OrdersPage />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: `Refund pesanan ${order.id}` }),
+    );
+    expect(screen.getByText(/Peringatan Aliran Dana/)).toBeInTheDocument();
+    const button = screen.getByRole("button", { name: "Konfirmasi Refund" });
+    expect(button).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/Alasan Refund/), {
+      target: { value: "Pembatalan resmi" },
+    });
+    expect(button).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/Kode 2FA/), {
+      target: { value: "123456" },
+    });
+    expect(button).toBeEnabled();
+  });
+  it("exchanges the factor for a token before refund with X-MFA-Step-Up and reason only", async () => {
+    await openRefund();
+    fireEvent.click(screen.getByRole("button", { name: "Konfirmasi Refund" }));
+    expect(await screen.findByText(/Refund tercatat/)).toBeInTheDocument();
+    const step = fetchMock.mock.calls.find((c) =>
+      String(c[0]).endsWith("/mfa/step-up"),
+    )!;
+    const refund = fetchMock.mock.calls.find((c) =>
+      String(c[0]).endsWith("/refund"),
+    )!;
+    expect(step[1]).toEqual(
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ code: "123456" }),
+        headers: expect.objectContaining({
+          Authorization: "Bearer admin-access-token",
+        }),
+      }),
+    );
+    expect(refund[1]).toEqual(
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ reason: "Pembatalan acara pernikahan" }),
+        headers: expect.objectContaining({
+          Authorization: "Bearer admin-access-token",
+          "X-MFA-Step-Up": "verified-step-up",
+        }),
+      }),
+    );
+    expect(fetchMock.mock.calls.indexOf(step)).toBeLessThan(
+      fetchMock.mock.calls.indexOf(refund),
+    );
+  });
+  it("does not submit refund when factor verification fails", async () => {
+    await openRefund();
+    fetchMock.mockImplementation(async () => response(null, 403));
+    fireEvent.click(screen.getByRole("button", { name: "Konfirmasi Refund" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Akses ditolak");
+    expect(
+      fetchMock.mock.calls.some((c) => String(c[0]).endsWith("/refund")),
+    ).toBe(false);
   });
 });

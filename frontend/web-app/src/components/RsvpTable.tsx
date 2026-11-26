@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import type { RsvpAttendanceStatus, RsvpItem, RsvpSummary } from "../lib/invitations";
+import type {
+  RsvpAttendanceStatus,
+  RsvpItem,
+  RsvpSummary,
+} from "../lib/invitations";
 import { formatEventDate } from "@wi/schema";
 
 export interface RsvpTableProps {
@@ -59,7 +63,6 @@ function formatTimestamp(isoString: string): string {
 }
 
 export function RsvpTable({
-  invitationId,
   rsvps,
   summary,
   currentFilter,
@@ -84,7 +87,9 @@ export function RsvpTable({
   };
 
   const handleDelete = async (rsvpId: string) => {
-    if (!window.confirm("Apakah Anda yakin ingin menghapus data konfirmasi ini?")) {
+    if (
+      !window.confirm("Apakah Anda yakin ingin menghapus data konfirmasi ini?")
+    ) {
       return;
     }
     setDeletingId(rsvpId);
@@ -190,7 +195,9 @@ export function RsvpTable({
       {/* RSVP Content: Empty State */}
       {rsvps.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border p-8 text-center text-text-muted">
-          <p className="text-sm">Belum ada data konfirmasi kehadiran yang sesuai.</p>
+          <p className="text-sm">
+            Belum ada data konfirmasi kehadiran yang sesuai.
+          </p>
         </div>
       ) : (
         <>
@@ -240,7 +247,11 @@ export function RsvpTable({
 
                   {message && (
                     <div className="mt-2.5 rounded bg-surface-sunken p-2.5 text-xs text-text">
-                      <p className={!isExpanded && hasLongMessage ? "line-clamp-2" : ""}>
+                      <p
+                        className={
+                          !isExpanded && hasLongMessage ? "line-clamp-2" : ""
+                        }
+                      >
                         &ldquo;{message}&rdquo;
                       </p>
                       {hasLongMessage && (
@@ -306,7 +317,9 @@ export function RsvpTable({
                           <div>
                             <p
                               className={
-                                !isExpanded && hasLongMessage ? "line-clamp-1" : ""
+                                !isExpanded && hasLongMessage
+                                  ? "line-clamp-1"
+                                  : ""
                               }
                             >
                               {message}

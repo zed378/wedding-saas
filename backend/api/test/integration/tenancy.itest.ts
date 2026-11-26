@@ -186,7 +186,7 @@ describe("findOwnedList — insecure API filtering (SECURITY/05 § 5)", () => {
 
   it("filters by status without dropping the owner filter", async () => {
     const alice = await seedParty("alice");
-    const mallory = await seedParty("mallory");
+    const _mallory = await seedParty("mallory");
     await pool.query("UPDATE invitations SET status = 'published'");
 
     const hers = await repo.findOwnedList(alice.scope, { status: "published" });

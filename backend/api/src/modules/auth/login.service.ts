@@ -15,6 +15,7 @@ import {
   revokeRefreshToken,
   rotateRefreshToken,
   type IssuedRefreshToken,
+  ADMIN_SESSION_TTL_MS,
 } from "./tokens/refresh-token.service";
 import { SessionService, type AuthenticatedUser } from "./session.service";
 
@@ -141,27 +142,34 @@ export class LoginService {
     // docs/SECURITY/03 § Admin Session:
     // 2FA (TOTP) is MANDATORY for admin and super_admin roles.
     if (row!.role === "admin" || row!.role === "super_admin") {
-      const isEnrolled = await this.mfa.hasConfirmedFactor(row!.id);
-      const ticket = await this.mfa.signMfaTicket(
-        row!.id,
-        row!.email,
-        row!.role,
-        isEnrolled ? "challenge" : "setup",
-      );
-
       if (options?.requireSession !== false) {
         throw new Error("MFA challenge required for administrative accounts");
       }
+    }
+
+    return this.issueLogin(authenticatedUser);
+  }
+
+  /** Both password and Google authentication must pass through the MFA gate. */
+  async issueLogin(user: AuthenticatedUser): Promise<LoginResult> {
+    if (user.role === "admin" || user.role === "super_admin") {
+      const isEnrolled = await this.mfa.hasConfirmedFactor(user.id);
+      const ticket = await this.mfa.signMfaTicket(
+        user.id,
+        user.email,
+        user.role,
+        isEnrolled ? "challenge" : "setup",
+      );
 
       return {
         requiresMfa: true,
         isEnrolled,
         ticket,
-        user: authenticatedUser,
+        user,
       };
     }
 
-    return this.issueSession(authenticatedUser);
+    return this.issueSession(user);
   }
 
   /**
@@ -198,7 +206,12 @@ export class LoginService {
     if (result.status === "invalid") throw new UnauthenticatedError();
 
     const user = await this.sessions.loadActiveUser(result.userId);
-    if (user === undefined) {
+    if (
+      user === undefined ||
+      ((user.role === "admin" || user.role === "super_admin") &&
+        (result.mfaVerifiedAt == null ||
+          Date.now() - result.mfaVerifiedAt.getTime() >= ADMIN_SESSION_TTL_MS))
+    ) {
       // Suspended or deleted between issuing and refreshing. The successor that
       // `rotateRefreshToken` just wrote is now unreachable -- it is tied to an account
       // that cannot authenticate -- but leaving it live would be a session that outlives
@@ -216,6 +229,11 @@ export class LoginService {
         userId: user.id,
         role: user.role,
         emailVerified: user.emailVerified,
+        ...(result.mfaVerifiedAt == null
+          ? {}
+          : {
+              mfaVerifiedAt: Math.floor(result.mfaVerifiedAt.getTime() / 1000),
+            }),
       }),
       refresh: result.issued,
       user,
@@ -234,20 +252,38 @@ export class LoginService {
   }
 
   /** Mint a fresh session. `P1-04` and `P1-05` call this without a password. */
-  async issueSession(user: AuthenticatedUser): Promise<Session> {
+  async issueSession(
+    user: AuthenticatedUser,
+    mfaVerifiedAt?: Date,
+  ): Promise<Session> {
+    if (
+      (user.role === "admin" || user.role === "super_admin") &&
+      mfaVerifiedAt === undefined
+    ) {
+      throw new UnauthenticatedError();
+    }
     const [accessToken, refresh] = await Promise.all([
       signAccessToken(this.env.JWT_SIGNING_KEY, {
         userId: user.id,
         role: user.role,
         emailVerified: user.emailVerified,
+        ...(mfaVerifiedAt === undefined
+          ? {}
+          : { mfaVerifiedAt: Math.floor(mfaVerifiedAt.getTime() / 1000) }),
       }),
-      issueRefreshToken(this.db, this.env.REFRESH_TOKEN_PEPPER, user.id),
+      issueRefreshToken(
+        this.db,
+        this.env.REFRESH_TOKEN_PEPPER,
+        user.id,
+        new Date(),
+        mfaVerifiedAt ?? null,
+      ),
     ]);
 
     return { accessToken, refresh, user };
   }
 
-  /** Mint a fresh session by user ID, re-checking active status. */
+  /** Called only after successful MFA confirmation/verification; re-check account state. */
   async issueSessionForUserId(userId: string): Promise<Session> {
     const rows = await this.db
       .select({
@@ -259,7 +295,7 @@ export class LoginService {
         status: users.status,
       })
       .from(users)
-      .where(eq(users.id, userId))
+      .where(and(eq(users.id, userId), isNull(users.deletedAt)))
       .limit(1);
 
     if (rows.length === 0 || rows[0]!.status !== "active") {
@@ -274,7 +310,7 @@ export class LoginService {
       emailVerified: rows[0]!.emailVerified,
     };
 
-    return this.issueSession(user);
+    return this.issueSession(user, new Date());
   }
 
   private async rehashIfNeeded(

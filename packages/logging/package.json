@@ -12,7 +12,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "lint": "echo \"[P0-17] lint not wired yet\"",
+    "lint": "oxlint --deny-warnings .",
     "typecheck": "tsc --noEmit -p tsconfig.build.json",
     "test": "vitest run"
   },
@@ -20,11 +20,11 @@
     "dist"
   ],
   "dependencies": {
-    "pino": "^10.3.1"
+    "pino": "^10.4.0"
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.0",
-    "@types/node": "^22.20.1"
+    "vitest": "^5.1.1"
   }
 }

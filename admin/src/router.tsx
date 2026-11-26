@@ -36,7 +36,7 @@ export function RouterProvider({ children }: { children: ReactNode }) {
     if (typeof window !== "undefined") {
       if (window.location.pathname !== to) {
         window.history.pushState(null, "", to);
-        setPath(to);
+        setPath(window.location.pathname || "/");
       }
     }
   }, []);
@@ -61,13 +61,7 @@ export interface LinkProps {
   children: ReactNode;
   className?: string | undefined;
   "aria-current"?:
-    | "page"
-    | "step"
-    | "location"
-    | "date"
-    | "time"
-    | boolean
-    | undefined;
+    "page" | "step" | "location" | "date" | "time" | boolean | undefined;
   id?: string | undefined;
 }
 

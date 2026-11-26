@@ -1,12 +1,4 @@
-import {
-  beforeAll,
-  afterAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { beforeAll, afterAll, beforeEach, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 
 import {
@@ -14,7 +6,6 @@ import {
   type RegisterInput,
 } from "../../src/modules/auth/registration.service";
 import {
-  consumeToken,
   hashToken,
   issueToken,
   TOKEN_LIFETIME_MS,

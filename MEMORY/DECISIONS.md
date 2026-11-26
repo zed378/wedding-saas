@@ -245,7 +245,7 @@ packages/   schema  template-renderer  ui  api-client  config
 
 **Context** — `docs/BACKEND/03` shows Zod schemas and requires the validation schema to double as the accepted-field whitelist, rejecting unknown fields. `docs/FRONTEND/03` wants client validation aligned with the server's, ideally from one source. `docs/DATABASE/03` requires `template_versions.sections` to be validated against a fixed schema before any write.
 
-**Decision** — **Zod 4.5.x**, living in `packages/schema`, as the single vocabulary for HTTP request validation in NestJS (through a Zod validation pipe), the template section and theme schema, the canonical field-path registry, and client-side form validation.
+**Decision** — **Zod 4.5.x** (minor version advanced to 4.6.x for security remediation by ADR-107), living in `packages/schema`, as the single vocabulary for HTTP request validation in NestJS (through a Zod validation pipe), the template section and theme schema, the canonical field-path registry, and client-side form validation.
 
 **Alternatives considered** — `class-validator` (the NestJS default): rejected because its decorators are not shareable with the frontend and its whitelist behaviour is configuration rather than the schema itself. JSON Schema with a validator: portable across languages, but that portability only pays if the backend is not TypeScript, which ADR-004 settled.
 
@@ -3249,6 +3249,72 @@ the expiry, because inside the window that is a resume.
    - Provides full management UI with visitor report inspection modals, filter chips, message badges, and confirmation dialogs with required reason inputs.
 
 **Consequences** — Platform staff possess complete visibility and responsive controls to maintain safety and compliance across public wedding invitations, backed by comprehensive audit trails and immediate cache eviction.
+
+---
+
+### ADR-105 — Complete operational admin contracts and protect mutable slug configuration
+
+**Date** 2026-11-25 · **Tasks** P5-10–P5-13 · **Status** Accepted for implementation; verification recorded per task · **Amends** docs/API/09-ADMIN-API.md
+
+**Context** — Phase 5 task cards require searchable operational invitation data, dashboard figures, audit export and mutable slug terms, while API/09 only lists minimal reads and omits the blocklist contract. The owner explicitly approved the proposed blocklist CRUD/test endpoints in the implementation conversation. Task cards already require resource-id audit filtering and audited bulk exports.
+
+**Decision** — Document GET/POST `/admin/slug-blocklist`, PATCH/DELETE `/:id`, and POST `/test`; reasons and atomic before/after audits are mandatory on writes. Exact `preview`/`public` terms cannot be removed or renamed because they protect public routes. Existing matches expose only id/slug/status and are audited; adding a term never unpublishes an invitation. Add an exact-seed public-route gate to local verification. Cache entries use a DB-computed blocklist fingerprint so failed Redis invalidation cannot approve newly forbidden terms. Complete resource-id audit filtering and bounded (10,000-row) JSON export with atomic export audit. Metrics and read-only invitation responses remain explicit snake_case operational DTOs.
+
+**Alternatives considered** — Code constants require deploying to change profanity. Unversioned TTL-only caching can accept newly blocked slugs after invalidation failures. Automatically unpublishing matched invitations would violate DATABASE/12 governance. Unlimited audit export risks resource exhaustion and silent truncation gives investigators incomplete evidence. Adding a chart dependency is unnecessary for this operational surface.
+
+**Consequences** — Slug checks retain one authoritative DB fingerprint query even on cache hits; this deliberately prioritizes fresh enforcement over avoiding all DB reads. Matching reads may create up to 100 audit rows per mutation. Export overflow requires narrower filters. UI and focused tests do not replace Phase 5 acceptance or the unresolved repository-wide MFA/session verification and CI gates; those remain recorded explicitly.
+
+**Metrics definition** — Summary periods use UTC and order creation dates because the documented order model has no settlement-date accounting contract. Only currently paid order amounts contribute revenue; refunds are excluded once. The lifetime paid cohort includes distinct invitations with paid or refunded order history; the published paid cohort intersects those invitations with `published_at`. This avoids counting renewals twice or mislabelling free trials as purchases. Values are labelled as operational revenue before fees, not accounting settlement revenue. Fixed windows (30 days/six months) and a 30-second cache bound dashboard work.
+
+### ADR-106 — Persist admin session MFA provenance across authentication and rotation
+
+**Date** 2026-11-25 · **Task** P5-14 · **Status** Implemented, verification pending · **Amends** DATABASE/02-USERS, API/01, SECURITY/03
+
+**Context** — Password login challenged administrators, but Google authentication minted ordinary sessions and refresh tokens did not record whether their session passed MFA. Enrollment does not prove authentication. A user promoted to admin could also inherit authority through an older token because the session resolver reloads roles.
+
+**Decision** — Apply the same MFA challenge gate to password and Google login, reject administrative session issuance without factor proof, sign `mfa_verified_at` into access tokens, and require it against the current database role. Add nullable `refresh_tokens.mfa_verified_at` in additive migration 0018; preserve its original value and four-hour absolute expiry across rotations. Legacy admin tokens require MFA login again. Ordinary user sessions keep their existing lifetime. Only successful MFA confirmation/verification calls the proof-bearing session issuance path.
+
+**Alternatives** — Checking a confirmed factor permits pre-MFA sessions to bypass the challenge. Requiring MFA at every 15-minute access refresh needlessly interrupts the session. Cache-only proof loses provenance on cache failure/restart. Database session provenance is explicit and survives rotation without changing endpoint shapes beyond applying the already documented MFA response to Google admin login.
+
+**Consequences** — Apply migration 0018 before the new API; existing admin sessions are intentionally invalidated. No production migration was run in this session. Testcontainer bootstrap now creates the application role only in newly created disposable containers, resolving migration 0006's missing-role failure without altering external database roles. The phase remains under review until named tests and broader acceptance pass.
+
+### ADR-107 — Remediate production dependencies within the approved major versions
+
+**Date** 2026-11-26 · **Task** P5-14 · **Status** Accepted maintenance implementation; regression evidence recorded separately · **Amends** ADR-008's Zod minor-version constraint
+
+**Context** — The Phase 5 dependency gate reported 32 production advisories. Retaining known vulnerable versions would prevent satisfying the global Definition of Done. The selected architecture requires the existing major versions and shared validation vocabulary, not vulnerable patch releases.
+
+**Decision** — Keep the existing libraries and major versions while updating Nest packages to 12.6.2, Express to 5.3.0, Next to 16.4.6, Zod to 4.6.7, sharp to 0.35.5, and sanitize-html to 2.18.2 with their resolved dependency subtrees. Zod remains the single shared schema implementation; ADR-008's 4.5.x minor pin is superseded by 4.6.x. Retain four exact-version release-age exceptions for the Nest 12.6.2 packages needed by this remediation; do not disable release-age or install-script protections globally.
+
+**Alternatives considered** — Lockfile-only refresh cannot remediate direct dependencies outside their existing constraints. Broad major upgrades introduce unnecessary migration risk. Deferring all remediation leaves the dependency gate failing. Disabling release-age checks globally weakens unrelated future installs; bounded exceptions affect only these reviewed releases.
+
+**Consequences** — The post-install production audit reports zero advisories; this is a registry audit result, not proof that the application has no vulnerabilities. Framework, validation, sanitizer and native-image regressions must be exercised after installation. Exact-version exceptions require deliberate review for future upgrades. No endpoint, authorization policy, payment-state source or upload acceptance rule is intentionally changed.
+
+**Specification impact** — No product/API/database contract changes. ADR-008 is annotated above; the existing architecture and shared validation design remain in force. The dependency change record and parent acceptance record contain the actual tests and remaining gates. No production deployment or migration is authorized by this decision.
+
+### ADR-108 — Enforce local correctness, coverage and security gates while CI remains deferred
+
+**Date** 2026-11-26 · **Task** P5-14 continuation / P0-17 local gate follow-up · **Status** Implemented locally; acceptance results recorded separately
+
+**Context** — All thirteen workspace lint commands were echo placeholders. API service coverage already defined 80% line/statements/functions and 75% branch thresholds, but the local verifier did not invoke it, integration suites, SAST or dependency auditing. This left the global Definition of Done unenforced even when `verify` exited successfully. ADR-028 defers the hosted pipeline; it does not waive these checks.
+
+**Decision** — Use Oxlint correctness rules across source, tests and tooling with warnings denied, retaining unused-name detection and only targeted intentional exceptions. The attempted ESLint/typescript-eslint combination has a TypeScript peer range below this repository's pinned TypeScript 7; adopting an unsupported parser or downgrading the compiler is unnecessary. Use digest-pinned Semgrep in Docker with checked-in rules, positive/negative rule fixtures, offline analysis and failure on scanner errors, empty scans or findings. The full local verifier invokes workspace integration, existing combined API coverage, all-dependency auditing and SAST; fast mode explicitly excludes these slow checks.
+
+**Alternatives considered** — Keeping successful echo scripts provides no verification. A blanket lint disable or automatic broad stylistic cleanup weakens correctness or obscures the change. Scanning only production dependencies hides toolchain advisories. Lowering coverage thresholds to fit an unmeasured suite would change the acceptance criterion. A new GitHub Actions pipeline is outside the still-deferred P0-17 scope.
+
+**Consequences** — Docker and isolated PostgreSQL/Redis/MinIO/ClamAV services are prerequisites for full local acceptance. Integration workspaces execute serially because API fixture resets can otherwise truncate worker test data; integration connection variables are explicitly passed through Turbo's strict environment filter. Dependency scanning may fail on development-only advisories, and coverage may expose pre-existing gaps; neither is waived or hidden. Local gates still require a person to run them and do not replace independent reviewer approval. Bounded Semgrep rules supplement the dedicated authorization/payment/upload/runtime tests; they do not prove those controls by themselves. No API, database, authorization policy or product contract changes.
+
+### ADR-109 — Retain bounded development dependency overrides with consumer compatibility evidence
+
+**Date** 2026-11-26 · **Task** P5-14 continuation · **Status** Existing maintenance configuration reviewed; application regression recorded separately
+
+**Context** — The current shared working tree already contains development-tool updates and four scoped transitive overrides beyond the dependency state described by ADR-108. Fresh all-dependency and production-only audits both return zero advisories. This continuation did not author or reinstall those changes; their earlier edit sequence is not reconstructed. Several overrides cross a consumer's declared major range, so a clean advisory result alone is insufficient compatibility evidence.
+
+**Decision** — Retain the existing consumer-scoped resolutions: `@esbuild-kit/core-utils>esbuild` 0.25.4, `dockerode>uuid` 11.1.1, `archiver-utils>glob` 14.0.2 and `glob>minimatch` 11.0.1. Verify the APIs through each actual consumer on Node 24: typed-source transform, CommonJS UUID generation/validation, `file.expand` include/exclude patterns, minimatch positive/negative matches, Testcontainers tar generation and an actual Dockerode daemon ping. Keep frozen installs and all-dependency auditing effective, with no advisory suppression, global override or install-script relaxation. The [dependency evidence record](./records/2026-11-26-P5-14-development-dependency-remediation.md) identifies installed direct versions and exact executed checks.
+
+**Alternatives considered** — Removing every inherited override without evaluating its consumer would restore known vulnerable chains and discard working maintenance changes. Treating an audit result as complete runtime verification ignores API compatibility. A broad global major override changes unrelated consumers. Replacing the ORM/container stack solely for transitive tooling would exceed this acceptance repair.
+
+**Consequences** — The bounded APIs exercised by current consumers pass, but this does not certify every upstream API or future release. Keep these overrides visible during Drizzle/Testcontainers upgrades and prefer supported upstream ranges when available. The complete application/SQL/native-media regressions remain required separately. No stack major, database schema, endpoint contract or business rule changes in this decision; no deployment or merge approval is implied.
 
 
 

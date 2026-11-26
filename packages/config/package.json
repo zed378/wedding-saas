@@ -12,7 +12,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "lint": "echo \"[later] lint not wired yet\"",
+    "lint": "oxlint --deny-warnings .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "echo \"[P0-19] tests not wired yet\""
   },

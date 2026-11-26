@@ -27,7 +27,10 @@ export interface FlushResult {
 export interface AnalyticsSummary {
   readonly views: {
     readonly total: number;
-    readonly daily: ReadonlyArray<{ readonly date: string; readonly count: number }>;
+    readonly daily: ReadonlyArray<{
+      readonly date: string;
+      readonly count: number;
+    }>;
   };
   readonly rsvps: {
     readonly total_responses: number;
@@ -75,7 +78,9 @@ export class AnalyticsService {
   async recordView(slug: string): Promise<{ recorded: boolean }> {
     const published = await this.publicInvitationRepo.findPublishedBySlug(slug);
     if (!published) {
-      throw new NotFoundError("Invitation not found or not currently published");
+      throw new NotFoundError(
+        "Invitation not found or not currently published",
+      );
     }
 
     const invitationId = published.invitation.id;

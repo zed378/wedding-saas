@@ -393,6 +393,7 @@ describe("user profile", () => {
 
       expect(await service.getPreferences(user.scope)).toEqual({
         rsvpEmail: true,
+        rsvpDigest: false,
         guestbookEmail: true,
         marketingEmail: false,
       });
@@ -414,6 +415,7 @@ describe("user profile", () => {
       });
       expect(updated).toEqual({
         rsvpEmail: true,
+        rsvpDigest: false,
         guestbookEmail: true,
         marketingEmail: true,
       });
@@ -426,6 +428,7 @@ describe("user profile", () => {
 
       expect(await service.getPreferences(user.scope)).toEqual({
         rsvpEmail: true,
+        rsvpDigest: false,
         guestbookEmail: true,
         marketingEmail: false,
       });

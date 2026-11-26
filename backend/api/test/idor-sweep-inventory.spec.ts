@@ -23,6 +23,12 @@ const SWEEP = join(__dirname, "integration", "idor-sweep.itest.ts");
  * their access rule instead. Adding a route here is a claim that needs that test.
  */
 const EXEMPT: Readonly<Record<string, string>> = {
+  "GET /api/v1/admin/invitations/:id":
+    "audited operational admin bypass, never owner content access (P5-10) — admin-invitations.spec.ts role denial/missing resource tests and admin-invitations.itest.ts per-resource audit assertions",
+  "PATCH /api/v1/admin/slug-blocklist/:id":
+    "platform configuration, not tenant data (P5-13) — admin-slug-blocklist.spec.ts ordinary-user denial/mass-assignment/missing-id tests and admin-slug-blocklist.itest.ts atomic audit",
+  "DELETE /api/v1/admin/slug-blocklist/:id":
+    "platform configuration, not tenant data (P5-13) — admin-slug-blocklist.spec.ts ordinary-user denial/missing-id tests and admin-slug-blocklist.itest.ts protected-reservation and deletion audit tests",
   "GET /public/i/:slug":
     "public by design; the status predicate is the rule — public-invitation.itest.ts › 'answers a draft, an unpublished, an expired and a deleted invitation identically…'",
   "POST /public/i/:slug/rsvp":

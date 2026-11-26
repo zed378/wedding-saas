@@ -60,10 +60,7 @@ export function ThemeEditor({
     theme.colors.secondary,
   );
 
-  const handleColorChange = (
-    key: keyof Theme["colors"],
-    value: string,
-  ) => {
+  const handleColorChange = (key: keyof Theme["colors"], value: string) => {
     onChangeTheme({
       ...theme,
       colors: {
@@ -113,7 +110,8 @@ export function ThemeEditor({
                 {contrastResult.warningMessage}
               </p>
               <div className="mt-2 text-xs font-mono text-amber-700">
-                Teks: {theme.colors.text} | Latar: {theme.colors.secondary} (Rasio: {contrastResult.ratio}:1, Butuh &gt;= 4.5:1)
+                Teks: {theme.colors.text} | Latar: {theme.colors.secondary}{" "}
+                (Rasio: {contrastResult.ratio}:1, Butuh &gt;= 4.5:1)
               </div>
             </div>
           </div>
@@ -125,7 +123,8 @@ export function ThemeEditor({
         <div>
           <h3 className="text-body-lg font-semibold">Palet Warna Tema</h3>
           <p className="text-body-sm text-text-muted">
-            Warna dasar yang akan diinterpolasi menjadi CSS tokens pada renderer undangan
+            Warna dasar yang akan diinterpolasi menjadi CSS tokens pada renderer
+            undangan
           </p>
         </div>
 
@@ -192,7 +191,7 @@ export function ThemeEditor({
                 color: theme.colors.text,
               }}
             >
-              Latar & Teks
+              Latar &amp; Teks
             </div>
           </div>
 
@@ -267,9 +266,10 @@ export function ThemeEditor({
       {/* Typography Section */}
       <div className="rounded-lg border border-border bg-surface p-5 space-y-4">
         <div>
-          <h3 className="text-body-lg font-semibold">Tipografi & Skala</h3>
+          <h3 className="text-body-lg font-semibold">Tipografi &amp; Skala</h3>
           <p className="text-body-sm text-text-muted">
-            Keluarga font untuk judul dan isi teks, beserta skala proporsi ukuran teks
+            Keluarga font untuk judul dan isi teks, beserta skala proporsi
+            ukuran teks
           </p>
         </div>
 
@@ -334,7 +334,7 @@ export function ThemeEditor({
             >
               <option value="compact">Compact (Padat)</option>
               <option value="default">Default (Standar)</option>
-              <option value="large">Large (Besar & Elegan)</option>
+              <option value="large">Large (Besar &amp; Elegan)</option>
             </select>
           </div>
         </div>
@@ -343,9 +343,12 @@ export function ThemeEditor({
       {/* Layout & Shape Tokens */}
       <div className="rounded-lg border border-border bg-surface p-5 space-y-4">
         <div>
-          <h3 className="text-body-lg font-semibold">Spasi & Sudut Lengkung</h3>
+          <h3 className="text-body-lg font-semibold">
+            Spasi &amp; Sudut Lengkung
+          </h3>
           <p className="text-body-sm text-text-muted">
-            Token layout global untuk jarak antarelemen dan radius sudut elemen UI
+            Token layout global untuk jarak antarelemen dan radius sudut elemen
+            UI
           </p>
         </div>
 
@@ -367,7 +370,9 @@ export function ThemeEditor({
               aria-label="Spacing"
             >
               <option value="compact">Compact (Ketat / Minimalis)</option>
-              <option value="comfortable">Comfortable (Nyaman / Seimbang)</option>
+              <option value="comfortable">
+                Comfortable (Nyaman / Seimbang)
+              </option>
               <option value="spacious">Spacious (Luas / Mewah)</option>
             </select>
           </div>
@@ -405,7 +410,8 @@ export function ThemeEditor({
               Kustomisasi yang Diizinkan untuk Pengguna
             </h3>
             <p className="text-body-sm text-text-muted">
-              Pilih properti tema yang dapat diubah oleh calon pengantin saat mengedit undangan
+              Pilih properti tema yang dapat diubah oleh calon pengantin saat
+              mengedit undangan
             </p>
           </div>
           <Badge tone="info">{customizableThemeKeys.length} diizinkan</Badge>

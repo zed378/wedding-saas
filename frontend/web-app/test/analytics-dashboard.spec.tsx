@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+
 import { ApiClient, accessTokenStore } from "@wi/api-client";
 
 import { AuthProvider } from "../src/lib/auth";
 import { InvitationCard } from "../src/components/InvitationCard";
 import AnalyticsDashboardPage from "../src/app/(app)/dashboard/[invitationId]/analytics/page";
-import type { InvitationAnalytics, InvitationSummary } from "../src/lib/invitations";
+import type {
+  InvitationAnalytics,
+  InvitationSummary,
+} from "../src/lib/invitations";
 
 const testInvitation: InvitationSummary = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -85,7 +88,9 @@ describe("AnalyticsDashboardPage (P4-10)", () => {
       "fetch",
       vi.fn().mockImplementation((url: string) => {
         if (url.includes(`/invitations/${testInvitation.id}/analytics`)) {
-          return Promise.resolve(json(200, { success: true, data: mockAnalytics }));
+          return Promise.resolve(
+            json(200, { success: true, data: mockAnalytics }),
+          );
         }
         return Promise.resolve(json(404, { success: false }));
       }),
@@ -93,14 +98,14 @@ describe("AnalyticsDashboardPage (P4-10)", () => {
 
     render(
       <AuthProvider initialClient={client}>
-        <AnalyticsDashboardPage
-          params={{ invitationId: testInvitation.id }}
-        />
+        <AnalyticsDashboardPage params={{ invitationId: testInvitation.id }} />
       </AuthProvider>,
     );
 
     // Initial heading
-    expect(screen.getByRole("heading", { name: "Statistik Undangan" })).toBeDefined();
+    expect(
+      screen.getByRole("heading", { name: "Statistik Undangan" }),
+    ).toBeDefined();
 
     // Wait for data load
     await waitFor(() => {
@@ -144,9 +149,7 @@ describe("AnalyticsDashboardPage (P4-10)", () => {
 
     render(
       <AuthProvider initialClient={client}>
-        <AnalyticsDashboardPage
-          params={{ invitationId: testInvitation.id }}
-        />
+        <AnalyticsDashboardPage params={{ invitationId: testInvitation.id }} />
       </AuthProvider>,
     );
 

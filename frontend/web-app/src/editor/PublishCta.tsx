@@ -127,7 +127,9 @@ export function PublishCta() {
           typeof data["settings"] === "object" &&
           data["settings"] !== null &&
           "slug" in (data["settings"] as object)
-            ? String((data["settings"] as Record<string, unknown>)["slug"] ?? "")
+            ? String(
+                (data["settings"] as Record<string, unknown>)["slug"] ?? "",
+              )
             : "";
         setSlugInput(currentSlug);
         setStep({
@@ -350,15 +352,15 @@ export function PublishCta() {
       >
         {step.kind === "slug-confirm" && (
           <div className="flex flex-col gap-3">
-            <p className="text-sm text-text">
-              Undangan akan dapat diakses di:
-            </p>
+            <p className="text-sm text-text">Undangan akan dapat diakses di:</p>
             <p className="rounded-md bg-surface-sunken px-3 py-2 font-mono text-sm text-text">
               invitation.vizunicum.my.id/
               {typeof data["settings"] === "object" &&
               data["settings"] !== null &&
               "slug" in (data["settings"] as object)
-                ? String((data["settings"] as Record<string, unknown>)["slug"] ?? "")
+                ? String(
+                    (data["settings"] as Record<string, unknown>)["slug"] ?? "",
+                  )
                 : "…"}
             </p>
             <p className="text-xs text-text-muted">

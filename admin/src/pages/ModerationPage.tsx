@@ -1,4 +1,5 @@
-import { useState, useEffect, useId } from "react";
+import { useState, useEffect, useId, useMemo, useRef } from "react";
+import { ApiClient, accessTokenStore } from "@wi/api-client";
 import {
   Button,
   Card,
@@ -9,7 +10,6 @@ import {
   Textarea,
   Modal,
 } from "@wi/ui";
-import { useAdminAuth } from "../auth/admin-auth.js";
 
 export interface AdminModerationReportItem {
   id: string;
@@ -41,89 +41,6 @@ export interface AdminModerationItem {
   flagLabel: string;
 }
 
-const INITIAL_MOCK_MODERATION_ITEMS: AdminModerationItem[] = [
-  {
-    id: "22222222-2222-4222-8222-222222222221",
-    invitationId: "11111111-1111-4111-8111-111111111111",
-    invitationSlug: "budi-and-ratna",
-    invitationTitle: "Undangan Budi & Ratna",
-    invitationStatus: "published",
-    owner: {
-      id: "owner-1",
-      email: "budi.santoso@example.com",
-      fullName: "Budi Santoso",
-    },
-    guestName: "Spammer Promosi",
-    message: "Klik tautan ini untuk dapat hadiah jutaan rupiah http://promo-palsu.xyz",
-    status: "pending",
-    submittedIpHash: "hash-ip-1",
-    moderatedBy: null,
-    moderatedAt: null,
-    createdAt: "2026-10-18T10:00:00.000Z",
-    reportCount: 2,
-    reports: [
-      {
-        id: "rep-1",
-        reason: "Tautan penipuan dan phising",
-        createdAt: "2026-10-18T10:05:00.000Z",
-      },
-      {
-        id: "rep-2",
-        reason: "Spam promosi berulang",
-        createdAt: "2026-10-18T10:10:00.000Z",
-      },
-    ],
-    flagSource: "reported",
-    flagLabel: "Dilaporkan Tamu (2x)",
-  },
-  {
-    id: "22222222-2222-4222-8222-222222222222",
-    invitationId: "11111111-1111-4111-8111-111111111111",
-    invitationSlug: "budi-and-ratna",
-    invitationTitle: "Undangan Budi & Ratna",
-    invitationStatus: "published",
-    owner: {
-      id: "owner-1",
-      email: "budi.santoso@example.com",
-      fullName: "Budi Santoso",
-    },
-    guestName: "Tamu Anonim",
-    message: "Pernikahan apaan ini jelek banget pelit dasar brengsek",
-    status: "pending",
-    submittedIpHash: "hash-ip-2",
-    moderatedBy: null,
-    moderatedAt: null,
-    createdAt: "2026-10-18T11:00:00.000Z",
-    reportCount: 0,
-    reports: [],
-    flagSource: "auto_flagged",
-    flagLabel: "Filter Otomatis (Kata Kasar)",
-  },
-  {
-    id: "22222222-2222-4222-8222-222222222223",
-    invitationId: "11111111-1111-4111-8111-111111111112",
-    invitationSlug: "siti-and-fajar",
-    invitationTitle: "The Wedding of Siti & Fajar",
-    invitationStatus: "published",
-    owner: {
-      id: "owner-2",
-      email: "siti.nurhaliza@example.com",
-      fullName: "Siti Nurhaliza",
-    },
-    guestName: "Dewi Lestari",
-    message: "Selamat untuk Siti & Fajar! Semoga sakinah mawaddah warahmah.",
-    status: "approved",
-    submittedIpHash: "hash-ip-3",
-    moderatedBy: "admin-1",
-    moderatedAt: "2026-10-18T12:00:00.000Z",
-    createdAt: "2026-10-18T11:30:00.000Z",
-    reportCount: 0,
-    reports: [],
-    flagSource: "standard",
-    flagLabel: "Standar",
-  },
-];
-
 function formatDate(iso: string): string {
   try {
     return new Date(iso).toLocaleString("id-ID", {
@@ -145,17 +62,29 @@ export function ModerationPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [flagSourceFilter, setFlagSourceFilter] = useState<string>("all");
-  const [itemsList, setItemsList] = useState<AdminModerationItem[]>(INITIAL_MOCK_MODERATION_ITEMS);
-  const [isLoading, setIsLoading] = useState(false);
-  const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
+  const [itemsList, setItemsList] = useState<AdminModerationItem[]>([]);
+  const [_isLoading, setIsLoading] = useState(true);
+  const [queueError, setQueueError] = useState<string | null>(null);
+  const requestSequence = useRef(0);
+  const client = useMemo(
+    () => new ApiClient({ baseUrl: "", tokenStore: accessTokenStore }),
+    [],
+  );
+  const [actionSuccessMessage, setActionSuccessMessage] = useState<
+    string | null
+  >(null);
 
   // Reports inspection modal
-  const [selectedReportsItem, setSelectedReportsItem] = useState<AdminModerationItem | null>(null);
+  const [selectedReportsItem, setSelectedReportsItem] =
+    useState<AdminModerationItem | null>(null);
   const [isReportsModalOpen, setIsReportsModalOpen] = useState(false);
 
   // Moderate / Delete action modal
-  const [targetActionItem, setTargetActionItem] = useState<AdminModerationItem | null>(null);
-  const [actionType, setActionType] = useState<"approve" | "reject" | "delete" | null>(null);
+  const [targetActionItem, setTargetActionItem] =
+    useState<AdminModerationItem | null>(null);
+  const [actionType, setActionType] = useState<
+    "approve" | "reject" | "delete" | null
+  >(null);
   const [actionReason, setActionReason] = useState("");
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
@@ -167,40 +96,26 @@ export function ModerationPage() {
 
   // Load items from API
   const loadQueue = async () => {
+    const sequence = ++requestSequence.current;
     setIsLoading(true);
+    setQueueError(null);
+    setItemsList([]);
     try {
       const params = new URLSearchParams();
       if (searchQuery.trim()) params.set("search", searchQuery.trim());
       if (statusFilter !== "all") params.set("status", statusFilter);
-      if (flagSourceFilter !== "all") params.set("flag_source", flagSourceFilter);
+      if (flagSourceFilter !== "all")
+        params.set("flag_source", flagSourceFilter);
 
-      const res = await fetch(`/api/v1/admin/moderation/guestbook?${params.toString()}`);
-      if (!res.ok) {
-        throw new Error(`Gagal memuat antrean moderasi (HTTP ${res.status})`);
-      }
-      const json = await res.json();
-      if (json.data && Array.isArray(json.data)) {
-        setItemsList(json.data);
-      }
+      const { data } = await client.get<AdminModerationItem[]>(
+        `/api/v1/admin/moderation/guestbook?${params.toString()}`,
+      );
+      if (sequence === requestSequence.current) setItemsList(data);
     } catch {
-      // Local fallback filter for demo / test
-      const filtered = INITIAL_MOCK_MODERATION_ITEMS.filter((item) => {
-        const matchesSearch =
-          !searchQuery.trim() ||
-          item.guestName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.invitationSlug.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesStatus = statusFilter === "all" || item.status === statusFilter;
-        const matchesFlag =
-          flagSourceFilter === "all" ||
-          (flagSourceFilter === "reported" && item.reportCount > 0) ||
-          (flagSourceFilter === "auto_flagged" &&
-            (item.flagSource === "auto_flagged" || item.flagSource === "owner_moderation"));
-        return matchesSearch && matchesStatus && matchesFlag;
-      });
-      setItemsList(filtered);
+      if (sequence === requestSequence.current)
+        setQueueError("Antrean moderasi gagal dimuat. Coba lagi.");
     } finally {
-      setIsLoading(false);
+      if (sequence === requestSequence.current) setIsLoading(false);
     }
   };
 
@@ -215,7 +130,10 @@ export function ModerationPage() {
   };
 
   // Open Action Modal (Approve / Reject / Delete)
-  const handleOpenAction = (item: AdminModerationItem, type: "approve" | "reject" | "delete") => {
+  const handleOpenAction = (
+    item: AdminModerationItem,
+    type: "approve" | "reject" | "delete",
+  ) => {
     setTargetActionItem(item);
     setActionType(type);
     setActionReason("");
@@ -226,45 +144,41 @@ export function ModerationPage() {
   // Submit Moderation Decision
   const handleConfirmAction = async () => {
     if (!targetActionItem || !actionType) return;
+    if (actionReason.trim().length < 5) {
+      setActionError("Alasan moderasi wajib diisi minimal 5 karakter.");
+      return;
+    }
     setIsSubmittingAction(true);
     setActionError(null);
 
     try {
       if (actionType === "approve" || actionType === "reject") {
         const newStatus = actionType === "approve" ? "approved" : "rejected";
-        const res = await fetch(`/api/v1/admin/moderation/guestbook/${targetActionItem.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            status: newStatus,
-            reason: actionReason.trim() || undefined,
-          }),
-        });
-
-        if (!res.ok) {
-          const errJson = await res.json().catch(() => null);
-          throw new Error(errJson?.error?.message || "Gagal memproses moderasi");
-        }
+        await client.request(
+          `/api/v1/admin/moderation/guestbook/${targetActionItem.id}`,
+          {
+            method: "PATCH",
+            body: {
+              status: newStatus,
+              reason: actionReason.trim(),
+            },
+          },
+        );
 
         setActionSuccessMessage(
-          `Pesan dari "${targetActionItem.guestName}" berhasil di-${newStatus === "approved" ? "setujui" : "tolak"}.`
+          `Pesan dari "${targetActionItem.guestName}" berhasil di-${newStatus === "approved" ? "setujui" : "tolak"}.`,
         );
       } else if (actionType === "delete") {
-        const res = await fetch(`/api/v1/admin/moderation/guestbook/${targetActionItem.id}`, {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            reason: actionReason.trim() || undefined,
-          }),
-        });
-
-        if (!res.ok) {
-          const errJson = await res.json().catch(() => null);
-          throw new Error(errJson?.error?.message || "Gagal menghapus pesan");
-        }
+        await client.request(
+          `/api/v1/admin/moderation/guestbook/${targetActionItem.id}`,
+          {
+            method: "DELETE",
+            body: { reason: actionReason.trim() },
+          },
+        );
 
         setActionSuccessMessage(
-          `Pesan dari "${targetActionItem.guestName}" berhasil dihapus permanen dari platform.`
+          `Pesan dari "${targetActionItem.guestName}" berhasil dihapus permanen dari platform.`,
         );
       }
 
@@ -272,7 +186,9 @@ export function ModerationPage() {
       setIsActionModalOpen(false);
       setTimeout(() => setActionSuccessMessage(null), 3000);
     } catch (err: any) {
-      setActionError(err?.message || "Terjadi kesalahan saat memproses tindakan.");
+      setActionError(
+        err?.message || "Terjadi kesalahan saat memproses tindakan.",
+      );
     } finally {
       setIsSubmittingAction(false);
     }
@@ -285,13 +201,22 @@ export function ModerationPage() {
         <div>
           <h1 className="text-display font-bold">Antrean Moderasi Platform</h1>
           <p className="mt-1 text-body text-text-muted">
-            Penyaringan terpadu konten buku tamu publik, penanganan laporan pengunjung, dan perlindungan platform (P5-09).
+            Penyaringan terpadu konten buku tamu publik, penanganan laporan
+            pengunjung, dan perlindungan platform (P5-09).
           </p>
         </div>
         <div className="text-sm text-text-muted">
-          Total Antrean: <span className="font-semibold text-text">{itemsList.length}</span>
+          Total Antrean:{" "}
+          <span className="font-semibold text-text">{itemsList.length}</span>
         </div>
       </div>
+
+      {queueError && (
+        <div role="alert">
+          <p>{queueError}</p>
+          <Button onClick={() => void loadQueue()}>Coba lagi</Button>
+        </div>
+      )}
 
       {/* Success banner */}
       {actionSuccessMessage && (
@@ -335,7 +260,10 @@ export function ModerationPage() {
               options={[
                 { value: "all", label: "Semua Sumber" },
                 { value: "reported", label: "Dilaporkan Tamu" },
-                { value: "auto_flagged", label: "Filter Otomatis (Spam/Kata Kasar)" },
+                {
+                  value: "auto_flagged",
+                  label: "Filter Otomatis (Spam/Kata Kasar)",
+                },
               ]}
             />
           </div>
@@ -363,7 +291,9 @@ export function ModerationPage() {
                 <th className="py-3 px-4 font-medium">Sumber Indikasi</th>
                 <th className="py-3 px-4 font-medium">Status</th>
                 <th className="py-3 px-4 font-medium">Tanggal</th>
-                <th className="py-3 px-4 font-medium text-right">Aksi Moderasi</th>
+                <th className="py-3 px-4 font-medium text-right">
+                  Aksi Moderasi
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -381,15 +311,21 @@ export function ModerationPage() {
                     data-testid={`moderation-row-${item.id}`}
                   >
                     <td className="py-3 px-4 max-w-xs sm:max-w-md">
-                      <div className="font-semibold text-text">{item.guestName}</div>
+                      <div className="font-semibold text-text">
+                        {item.guestName}
+                      </div>
                       <p className="mt-1 text-sm text-text bg-surface-subtle/40 p-2 rounded border border-border/50 break-words">
                         "{item.message}"
                       </p>
                     </td>
 
                     <td className="py-3 px-4 text-xs">
-                      <div className="font-medium text-text">{item.invitationTitle}</div>
-                      <div className="font-mono text-text-muted">/{item.invitationSlug}</div>
+                      <div className="font-medium text-text">
+                        {item.invitationTitle}
+                      </div>
+                      <div className="font-mono text-text-muted">
+                        /{item.invitationSlug}
+                      </div>
                       <div className="text-xs text-text-muted mt-1">
                         Pemilik: {item.owner.fullName} ({item.owner.email})
                       </div>
@@ -401,8 +337,8 @@ export function ModerationPage() {
                           item.flagSource === "reported"
                             ? "danger"
                             : item.flagSource === "auto_flagged"
-                            ? "warning"
-                            : "neutral"
+                              ? "warning"
+                              : "neutral"
                         }
                       >
                         {item.flagLabel}
@@ -426,8 +362,8 @@ export function ModerationPage() {
                           item.status === "approved"
                             ? "success"
                             : item.status === "pending"
-                            ? "warning"
-                            : "danger"
+                              ? "warning"
+                              : "danger"
                         }
                       >
                         {item.status.toUpperCase()}
@@ -491,8 +427,12 @@ export function ModerationPage() {
           {selectedReportsItem && (
             <>
               <div className="rounded-md border border-border bg-surface-subtle/50 p-3 text-sm">
-                <span className="font-semibold text-text">Pesan yang Dilaporkan:</span>
-                <p className="mt-1 italic text-text-muted">"{selectedReportsItem.message}"</p>
+                <span className="font-semibold text-text">
+                  Pesan yang Dilaporkan:
+                </span>
+                <p className="mt-1 italic text-text-muted">
+                  "{selectedReportsItem.message}"
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -500,7 +440,9 @@ export function ModerationPage() {
                   Daftar Laporan ({selectedReportsItem.reports.length})
                 </h4>
                 {selectedReportsItem.reports.length === 0 ? (
-                  <p className="text-sm text-text-muted">Tidak ada rincian laporan tercatat.</p>
+                  <p className="text-sm text-text-muted">
+                    Tidak ada rincian laporan tercatat.
+                  </p>
                 ) : (
                   <div className="space-y-2 max-h-56 overflow-y-auto">
                     {selectedReportsItem.reports.map((rep, idx) => (
@@ -512,10 +454,13 @@ export function ModerationPage() {
                           <span className="font-bold text-red-900 dark:text-red-300">
                             Laporan #{idx + 1}
                           </span>
-                          <span className="text-text-muted">{formatDate(rep.createdAt)}</span>
+                          <span className="text-text-muted">
+                            {formatDate(rep.createdAt)}
+                          </span>
                         </div>
                         <div className="mt-1 text-text">
-                          {rep.reason || "(Pengunjung tidak menyertakan alasan tertulis)"}
+                          {rep.reason ||
+                            "(Pengunjung tidak menyertakan alasan tertulis)"}
                         </div>
                       </div>
                     ))}
@@ -524,7 +469,10 @@ export function ModerationPage() {
               </div>
 
               <div className="flex justify-end pt-2 border-t border-border">
-                <Button variant="secondary" onClick={() => setIsReportsModalOpen(false)}>
+                <Button
+                  variant="secondary"
+                  onClick={() => setIsReportsModalOpen(false)}
+                >
                   Tutup
                 </Button>
               </div>
@@ -541,8 +489,8 @@ export function ModerationPage() {
           actionType === "approve"
             ? "Setujui Pesan Buku Tamu"
             : actionType === "reject"
-            ? "Tolak Pesan Buku Tamu"
-            : "Hapus Permanen Pesan Buku Tamu"
+              ? "Tolak Pesan Buku Tamu"
+              : "Hapus Permanen Pesan Buku Tamu"
         }
         description={
           targetActionItem
@@ -554,17 +502,24 @@ export function ModerationPage() {
         <div className="space-y-4 pt-2">
           {actionType === "delete" && (
             <div className="rounded-md border border-red-300 bg-red-50 p-3 text-xs text-red-900 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
-              <span className="font-bold">Peringatan:</span> Pesan ini akan dihapus permanen dari basis data dan tidak dapat dikembalikan. Cache halaman publik akan langsung dibersihkan.
+              <span className="font-bold">Peringatan:</span> Pesan ini akan
+              dihapus permanen dari basis data dan tidak dapat dikembalikan.
+              Cache halaman publik akan langsung dibersihkan.
             </div>
           )}
 
           <div className="rounded-md border border-border bg-surface-subtle/50 p-3 text-xs">
             <span className="font-semibold text-text">Teks Pesan:</span>
-            <p className="mt-1 text-text-muted italic">"{targetActionItem?.message}"</p>
+            <p className="mt-1 text-text-muted italic">
+              "{targetActionItem?.message}"
+            </p>
           </div>
 
           <Textarea
-            label="Alasan Moderasi (Opsional, dicatat pada audit log)"
+            label="Alasan Moderasi (wajib, dicatat pada audit log)"
+            required
+            minLength={5}
+            maxLength={500}
             placeholder="Tuliskan catatan alasan moderasi untuk rekam jejak audit..."
             value={actionReason}
             onChange={(e) => {
@@ -589,17 +544,21 @@ export function ModerationPage() {
               Batal
             </Button>
             <Button
-              variant={actionType === "delete" || actionType === "reject" ? "danger" : "primary"}
+              variant={
+                actionType === "delete" || actionType === "reject"
+                  ? "danger"
+                  : "primary"
+              }
               onClick={handleConfirmAction}
-              disabled={isSubmittingAction}
+              disabled={isSubmittingAction || actionReason.trim().length < 5}
             >
               {isSubmittingAction
                 ? "Memproses..."
                 : actionType === "approve"
-                ? "Konfirmasi Setujui"
-                : actionType === "reject"
-                ? "Konfirmasi Tolak"
-                : "Konfirmasi Hapus"}
+                  ? "Konfirmasi Setujui"
+                  : actionType === "reject"
+                    ? "Konfirmasi Tolak"
+                    : "Konfirmasi Hapus"}
             </Button>
           </div>
         </div>

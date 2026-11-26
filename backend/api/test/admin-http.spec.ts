@@ -11,6 +11,11 @@ import { AdminPaymentsController } from "../src/modules/admin/admin-payments.con
 import { SessionService } from "../src/modules/auth/session.service";
 import { DB } from "../src/infra/db/client";
 import { UnauthenticatedError } from "../src/http/errors";
+import {
+  POLICY_REGISTRY,
+  RATE_LIMITER,
+} from "../src/shared/rate-limit/rate-limit.guard";
+import { PolicyRegistry } from "../src/shared/rate-limit/config";
 
 describe("Admin Authorization Path and Audit Middleware (P5-03)", () => {
   let app: INestApplication;
@@ -117,6 +122,22 @@ describe("Admin Authorization Path and Audit Middleware (P5-03)", () => {
         { provide: AdminAuditLogService, useValue: mockAuditService },
         { provide: SessionService, useValue: mockSessions },
         { provide: DB, useValue: mockDb },
+        {
+          provide: RATE_LIMITER,
+          useValue: {
+            check: vi.fn().mockResolvedValue({
+              allowed: true,
+              limit: 300,
+              remaining: 299,
+              resetAt: Date.now() + 60_000,
+            }),
+            block: vi.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: POLICY_REGISTRY,
+          useValue: new PolicyRegistry(undefined, undefined),
+        },
         { provide: APP_FILTER, useClass: AppExceptionFilter },
       ],
     }).compile();
@@ -131,7 +152,9 @@ describe("Admin Authorization Path and Audit Middleware (P5-03)", () => {
 
   describe("Admin Role Gating & Authorization (BR-Admin.1, BR-Admin.2)", () => {
     it("rejects unauthenticated requests with 401 UNAUTHENTICATED", async () => {
-      const res = await request(app.getHttpServer()).get("/api/v1/admin/audit-logs");
+      const res = await request(app.getHttpServer()).get(
+        "/api/v1/admin/audit-logs",
+      );
       expect(res.status).toBe(401);
       expect(res.body.error.code).toBe("UNAUTHENTICATED");
     });

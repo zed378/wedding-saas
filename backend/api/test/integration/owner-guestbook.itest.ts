@@ -147,7 +147,9 @@ describe("owner guestbook moderation (P4-04)", () => {
 
     // 2. Filter by status = 'approved'
     const resApproved = await request(app.getHttpServer())
-      .get(`/api/v1/invitations/${alice.invitation.id}/guestbook?status=approved`)
+      .get(
+        `/api/v1/invitations/${alice.invitation.id}/guestbook?status=approved`,
+      )
       .set("Authorization", `Bearer ${alice.token}`);
 
     expect(resApproved.status).toBe(200);
@@ -157,7 +159,9 @@ describe("owner guestbook moderation (P4-04)", () => {
 
     // 3. Filter by status = 'pending'
     const resPending = await request(app.getHttpServer())
-      .get(`/api/v1/invitations/${alice.invitation.id}/guestbook?status=pending`)
+      .get(
+        `/api/v1/invitations/${alice.invitation.id}/guestbook?status=pending`,
+      )
       .set("Authorization", `Bearer ${alice.token}`);
 
     expect(resPending.status).toBe(200);
@@ -166,7 +170,9 @@ describe("owner guestbook moderation (P4-04)", () => {
 
     // 4. Filter by status = 'rejected'
     const resRejected = await request(app.getHttpServer())
-      .get(`/api/v1/invitations/${alice.invitation.id}/guestbook?status=rejected`)
+      .get(
+        `/api/v1/invitations/${alice.invitation.id}/guestbook?status=rejected`,
+      )
       .set("Authorization", `Bearer ${alice.token}`);
 
     expect(resRejected.status).toBe(200);
@@ -186,12 +192,9 @@ describe("owner guestbook moderation (P4-04)", () => {
 
     // Pre-populate public cache for alice's slug
     const publicCache = app.get(PublicInvitationCache);
-    await publicCache.set(
-      aliceSlug,
-      alice.invitation.id,
-      "test-v1",
-      { status: "published" } as any,
-    );
+    await publicCache.set(aliceSlug, alice.invitation.id, "test-v1", {
+      status: "published",
+    } as any);
     expect(await publicCache.get(aliceSlug)).toBeDefined();
 
     const res = await request(app.getHttpServer())
@@ -206,7 +209,11 @@ describe("owner guestbook moderation (P4-04)", () => {
     expect(res.body.data.moderated_at).not.toBeNull();
 
     // Verify persisted in DB
-    const { rows } = await pool.query<{ status: string; moderated_by: string; moderated_at: Date }>(
+    const { rows } = await pool.query<{
+      status: string;
+      moderated_by: string;
+      moderated_at: Date;
+    }>(
       "SELECT status, moderated_by, moderated_at FROM invitation_guestbook WHERE id = $1",
       [entryId],
     );
@@ -256,12 +263,9 @@ describe("owner guestbook moderation (P4-04)", () => {
 
     // Populate cache to check invalidation
     const publicCache = app.get(PublicInvitationCache);
-    await publicCache.set(
-      aliceSlug,
-      alice.invitation.id,
-      "test-v1",
-      { status: "published" } as any,
-    );
+    await publicCache.set(aliceSlug, alice.invitation.id, "test-v1", {
+      status: "published",
+    } as any);
     expect(await publicCache.get(aliceSlug)).toBeDefined();
 
     const res = await request(app.getHttpServer())
@@ -326,14 +330,18 @@ describe("owner guestbook moderation (P4-04)", () => {
 
     // Alice calls patch on first invitation with secondEntryId
     const resPatch = await request(app.getHttpServer())
-      .patch(`/api/v1/invitations/${alice.invitation.id}/guestbook/${secondEntryId}`)
+      .patch(
+        `/api/v1/invitations/${alice.invitation.id}/guestbook/${secondEntryId}`,
+      )
       .set("Authorization", `Bearer ${alice.token}`)
       .send({ status: "approved" });
     expect(resPatch.status).toBe(404);
 
     // Alice calls delete on first invitation with secondEntryId
     const resDelete = await request(app.getHttpServer())
-      .delete(`/api/v1/invitations/${alice.invitation.id}/guestbook/${secondEntryId}`)
+      .delete(
+        `/api/v1/invitations/${alice.invitation.id}/guestbook/${secondEntryId}`,
+      )
       .set("Authorization", `Bearer ${alice.token}`);
     expect(resDelete.status).toBe(404);
   });
@@ -368,17 +376,21 @@ describe("owner guestbook moderation (P4-04)", () => {
   });
 
   it("requires authentication for all endpoints", async () => {
-    const resList = await request(app.getHttpServer())
-      .get(`/api/v1/invitations/${alice.invitation.id}/guestbook`);
+    const resList = await request(app.getHttpServer()).get(
+      `/api/v1/invitations/${alice.invitation.id}/guestbook`,
+    );
     expect(resList.status).toBe(401);
 
     const resPatch = await request(app.getHttpServer())
-      .patch(`/api/v1/invitations/${alice.invitation.id}/guestbook/${alice.guestbookId}`)
+      .patch(
+        `/api/v1/invitations/${alice.invitation.id}/guestbook/${alice.guestbookId}`,
+      )
       .send({ status: "approved" });
     expect(resPatch.status).toBe(401);
 
-    const resDelete = await request(app.getHttpServer())
-      .delete(`/api/v1/invitations/${alice.invitation.id}/guestbook/${alice.guestbookId}`);
+    const resDelete = await request(app.getHttpServer()).delete(
+      `/api/v1/invitations/${alice.invitation.id}/guestbook/${alice.guestbookId}`,
+    );
     expect(resDelete.status).toBe(401);
   });
 });

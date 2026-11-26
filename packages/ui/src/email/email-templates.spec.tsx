@@ -275,7 +275,9 @@ describe("Email Templates & Rendering (P4-06)", () => {
     expect(rendered.html).toContain("Hadir");
     expect(rendered.html).toContain("Citra Lestari");
     expect(rendered.html).toContain("Tidak Hadir");
-    expect(rendered.html).toContain("https://momenbahagia.id/settings/notifications");
+    expect(rendered.html).toContain(
+      "https://momenbahagia.id/settings/notifications",
+    );
     expect(rendered.text).toContain("15 konfirmasi");
   });
 

@@ -170,4 +170,3 @@ export class PublicGuestbookController {
     return ok(result);
   }
 }
-

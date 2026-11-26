@@ -450,17 +450,17 @@ export async function updateSlug(
   api: ApiClient,
   invitationId: string,
   slug: string,
-): Promise<{ slug: string; slug_change?: { previous_slug: string; links_broken: boolean } }> {
+): Promise<{
+  slug: string;
+  slug_change?: { previous_slug: string; links_broken: boolean };
+}> {
   const result = await api.request<{
     slug: string;
     slug_change?: { previous_slug: string; links_broken: boolean };
-  }>(
-    `/invitations/${encodeURIComponent(invitationId)}/settings`,
-    {
-      method: "PATCH",
-      body: { slug },
-    },
-  );
+  }>(`/invitations/${encodeURIComponent(invitationId)}/settings`, {
+    method: "PATCH",
+    body: { slug },
+  });
   return result.data;
 }
 
@@ -470,7 +470,10 @@ export async function updateSlug(
 export interface InvitationAnalytics {
   readonly views: {
     readonly total: number;
-    readonly daily: ReadonlyArray<{ readonly date: string; readonly count: number }>;
+    readonly daily: ReadonlyArray<{
+      readonly date: string;
+      readonly count: number;
+    }>;
   };
   readonly rsvps: {
     readonly total_responses: number;
@@ -527,7 +530,10 @@ export async function listInvitationRsvps(
     limit?: number | undefined;
     status?: RsvpAttendanceStatus | undefined;
   } = {},
-): Promise<{ items: readonly RsvpItem[]; meta?: { page: number; per_page: number; total: number } | undefined }> {
+): Promise<{
+  items: readonly RsvpItem[];
+  meta?: { page: number; per_page: number; total: number } | undefined;
+}> {
   const query: Record<string, string | number | undefined> = {};
   if (options.page !== undefined) query["page"] = options.page;
   if (options.limit !== undefined) query["limit"] = options.limit;
@@ -588,7 +594,10 @@ export async function listInvitationGuestbook(
     limit?: number | undefined;
     status?: GuestbookStatus | undefined;
   } = {},
-): Promise<{ items: readonly GuestbookItem[]; meta?: { page: number; per_page: number; total: number } | undefined }> {
+): Promise<{
+  items: readonly GuestbookItem[];
+  meta?: { page: number; per_page: number; total: number } | undefined;
+}> {
   const query: Record<string, string | number | undefined> = {};
   if (options.page !== undefined) query["page"] = options.page;
   if (options.limit !== undefined) query["limit"] = options.limit;

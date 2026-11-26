@@ -717,14 +717,12 @@ export function RsvpSubmittedEmail(
 export function RsvpDailyDigestEmail(
   props: RsvpDailyDigestProps,
 ): React.JSX.Element {
-  const statusLabels: Record<
-    "attending" | "not_attending" | "maybe",
-    string
-  > = {
-    attending: "Hadir",
-    not_attending: "Tidak Hadir",
-    maybe: "Belum Pasti",
-  };
+  const statusLabels: Record<"attending" | "not_attending" | "maybe", string> =
+    {
+      attending: "Hadir",
+      not_attending: "Tidak Hadir",
+      maybe: "Belum Pasti",
+    };
 
   return (
     <EmailLayout
@@ -760,8 +758,8 @@ export function RsvpDailyDigestEmail(
           margin: "0 0 20px 0",
         }}
       >
-        Berikut adalah ringkasan konfirmasi kehadiran (RSVP) harian untuk undangan{" "}
-        <strong>{props.invitationTitle}</strong> per tanggal{" "}
+        Berikut adalah ringkasan konfirmasi kehadiran (RSVP) harian untuk
+        undangan <strong>{props.invitationTitle}</strong> per tanggal{" "}
         <strong>{props.dateFormatted}</strong>:
       </p>
 
@@ -775,7 +773,8 @@ export function RsvpDailyDigestEmail(
         }}
       >
         <p style={{ margin: "0 0 8px 0", fontSize: "14px", color: "#334155" }}>
-          Respon Baru 24 Jam Terakhir: <strong>{props.totalResponsesToday} konfirmasi</strong>
+          Respon Baru 24 Jam Terakhir:{" "}
+          <strong>{props.totalResponsesToday} konfirmasi</strong>
         </p>
         <p style={{ margin: "0 0 8px 0", fontSize: "14px", color: "#16a34a" }}>
           Hadir: <strong>{props.attendingCount} orang</strong>
@@ -809,10 +808,14 @@ export function RsvpDailyDigestEmail(
             }}
           >
             <thead>
-              <tr style={{ borderBottom: "1px solid #e2e8f0", textAlign: "left" }}>
+              <tr
+                style={{ borderBottom: "1px solid #e2e8f0", textAlign: "left" }}
+              >
                 <th style={{ padding: "6px 8px" }}>Nama Tamu</th>
                 <th style={{ padding: "6px 8px" }}>Status</th>
-                <th style={{ padding: "6px 8px", textAlign: "right" }}>Jumlah</th>
+                <th style={{ padding: "6px 8px", textAlign: "right" }}>
+                  Jumlah
+                </th>
               </tr>
             </thead>
             <tbody>

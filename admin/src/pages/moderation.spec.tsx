@@ -1,140 +1,152 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import {
+  cleanup,
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from "@testing-library/react";
+import { accessTokenStore } from "@wi/api-client";
 import { ModerationPage } from "./ModerationPage.js";
 
-describe("Admin Moderation Queue UI (P5-09)", () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
+const entry = {
+  id: "22222222-2222-4222-8222-222222222221",
+  invitationId: "11111111-1111-4111-8111-111111111111",
+  invitationSlug: "budi-ratna",
+  invitationTitle: "Undangan Budi",
+  invitationStatus: "published",
+  owner: { id: "owner", email: "owner@example.test", fullName: "Budi" },
+  guestName: "Tamu Uji",
+  message: "Selamat menempuh hidup baru.",
+  status: "pending",
+  createdAt: "2026-11-25T00:00:00Z",
+  reportCount: 1,
+  reports: [
+    {
+      id: "report",
+      reason: "Tinjau pesan ini",
+      createdAt: "2026-11-25T00:00:00Z",
+    },
+  ],
+  flagSource: "reported",
+  flagLabel: "Dilaporkan Tamu (1x)",
+};
+const response = (data: unknown, status = 200) =>
+  new Response(
+    JSON.stringify(
+      status < 400
+        ? { success: true, data }
+        : {
+            success: false,
+            error: { code: "FORBIDDEN", message: "Akses ditolak" },
+          },
+    ),
+    { status, headers: { "Content-Type": "application/json" } },
+  );
+let fetchMock: ReturnType<typeof vi.fn>;
+beforeEach(() => {
+  accessTokenStore.set("admin-access");
+  fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
+    response(init?.method === "GET" ? [entry] : { id: entry.id }),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+});
+afterEach(() => {
+  cleanup();
+  accessTokenStore.clear();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
-  it("renders moderation queue with initial mock entries and indicators", () => {
+describe("P5-14 authenticated moderation", () => {
+  it("loads queue from the actual API client with admin authentication", async () => {
     render(<ModerationPage />);
-
-    expect(screen.getByText("Antrean Moderasi Platform")).toBeDefined();
-    expect(screen.getByText("Spammer Promosi")).toBeDefined();
-    expect(screen.getByText("Tamu Anonim")).toBeDefined();
-    expect(screen.getByText("Dilaporkan Tamu (2x)")).toBeDefined();
-    expect(screen.getByText("Filter Otomatis (Kata Kasar)")).toBeDefined();
-  });
-
-  it("filters queue by flag source (reported vs auto_flagged)", async () => {
-    render(<ModerationPage />);
-
-    const flagSelect = screen.getByLabelText(/Sumber Indikasi/i);
-    fireEvent.change(flagSelect, { target: { value: "reported" } });
-
-    await waitFor(() => {
-      expect(screen.getByText("Spammer Promosi")).toBeDefined();
-      expect(screen.queryByText("Tamu Anonim")).toBeNull();
-    });
-
-    fireEvent.change(flagSelect, { target: { value: "auto_flagged" } });
-
-    await waitFor(() => {
-      expect(screen.getByText("Tamu Anonim")).toBeDefined();
-      expect(screen.queryByText("Spammer Promosi")).toBeNull();
-    });
-  });
-
-  it("opens visitor reports modal displaying specific user report reasons", async () => {
-    render(<ModerationPage />);
-
-    const viewReportsBtn = screen.getByRole("button", {
-      name: /Lihat 2 Laporan Tamu/i,
-    });
-    fireEvent.click(viewReportsBtn);
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("Laporan Pengunjung atas Pesan Buku Tamu"),
-      ).toBeDefined();
-      expect(screen.getByText("Tautan penipuan dan phising")).toBeDefined();
-      expect(screen.getByText("Spam promosi berulang")).toBeDefined();
-    });
-  });
-
-  it("submits moderation approve action and reflects status change", async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        status: "success",
-        data: {
-          id: "22222222-2222-4222-8222-222222222221",
-          status: "approved",
-          message: "Pesan buku tamu berhasil di-setujui.",
-        },
+    expect(await screen.findByText("Tamu Uji")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "/api/v1/admin/moderation/guestbook?status=pending",
+      ),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer admin-access",
+        }),
       }),
-    });
-    global.fetch = mockFetch as any;
-
+    );
+    expect(screen.queryByText("Spammer Promosi")).not.toBeInTheDocument();
+  });
+  it("sends source and search filters to the server", async () => {
     render(<ModerationPage />);
-
-    const approveBtn = screen.getByRole("button", {
-      name: /Setujui pesan dari Spammer Promosi/i,
+    await screen.findByText("Tamu Uji");
+    fireEvent.change(screen.getByLabelText(/Sumber Indikasi/), {
+      target: { value: "reported" },
     });
-    fireEvent.click(approveBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText("Setujui Pesan Buku Tamu")).toBeDefined();
+    fireEvent.change(screen.getByLabelText(/Cari Pesan atau Pengirim/), {
+      target: { value: "budi" },
     });
-
-    const reasonInput = screen.getByLabelText(/Alasan Moderasi/i);
-    fireEvent.change(reasonInput, { target: { value: "Konten telah diverifikasi aman" } });
-
-    const confirmBtn = screen.getByRole("button", { name: "Konfirmasi Setujui" });
-    fireEvent.click(confirmBtn);
-
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith(
-        "/api/v1/admin/moderation/guestbook/22222222-2222-4222-8222-222222222221",
-        expect.objectContaining({
-          method: "PATCH",
-          body: JSON.stringify({
-            status: "approved",
-            reason: "Konten telah diverifikasi aman",
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        expect.stringContaining(
+          "search=budi&status=pending&flag_source=reported",
+        ),
+        expect.anything(),
+      ),
+    );
+  });
+  it("shows reports from the fetched entry", async () => {
+    render(<ModerationPage />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Lihat 1 Laporan Tamu/ }),
+    );
+    expect(await screen.findByText("Tinjau pesan ini")).toBeInTheDocument();
+  });
+  it.each(["approve", "delete"])(
+    "requires a reason and sends authenticated %s",
+    async (action) => {
+      render(<ModerationPage />);
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name:
+            action === "approve"
+              ? /Setujui pesan dari Tamu Uji/
+              : /Hapus pesan dari Tamu Uji/,
+        }),
+      );
+      const confirm = screen.getByRole("button", {
+        name: action === "approve" ? "Konfirmasi Setujui" : "Konfirmasi Hapus",
+      });
+      expect(confirm).toBeDisabled();
+      fireEvent.change(screen.getByLabelText(/Alasan Moderasi/), {
+        target: { value: "Pemeriksaan konten selesai" },
+      });
+      fireEvent.click(confirm);
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith(
+          expect.stringContaining(
+            `/api/v1/admin/moderation/guestbook/${entry.id}`,
+          ),
+          expect.objectContaining({
+            method: action === "approve" ? "PATCH" : "DELETE",
+            headers: expect.objectContaining({
+              Authorization: "Bearer admin-access",
+            }),
+            body: JSON.stringify(
+              action === "approve"
+                ? { status: "approved", reason: "Pemeriksaan konten selesai" }
+                : { reason: "Pemeriksaan konten selesai" },
+            ),
           }),
-        }),
+        ),
       );
-    });
-  });
-
-  it("submits moderation delete action permanently", async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        status: "success",
-        data: {
-          id: "22222222-2222-4222-8222-222222222222",
-          deleted: true,
-        },
-      }),
-    });
-    global.fetch = mockFetch as any;
-
+    },
+  );
+  it("shows a retryable failure without inventing queue entries", async () => {
+    fetchMock.mockResolvedValueOnce(response(null, 403));
     render(<ModerationPage />);
-
-    const deleteBtn = screen.getByRole("button", {
-      name: /Hapus pesan dari Tamu Anonim/i,
-    });
-    fireEvent.click(deleteBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText("Hapus Permanen Pesan Buku Tamu")).toBeDefined();
-      expect(
-        screen.getByText(/Pesan ini akan dihapus permanen dari basis data/i),
-      ).toBeDefined();
-    });
-
-    const confirmBtn = screen.getByRole("button", { name: "Konfirmasi Hapus" });
-    fireEvent.click(confirmBtn);
-
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith(
-        "/api/v1/admin/moderation/guestbook/22222222-2222-4222-8222-222222222222",
-        expect.objectContaining({
-          method: "DELETE",
-        }),
-      );
-    });
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Antrean moderasi gagal dimuat",
+    );
+    expect(screen.queryByText("Tamu Uji")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
+    expect(await screen.findByText("Tamu Uji")).toBeInTheDocument();
   });
 });

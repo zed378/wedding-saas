@@ -26,7 +26,9 @@ export class InvitationExpiryService {
     private readonly cache?: PublicInvitationCache,
   ) {}
 
-  async expireOverdueInvitations(limit = 200): Promise<{ expiredCount: number }> {
+  async expireOverdueInvitations(
+    limit = 200,
+  ): Promise<{ expiredCount: number }> {
     const overdue = await this.repository.overduePublishedInvitations(limit);
     let expiredCount = 0;
 
@@ -46,7 +48,10 @@ export class InvitationExpiryService {
         metrics.invitationsExpired.inc();
 
         if (item.slug) {
-          await this.cache?.invalidate({ slug: item.slug, invitationId: item.id });
+          await this.cache?.invalidate({
+            slug: item.slug,
+            invitationId: item.id,
+          });
         }
 
         await this.queue.enqueue(
